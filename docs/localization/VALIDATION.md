@@ -50,8 +50,11 @@ close-animation regression was found and fixed; its independent two-file
 These overlapping results are not summed as unique full-suite coverage.
 
 Four later browser journeys passed in Chromium and WebKit, eight cases with
-one worker and no retries. They cover DM draft/send, agent memory, focus/status
-and community membership with raw signed data preserved. Three journeys use
+one worker and no retries. They cover DM recipient selection and retained draft,
+empty agent memory, Focus preferences/status draft and a modeled membership
+invitation. Canonical recipient values and modeled invite parameters remain
+unchanged. They do not create/send a DM, write memory, start Focus, save status
+or prove real invite authorization. Three journeys use
 the existing production-broker fixture; membership uses the existing HTTP
 fixture instead. Those tests ran on an earlier source snapshot, not this
 newer public projection. Browser fixtures do not establish native IME, account
