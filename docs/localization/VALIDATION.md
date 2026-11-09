@@ -2,12 +2,16 @@
 
 This source is for review, not a released or fully validated installer.
 
-The frozen implementation preceding this documentation cleanup passed a
-production Vite build, TypeScript/lint/design checks and workspace/all-targets
-Clippy. Its full Vitest run executed 20384 cases: 20357 passed, 4 failed and 23
-existing conditional cases were skipped. The four failures were stale language
-or timezone expectations. Test repairs preserve and strengthen assertions; the
-affected 59 cases passed together. A later full integrated run is still needed.
+This public source passed its own current pnpm check and production Vite build.
+The build retains the existing large-chunk warning. Those commands do not run
+the full test suite or establish native packaging.
+
+An earlier frozen implementation, before the later staff/status/focus batches,
+passed workspace/all-targets Clippy. That earlier snapshot's full Vitest run
+executed 20384 cases: 20357 passed, 4 failed and 23 existing conditional cases
+were skipped. The four failures were stale language or timezone expectations.
+Repairs now included here preserve and strengthen assertions; the affected
+59 cases passed together. The new integrated source still needs a full rerun.
 
 Independent focused reviews cover the integrated relay-staff and status/focus
 batches. The same 70 status/focus cases passed separately in Seoul and New York,
