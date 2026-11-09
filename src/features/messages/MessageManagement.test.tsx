@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { setLanguage } from "../../shared/i18n";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { bytesToHex } from "nostr-tools/utils";
 import { afterEach, assert, expect, it, vi } from "vitest";
@@ -58,6 +59,8 @@ composerDOMFixture();
 const owners: ReturnType<typeof createRelaySession>[] = [];
 afterEach(() => {
   cleanup();
+  setLanguage("en");
+  localStorage.clear();
   vi.unstubAllGlobals();
   for (const owner of owners.splice(0)) owner.dispose();
 });
@@ -1580,4 +1583,50 @@ it("row visits follow document focus and visibility, including inactive entry an
     focus.mockRestore();
     visibility.mockRestore();
   }
+});
+
+it("retains deletion controls and retries the identical signed operation through EN→KO→EN", async () => {
+  setLanguage("en");
+  const h = await fixture();
+  const item = await screen.findByRole("menuitem", { name: "Delete message" });
+  item.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("menuitem", { name: "메시지 삭제" })).toBe(item);
+  expect(item).toHaveFocus();
+  fireEvent.click(item);
+  const dialog = await screen.findByRole("alertdialog", {
+    name: "메시지를 삭제할까요?",
+  });
+  const cancel = screen.getByRole("button", { name: "취소" });
+  cancel.focus();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("alertdialog", { name: "Delete message?" })).toBe(
+    dialog,
+  );
+  expect(screen.getByRole("button", { name: "Cancel" })).toBe(cancel);
+  expect(cancel).toHaveFocus();
+  const remove = screen.getByRole("button", { name: "Delete" });
+  fireEvent.click(remove);
+  await waitFor(() => expect(h.publications).toHaveLength(1));
+  const original = h.publication(0).event;
+  expect(original.kind).toBe(5);
+  expect(original.tags).toContainEqual(["e", h.original.id]);
+  expect(original.pubkey).toBe(h.owner.session.viewer);
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "삭제 중…" })).toBe(remove);
+  await act(async () =>
+    h.publication(0).result.reject(new PublishRejected("Provider raw {error}")),
+  );
+  const retry = await screen.findByRole("button", { name: "다시 시도" });
+  expect(retry).toBe(remove);
+  expect(screen.getAllByText(/Provider raw \{error\}/).length).toBeGreaterThan(
+    0,
+  );
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Retry" })).toBe(retry);
+  fireEvent.click(retry);
+  await waitFor(() => expect(h.publications).toHaveLength(2));
+  expect(h.publication(1).event.id).toBe(original.id);
+  expect(h.publication(1).event).toEqual(original);
+  await act(async () => h.publication(1).result.resolve());
 });

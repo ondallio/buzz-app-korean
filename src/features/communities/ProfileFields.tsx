@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useState, type Ref } from "react";
 import { Field } from "../../shared/design-system/ui/Field";
 import { Input } from "../../shared/design-system/ui/Input";
@@ -58,6 +59,7 @@ export function ProfileFields({
       }
     | undefined;
 }) {
+  useLanguage();
   // A simplified form must still let people repair an invalid saved description.
   const [repairAbout] = useState(
     () => (profile.about?.length ?? 0) > PROFILE_ABOUT_MAX_LENGTH,
@@ -76,19 +78,26 @@ export function ProfileFields({
         />
       )}
       <Field
-        label="Display name"
+        label={t("profileEditing.displayName")}
         description={
           verifiedName
-            ? `${
-                verifiedName.status === "checked"
-                  ? `Name verified by ${verifiedName.issuerLabel}`
-                  : `Cached verification from ${verifiedName.issuerLabel}`
-              }${
-                verifiedName.username &&
-                verifiedName.username !== verifiedName.name
-                  ? ` · @${verifiedName.username}`
-                  : ""
-              }`
+            ? verifiedName.username &&
+              verifiedName.username !== verifiedName.name
+              ? t(
+                  verifiedName.status === "checked"
+                    ? "profileEditing.verifiedUsername"
+                    : "profileEditing.cachedUsername",
+                  {
+                    issuer: verifiedName.issuerLabel,
+                    username: verifiedName.username,
+                  },
+                )
+              : t(
+                  verifiedName.status === "checked"
+                    ? "profileEditing.verified"
+                    : "profileEditing.cachedVerification",
+                  { issuer: verifiedName.issuerLabel },
+                )
             : undefined
         }
       >
@@ -109,11 +118,16 @@ export function ProfileFields({
       </Field>
       {(showAbout || repairAbout) && (
         <Field
-          label="Profile description (optional)"
-          description={`${profile.about?.length ?? 0} of ${PROFILE_ABOUT_MAX_LENGTH} characters`}
+          label={t("profileEditing.profileDescription")}
+          description={t("profileEditing.characters", {
+            count: profile.about?.length ?? 0,
+            max: PROFILE_ABOUT_MAX_LENGTH,
+          })}
           error={
             (profile.about?.length ?? 0) > PROFILE_ABOUT_MAX_LENGTH
-              ? `Shorten the description to ${PROFILE_ABOUT_MAX_LENGTH} characters before saving.`
+              ? t("profileEditing.shortenDescription", {
+                  max: PROFILE_ABOUT_MAX_LENGTH,
+                })
               : undefined
           }
         >

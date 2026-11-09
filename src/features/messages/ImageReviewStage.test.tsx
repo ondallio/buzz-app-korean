@@ -18,6 +18,7 @@ vi.mock("@tauri-apps/api/core", async (original) => ({
 }));
 import * as imageCopy from "./image-copy";
 import * as nativeImageCopy from "./native-image-copy";
+import { setLanguage } from "../../shared/i18n";
 import { ImageReviewStage } from "./ImageReviewStage";
 
 // jsdom does not implement pointer capture.
@@ -25,6 +26,8 @@ HTMLElement.prototype.setPointerCapture ??= () => {};
 HTMLElement.prototype.releasePointerCapture ??= () => {};
 afterEach(() => {
   cleanup();
+  setLanguage("en");
+  localStorage.clear();
   vi.restoreAllMocks();
   vi.useRealTimers();
 });
@@ -978,4 +981,31 @@ it("hides Copy when the host does not provide image clipboard access", () => {
   expect(
     screen.queryByRole("button", { name: "Copy image" }),
   ).not.toBeInTheDocument();
+});
+
+it("keeps the same image, zoom transform and focused keyboard control across EN→KO→EN", async () => {
+  setLanguage("en");
+  const { image } = setup();
+  const cycle = screen.getByRole("button", {
+    name: "Image zoom: 100%. Zoom to 150%",
+  });
+  cycle.focus();
+  await userEvent.setup().keyboard("{Enter}");
+  expect(image.style.transform).toBe("translate(0px, 0px) scale(1.5)");
+  const source = image.getAttribute("src");
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("button", { name: "이미지 확대/축소: 150%. 200%로 조정" }),
+  ).toBe(cycle);
+  expect(cycle).toHaveFocus();
+  expect(screen.getByRole("img", { name: "첨부 파일 미리보기" })).toBe(image);
+  expect(image.getAttribute("src")).toBe(source);
+  expect(image.style.transform).toBe("translate(0px, 0px) scale(1.5)");
+  await userEvent.setup().keyboard(" ");
+  expect(image.style.transform).toBe("translate(0px, 0px) scale(2)");
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("button", { name: "Image zoom: 200%. Zoom to 50%" }),
+  ).toBe(cycle);
+  expect(cycle).toHaveFocus();
 });

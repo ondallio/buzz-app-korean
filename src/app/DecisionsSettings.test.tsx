@@ -11,9 +11,13 @@ import {
   type DecisionProviderStatus,
   type RegisteredProvider,
 } from "../features/decisions/service";
+import { setLanguage } from "../shared/i18n/language";
 import { DecisionsSettings } from "./DecisionsSettings";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 
 const TYPESAFE = DEFAULT_DECISION_PROVIDER;
 
@@ -210,6 +214,20 @@ it("keeps a provider's failing settings inside its own part, even while hidden",
   expect(alert).toHaveTextContent(
     "Provider typesafe settings are unavailable. You can turn its plugin off in Manage plugins.",
   );
+  const recovery = within(alert).getByRole("button", {
+    name: "Manage plugins",
+  });
+  recovery.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("alert")).toBe(alert);
+  expect(alert).toHaveTextContent(
+    "Provider typesafe 설정을 사용할 수 없습니다. 플러그인 관리에서 해당 플러그인을 비활성화할 수 있습니다.",
+  );
+  expect(within(alert).getByRole("button", { name: "플러그인 관리" })).toBe(
+    recovery,
+  );
+  expect(recovery).toHaveFocus();
+  act(() => setLanguage("en"));
   await user.click(
     within(alert).getByRole("button", { name: "Manage plugins" }),
   );
@@ -361,4 +379,36 @@ it("hands focus to the section when the removed provider was the only one", asyn
   await user.keyboard("{Enter}");
   expect(screen.getByRole("status")).toHaveTextContent("Manage plugins");
   expect(screen.getByRole("region", { name: "Decisions API" })).toHaveFocus();
+});
+
+it("translates host disclosure and recovery link while preserving provider controls and identity", async () => {
+  const onSection = vi.fn();
+  const service = fake(
+    [
+      { key: "Decisions API", status: "ready" },
+      { key: "second", status: "ready" },
+    ],
+    "Decisions API",
+  );
+  render(
+    <DecisionsSettings
+      decisions={service}
+      active={() => true}
+      onSection={onSection}
+    />,
+  );
+  const control = screen.getByRole("radio", { name: /Provider Decisions API/ });
+  control.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("heading", { name: "의사 결정 API" })).toBeVisible();
+  expect(screen.getByRole("radio", { name: /Provider Decisions API/ })).toBe(
+    control,
+  );
+  expect(control).toHaveFocus();
+  expect(service.chosen()).toBe("Decisions API");
+  expect(screen.getByText("Settings for Decisions API")).toBeVisible();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("radio", { name: /Provider Decisions API/ })).toBe(
+    control,
+  );
 });

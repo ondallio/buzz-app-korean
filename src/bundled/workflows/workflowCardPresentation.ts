@@ -93,8 +93,19 @@ function joinActions(labels: readonly string[]): string {
   return `${labels.slice(0, -1).join(", ")}, and ${labels.at(-1) ?? second}`;
 }
 
+/** Pure display projection; semantic icons and identities remain canonical. */
+export type WorkflowCardDescription = (
+  input: Readonly<{
+    trigger: WorkflowCardIcon;
+    actions: readonly WorkflowCardIcon[];
+    malformed: boolean;
+  }>,
+) => string;
+
+/** Reads canonical metadata; the optional projection changes only its description. */
 export function workflowCardPresentation(
   yaml: string,
+  describe?: WorkflowCardDescription,
 ): WorkflowCardPresentation {
   try {
     const document = record(parseYaml(yaml));
@@ -116,14 +127,22 @@ export function workflowCardPresentation(
         icon: action.icon,
         key: action.key,
       })),
-      description: `${trigger.label}, ${joinActions(actions.map((action) => action.label))}.`,
+      description:
+        describe?.({
+          trigger: trigger.icon,
+          actions: actions.map((action) => action.icon),
+          malformed: false,
+        }) ??
+        `${trigger.label}, ${joinActions(actions.map((action) => action.label))}.`,
       triggerEmoji: trigger.emoji,
       triggerIcon: trigger.icon,
     };
   } catch {
     return {
       actionIcons: [],
-      description: "Review this workflow configuration.",
+      description:
+        describe?.({ trigger: "workflow", actions: [], malformed: true }) ??
+        "Review this workflow configuration.",
       triggerEmoji: null,
       triggerIcon: "workflow",
     };

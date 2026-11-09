@@ -1,3 +1,4 @@
+import { setLanguage } from "../../shared/i18n";
 // @vitest-environment jsdom
 import { SOLO_LABEL } from "../../features/solo/labels";
 import type { Agents } from "../../features/agents/service";
@@ -17,7 +18,7 @@ import { schnorr } from "@noble/curves/secp256k1.js";
 import { bytesToHex } from "nostr-tools/utils";
 import { npubEncode } from "nostr-tools/nip19";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, afterEach, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, expect, it, vi, onTestFinished } from "vitest";
 import { useEffect } from "react";
 import type { LiveCallbacks } from "../../features/relay/live";
 import { createRelaySession } from "../../features/relay/session";
@@ -87,6 +88,7 @@ afterEach(async () => {
   for (const task of tasks) task.controller.abort();
   await Promise.all(tasks.splice(0).map(({ outcome }) => outcome));
   cleanup();
+  setLanguage("en");
   Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
   for (const stop of stops.splice(0)) stop();
 });
@@ -2758,6 +2760,107 @@ it("names three refused members and counts the rest", async () => {
     }),
   ).toBeEnabled();
 });
+it.each([false, true])(
+  "keeps a grouped retry's raw name snapshot, rest count and focused search (language switches: %s)",
+  async (switchLanguage) => {
+    const h = await teamSetup(["Di", "Ada", "Cy", "Bo {name} 한글"]);
+    h.fail("Invitation denied: raw {reason}");
+    await h.user.click(screen.getByRole("button", { name: "Add team Crew" }));
+    const retry = await screen.findByRole("button", {
+      name: "Retry adding Ada, Bo {name} 한글, Cy, and 1 more",
+    });
+    const error = screen.getByText(
+      /^Ada, Bo \{name\} 한글, Cy, and 1 more: Invitation denied/,
+    );
+    const input = screen.getByRole("searchbox");
+    if (switchLanguage) {
+      act(() => setLanguage("ko"));
+      expect(
+        screen.getByRole("searchbox", { name: "사람 및 에이전트 검색" }),
+      ).toBe(input);
+      expect(
+        screen.getByRole("button", {
+          name: "Ada, Bo {name} 한글, Cy 및 다른 1명 추가 다시 시도",
+        }),
+      ).toBe(retry);
+      expect(error).toHaveTextContent("Invitation denied: raw {reason}");
+    }
+    h.fail("");
+    const base = h.publish.getMockImplementation();
+    if (!base) throw new Error("Missing publish fixture");
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    onTestFinished(() => release());
+    h.publish.mockImplementation(async (event) => {
+      await gate;
+      return base(event);
+    });
+    await h.user.click(retry);
+    expect(input).toHaveFocus();
+    if (switchLanguage) act(() => setLanguage("en"));
+    await act(async () => release());
+    const notice = await screen.findByText(
+      "Ada, Bo {name} 한글, Cy, and 1 more are in the channel.",
+    );
+    expect(input).toHaveFocus();
+    const calls = h.publish.mock.calls.length;
+    if (switchLanguage) {
+      act(() => setLanguage("ko"));
+      expect(
+        screen.getByText(
+          "Ada, Bo {name} 한글, Cy 및 다른 1명의 채널 참여가 완료되었습니다.",
+        ),
+      ).toBe(notice);
+      act(() => setLanguage("en"));
+      expect(
+        screen.getByText(
+          "Ada, Bo {name} 한글, Cy, and 1 more are in the channel.",
+        ),
+      ).toBe(notice);
+    }
+    expect(screen.getByRole("searchbox")).toBe(input);
+    expect(h.publish).toHaveBeenCalledTimes(calls);
+    // Same nine writes with or without a language switch: the original failed
+    // four-person batch, its four single fallbacks, then four explicit retries.
+    expect(calls).toBe(9);
+    expect(h.publish.mock.calls.map(([event]) => event.kind)).toEqual(
+      Array(9).fill(9000),
+    );
+    const clientId = expect.stringMatching(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(h.publish.mock.calls[0]?.[0].tags).toEqual([
+      ["h", "11111111-1111-4111-8111-111111111111"],
+      ...[0, 1, 2, 3].map((index) => ["p", String(index).repeat(64)]),
+      ["role", "member"],
+      ["client-id", clientId],
+    ]);
+    for (const [event] of h.publish.mock.calls) expect(event.content).toBe("");
+    for (const [event] of h.publish.mock.calls.slice(1)) {
+      expect(event.tags).toEqual([
+        ["h", "11111111-1111-4111-8111-111111111111"],
+        ["p", expect.stringMatching(/^[0-3]{64}$/)],
+        ["role", "member"],
+        ["client-id", clientId],
+      ]);
+    }
+
+    const additions = h.publish.mock.calls
+      .map(([event]) => event.tags.filter(([tag]) => tag === "p"))
+      .filter((recipients) => recipients.length === 1)
+      .map((recipients) => recipients[0]?.[1]);
+    expect(additions.sort()).toEqual(
+      [0, 1, 2, 3]
+        .flatMap((index) => [
+          String(index).repeat(64),
+          String(index).repeat(64),
+        ])
+        .sort(),
+    );
+  },
+);
 it("shows a team's refusals with different reasons as separate alerts", async () => {
   const t = await teamSetup();
   const base = t.publish.getMockImplementation();
@@ -3749,7 +3852,7 @@ it("keeps the current member page through live removals and clamps a shortened r
       .map((row) => row.textContent);
   await t.user.click(within(pages()).getByRole("button", { name: "Next" }));
   expect(within(pages()).getByText("2 of 3")).toBeVisible();
-  expect(within(pages()).getByText("2 of 3")).toHaveTextContent("Page 2 of 3");
+  expect(within(pages()).getByText("Page 2 of 3")).toHaveClass("sr-only");
   await act(async () => t.replaceRoster([t.viewer.pubkey, ...keys.slice(1)]));
   expect(within(pages()).getByText("2 of 3")).toBeVisible();
   await t.user.click(within(pages()).getByRole("button", { name: "Next" }));
@@ -4101,3 +4204,66 @@ it.each([0, 75])(
     ).not.toBeInTheDocument();
   },
 );
+
+it("keeps a searched member, pending Add focus and the same raw publish across locale switches", async () => {
+  const h = await setup();
+  const add = await h.search();
+  const input = screen.getByRole("searchbox");
+  h.hold();
+  await h.user.click(add);
+  await vi.waitFor(() => expect(h.publish).toHaveBeenCalledOnce());
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("searchbox", { name: "사람 및 에이전트 검색" })).toBe(
+    input,
+  );
+  expect(input).toHaveValue("Morgan");
+  expect(screen.getByRole("button", { name: /Morgan.*추가/ })).toBe(add);
+  expect(add).toHaveFocus();
+  expect(add).toHaveAttribute("aria-disabled", "true");
+  await act(async () => h.release());
+  const notice = await screen.findByText("Morgan님이 채널에 참여했습니다.");
+  expect(h.publish).toHaveBeenCalledOnce();
+  expect(h.publish.mock.calls[0]?.[0].tags).toContainEqual([
+    "p",
+    h.person.pubkey,
+  ]);
+  act(() => setLanguage("en"));
+  expect(screen.getByText("Morgan is in the channel.")).toBe(notice);
+  expect(screen.getByRole("searchbox")).toBe(input);
+});
+
+it("retains the canonical people filter and same focused option while its labels change language", async () => {
+  const h = await setup("stream", false, true);
+  await act(async () => h.replaceRoster([h.viewer.pubkey, h.agent.pubkey]));
+  const filter = await screen.findByRole("button", {
+    name: "Filter people and agents: All",
+  });
+  await h.user.click(filter);
+  await h.user.click(
+    await screen.findByRole("menuitemradio", { name: "People · 1" }),
+  );
+  await vi.waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+  const input = screen.getByRole("searchbox");
+  const person = screen.getByText("Carl (you)");
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("button", { name: "사람 및 에이전트 필터: 사람" }),
+  ).toBe(filter);
+  expect(screen.getByRole("searchbox", { name: "사람 및 에이전트 검색" })).toBe(
+    input,
+  );
+  expect(screen.getByText("Carl (나)")).toBe(person);
+  await h.user.click(filter);
+  const selected = await screen.findByRole("menuitemradio", {
+    name: "사람 · 1",
+  });
+  expect(selected).toHaveAttribute("aria-checked", "true");
+  selected.focus();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("menuitemradio", { name: "People · 1" })).toBe(
+    selected,
+  );
+  expect(selected).toHaveAttribute("aria-checked", "true");
+  expect(selected).toHaveFocus();
+  expect(h.publish).not.toHaveBeenCalled();
+});

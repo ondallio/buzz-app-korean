@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useCallback,
   useEffect,
@@ -19,7 +20,7 @@ import {
 import { Button } from "../../shared/design-system/ui/Button";
 import { Dialog } from "../../shared/design-system/ui/Dialog";
 import { ChannelDurationField } from "./ChannelDurationField";
-import { ChannelTextField } from "./ChannelTextField";
+import { ChannelTextField, localizedDetailsErrors } from "./ChannelTextField";
 import { DEFAULT_TEMPORARY_CHANNEL_TTL_SECONDS } from "../../features/relay/channel-writes";
 import styles from "./Channels.module.css";
 
@@ -44,6 +45,7 @@ export function ChannelDetailsEditor({
     loading: boolean,
   ): ReactNode;
 }) {
+  useLanguage();
   const id = channel.id;
   const attempt = useSyncExternalStore(capability.subscribe, () =>
     capability.snapshot(id),
@@ -152,6 +154,7 @@ export function ChannelDetailsEditor({
     name: canonicalDetailsName(draft.name),
   };
   const errors = normalized ? detailsDraftErrors(normalized) : undefined;
+  const displayErrors = errors && localizedDetailsErrors(errors);
   const dirty =
     !!normalized &&
     !!view.base &&
@@ -258,11 +261,7 @@ export function ChannelDetailsEditor({
     attempt?.status === "unconfirmed" || view.error ? (
       <div id={statusId} className={styles.detailsEditor}>
         {attempt?.status === "unconfirmed" && (
-          <p role="status">
-            The change may have been saved. Check its status before trying
-            again. Checking never resends it. Closing this dialog does not undo
-            the change.
-          </p>
+          <p role="status">{t("channelForms.details.unconfirmed")}</p>
         )}
         {view.error && <p role="alert">{view.error}</p>}
         {!attempt && view.error && (
@@ -272,7 +271,7 @@ export function ChannelDetailsEditor({
               if (lifetime.current) void load(lifetime.current.signal);
             }}
           >
-            Reload details
+            {t("channelForms.details.reload")}
           </Button>
         )}
       </div>
@@ -280,7 +279,7 @@ export function ChannelDetailsEditor({
   const trigger = (
     <section
       className={styles.detailsEditor}
-      aria-label="Edit channel details"
+      aria-label={t("channelForms.details.title")}
       aria-busy={view.loading}
     >
       {(canEdit || attempt) && (
@@ -290,7 +289,7 @@ export function ChannelDetailsEditor({
           loading={pending}
           disabled={pending}
         >
-          Edit details
+          {t("channelForms.details.action")}
         </Button>
       )}
       {!view.editing && status}
@@ -326,16 +325,18 @@ export function ChannelDetailsEditor({
           if (!open) requestClose();
         }}
         dismissOnOutsideClick
-        title={confirmDiscard ? "Discard changes?" : "Edit channel details"}
-        description={
+        title={
           confirmDiscard
-            ? "Your channel details have unsaved changes."
-            : undefined
+            ? t("channelForms.discard.title")
+            : t("channelForms.details.title")
+        }
+        description={
+          confirmDiscard ? t("channelForms.details.unsaved") : undefined
         }
         closeLabel={
           confirmDiscard
-            ? "Back to edit channel details"
-            : "Close edit channel details"
+            ? t("channelForms.details.back")
+            : t("channelForms.details.close")
         }
         preventClose={pending}
         initialFocus={
@@ -353,16 +354,16 @@ export function ChannelDetailsEditor({
                 ref={keepEditing}
                 onClick={() => patch({ confirmDiscard: false })}
               >
-                Keep editing
+                {t("channelForms.discard.keep")}
               </Button>
               <Button variant="destructive" onClick={close}>
-                Discard changes
+                {t("channelForms.discard.action")}
               </Button>
             </>
           ) : (
             <>
               <Button disabled={pending} onClick={close}>
-                {attempt ? "Close" : "Cancel"}
+                {attempt ? t("channelForms.close") : t("channelForms.cancel")}
               </Button>
               {attempt?.status === "unconfirmed" ? (
                 <Button
@@ -371,7 +372,7 @@ export function ChannelDetailsEditor({
                   disabled={view.loading}
                   onClick={() => void check()}
                 >
-                  Check save status
+                  {t("channelForms.details.check")}
                 </Button>
               ) : (
                 <Button
@@ -381,7 +382,7 @@ export function ChannelDetailsEditor({
                   loading={pending}
                   disabled={!canSave}
                 >
-                  Save changes
+                  {t("channelForms.details.save")}
                 </Button>
               )}
             </>
@@ -404,7 +405,7 @@ export function ChannelDetailsEditor({
                   field="name"
                   inputRef={nameInput}
                   value={draft.name}
-                  error={errors?.name}
+                  error={displayErrors?.name}
                   disabled={locked || !canEdit}
                   onChange={(name) => patch({ draft: { ...draft, name } })}
                 />
@@ -412,7 +413,7 @@ export function ChannelDetailsEditor({
                   field="description"
                   inputRef={descriptionInput}
                   value={draft.description}
-                  error={errors?.description}
+                  error={displayErrors?.description}
                   disabled={locked || !canEdit}
                   onChange={(description) =>
                     patch({ draft: { ...draft, description } })
@@ -421,7 +422,7 @@ export function ChannelDetailsEditor({
                 <ChannelDurationField
                   temporary={draft.ttlSeconds !== undefined}
                   ttlSeconds={temporaryTtl}
-                  error={errors?.lifetime}
+                  error={displayErrors?.lifetime}
                   disabled={locked || !canEdit}
                   onChange={(ttlSeconds) =>
                     patch({

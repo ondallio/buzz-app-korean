@@ -17,6 +17,8 @@ import userEvent from "@testing-library/user-event";
 import { PageTabs } from "../channels/PageTabs";
 import { InboxPage } from "./InboxPage";
 import { InboxPreview } from "./InboxPreview";
+import { setLanguage } from "../../shared/i18n/language";
+import { communityRefusalTitle } from "../../features/federated-identity/CommunitySignIn";
 import { huddleDescription } from "../../features/huddle/lifecycle";
 import { ToastProvider } from "../../shared/design-system/ui/Toast";
 import { writeView } from "../../shared/view-state";
@@ -58,6 +60,7 @@ stubAvatarBrowserApis();
 HTMLElement.prototype.scrollIntoView = vi.fn();
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.restoreAllMocks();
   for (const owner of owners.splice(0)) owner.dispose();
   vi.useRealTimers();
@@ -5170,4 +5173,166 @@ it("moves solo emoji into a shared row and back after a live removal", async () 
   expect(screen.getAllByRole("button", { name: /reacted with/ })).toHaveLength(
     1,
   );
+});
+
+it("localizes the retained Inbox list during one gated read without changing rows, raw content or stored read targets", async () => {
+  const h = fixture({ withWriter: true });
+  render(h.view, { wrapper: ToastProvider });
+  await waitFor(() => expect(rows()).toHaveLength(2));
+  const list = screen.getByRole("list", { name: "Activity" });
+  await waitFor(() => expect(list).toHaveAttribute("aria-busy", "false"));
+  const row = rows().find((row) => row.textContent?.includes("Please review"));
+  if (!row) throw new Error("Missing mention row");
+  const action = within(row).getByRole("button", { name: /^Mark as read / });
+  const from = screen.getByRole("button", { name: "From anyone" });
+  scrollTo(123);
+  const release = h.holdSave();
+  action.focus();
+  fireEvent.click(action);
+  try {
+    await waitFor(() => expect(h.saveStarted()).toBe(true));
+    const steps = [...h.readSteps];
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("list", { name: "활동" })).toBe(list);
+    expect(screen.getByRole("button", { name: "보낸 사람: 모든 사람" })).toBe(
+      from,
+    );
+    expect(within(row).getByRole("button", { name: /읽음으로 표시/ })).toBe(
+      action,
+    );
+    expect(list).toHaveAttribute("aria-busy", "true");
+    expect(list).toContainElement(row);
+    expect(row).toHaveTextContent("Please review this");
+    expect(row).toHaveTextContent("#Design");
+    expect(list.parentElement?.scrollTop).toBe(123);
+    expect(h.readSteps).toEqual(steps);
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("list", { name: "Activity" })).toBe(list);
+    expect(within(row).getByRole("button", { name: /^Mark as read / })).toBe(
+      action,
+    );
+  } finally {
+    await act(async () => release());
+  }
+  await waitFor(() => expect(list).toHaveAttribute("aria-busy", "false"));
+  expect(h.journal()?.state.frontiers[`msg:${h.mention.id}`]).toBe(21);
+});
+
+it("localizes the same Activity preview and unread summary while preserving raw names and exact navigation", async () => {
+  const h = fixture({ withDm: true });
+  const close = vi.fn();
+  render(previewAt(h, close));
+  await waitFor(() => expect(previewRows()).toHaveLength(3));
+  const list = screen.getByRole("list", { name: "Recent activity" });
+  const control = screen.getByRole("switch", { name: "Unread only" });
+  const row = within(list)
+    .getAllByRole("listitem")
+    .find((entry) => entry.textContent?.includes("A thread update"));
+  if (!row) throw new Error("Missing preview thread row");
+  const open = within(row).getByRole("button", {
+    name: /^Open Alice in #Design/,
+  });
+  control.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("list", { name: "최근 활동" })).toBe(list);
+  expect(screen.getByRole("switch", { name: "읽지 않은 항목만" })).toBe(
+    control,
+  );
+  expect(control).toHaveFocus();
+  expect(
+    within(row).getByRole("button", { name: /#Design에서 Alice 열기/ }),
+  ).toBe(open);
+  expect(
+    screen.getByText("읽지 않은 항목 3개 · 멘션 1개 · 스레드 1개 · DM 1개"),
+  ).toBeVisible();
+  expect(h.open).not.toHaveBeenCalled();
+  fireEvent.click(open);
+  expect(close).toHaveBeenCalledOnce();
+  expect(h.open).toHaveBeenCalledExactlyOnceWith({
+    version: 1,
+    kind: "conversation",
+    scope: h.scope,
+    channelId: "room",
+    messageId: h.reply.id,
+    threadRootId: h.root?.id ?? h.reply.tags.find(([key]) => key === "e")?.[1],
+  });
+});
+
+it.each(["page", "preview"] as const)(
+  "projects exact refusal codes in the %s without changing canonical titles or raw errors",
+  async (surface) => {
+    const h = fixture();
+    render(surface === "page" ? h.view : previewAt(h));
+    await screen.findByText("Please review this");
+    act(() =>
+      h.failConnection("raw provider error", {
+        denied: true,
+        refusal: "sign-in",
+      }),
+    );
+    act(() => setLanguage("ko"));
+    expect(
+      screen.getByText("이 커뮤니티를 열려면 로그인해 주세요"),
+    ).toBeVisible();
+    expect(communityRefusalTitle("sign-in")).toBe(
+      "Sign in to open this community",
+    );
+    act(() =>
+      h.failConnection("raw provider error", {
+        denied: true,
+        refusal: "access",
+      }),
+    );
+    expect(
+      screen.getByText("이 커뮤니티에 접근할 권한이 없습니다"),
+    ).toBeVisible();
+    expect(h.retryConnection).not.toHaveBeenCalled();
+    cleanup();
+    const raw = fixture();
+    render(surface === "page" ? raw.view : previewAt(raw));
+    act(() => raw.failConnection("Choose a community to see your activity."));
+    expect(
+      screen.getByText("Choose a community to see your activity."),
+    ).toBeVisible();
+    expect(raw.retryConnection).not.toHaveBeenCalled();
+  },
+);
+
+it("keeps owned fallback failure live and the identical external error literal across retry without retargeting a read", async () => {
+  const h = fixture({ withWriter: true });
+  render(h.view);
+  await waitFor(() => expect(rows()).toHaveLength(2));
+  const row = rows().find((entry) =>
+    entry.textContent?.includes("Please review"),
+  );
+  if (!row) throw new Error("Missing mention");
+  const write = vi
+    .spyOn(h.session.unread, "markThrough")
+    .mockRejectedValueOnce(null)
+    .mockRejectedValueOnce(new Error("That action failed. Try again."));
+  fireEvent.click(within(row).getByRole("button", { name: /^Mark as read / }));
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("That action failed. Try again.");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("alert")).toBe(alert);
+  expect(alert).toHaveTextContent(
+    "작업을 완료하지 못했습니다. 다시 시도해 주세요.",
+  );
+  expect(write).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole("button", { name: "활동 다시 불러오기" }));
+  await waitFor(() =>
+    expect(alert).toHaveTextContent("That action failed. Try again."),
+  );
+  expect(write).toHaveBeenCalledTimes(2);
+  for (const call of write.mock.calls)
+    expect(call).toEqual([
+      { kind: "message", channelId: "room", messageId: h.mention.id },
+      h.mention.id,
+    ]);
+  write.mockRestore();
+  fireEvent.click(screen.getByRole("button", { name: "활동 다시 불러오기" }));
+  await waitFor(() =>
+    expect(h.journal()?.state.frontiers[`msg:${h.mention.id}`]).toBe(21),
+  );
+  expect(screen.queryByRole("alert")).toBeNull();
 });

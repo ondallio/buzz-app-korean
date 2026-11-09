@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { setLanguage } from "../../shared/i18n";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { Profiler } from "react";
 import { afterEach, expect, it, vi } from "vitest";
@@ -14,7 +15,11 @@ import {
 import { ChannelMemberAvatars } from "./ChannelMemberAvatars";
 import { ChannelMembersButton } from "./ChannelMembersDialog";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 it("keeps the people preview and overflow current as profiles and membership arrive", () => {
   const listeners = new Set<() => void>();
@@ -279,3 +284,29 @@ it("renders members of a channel missing from the list without rerendering on li
   });
   expect(commits).not.toHaveBeenCalled();
 });
+
+it.each([undefined, "Member"])(
+  "translates only its missing-identity fallback and preserves raw name %s without resubscribing",
+  (name) => {
+    const profiles = new Map(name ? [["unknown-id", { name }]] : []);
+    const list = { channels: [{ id: "raw-channel", members: ["unknown-id"] }] };
+    const choices = { identities: [] };
+    const ensure = vi.fn(async () => {});
+    const session = {
+      channels: { subscribeList: () => () => {}, list: () => list },
+      profiles: { subscribe: () => () => {}, snapshot: () => profiles, ensure },
+      agentChoices: { subscribe: () => () => {}, snapshot: () => choices },
+      media: (url: string) => url,
+    } as unknown as RelaySession;
+    render(<ChannelMemberAvatars session={session} channelId="raw-channel" />);
+    const avatar = screen.getByTitle("Member");
+    act(() => setLanguage("ko"));
+    expect(screen.getByTitle(name ?? "멤버")).toBe(avatar);
+    expect(ensure).toHaveBeenCalledExactlyOnceWith(
+      ["unknown-id"],
+      "background",
+    );
+    act(() => setLanguage("en"));
+    expect(screen.getByTitle("Member")).toBe(avatar);
+  },
+);

@@ -3,6 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../shared/i18n/language";
 import { DeveloperSettings } from "./DeveloperSettings";
 import { logLevel, setLogLevel } from "../features/developer/logging";
 import type { RelayData } from "../features/relay/service";
@@ -11,6 +12,7 @@ beforeEach(() => vi.stubEnv("BUZZ_DEV_SETTINGS", "1"));
 let revision = 0;
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   vi.useRealTimers();
@@ -52,7 +54,12 @@ it("shows save failure without pretending the level was persisted", async () => 
     vi.fn(async (_url: unknown, init?: RequestInit) =>
       init?.method === "POST"
         ? new Response("", { status: 500 })
-        : Response.json({ logLevel: "debug", revision: ++revision }),
+        : Response.json({
+            logLevel: init?.body
+              ? JSON.parse(String(init.body)).logLevel
+              : "debug",
+            revision: ++revision,
+          }),
     ),
   );
   render(<DeveloperSettings relay={relay} />);
@@ -72,6 +79,15 @@ it("shows save failure without pretending the level was persisted", async () => 
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Log level wasn’t saved",
   );
+  const error = screen.getByRole("alert");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("combobox", { name: "로그 수준" })).toBe(control);
+  expect(screen.getByRole("alert")).toBe(error);
+  expect(error).toHaveTextContent(
+    "로그 수준을 저장하지 못했습니다. 다시 시도해 주세요.",
+  );
+  expect(control).toHaveFocus();
+  act(() => setLanguage("en"));
   expect(control).toHaveTextContent("Debug");
   expect(control).toBeEnabled();
 });
@@ -142,4 +158,76 @@ it("shows broker diagnostics and refreshes their totals in development", async (
   unmount();
   await act(async () => vi.advanceTimersByTimeAsync(5_000));
   expect(statsReads).toBe(2);
+});
+
+it("translates a retained cache failure without repeating the action and keeps the diagnostic literal", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({ logLevel: "debug", revision: ++revision }),
+    ),
+  );
+  relay.clearCache = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("Clear cache"))
+    .mockResolvedValue(undefined);
+  const user = userEvent.setup();
+  render(<DeveloperSettings relay={relay} />);
+  const action = screen.getByRole("button", { name: "Clear cache" });
+  await user.click(action);
+  expect(await screen.findByRole("status")).toHaveTextContent(
+    "Buzz couldn’t clear the cache. Error: Clear cache",
+  );
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "캐시 지우기" })).toBe(action);
+  expect(action).toHaveFocus();
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Buzz에서 캐시를 지우지 못했습니다. Error: Clear cache",
+  );
+  expect(relay.clearCache).toHaveBeenCalledOnce();
+  act(() => setLanguage("en"));
+  await user.click(action);
+  expect(await screen.findByRole("status")).toHaveTextContent("Cache cleared.");
+  expect(relay.clearCache).toHaveBeenCalledTimes(2);
+});
+
+it("keeps the same log-level menu, raw saved level and poll schedule across language changes", async () => {
+  vi.stubEnv("VITE_BUZZ_LIVE", "1");
+  const fetcher = vi.fn(async (url: string, init?: RequestInit) =>
+    url === "/api/relay/stats"
+      ? Response.json(brokerStats)
+      : Response.json({
+          logLevel: init?.body
+            ? JSON.parse(String(init.body)).logLevel
+            : "debug",
+          revision: ++revision,
+        }),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  const user = userEvent.setup();
+  render(<DeveloperSettings relay={relay} />);
+  const control = screen.getByRole("combobox", { name: "Log level" });
+  await waitFor(() => expect(control).toBeEnabled());
+  control.focus();
+  await user.keyboard("{ArrowDown}");
+  const option = await screen.findByRole("option", { name: "Debug" });
+  await waitFor(() => expect(option).toHaveFocus());
+  const before = fetcher.mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("combobox", { name: "로그 수준" })).toBe(control);
+  expect(screen.getByRole("option", { name: "디버그" })).toBe(option);
+  expect(option).toHaveFocus();
+  expect(logLevel()).toBe("debug");
+  expect(fetcher).toHaveBeenCalledTimes(before);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("option", { name: "Debug" })).toBe(option);
+  expect(option).toHaveFocus();
+  await user.keyboard("{End}{Enter}");
+  await waitFor(() => expect(logLevel()).toBe("trace"));
+  const post = fetcher.mock.calls.find(
+    ([, init]) => (init as RequestInit | undefined)?.method === "POST",
+  );
+  expect(
+    JSON.parse(String((post?.[1] as RequestInit | undefined)?.body)),
+  ).toEqual({ logLevel: "trace" });
 });

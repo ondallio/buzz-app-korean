@@ -1,3 +1,12 @@
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
+import {
+  localError,
+  errorMessage,
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import type { ChannelCreationInput } from "../../features/channel-templates/setup";
 import type { RelaySession } from "../../features/relay/session";
 import type { Agents } from "../../features/agents/service";
@@ -29,7 +38,7 @@ import {
   rememberPrivacyConfirmation,
 } from "./ChannelPrivacyConfirmation";
 import { ChannelDurationField } from "./ChannelDurationField";
-import { ChannelTextField } from "./ChannelTextField";
+import { ChannelTextField, localizedDetailsErrors } from "./ChannelTextField";
 import { SidebarGroupIcon } from "./SidebarGroupIcon";
 import { SidebarStarIcon } from "./SidebarStarIcon";
 import {
@@ -89,6 +98,7 @@ function OpenCreateChannelDialog({
   initialStarred = false,
   groupsReady,
 }: Props) {
+  useLanguage();
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const keepEditing = useRef<HTMLButtonElement>(null);
   const previousDiscard = useRef(confirmDiscard);
@@ -119,7 +129,7 @@ function OpenCreateChannelDialog({
   );
   const [privateChannel, setPrivateChannel] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const [groupId, setGroupId] = useState("");
   const [starred, setStarred] = useState(false);
   const templates = useChannelTemplates();
@@ -182,15 +192,20 @@ function OpenCreateChannelDialog({
   const templateNote =
     templateSetup &&
     !unresolved &&
-    ([
-      templateSetup.agents.length
-        ? `Adds ${templateSetup.agents.map((key) => agentNames.get(key)).join(", ")}`
-        : "",
-      templateSetup.canvas.trim() ? "Starts the Canvas" : "",
-    ]
-      .filter(Boolean)
-      .join(" · ") ||
-      "None of its agents are in this community, and it has no Canvas.");
+    (templateSetup.agents.length
+      ? t(
+          templateSetup.canvas.trim()
+            ? "channelForms.create.templateBoth"
+            : "channelForms.create.templateAdds",
+          {
+            names: templateSetup.agents
+              .map((key) => agentNames.get(key))
+              .join(", "),
+          },
+        )
+      : templateSetup.canvas.trim()
+        ? t("channelForms.create.templateStarts")
+        : t("channelForms.create.templateEmpty"));
   const destination = destinations.find((g) => g.id === groupId);
   const editing = useRef(false);
   editing.current = !busy && !privacyChoice && !confirmDiscard;
@@ -225,6 +240,7 @@ function OpenCreateChannelDialog({
     description,
     visibility: privateChannel ? "private" : "public",
   });
+  const displayErrors = localizedDetailsErrors(errors);
   const invalid = Object.values(errors).some(Boolean) || unresolved;
 
   const dirty =
@@ -251,10 +267,10 @@ function OpenCreateChannelDialog({
         groupId &&
         (!groupsReady || !destinations.some((g) => g.id === groupId))
       )
-        throw new Error(
+        throw localError(
           groupsReady
-            ? "This group is no longer available. Close this dialog and create from another sidebar group or Channels."
-            : "Wait for saved sidebar groups to load, then try again.",
+            ? "channelForms.create.groupGone"
+            : "channelForms.create.groupLoading",
         );
       await onCreate({
         name: normalizedName,
@@ -280,8 +296,8 @@ function OpenCreateChannelDialog({
       if (mounted.current)
         setError(
           reason instanceof Error
-            ? reason.message
-            : "The channel could not be created.",
+            ? errorMessage(reason)
+            : localMessage("channelForms.create.failed"),
         );
     } finally {
       if (mounted.current) setBusy(false);
@@ -307,44 +323,49 @@ function OpenCreateChannelDialog({
       preventClose={busy}
       title={
         confirmDiscard ? (
-          "Discard changes?"
+          t("channelForms.discard.title")
         ) : privacyChoice ? (
           privacyChoice === "private" ? (
-            "Make channel private?"
+            t("channelForms.create.privateTitle")
           ) : (
-            "Make channel public?"
+            t("channelForms.create.publicTitle")
           )
         ) : (
           <span className={styles.title}>
-            Create a channel
-            {(groupId || starred) && (
-              <>
-                {" in "}
-                {starred ? (
-                  <>
-                    <SidebarStarIcon />{" "}
-                  </>
-                ) : destination?.icon ? (
-                  <>
-                    <SidebarGroupIcon
-                      icon={destination.icon}
-                      session={session}
-                    />{" "}
-                  </>
-                ) : null}
-                {starred ? "Starred" : (destination?.name ?? "saved group")}
-              </>
-            )}
+            {groupId || starred
+              ? rich("channelForms.create.inGroup", {
+                  group: (
+                    <>
+                      {starred ? (
+                        <>
+                          <SidebarStarIcon />{" "}
+                        </>
+                      ) : destination?.icon ? (
+                        <>
+                          <SidebarGroupIcon
+                            icon={destination.icon}
+                            session={session}
+                          />{" "}
+                        </>
+                      ) : null}
+                      {starred
+                        ? t("channelForms.create.starred")
+                        : (destination?.name ??
+                          t("channelForms.create.savedGroup"))}
+                    </>
+                  ),
+                })
+              : t("channelForms.create.title")}
           </span>
         )
       }
       description={
-        confirmDiscard ? "Your channel draft has unsaved changes." : undefined
+        confirmDiscard ? t("channelForms.create.unsaved") : undefined
       }
       closeLabel={
         confirmDiscard || privacyChoice
-          ? "Back to channel creation"
-          : "Close channel creation"
+          ? t("channelForms.create.back")
+          : t("channelForms.create.close")
       }
       initialFocus={input}
       finalFocus={finalFocus}
@@ -352,7 +373,7 @@ function OpenCreateChannelDialog({
         confirmDiscard ? (
           <>
             <Button ref={keepEditing} onClick={() => setConfirmDiscard(false)}>
-              Keep editing
+              {t("channelForms.discard.keep")}
             </Button>
             <Button
               variant="destructive"
@@ -360,7 +381,7 @@ function OpenCreateChannelDialog({
                 if (!busy) onOpenChange(false);
               }}
             >
-              Discard changes
+              {t("channelForms.discard.action")}
             </Button>
           </>
         ) : privacyChoice ? (
@@ -369,7 +390,7 @@ function OpenCreateChannelDialog({
               ref={privacyCancel}
               onClick={() => setPrivacyChoice(undefined)}
             >
-              Cancel
+              {t("channelForms.cancel")}
             </Button>
             <Button
               variant="prominent"
@@ -382,7 +403,7 @@ function OpenCreateChannelDialog({
                 setError("");
               }}
             >
-              Continue
+              {t("channelForms.continue")}
             </Button>
           </>
         ) : (
@@ -391,7 +412,7 @@ function OpenCreateChannelDialog({
               <Switch
                 id={privateControlId}
                 ref={privateSwitch}
-                aria-label="Private"
+                aria-label={t("channelForms.create.private")}
                 checked={privateChannel}
                 readOnly={busy}
                 aria-disabled={busy || undefined}
@@ -408,7 +429,7 @@ function OpenCreateChannelDialog({
                 }}
               />
               <label className="text-label-sm" htmlFor={privateControlId}>
-                Private
+                {t("channelForms.create.private")}
               </label>
             </span>
             <Button
@@ -418,7 +439,7 @@ function OpenCreateChannelDialog({
               loading={busy}
               disabled={invalid}
             >
-              Create channel
+              {t("channelForms.create.action")}
             </Button>
           </>
         )
@@ -446,7 +467,7 @@ function OpenCreateChannelDialog({
             creation
             inputRef={input}
             value={name}
-            error={name ? errors.name : undefined}
+            error={name ? displayErrors.name : undefined}
             onChange={(value) => {
               setName(value);
               setError("");
@@ -455,7 +476,7 @@ function OpenCreateChannelDialog({
           <ChannelTextField
             field="description"
             value={description}
-            error={errors.description}
+            error={displayErrors.description}
             onChange={(value) => {
               setDescription(value);
               setError("");
@@ -464,21 +485,19 @@ function OpenCreateChannelDialog({
           {templates.length > 0 && (
             <div ref={templateField} style={{ display: "contents" }}>
               <Select
-                label="Template"
+                label={t("channelForms.create.template")}
                 variant="field"
                 value={templateId}
                 description={
                   checkingAgents
-                    ? "Checking which of its agents are in this community…"
+                    ? t("channelForms.create.checkingAgents")
                     : templateNote
                 }
                 error={
                   (unresolved && !checkingAgents) ||
                   (needsAgents && retrying) ? (
                     <>
-                      Its agents can’t be checked right now, so they can’t be
-                      added. Retry, or choose None to create the channel without
-                      them.{" "}
+                      {t("channelForms.create.agentsUnavailable")}{" "}
                       <Button
                         ref={retryButton}
                         size="xs"
@@ -486,7 +505,7 @@ function OpenCreateChannelDialog({
                         loading={retrying}
                         onClick={() => void retryAgents()}
                       >
-                        Retry
+                        {t("channelForms.retry")}
                       </Button>
                     </>
                   ) : undefined
@@ -495,7 +514,7 @@ function OpenCreateChannelDialog({
                   {
                     label: "",
                     options: [
-                      { value: "", label: "None" },
+                      { value: "", label: t("channelForms.create.none") },
                       ...templates.map((item) => ({
                         value: item.id,
                         label: item.name,
@@ -523,7 +542,7 @@ function OpenCreateChannelDialog({
           />
           {error && (
             <p role="alert" className={styles.error}>
-              {error}
+              {resolveMessage(error)}
             </p>
           )}
         </form>

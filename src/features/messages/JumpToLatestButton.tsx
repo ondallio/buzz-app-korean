@@ -1,5 +1,6 @@
 import { ArrowDownIcon } from "../../shared/design-system/icons/index";
 import { Button } from "../../shared/design-system/ui/Button";
+import { t, useLanguage } from "../../shared/i18n";
 import styles from "./Messages.module.css";
 
 export function JumpToLatestButton({
@@ -11,10 +12,16 @@ export function JumpToLatestButton({
   newMessageCount: number;
   onClick(): void;
 }) {
+  useLanguage();
   const label =
     newMessageCount > 0
-      ? `${newMessageCount} new message${newMessageCount === 1 ? "" : "s"}`
-      : "Jump to latest";
+      ? t(
+          newMessageCount === 1
+            ? "messageNotices.latest.one"
+            : "messageNotices.latest.many",
+          { count: newMessageCount },
+        )
+      : t("messageNotices.latest");
   return (
     <div
       className={styles.jumpToLatest}

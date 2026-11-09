@@ -12,6 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import type { Communities } from "../features/communities/service";
 import { ToastProvider } from "../shared/design-system/ui/Toast";
+import { setLanguage } from "../shared/i18n";
 import { CommunityDepartureSettings } from "./CommunityDepartureSettings";
 
 const api = vi.hoisted(() => ({ requestLeave: vi.fn() }));
@@ -53,6 +54,7 @@ function setup() {
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   api.requestLeave.mockReset();
 });
 
@@ -263,4 +265,48 @@ it("distinguishes the published name, local label and exact community address be
   expect(within(dialog).getByText(community.id)).toBeVisible();
   expect(api.requestLeave).not.toHaveBeenCalled();
   await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+});
+
+it("keeps removal confirmation identity and focus across languages and a completed notice live after the settings unmounts", async () => {
+  setLanguage("en");
+  const h = setup();
+  const opener = screen.getByRole("button", {
+    name: "Remove from this device",
+  });
+  await h.user.click(opener);
+  const dialog = screen.getByRole("alertdialog", {
+    name: "Remove Acme from this device?",
+  });
+  const cancel = within(dialog).getByRole("button", { name: "Cancel" });
+  cancel.focus();
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("alertdialog", {
+      name: "이 기기에서 Acme을(를) 제거할까요?",
+    }),
+  ).toBe(dialog);
+  expect(within(dialog).getByRole("button", { name: "취소" })).toBe(cancel);
+  expect(cancel).toHaveFocus();
+  await h.user.click(
+    within(dialog).getByRole("button", { name: "이 기기에서 제거" }),
+  );
+  expect(
+    await screen.findByText(
+      "이 기기에서 Acme — https://acme.example을(를) 제거했습니다. 멤버십은 바뀌지 않았으며 나중에 다시 추가할 수 있습니다.",
+    ),
+  ).toBeVisible();
+  expect(h.leave).toHaveBeenCalledExactlyOnceWith(community.id, {
+    purge: true,
+  });
+  h.rerender(
+    <ToastProvider>
+      <p>Other destination</p>
+    </ToastProvider>,
+  );
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByText(
+      "Acme — https://acme.example was removed from this device. Your membership wasn’t changed. You can add it again later.",
+    ),
+  ).toBeVisible();
 });

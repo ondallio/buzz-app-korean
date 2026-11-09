@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { OnboardingBack } from "./OnboardingBack";
 import { useState } from "react";
 import { enteredRelayOrigin } from "../communities/destination";
@@ -47,6 +48,7 @@ export function CommunityUrlField({
   /** Continue fills the width right under the field, for a card whose only step this is. */
   stacked?: boolean;
 }) {
+  useLanguage();
   const [invalid, setInvalid] = useState(false);
   const entered = enteredCommunity(url);
   const submit = () => {
@@ -58,17 +60,15 @@ export function CommunityUrlField({
       <div className="flex flex-col gap-12">
         <div className="min-w-0 w-full">
           <Field
-            label="Community address or invite link"
-            error={
-              invalid ? "Enter a community address or invite link." : undefined
-            }
+            label={t("identityMore.addressLabel")}
+            error={invalid ? t("identityMore.addressInvalid") : undefined}
             disabled={disabled}
           >
             <Input
               inputMode="url"
               autoComplete="off"
               spellCheck={false}
-              placeholder="Paste a link or address"
+              placeholder={t("identityMore.addressPlaceholder")}
               value={url}
               disabled={disabled}
               onChange={(event) => {
@@ -93,7 +93,7 @@ export function CommunityUrlField({
               disabled={disabled}
               onClick={submit}
             >
-              Continue
+              {t("identity.continue")}
             </Button>
           </div>
         ) : (
@@ -105,7 +105,7 @@ export function CommunityUrlField({
               disabled={disabled}
               onClick={submit}
             >
-              Continue
+              {t("identity.continue")}
             </Button>
           </div>
         )}

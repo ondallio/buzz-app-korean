@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FOCUS_KEY, createFocus } from "./state";
+import { errorMessage } from "../../shared/i18n/deferred-message";
 
 function browser(stored?: unknown) {
   const values = new Map<string, string>(
@@ -50,6 +51,35 @@ it("rejects a deadline that is not in the future", () => {
   const focus = createFocus(browser().host);
   expect(() => focus.start(at(0))).toThrow("future");
   expect(focus.snapshot().until).toBeUndefined();
+});
+
+it("attaches display provenance without changing the start error or state", () => {
+  const h = browser();
+  const focus = createFocus(h.host);
+  let caught: unknown;
+  try {
+    focus.start(at(0));
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(Error);
+  expect(caught instanceof Error && caught.message).toBe(
+    "Choose a time in the future.",
+  );
+  expect(errorMessage(caught)).toMatchObject({
+    kind: "localized-message",
+    key: "statusFocus.futureFocus",
+  });
+  expect(errorMessage(new Error("Choose a time in the future."))).toBe(
+    "Choose a time in the future.",
+  );
+  expect(focus.snapshot()).toEqual({
+    until: undefined,
+    status: undefined,
+    error: null,
+  });
+  expect(h.storage.setItem).not.toHaveBeenCalled();
+  focus.dispose();
 });
 
 it("restores an active Focus after a restart and drops an expired one", () => {

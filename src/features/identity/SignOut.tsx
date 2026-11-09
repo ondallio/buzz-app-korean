@@ -1,3 +1,9 @@
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useState } from "react";
 import { AlertDialog } from "../../shared/design-system/ui/AlertDialog";
 import { Button } from "../../shared/design-system/ui/Button";
@@ -41,6 +47,7 @@ export function SignOutDialog({
   identity: Identity;
   onClose(): void;
 }) {
+  useLanguage();
   const [touched, setTouched] = useState(false);
   const [haveKey, setHaveKey] = useState(false);
   const [wipe, setWipe] = useState(false);
@@ -49,12 +56,12 @@ export function SignOutDialog({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   // Asked of the native side, which enforces it; wipe stays off until it answers.
-  const [wipeRefusal, setWipeRefusal] = useState<string | null>();
+  const [wipeRefusal, setWipeRefusal] = useState<DisplayMessage | null>();
   useEffect(() => {
     let current = true;
     identity
       .wipeRefusal()
-      .catch(() => "Couldn’t check whether erasing is available")
+      .catch(() => localMessage("accessDialogs.wipeCheckFailed"))
       .then((reason) => {
         if (current) setWipeRefusal(reason ?? null);
       });
@@ -75,21 +82,21 @@ export function SignOutDialog({
   }
   return (
     <AlertDialog
-      title="Sign out of Buzz?"
-      description="Signing out removes your private key from this device. Your key is how you sign in, so save it before you continue. You’ll need it to sign back in as this identity."
+      title={t("accessDialogs.signOutTitle")}
+      description={t("accessDialogs.signOutDescription")}
       onClose={onClose}
       pending={pending}
       actions={
         <>
           <Button type="button" disabled={pending} onClick={onClose}>
-            Cancel
+            {t("accessDialogs.cancel")}
           </Button>
           <Button
             type="button"
             disabled={!ready || pending}
             onClick={() => void confirm()}
           >
-            {wipe ? "Sign out and erase" : "Sign out"}
+            {t(wipe ? "accessDialogs.signOutErase" : "accessDialogs.signOut")}
           </Button>
         </>
       }
@@ -97,13 +104,13 @@ export function SignOutDialog({
       <PrivateKey identity={identity} onInteraction={() => setTouched(true)} />
       <div className="mt-6 flex flex-col gap-3">
         <Checkbox
-          label="I have my key"
+          label={t("accessDialogs.haveKey")}
           checked={haveKey}
           disabled={!touched || pending}
           onCheckedChange={setHaveKey}
         />
         <Checkbox
-          label="Also erase everything else Buzz stores on this device"
+          label={t("accessDialogs.alsoErase")}
           checked={wipe}
           disabled={pending || wipeRefusal !== null}
           onCheckedChange={(checked) => {
@@ -115,18 +122,22 @@ export function SignOutDialog({
           }}
         />
         {wipeRefusal && (
-          <p className="text-body-sm text-muted">{wipeRefusal}.</p>
+          <p className="text-body-sm text-muted">
+            {typeof wipeRefusal === "string"
+              ? `${wipeRefusal}.`
+              : resolveMessage(wipeRefusal)}
+          </p>
         )}
         {wipe && (
           <>
             <Checkbox
-              label="Also remove my agents"
+              label={t("accessDialogs.removeAgents")}
               checked={removeAgents}
               disabled={pending}
               onCheckedChange={setRemoveAgents}
             />
             <label className="block text-label-sm" htmlFor="sign-out-phrase">
-              Type “{WIPE_PHRASE}” to confirm
+              {t("accessDialogs.confirmPhrase", { phrase: WIPE_PHRASE })}
             </label>
             <Input
               id="sign-out-phrase"
@@ -136,20 +147,17 @@ export function SignOutDialog({
               onChange={(event) => setPhrase(event.currentTarget.value)}
             />
             <p className="text-body-sm text-muted">
-              Erasing clears this app’s data, local storage, caches and plugin
-              storage on this device only. It can’t reach your clipboard, keys
-              you exported, or relay data; your npub and its history stay on the
-              relays.
-              {!removeAgents &&
-                " Kept agents keep their names, types and keys; their settings on this device are erased."}
+              {t(
+                removeAgents
+                  ? "accessDialogs.eraseDescription"
+                  : "accessDialogs.eraseKeepAgentsDescription",
+              )}
             </p>
           </>
         )}
         {!wipe && (
           <p className="text-body-sm text-muted">
-            Your settings, agents and other Buzz data stay on this device. Sign
-            back in with this key and they’ll be here. Agents start only for
-            this key.
+            {t("accessDialogs.keepDataDescription")}
           </p>
         )}
       </div>

@@ -23,8 +23,15 @@ import {
   type AgentCardReads,
 } from "./AgentCardLink";
 
+import { setLanguage } from "../../shared/i18n";
+import {
+  LinkPreviewContext,
+  type LinkPreview,
+} from "../../features/conversation/LinkLabelContext";
 afterEach(() => {
   cleanup();
+  setLanguage("en");
+  localStorage.clear();
   Reflect.deleteProperty(HTMLElement.prototype, "showPopover");
 });
 
@@ -335,4 +342,64 @@ it("reads nothing for a composer decoration", () => {
     />,
   );
   expect(read).not.toHaveBeenCalled();
+});
+
+it("keeps the real open card and focused Add action while retranslating its accessible name", async () => {
+  const read = vi.fn(async () => ({ ...laggo, name: "Message" }));
+  const { registry, session } = setup(read);
+  const open = vi.fn(() => true);
+  const user = userEvent.setup();
+  render(
+    <MessageLink
+      url={share}
+      registry={registry}
+      onOpenLink={open}
+      session={session}
+    />,
+  );
+  const link = await screen.findByRole("link", { name: "Message" });
+  await user.tab();
+  const dialog = await screen.findByRole("dialog", {
+    name: "Message agent card",
+  });
+  const add = within(dialog).getByRole("button", { name: "Add to Buzz" });
+  add.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("dialog", { name: "Message 에이전트 카드" })).toBe(
+    dialog,
+  );
+  expect(within(dialog).getByRole("button", { name: "Buzz에 추가" })).toBe(add);
+  expect(add).toHaveFocus();
+  expect(within(dialog).getByText("Message")).toBeVisible();
+  expect(link).toHaveAttribute("href", share);
+  expect(read).toHaveBeenCalledOnce();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("dialog", { name: "Message agent card" })).toBe(
+    dialog,
+  );
+  expect(add).toHaveFocus();
+  await user.click(add);
+  expect(open).toHaveBeenCalledExactlyOnceWith(
+    "buzz://agent/new?card=av_Q430oIuy2pHC345U08CVjg",
+  );
+});
+it("offers one stable getter descriptor across language changes", async () => {
+  const reads = createAgentCardReads(async () => laggo);
+  const offer = vi.fn<(value: LinkPreview | undefined) => void>();
+  const view = render(
+    <LinkPreviewContext value={offer}>
+      <AgentCardLink url={share} reads={reads} />
+    </LinkPreviewContext>,
+  );
+  await waitFor(() => expect(offer).toHaveBeenCalledOnce());
+  const descriptor = offer.mock.calls[0]?.[0];
+  expect(descriptor?.label).toBe("Laggo agent card");
+  act(() => setLanguage("ko"));
+  expect(descriptor?.label).toBe("Laggo 에이전트 카드");
+  expect(offer).toHaveBeenCalledOnce();
+  act(() => setLanguage("en"));
+  expect(descriptor?.label).toBe("Laggo agent card");
+  expect(offer).toHaveBeenCalledOnce();
+  view.unmount();
+  expect(offer.mock.calls).toEqual([[descriptor], [undefined]]);
 });

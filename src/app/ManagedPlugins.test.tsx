@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { setLanguage } from "../shared/i18n";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -20,7 +22,11 @@ import type {
 import { createPluginInstallRequests } from "../plugins/installer";
 import { ManagedPlugins, UrlPluginInstallReview } from "./ManagedPlugins";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 const commit = "0123456789abcdef0123456789abcdef01234567";
 const entry = (
@@ -834,3 +840,94 @@ it("refuses a URL install request over a plugin installed from Git", async () =>
   fireEvent.keyDown(dialog, { key: "Escape" });
   await expect(outcome).resolves.toBe("cancelled");
 });
+
+it("keeps a managed review and exact pinned pending install while labels change language", async () => {
+  setLanguage("en");
+  const { manager, git } = harness();
+  let finish = (_: boolean) => {};
+  manager.installImport.mockImplementationOnce(
+    () =>
+      new Promise<boolean>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  show(manager, ready([entry("missing")]));
+  const open = screen.getByRole("button", {
+    name: "Review and install example.managed",
+  });
+  open.focus();
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("button", { name: "example.managed 검토 및 설치" }),
+  ).toBe(open);
+  expect(open).toHaveFocus();
+  fireEvent.click(open);
+  const dialog = await screen.findByRole("dialog", {
+    name: "Managed example 플러그인 접근 권한 검토",
+  });
+  expect(git).toHaveBeenCalledExactlyOnceWith(
+    "https://example.com/plugins",
+    "v1",
+    undefined,
+    commit,
+  );
+  const enable = screen.getByRole("switch", { name: "플러그인 활성화" });
+  fireEvent.click(enable);
+  const install = screen.getByRole("button", { name: "플러그인 설치" });
+  install.focus();
+  fireEvent.click(install);
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("dialog", {
+      name: "Review Managed example Plugin access",
+    }),
+  ).toBe(dialog);
+  expect(screen.getByRole("button", { name: "Install plugin" })).toBe(install);
+  expect(install).toBeDisabled();
+  expect(enable).not.toBeChecked();
+  expect(manager.installImport).toHaveBeenCalledExactlyOnceWith(
+    "preview",
+    "dist",
+  );
+  await act(async () => finish(true));
+  expect(manager.change).not.toHaveBeenCalled();
+  expect(git).toHaveBeenCalledOnce();
+});
+
+it.each([false, true])(
+  "retains managed error provenance and the same focused recovery control (external:%s)",
+  async (external) => {
+    setLanguage("en");
+    const git = vi.fn(async () => {
+      if (external) throw new Error("No plugin source found.");
+      return null;
+    });
+    const h = harness({ git });
+    show(h.manager, ready([entry("missing")]));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Review and install example.managed",
+      }),
+    );
+    const error = await screen.findByRole("alert");
+    expect(error).toHaveTextContent("No plugin source found.");
+    const retry = screen.getByRole("button", { name: "Try again" });
+    retry.focus();
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("alert")).toBe(error);
+    expect(error).toHaveTextContent(
+      external ? "No plugin source found." : "플러그인 출처를 찾지 못했습니다.",
+    );
+    expect(screen.getByRole("button", { name: "다시 시도" })).toBe(retry);
+    expect(retry).toHaveFocus();
+    expect(git).toHaveBeenCalledExactlyOnceWith(
+      "https://example.com/plugins",
+      "v1",
+      undefined,
+      commit,
+    );
+    expect(h.manager.installImport).not.toHaveBeenCalled();
+    act(() => setLanguage("en"));
+    expect(error).toHaveTextContent("No plugin source found.");
+  },
+);

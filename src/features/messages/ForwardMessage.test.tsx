@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { setLanguage } from "../../shared/i18n";
 import "@testing-library/jest-dom/vitest";
 import {
   act,
@@ -70,6 +71,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  setLanguage("en");
+  localStorage.clear();
   for (const stop of stops.splice(0)) stop();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -909,3 +912,69 @@ it.each([
     );
   },
 );
+
+it("retains the forwarding draft/caret/pending controls, exact payload and live result across locales", async () => {
+  setLanguage("en");
+  const user = userEvent.setup();
+  const h = setup();
+  await choose(user);
+  let reject!: (error: Error) => void;
+  h.directMessages.delivered.mockImplementationOnce(
+    () =>
+      new Promise<void>((_, no) => {
+        reject = no;
+      }),
+  );
+  const dialog = screen.getByRole("dialog", { name: "Forward message" });
+  const note = screen.getByRole("textbox", { name: "Note (optional)" });
+  if (!(note instanceof HTMLTextAreaElement))
+    throw new Error("Expected actual forward note");
+  fireEvent.change(note, { target: { value: "메모 {name}\n둘째 줄" } });
+  note.focus();
+  note.setSelectionRange(2, 5);
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("dialog", { name: "메시지 전달" })).toBe(dialog);
+  expect(screen.getByRole("textbox", { name: "메모 (선택사항)" })).toBe(note);
+  expect(note).toHaveFocus();
+  expect(note.selectionStart).toBe(2);
+  expect(note.selectionEnd).toBe(5);
+  expect(note).toHaveValue("메모 {name}\n둘째 줄");
+  const send = screen.getByRole("button", { name: "전달" });
+  fireEvent.click(send);
+  await waitFor(() =>
+    expect(h.directMessages.delivered).toHaveBeenCalledOnce(),
+  );
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Retry forward" })).toBe(send);
+  expect(send).toHaveAttribute("aria-busy", "true");
+  expect(h.messages.send.mock.calls[0]?.[1]).toBe(
+    `메모 \\{name\\}\n둘째 줄\n\nbuzz://message?channel=alpha&id=${messageId}`,
+  );
+  expect(h.messages.send).toHaveBeenCalledOnce();
+  expect(h.directMessages.open).toHaveBeenCalledExactlyOnceWith(
+    [recipient],
+    expect.any(AbortSignal),
+  );
+  await act(async () =>
+    reject(new Error("Couldn’t forward the message. Try again.")),
+  );
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getAllByText("Couldn’t forward the message. Try again.").length,
+  ).toBeGreaterThan(0);
+  expect(screen.getByRole("textbox", { name: "메모 (선택사항)" })).toBe(note);
+  fireEvent.click(screen.getByRole("button", { name: "전달 다시 시도" }));
+  const notice = await screen.findByRole("dialog", {
+    name: "Avery Chen에게 메시지를 전달했습니다",
+  });
+  expect(h.messages.send).toHaveBeenCalledOnce();
+  expect(h.directMessages.delivered).toHaveBeenCalledTimes(2);
+  expect(h.outbox.acknowledge).toHaveBeenCalledExactlyOnceWith("e".repeat(64));
+  expect(
+    screen.getByRole("button", { name: "Avery Chen과의 DM 열기" }),
+  ).toBeVisible();
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("dialog", { name: "Message forwarded to Avery Chen" }),
+  ).toBe(notice);
+});

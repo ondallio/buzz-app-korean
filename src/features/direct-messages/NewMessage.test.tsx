@@ -40,6 +40,7 @@ import {
 } from "../../shared/identity/public-key";
 import type { RelaySession } from "../relay/session";
 import { NewMessage } from "./NewMessage";
+import { setLanguage } from "../../shared/i18n";
 import { createAgentChoices } from "../agents/choices";
 import type { LocalAgentsSnapshot } from "../agents/local";
 
@@ -100,6 +101,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -2097,4 +2099,60 @@ it("searches and labels by profile names on a relay without verified identity", 
     screen.getByRole("option", { name: `jack ${labels.get(imitator.pubkey)}` }),
   );
   screen.getByRole("textbox", { name: "Message jack" });
+});
+
+it("keeps the recipient input, memoized agent option and keyboard choice across languages", async () => {
+  const t = setup();
+  t.mount();
+  const input = recipient();
+  if (!(input instanceof HTMLInputElement))
+    throw new Error("Missing recipient input");
+  await screen.findByRole("option", { name: "Person 2, Agent" });
+  await t.user.type(input, "Person");
+  const option = await screen.findByRole("option", { name: "Person 2, Agent" });
+  const beforeHighlight = input.getAttribute("aria-activedescendant");
+  await t.user.keyboard("{ArrowDown}");
+  expect(input.getAttribute("aria-activedescendant")).not.toBe(beforeHighlight);
+  const target = screen
+    .getAllByRole("option")
+    .find((row) => row.getAttribute("aria-selected") === "true");
+  assert(target);
+  const picked = people.find(
+    (person) => person.pubkey === target.getAttribute("data-recipient-key"),
+  );
+  assert(picked);
+  const highlighted = input.getAttribute("aria-activedescendant");
+  input.setSelectionRange(1, 3);
+  const calls = t.directMessages.people.mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("combobox", { name: "메시지를 받을 사람" })).toBe(
+    input,
+  );
+  expect(screen.getByRole("option", { name: "Person 2, 에이전트" })).toBe(
+    option,
+  );
+  expect(target).toHaveAttribute("aria-selected", "true");
+  expect(input).toHaveAttribute("aria-activedescendant", highlighted);
+  expect(input).toHaveValue("Person");
+  expect(input).toHaveFocus();
+  expect(input.selectionStart).toBe(1);
+  expect(input.selectionEnd).toBe(3);
+  expect(t.directMessages.people).toHaveBeenCalledTimes(calls);
+  await t.user.keyboard("{Enter}");
+  const remove = screen.getByRole("button", { name: `${picked.name} 제거` });
+  expect(input).toHaveValue("");
+  expect(input).toHaveFocus();
+  act(() => setLanguage("en"));
+  expect(recipient()).toBe(input);
+  expect(screen.getByRole("button", { name: `Remove ${picked.name}` })).toBe(
+    remove,
+  );
+  await t.user.type(screen.getByRole("textbox"), "Raw payload 한글");
+  await t.user.click(send());
+  await waitFor(() => expect(t.onStarted).toHaveBeenCalledOnce());
+  expect(t.directMessages.open).toHaveBeenCalledExactlyOnceWith(
+    [picked.pubkey],
+    expect.any(AbortSignal),
+  );
+  expect(t.messages.send.mock.calls[0]?.[1]).toBe("Raw payload 한글");
 });

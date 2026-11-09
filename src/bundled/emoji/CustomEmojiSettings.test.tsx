@@ -12,6 +12,7 @@ import { PublishRejected } from "../../features/relay/outbox";
 import { keypair, signed } from "../../features/relay/testing";
 import { ToastProvider } from "../../shared/design-system/ui/Toast";
 import { CustomEmojiSettings } from "./CustomEmojiSettings";
+import { setLanguage } from "../../shared/i18n/language";
 
 const viewer = keypair(),
   relayKey = keypair();
@@ -19,11 +20,13 @@ const origin = "https://relay.test";
 const owners: { dispose(): void }[] = [];
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   for (const owner of owners.splice(0)) owner.dispose();
 });
 /** One relay store shared across sessions so remounts prove persistence. */
 function relayStore() {
   const stored: RelayEvent[] = [];
+  const published: RelayEvent[] = [];
   const matches = (
     event: RelayEvent,
     filter: { kinds?: readonly number[]; authors?: readonly string[] },
@@ -35,6 +38,7 @@ function relayStore() {
   let publicationGate: Promise<void> | undefined;
   return {
     stored,
+    published,
     /** Queue a relay rejection for the next publish. */
     rejectNext(error: Error) {
       failures.push(error);
@@ -72,6 +76,7 @@ function relayStore() {
             ...(kinds ? { kinds } : {}),
             sign: async (template) => signed(viewer, template),
             async publish(event) {
+              published.push(event);
               const gate = publicationGate;
               publicationGate = undefined;
               await gate;
@@ -490,3 +495,122 @@ it("searches the read-only community collection, clears the query and handles no
   expect(screen.getAllByRole("listitem")).toHaveLength(2);
   expect(store.stored).toHaveLength(2);
 });
+
+it("keeps the draft and one gated publication through language changes with exact shortcode tags", async () => {
+  const user = userEvent.setup();
+  const store = relayStore();
+  const upload = vi.fn(async (file: File) => uploaded(file));
+  store.connect(upload);
+  await user.upload(
+    screen.getByLabelText("Upload image"),
+    png("Raw filename.png"),
+  );
+  const input = await screen.findByRole("textbox", { name: "Give it a name" });
+  await user.clear(input);
+  await user.type(input, "my_raw-code");
+  input.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("textbox", { name: "이름" })).toBe(input);
+  expect(input).toHaveValue("my_raw-code");
+  expect(input).toHaveFocus();
+  expect(screen.getByText("Raw filename.png")).toBeVisible();
+  expect(
+    screen.getByText(
+      "메시지와 반응에서 이 이름의 양쪽에 콜론을 붙여 사용하세요.",
+    ),
+  ).toBeVisible();
+  const gate = deferred<void>();
+  store.holdNextPublication(gate.promise);
+  await user.click(screen.getByRole("button", { name: "이모지 저장" }));
+  try {
+    expect(screen.getByRole("button", { name: "저장 중…" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("textbox", { name: "Give it a name" })).toBe(input);
+    expect(input).toHaveValue("my_raw-code");
+    expect(screen.getByRole("button", { name: "Saving…" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Saving…" })).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+    await user.click(screen.getByRole("button", { name: "Saving…" }));
+    expect(store.stored).toEqual([]);
+    expect(store.published).toHaveLength(1);
+  } finally {
+    await act(async () => gate.resolve());
+  }
+  await screen.findByText("Added :my_raw-code:");
+  expect(store.published).toHaveLength(1);
+  expect(store.stored).toHaveLength(1);
+  expect(store.stored[0]?.kind).toBe(30030);
+  expect(store.stored[0]?.tags).toEqual([
+    ["d", "buzz:custom-emoji"],
+    ["emoji", "my_raw-code", `${origin}/media/${"a".repeat(64)}.png`],
+  ]);
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByText(":my_raw-code: 이모지를 추가했습니다."),
+  ).toBeVisible();
+  expect(screen.getByRole("tab", { name: "내 이모지 (1)" })).toBeVisible();
+  expect(upload).toHaveBeenCalledTimes(1);
+  await user.click(screen.getByRole("tab", { name: "커뮤니티 이모지 (0)" }));
+  const search = screen.getByRole("searchbox", { name: "검색" });
+  await user.type(search, "raw_query");
+  const clear = screen.getByRole("button", { name: "검색 지우기" });
+  search.focus();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("searchbox", { name: "Search" })).toBe(search);
+  expect(search).toHaveFocus();
+  expect(search).toHaveValue("raw_query");
+  expect(screen.getByRole("button", { name: "Clear search" })).toBe(clear);
+  await user.click(clear);
+  expect(search).toHaveValue("");
+  expect(search).toHaveFocus();
+  expect(store.stored).toHaveLength(1);
+});
+
+it.each(["local", "external", "fallback"] as const)(
+  "keeps %s upload failure provenance while changing display language",
+  async (kind) => {
+    const user = userEvent.setup();
+    const upload = vi.fn(async (file: File) => {
+      if (kind === "external")
+        throw new Error("Choose an image file for custom emoji.");
+      if (kind === "fallback") throw null;
+      return { ...uploaded(file), type: "application/pdf" };
+    });
+    const store = relayStore();
+    store.connect(upload);
+    const fileInput = screen.getByLabelText("Upload image");
+    await user.upload(fileInput, png("Raw-file.png"));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      kind === "fallback"
+        ? "Failed to upload emoji image."
+        : "Choose an image file for custom emoji.",
+    );
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("alert")).toBe(alert);
+    expect(alert).toHaveTextContent(
+      kind === "external"
+        ? "Choose an image file for custom emoji."
+        : kind === "fallback"
+          ? "이모지 이미지를 업로드하지 못했습니다."
+          : "이모지로 사용할 이미지 파일을 선택해 주세요.",
+    );
+    expect(screen.getByLabelText("이미지 업로드")).toBe(fileInput);
+    act(() => setLanguage("en"));
+    expect(alert).toHaveTextContent(
+      kind === "fallback"
+        ? "Failed to upload emoji image."
+        : "Choose an image file for custom emoji.",
+    );
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(store.stored).toEqual([]);
+  },
+);

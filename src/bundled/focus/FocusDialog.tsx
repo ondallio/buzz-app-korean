@@ -1,3 +1,10 @@
+import { formattingLocale, t } from "../../shared/i18n";
+import { clockHourCycle, useClockFormat } from "../../shared/clock-preference";
+import {
+  errorMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { useState, useSyncExternalStore } from "react";
 import { TelescopeIcon } from "../../shared/design-system/icons/index";
 import { Button } from "../../shared/design-system/ui/Button";
@@ -25,6 +32,13 @@ const focusDurations: readonly (readonly [Duration, string])[] = [
   ["custom", "Custom"],
 ];
 type Duration = FocusLength | "custom";
+const durationKeys = {
+  "1800": "statusFocus.minutes30",
+  "3600": "statusFocus.hour1",
+  "7200": "statusFocus.hours2",
+  today: "statusFocus.restToday",
+  custom: "statusFocus.custom",
+} as const;
 /** Start Focus for a preset; the shortcut and the dialog share it. */
 export function startFocus(focus: Focus, length: FocusLength) {
   focus.start(statusDeadline(length, Math.floor(Date.now() / 1000)));
@@ -37,27 +51,33 @@ export function useFocus(focus: Focus) {
 /** "3:30 PM" today, otherwise "Tue 3:30 PM". */
 export function focusUntilLabel(until: number, now = new Date()) {
   const date = new Date(until * 1000);
-  const time = date.toLocaleTimeString([], {
+  const cycle = clockHourCycle();
+  const time = date.toLocaleTimeString(formattingLocale(), {
+    ...(cycle ? { hourCycle: cycle } : {}),
     hour: "numeric",
     minute: "2-digit",
   });
   return date.toDateString() === now.toDateString()
     ? time
-    : `${date.toLocaleDateString([], { weekday: "short" })} ${time}`;
+    : t("statusFocus.dayTime", {
+        day: date.toLocaleDateString(formattingLocale(), { weekday: "short" }),
+        time,
+      });
 }
 
 /** Sidebar banner while Focus is on: until when, and End. */
 export function FocusBanner({ focus }: { focus: Focus }) {
+  useClockFormat();
   const { until } = useFocus(focus);
   if (until === undefined) return null;
   return (
     <div className={styles.banner}>
       <span className={`${styles.label} text-label-sm`}>
         <TelescopeIcon size={16} aria-hidden="true" />
-        Focusing until {focusUntilLabel(until)}
+        {t("statusFocus.focusUntil", { time: focusUntilLabel(until) })}
       </span>
       <Button size="sm" variant="ghost" onClick={focus.end}>
-        End
+        {t("statusFocus.end")}
       </Button>
     </div>
   );
@@ -75,6 +95,7 @@ export function FocusDialog({
   focus: Focus;
   preferences: Preferences;
 }) {
+  useClockFormat();
   const state = useFocus(focus);
   // Each opening starts from the default in Settings.
   const [duration, setDuration] = useState<Duration>(
@@ -85,7 +106,7 @@ export function FocusDialog({
     date.setMinutes(date.getMinutes() < 30 ? 30 : 60, 0, 0);
     return date;
   });
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const close = () => onOpenChange(false);
   const on = state.until !== undefined;
   const start = () => {
@@ -95,22 +116,23 @@ export function FocusDialog({
       else startFocus(focus, duration);
       close();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(errorMessage(reason));
     }
   };
-  const durationLabel =
-    focusDurations.find(([value]) => value === duration)?.[1] ?? "";
+  const durationLabel = t(durationKeys[duration]);
   return (
     <Dialog
       size="compact"
       open={open}
       onOpenChange={onOpenChange}
-      title="Focus"
-      closeLabel="Close Focus"
+      title={t("statusFocus.focus")}
+      closeLabel={t("statusFocus.closeFocus")}
       description={
         on
-          ? `Focusing until ${focusUntilLabel(state.until as number)}`
-          : "Only Solo chats show and alert you until Focus ends."
+          ? t("statusFocus.focusUntil", {
+              time: focusUntilLabel(state.until as number),
+            })
+          : t("statusFocus.focusHelp")
       }
       actions={
         on ? (
@@ -121,11 +143,11 @@ export function FocusDialog({
               close();
             }}
           >
-            End focus
+            {t("statusFocus.endFocus")}
           </Button>
         ) : (
           <Button variant="prominent" onClick={start}>
-            Start focus
+            {t("statusFocus.startFocus")}
           </Button>
         )
       }
@@ -133,10 +155,14 @@ export function FocusDialog({
       {!on && (
         <div className={styles.fields}>
           <div className={styles.section}>
-            <span className="text-label-sm text-subtle">Duration</span>
+            <span className="text-label-sm text-subtle">
+              {t("statusFocus.duration")}
+            </span>
             <MenuRoot>
               <MenuTrigger
-                aria-label={`Duration: ${durationLabel}`}
+                aria-label={t("statusFocus.durationName", {
+                  duration: durationLabel,
+                })}
                 render={<FieldButton />}
               >
                 {durationLabel}
@@ -148,11 +174,11 @@ export function FocusDialog({
                     setDuration(value as Duration);
                     setError("");
                   }}
-                  aria-label="Duration"
+                  aria-label={t("statusFocus.duration")}
                 >
-                  {focusDurations.map(([value, label]) => (
+                  {focusDurations.map(([value]) => (
                     <MenuRadioItem key={value} value={value} closeOnClick>
-                      {label}
+                      {t(durationKeys[value])}
                     </MenuRadioItem>
                   ))}
                 </MenuRadioGroup>
@@ -161,7 +187,7 @@ export function FocusDialog({
           </div>
           {duration === "custom" && (
             <StatusExpiration
-              label="Focus end"
+              label={t("statusFocus.focusEnd")}
               value={custom}
               disabled={false}
               onChange={(next) => {
@@ -174,7 +200,11 @@ export function FocusDialog({
       )}
       {(error || state.error) && (
         <p role="alert" className="text-body-sm text-danger">
-          {error || state.error}
+          {error
+            ? resolveMessage(error)
+            : state.error === "Focus could not be saved on this device."
+              ? t("statusFocus.focusSaveFailed")
+              : state.error}
         </p>
       )}
     </Dialog>

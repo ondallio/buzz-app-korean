@@ -4,6 +4,7 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { invoke } from "@tauri-apps/api/core";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../shared/i18n";
 import { ExternalIdentityAuthorization } from "./ExternalIdentityAuthorization";
 import { IdentitySettings } from "./IdentitySettings";
 import { SecuritySettings } from "./SecuritySettings";
@@ -42,6 +43,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
@@ -280,3 +282,65 @@ it.each(["restore", "signer"])(
     );
   },
 );
+
+it("keeps the entered key, confirmation and proof through language changes without changing grant or clipboard payloads", async () => {
+  setLanguage("en");
+  const user = userEvent.setup();
+  render(<ExternalIdentityAuthorization viewer={viewer} />);
+  const input = screen.getByLabelText(
+    "Application public key (hex)",
+  ) as HTMLInputElement;
+  await user.type(input, "invalid");
+  await user.click(screen.getByRole("button", { name: "Authorize identity" }));
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "64-character hexadecimal public key",
+  );
+  await user.click(input);
+  input.setSelectionRange(1, 4);
+  act(() => setLanguage("ko"));
+  expect(screen.getByLabelText("앱 공개 키 (hex)")).toBe(input);
+  expect(input).toHaveFocus();
+  expect([input.selectionStart, input.selectionEnd]).toEqual([1, 4]);
+  expect(input).toHaveValue("invalid");
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "내 키와 다른 앱의 64자 16진수 공개 키를 입력해 주세요.",
+  );
+  expect(invoke).not.toHaveBeenCalled();
+  await user.clear(input);
+  await user.type(input, agent.toUpperCase());
+  await user.click(screen.getByRole("button", { name: "신원 허용" }));
+  const dialog = screen.getByRole("alertdialog", {
+    name: "이 신원을 허용할까요?",
+  });
+  const cancel = screen.getByRole("button", { name: "취소" });
+  await waitFor(() => expect(cancel).toHaveFocus());
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("alertdialog", { name: "Authorize this identity?" }),
+  ).toBe(dialog);
+  expect(screen.getByRole("button", { name: "Cancel" })).toBe(cancel);
+  expect(cancel).toHaveFocus();
+  expect(screen.getByLabelText("Application identity (npub)")).toHaveValue(
+    npubEncode(agent),
+  );
+  await user.click(screen.getByRole("button", { name: "Authorize this key" }));
+  const proof = await screen.findByLabelText("Ownership proof");
+  expect(proof).toHaveValue(JSON.stringify(tag));
+  act(() => setLanguage("ko"));
+  expect(screen.getByLabelText("소유권 증명")).toBe(proof);
+  await user.click(screen.getByRole("button", { name: "소유권 증명 복사" }));
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "소유권 증명을 복사했습니다.",
+  );
+  expect(invoke).toHaveBeenCalledWith(
+    "identity_prepare_remote_agent_authorization",
+    { owner: viewer, agentPubkey: agent },
+  );
+  expect(invoke).toHaveBeenLastCalledWith("clipboard_write_text", {
+    text: JSON.stringify(tag),
+  });
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Ownership proof copied.",
+  );
+});

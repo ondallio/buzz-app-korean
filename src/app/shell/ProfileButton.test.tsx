@@ -16,10 +16,15 @@ import type { AccountActionsService } from "../../features/account-actions/servi
 import type { Communities } from "../../features/communities/service";
 import { APPEARANCE_KEY, createAppearance } from "../../shared/theme/service";
 import { ProfileButton } from "./ProfileButton";
+import { setLanguage } from "../../shared/i18n";
 
 const testAppearance = createAppearance(window);
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 it("keeps the header cutout and menu status in sync with presence", () => {
   const listeners = new Set<() => void>();
@@ -323,7 +328,27 @@ it("opens profile settings from the header, selects appearance in a submenu, and
   expect(
     within(submenu).getByRole("menuitemradio", { name: "System" }),
   ).not.toBeChecked();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("menu", { name: "화면 설정" })).toBe(submenu);
+  expect(within(submenu).getByRole("menuitemradio", { name: "밝게" })).toBe(
+    light,
+  );
+  expect(light).toHaveFocus();
+  expect(light).toBeChecked();
+  expect(screen.getByRole("menuitem", { name: "Fixture 프로필 편집" })).toBe(
+    header,
+  );
+  expect(appearance.snapshot().preference).toBe("light");
+  expect(localStorage.getItem(APPEARANCE_KEY)).toBe("light");
   await user.keyboard("{ArrowDown}{Enter}");
+  expect(
+    within(submenu).getByRole("menuitemradio", { name: "어둡게" }),
+  ).toBeChecked();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("menu", { name: "Appearance" })).toBe(submenu);
+  expect(within(submenu).getByRole("menuitemradio", { name: "Light" })).toBe(
+    light,
+  );
   expect(appearance.snapshot().preference).toBe("dark");
   expect(
     within(submenu).getByRole("menuitemradio", { name: "Dark" }),
@@ -1090,6 +1115,49 @@ async function statusFeedbackFixture(disconnected = false) {
     },
   };
 }
+
+it("translates live presence feedback without replacing a focused option, changing raw preferences or extending its deadline", async () => {
+  setLanguage("en");
+  const h = await statusFeedbackFixture();
+  vi.useFakeTimers();
+  try {
+    const away = screen.getByRole("menuitemradio", { name: "Away" });
+    away.focus();
+    fireEvent.click(away);
+    act(() => vi.advanceTimersByTime(10000));
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("menuitemradio", { name: "자리 비움" })).toBe(away);
+    expect(away).toHaveFocus();
+    expect(screen.getByRole("menuitemradio", { name: "온라인" })).toBeChecked();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "자리 비움 상태로 변경 중…",
+    );
+    expect(
+      screen.getByRole("button", {
+        name: "접속 상태: 온라인, 자리 비움 상태로 변경 중",
+      }),
+    ).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(4999));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1));
+    const failure = screen.getByRole("alert");
+    expect(failure).toHaveTextContent(
+      "상태를 확인하지 못했습니다. 다시 시도하세요.",
+    );
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("menuitemradio", { name: "Away" })).toBe(away);
+    expect(screen.getByRole("alert")).toBe(failure);
+    expect(failure).toHaveTextContent(
+      "Could not confirm your status. Try again.",
+    );
+    expect(h.setPreference.mock.calls).toEqual([["away"]]);
+    h.observe("away");
+    expect(screen.getByRole("menuitemradio", { name: "Away" })).toBeChecked();
+  } finally {
+    cleanup();
+    vi.useRealTimers();
+  }
+});
 
 it("keeps confirmed indicators while pending, replaces attempts, times out, retries and clears late success", async () => {
   const h = await statusFeedbackFixture();

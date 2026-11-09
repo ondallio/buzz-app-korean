@@ -1,3 +1,11 @@
+import { t, useLanguage, formattingLocale } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
+import { clockHourCycle, useClockFormat } from "../../shared/clock-preference";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -49,15 +57,36 @@ import "./repos.css";
 import { writeClipboardText } from "../../shared/clipboard";
 
 type Open = Navigation["open"];
+
+// Entity statuses are canonical producer values; project them only in this view.
+const statusKeys = {
+  Open: "repositoryPage.statusOpen",
+  Merged: "repositoryPage.statusMerged",
+  Done: "repositoryPage.statusDone",
+  Closed: "repositoryPage.statusClosed",
+  Draft: "repositoryPage.statusDraft",
+} as const;
+function repositoryStatus(status: string | undefined): string | undefined {
+  const key = Object.entries(statusKeys).find(
+    ([value]) => value === status,
+  )?.[1];
+  return key ? t(key) : status;
+}
+function repositoryDate(unixSeconds: number): string {
+  return new Date(unixSeconds * 1000).toLocaleString(formattingLocale(), {
+    hourCycle: clockHourCycle(),
+  });
+}
+
 const labels = {
-  overview: "Overview",
-  files: "Files",
-  commits: "Commits",
-  prs: "Pull requests",
-  issues: "Issues",
-  contributors: "Contributors",
-  channels: "Channels",
-};
+  overview: "repositoryPage.overview",
+  files: "repositoryPage.files",
+  commits: "repositoryPage.commits",
+  prs: "repositoryPage.prs",
+  issues: "repositoryPage.issues",
+  contributors: "repositoryPage.contributors",
+  channels: "repositoryPage.channels",
+} as const;
 const tabs = ["overview", ...entityTabs].map((value) => ({
   value,
   label: labels[value as keyof typeof labels],
@@ -74,6 +103,7 @@ export function RepoPage({
   navigation,
   open,
 }: PageProps & { relay: RelayData; open: Open }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const request = useMemo(
     () => navigation?.forSession(relay, connection),
@@ -114,7 +144,7 @@ export function RepoPage({
       request.complete({ status: "failed", reason: "unavailable" });
   }, [request, connection, scope, target]);
   return (
-    <FullPageSurface aria-label="Repository">
+    <FullPageSurface aria-label={t("repositoryPage.repository")}>
       <div className="repos-page text-body">
         {connection.status === "ready" && request && scope ? (
           <Destination
@@ -126,11 +156,11 @@ export function RepoPage({
           />
         ) : (
           <>
-            <h1 className="text-title">Repository</h1>
+            <h1 className="text-title">{t("repositoryPage.repository")}</h1>
             <p role="status">
               {connection.status === "connecting"
-                ? "Connecting to your community..."
-                : "Select a community to open a repository."}
+                ? t("repositoryPage.connecting")
+                : t("repositoryPage.selectCommunity")}
             </p>
           </>
         )}
@@ -150,6 +180,7 @@ function Destination({
   open: Open;
   scope: NavigationScope;
 }) {
+  useClockFormat();
   const target = request.target;
   const route = useMemo(
     () =>
@@ -298,27 +329,26 @@ function Destination({
   if (failure)
     return (
       <div role="alert">
-        <h1 className="text-title">This destination couldn’t open</h1>
+        <h1 className="text-title">{t("repositoryPage.failedTitle")}</h1>
         <p>
           {failure === "not-found"
-            ? "The requested entity was not found in this community."
-            : "Repository content is unavailable."}
+            ? t("repositoryPage.notFound")
+            : t("repositoryPage.unavailable")}
         </p>
-        <Button onClick={() => setRefresh((n) => n + 1)}>Retry</Button>
+        <Button onClick={() => setRefresh((n) => n + 1)}>
+          {t("repositoryPage.retry")}
+        </Button>
       </div>
     );
-  if (!data) return <p role="status">Loading repository...</p>;
+  if (!data) return <p role="status">{t("repositoryPage.loading")}</p>;
   const detail = data.detail;
   if (!detail)
     return (
       <>
         <h1 ref={heading} tabIndex={-1} className="text-title">
-          Destination no longer available
+          {t("repositoryPage.retiredTitle")}
         </h1>
-        <p role="status">
-          Project containers are no longer available. Open a repository, issue
-          or pull request link instead.
-        </p>
+        <p role="status">{t("repositoryPage.retired")}</p>
       </>
     );
   const active =
@@ -344,7 +374,9 @@ function Destination({
       <header className="repo-heading">
         <div>
           <p className="text-secondary">
-            Repository · {formatPublicKey(detail.entity.owner)}
+            {t("repositoryPage.owner", {
+              owner: formatPublicKey(detail.entity.owner) ?? "",
+            })}
           </p>
           <h1 ref={heading} tabIndex={-1} className="text-title">
             {detail.item
@@ -362,8 +394,8 @@ function Destination({
       )}
       <Tabs
         variant="panel"
-        label="Repository sections"
-        items={tabs}
+        label={t("repositoryPage.sections")}
+        items={tabs.map((tab) => ({ ...tab, label: t(tab.label) }))}
         value={active}
         onValueChange={(tab) =>
           go({
@@ -374,45 +406,45 @@ function Destination({
           })
         }
       />
-      <section className="repo-content" aria-label={labels[active]}>
+      <section className="repo-content" aria-label={t(labels[active])}>
         {detail.item ? (
           <>
             <p>
-              {detail.status} · {formatPublicKey(detail.item.pubkey)} ·{" "}
-              <time>
-                {new Date(detail.item.created_at * 1000).toLocaleString()}
-              </time>
+              {repositoryStatus(detail.status)} ·{" "}
+              {formatPublicKey(detail.item.pubkey)} ·{" "}
+              <time>{repositoryDate(detail.item.created_at)}</time>
             </p>
             <Body text={detail.item.content} open={open} scope={scope} />
             {commit && (
               <p>
-                Look up commit in the base repository:{" "}
-                <Button
-                  variant="link"
-                  disabled={!session.projectGit}
-                  onClick={() =>
-                    go({ ...base, type: "repo", tab: "commits", commit })
-                  }
-                >
-                  <code>{commit}</code>
-                </Button>{" "}
-                Exact PR diffs from external forks are unavailable. This lookup
-                only works if the commit is readable from the base repository.
+                {rich("repositoryPage.commitLookup", {
+                  lookup: (
+                    <Button
+                      variant="link"
+                      disabled={!session.projectGit}
+                      onClick={() =>
+                        go({ ...base, type: "repo", tab: "commits", commit })
+                      }
+                    >
+                      <code>{commit}</code>
+                    </Button>
+                  ),
+                })}
               </p>
             )}
-            <h2 className="text-heading">Discussion</h2>
+            <h2 className="text-heading">{t("repositoryPage.discussion")}</h2>
             {detail.activity.length ? (
               detail.activity.map((event) => (
                 <article className="repo-comment" key={event.id}>
                   <p className="text-secondary">
                     {formatPublicKey(event.pubkey)} ·{" "}
-                    {new Date(event.created_at * 1000).toLocaleString()}
+                    {repositoryDate(event.created_at)}
                   </p>
                   <Body text={event.content} open={open} scope={scope} />
                 </article>
               ))
             ) : (
-              <p>No comments.</p>
+              <p>{t("repositoryPage.noComments")}</p>
             )}
           </>
         ) : active === "overview" ? (
@@ -421,16 +453,16 @@ function Destination({
             {data.gitError ? (
               <p role="status">
                 {data.gitError === "denied"
-                  ? "Repository files require access to the linked channel."
-                  : "Repository files are unavailable."}{" "}
+                  ? t("repositoryPage.filesDenied")
+                  : t("repositoryPage.filesUnavailable")}{" "}
                 <Button variant="link" onClick={() => setRefresh((n) => n + 1)}>
-                  Retry files
+                  {t("repositoryPage.retryFiles")}
                 </Button>
               </p>
             ) : data.git?.readme ? (
               <Body text={data.git.readme} open={open} scope={scope} />
             ) : (
-              <p>No README in this repository.</p>
+              <p>{t("repositoryPage.noReadme")}</p>
             )}
           </>
         ) : active === "prs" || active === "issues" ? (
@@ -460,7 +492,13 @@ function Destination({
               })}
             </ul>
             {!detail.items.length && (
-              <p>No {labels[active].toLowerCase()} found.</p>
+              <p>
+                {t(
+                  active === "prs"
+                    ? "repositoryPage.noPrs"
+                    : "repositoryPage.noIssues",
+                )}
+              </p>
             )}
           </>
         ) : active === "channels" ? (
@@ -482,7 +520,7 @@ function Destination({
                 </Button>
               </li>
             ))}
-            {!channels.length && <li>No accessible linked channels.</li>}
+            {!channels.length && <li>{t("repositoryPage.noChannels")}</li>}
           </ul>
         ) : data.git ? (
           <GitContent
@@ -501,7 +539,7 @@ function Destination({
             }}
           />
         ) : (
-          <p>No repository linked.</p>
+          <p>{t("repositoryPage.noRepository")}</p>
         )}
       </section>
     </>
@@ -519,17 +557,18 @@ function GitContent({
   selectFile(path: string | undefined): void;
   selectCommit(hash: string): void;
 }) {
+  useLanguage();
   if (active === "files")
     return git.file ? (
       <>
         <Button variant="link" onClick={() => selectFile(undefined)}>
-          All files
+          {t("repositoryPage.allFiles")}
         </Button>
         <h2 className="text-heading">{git.file.path}</h2>
         {git.file.content !== null ? (
           <pre className="repo-code text-code">{git.file.content}</pre>
         ) : (
-          <p>Binary file or text larger than 1 MiB ({git.file.size} bytes).</p>
+          <p>{t("repositoryPage.binaryFile", { bytes: git.file.size })}</p>
         )}
       </>
     ) : (
@@ -540,23 +579,27 @@ function GitContent({
             <Button variant="link" onClick={() => selectFile(file.path)}>
               {file.path}
             </Button>
-            <small>{file.size} bytes</small>
+            <small>{t("repositoryPage.bytes", { bytes: file.size })}</small>
           </li>
         ))}
-        {!git.files.length && <li>No files.</li>}
+        {!git.files.length && <li>{t("repositoryPage.noFiles")}</li>}
       </ul>
     );
   if (active === "commits")
     return git.diff !== null ? (
       <>
-        <h2 className="text-heading">Commit {git.head}</h2>
-        <section aria-label="Commit changes">
+        <h2 className="text-heading">
+          {t("repositoryPage.commit", { hash: git.head ?? "" })}
+        </h2>
+        <section aria-label={t("repositoryPage.commitChanges")}>
           <pre className="repo-code text-code">{git.diff}</pre>
         </section>
       </>
     ) : (
       <>
-        <p className="text-secondary">Latest {git.commits.length} commits</p>
+        <p className="text-secondary">
+          {t("repositoryPage.latestCommits", { count: git.commits.length })}
+        </p>
         <ul className="repo-list">
           {git.commits.map((commit) => (
             <li key={commit.hash}>
@@ -577,7 +620,7 @@ function GitContent({
   return (
     <>
       <p className="text-secondary">
-        Contributors in the latest {git.commits.length} commits
+        {t("repositoryPage.contributorsCount", { count: git.commits.length })}
       </p>
       <ul className="repo-list">
         {[...counts]
@@ -585,7 +628,7 @@ function GitContent({
           .map(([name, count]) => (
             <li key={name}>
               <span>{name}</span>
-              <small>{count} commits</small>
+              <small>{t("repositoryPage.commitCount", { count })}</small>
             </li>
           ))}
       </ul>
@@ -593,22 +636,23 @@ function GitContent({
   );
 }
 function CopyLink({ route }: { route: EntityRoute }) {
-  const [status, setStatus] = useState("");
+  useLanguage();
+  const [status, setStatus] = useState<DisplayMessage>("");
   return (
     <div>
       <IconButton
         hint="familiar"
-        aria-label="Copy link"
-        title="Copy link"
+        aria-label={t("repositoryPage.copyLink")}
+        title={t("repositoryPage.copyLink")}
         icon={<CopyIcon size={18} />}
         onClick={() =>
           void writeClipboardText(entityHref(route)).then(
-            () => setStatus("Link copied"),
-            () => setStatus("Could not copy link"),
+            () => setStatus(localMessage("repositoryPage.copied")),
+            () => setStatus(localMessage("repositoryPage.copyFailed")),
           )
         }
       />
-      <span role="status">{status}</span>
+      <span role="status">{resolveMessage(status)}</span>
     </div>
   );
 }

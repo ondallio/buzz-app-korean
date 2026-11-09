@@ -21,6 +21,7 @@ import { backupOfferedFor } from "../features/identity/builderlab-account";
 import type { Identity } from "../features/identity/service";
 import type { FederatedIdentity } from "../features/federated-identity/service";
 import { CHANNEL_ACTIVITY_KINDS } from "../features/relay/channel-activity";
+import { setLanguage } from "../shared/i18n";
 import { IdentitySettings, keyActivity } from "./IdentitySettings";
 import { federatedFixture } from "../features/federated-identity/testing";
 
@@ -34,6 +35,7 @@ vi.mock("@tauri-apps/api/core", async (importOriginal) => ({
 const viewer = "ab".repeat(32);
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
 });
@@ -186,6 +188,15 @@ it("clears a revealed key when leaving identity settings and starts masked on re
   expect(screen.getByLabelText("Private key (nsec)")).toHaveValue(
     "nsec-public-test-fixture",
   );
+  const revealed = screen.getByLabelText("Private key (nsec)");
+  revealed.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByLabelText("비밀 키(nsec)")).toBe(revealed);
+  expect(revealed).toHaveFocus();
+  expect(revealed).toHaveValue("nsec-public-test-fixture");
+  expect(exportKey).toHaveBeenCalledTimes(1);
+  act(() => setLanguage("en"));
+  expect(screen.getByLabelText("Private key (nsec)")).toBe(revealed);
   view.rerender(<div />);
   expect(screen.queryByLabelText("Private key (nsec)")).toBeNull();
   view.rerender(<IdentitySettings viewer={viewer} identity={identity} />);
@@ -906,4 +917,65 @@ it("reads activity again when the relay connection changes", async () => {
   expect(await screen.findByText(/Last active 2 hours ago$/)).toBeVisible();
   // The account isn't read again for it.
   expect(fi.request).toHaveBeenCalledTimes(2);
+});
+
+it("retranslates retained copy feedback without replacing public-key controls or altering clipboard bytes", async () => {
+  setLanguage("en");
+  const user = userEvent.setup();
+  const writeText = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("denied"))
+    .mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText },
+  });
+  render(<IdentitySettings viewer={viewer} />, { wrapper: ToastProvider });
+  const publicCopy = screen.getByRole("button", { name: "Copy public key" });
+  const npubCopy = screen.getByRole("button", { name: "Copy nostr address" });
+  const key = screen.getByText(viewer, { exact: true });
+  await user.click(publicCopy);
+  expect(await screen.findByText("Identity wasn’t copied")).toBeVisible();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "공개 키 복사" })).toBe(publicCopy);
+  expect(publicCopy).toHaveFocus();
+  expect(screen.getByText(viewer, { exact: true })).toBe(key);
+  expect(
+    screen.getByText(
+      "공개 키를 복사하지 못했습니다. 직접 선택하여 복사해 주세요.",
+    ),
+  ).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Nostr 주소 복사" }));
+  expect(screen.getByText("Nostr 주소를 복사했습니다.")).toBeVisible();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Copy nostr address" })).toBe(
+    npubCopy,
+  );
+  expect(screen.getByText("Nostr address copied.")).toBeVisible();
+  expect(writeText.mock.calls).toEqual([[viewer], [npubEncode(viewer)]]);
+});
+
+it("changes structured backup feedback live without starting a new backup pass", async () => {
+  setLanguage("en");
+  vi.stubEnv("VITE_BUZZ_BUILDERLAB_URL", "https://builderlab.example");
+  const host = renderBackup(at(1, { status: "failed", kind: "unreachable" }));
+  await host.settled();
+  const feedback = status();
+  expect(feedback).toHaveTextContent(
+    "Couldn’t reach Builderlab to back up your key. Buzz tries again when you next sign in to Builderlab.",
+  );
+  act(() => setLanguage("ko"));
+  expect(status()).toBe(feedback);
+  expect(feedback).toHaveTextContent(
+    "키를 백업할 Builderlab에 연결하지 못했습니다. 다음에 Builderlab에 로그인하면 Buzz가 다시 시도합니다.",
+  );
+  expect(host.setBackupChoice).not.toHaveBeenCalled();
+  host.push(at(2, { status: "complete" }));
+  expect(screen.getByText("Builderlab과 동기화됨")).toBeVisible();
+  act(() => setLanguage("en"));
+  expect(screen.getByText("Synced with Builderlab")).toBeVisible();
+  expect(host.identity.backup.snapshot()).toMatchObject({
+    seq: 2,
+    status: "complete",
+  });
 });

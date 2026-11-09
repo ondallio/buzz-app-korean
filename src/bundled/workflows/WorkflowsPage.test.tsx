@@ -22,6 +22,7 @@ import { createAgentLibrary } from "../../features/agents/library";
 import { bindNames } from "../../features/identity-names/service";
 import { agentDirectory } from "../../features/identity-names/testing";
 import { ToastProvider } from "../../shared/design-system/ui/Toast";
+import { setLanguage } from "../../shared/i18n/language";
 import { WorkflowCommunity } from "./WorkflowsPage";
 import {
   createWorkflowFixture,
@@ -37,7 +38,10 @@ vi.stubGlobal(
     disconnect() {}
   },
 );
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 
 function mount(
   initialYaml = fixtureYaml,
@@ -1631,4 +1635,51 @@ it("describes an unreadable workflow outside its row button", async () => {
   expect(
     screen.getByText("Unreadable configuration").closest("button"),
   ).toBeNull();
+});
+
+it("keeps unnamed selection provenance separate from a real name equal to the English fallback", async () => {
+  const fixture = mount("not: [valid yaml");
+  fireEvent.click(
+    await screen.findByRole("button", {
+      name: /^Open Unnamed or malformed workflow:/,
+    }),
+  );
+  const tab = screen.getByRole("tab", {
+    name: "Unnamed or malformed workflow",
+  });
+  tab.focus();
+  const reads = fixture.calls.runs;
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("tab", { name: "이름이 없거나 형식이 잘못된 워크플로" }),
+  ).toBe(tab);
+  expect(tab).toHaveFocus();
+  const rename = (yaml: string) =>
+    act(() =>
+      fixture.definitions.update({
+        status: "ready",
+        data: { items: [{ ...fixtureDefinition, yaml }], partial: false },
+      }),
+    );
+  rename(
+    fixtureYaml.replace("Message helper", "Unnamed or malformed workflow"),
+  );
+  expect(
+    screen.getByRole("tab", { name: "Unnamed or malformed workflow" }),
+  ).toBe(tab);
+  expect(
+    screen.getByRole("region", {
+      name: "Unnamed or malformed workflow 세부 정보",
+    }),
+  ).toBeInTheDocument();
+  expect(tab).toHaveFocus();
+  rename("not: [valid yaml");
+  expect(
+    screen.getByRole("tab", { name: "이름이 없거나 형식이 잘못된 워크플로" }),
+  ).toBe(tab);
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("tab", { name: "Unnamed or malformed workflow" }),
+  ).toBe(tab);
+  expect(fixture.calls.runs).toBe(reads);
 });

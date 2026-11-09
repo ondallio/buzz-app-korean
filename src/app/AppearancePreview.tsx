@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../shared/i18n";
 import type { MessageDensity, MessageWidth } from "../shared/theme/service";
 import styles from "./AppearancePreview.module.css";
 
@@ -12,12 +13,13 @@ export function AppearancePreview({
   /** Join the preview to the related preference group. */
   embedded?: boolean;
 }) {
+  useLanguage();
   const effectiveWidth = density === "compact" ? "wide" : messageWidth;
   return (
     <figure
       className={styles.preview}
       data-embedded={embedded || undefined}
-      aria-label="Appearance preview"
+      aria-label={t("appearance.previewLabel")}
     >
       <div className={styles.scene} inert aria-hidden="true">
         <div className={styles.sidebar}>
@@ -66,10 +68,13 @@ export function AppearancePreview({
         </div>
       </div>
       <figcaption className="sr-only">
-        Illustrated preview of your current mode, accent, contrast, and{" "}
-        {density === "compact"
-          ? "Compact flat-list messages use the full conversation width."
-          : `Default bubble messages at ${messageWidth} width.`}
+        {t(
+          density === "compact"
+            ? "appearance.previewCompact"
+            : messageWidth === "wide"
+              ? "appearance.previewWide"
+              : "appearance.previewNarrow",
+        )}
       </figcaption>
     </figure>
   );

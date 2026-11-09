@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { setLanguage } from "../../shared/i18n";
+import { ToastProvider } from "../../shared/design-system/ui/Toast";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
@@ -31,7 +33,11 @@ const member = {
   viewerRole: "member",
   owners: [other],
 } as const satisfies Partial<ChannelSummary>;
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 function harness(value: ChannelSummary | undefined = channel) {
   const details = {
     channelId: "alpha",
@@ -405,3 +411,64 @@ it.each([true, false])(
     expect(h.run).not.toHaveBeenCalled();
   },
 );
+
+it("keeps an open header menu and its focused detail action across locale changes", async () => {
+  const h = harness();
+  h.mount();
+  const trigger = screen.getByRole("button", { name: "Channel actions" });
+  await userEvent.setup().click(trigger);
+  const details = await screen.findByRole("menuitem", {
+    name: "View channel details",
+  });
+  details.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "채널 작업" })).toBe(trigger);
+  expect(screen.getByRole("menuitem", { name: "채널 세부 정보 보기" })).toBe(
+    details,
+  );
+  expect(details).toHaveFocus();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("menuitem", { name: "View channel details" })).toBe(
+    details,
+  );
+  await userEvent.setup().keyboard("{Enter}");
+  expect(h.props.openDetails).toHaveBeenCalledExactlyOnceWith();
+  expect(h.run).not.toHaveBeenCalled();
+});
+
+it("keeps the failed lifecycle title live in its actual navigation owner after the confirming dialog closes", async () => {
+  const h = harness();
+  h.run.mockRejectedValueOnce(new Error("Provider raw {reason}"));
+  render(
+    <ToastProvider>
+      <ChannelNavigationProvider relay={h.relay}>
+        <ChannelHeaderMenu {...h.props} />
+      </ChannelNavigationProvider>
+    </ToastProvider>,
+  );
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Channel actions" }));
+  await user.click(
+    await screen.findByRole("menuitem", { name: "Delete channel" }),
+  );
+  const confirmation = await screen.findByRole("dialog", {
+    name: "Delete Alpha?",
+  });
+  await user.click(screen.getByRole("button", { name: "Delete channel" }));
+  const failed = await screen.findByRole("dialog", {
+    name: "Delete channel failed",
+  });
+  expect(confirmation).not.toBeInTheDocument();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("dialog", { name: "채널 삭제 실패" })).toBe(failed);
+  expect(failed).toHaveTextContent("Provider raw {reason}");
+  expect(h.run).toHaveBeenCalledExactlyOnceWith(
+    "delete",
+    channel.id,
+    expect.any(AbortSignal),
+  );
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("dialog", { name: "Delete channel failed" })).toBe(
+    failed,
+  );
+});

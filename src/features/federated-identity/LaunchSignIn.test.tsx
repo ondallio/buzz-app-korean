@@ -12,10 +12,14 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "../../shared/design-system/ui/Toast";
+import { setLanguage } from "../../shared/i18n";
 import { LaunchSignIn, SignInEnding } from "./LaunchSignIn";
 import type { SessionSnapshot } from "./service";
 import { federatedFixture } from "./testing";
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 // Lets a test say when the launch mark has left.
 const launch = vi.hoisted(() => new Set<() => void>());
 vi.mock("../../app/launch", async (actual) => ({
@@ -385,4 +389,35 @@ it("warns only in at-launch builds, once the session is ending", () => {
     </ToastProvider>,
   );
   expect(screen.queryByText(/sign-in ends/)).not.toBeInTheDocument();
+});
+
+it("keeps the same pending launch sign-in controls and attempt when their language changes", () => {
+  setLanguage("en");
+  const h = launchFixture("Example");
+  h.set({ status: "signed-out" });
+  render(
+    <LaunchSignIn identity={h.service}>
+      <Workspace />
+    </LaunchSignIn>,
+  );
+  const again = screen.getByRole("button", {
+    name: "Open the sign-in page again",
+  });
+  again.focus();
+  expect(h.service.signIn).toHaveBeenCalledExactlyOnceWith();
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("heading", { name: "Example 로그인 중" }),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: "로그인 페이지 다시 열기" })).toBe(
+    again,
+  );
+  expect(again).toHaveFocus();
+  expect(h.service.signIn).toHaveBeenCalledExactlyOnceWith();
+  expect(h.service.cancelSignIn).not.toHaveBeenCalled();
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("button", { name: "Open the sign-in page again" }),
+  ).toBe(again);
+  expect(h.service.snapshot().status).toBe("signing-in");
 });

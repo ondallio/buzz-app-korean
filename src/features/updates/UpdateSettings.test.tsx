@@ -10,6 +10,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../../shared/i18n/language";
 import { UpdateSettings } from "./UpdateSettings";
 import { createUpdates, type UpdatePlatform, type Updates } from "./updates";
 
@@ -23,6 +24,7 @@ vi.mock("@tauri-apps/api/core", () => ({ isTauri: native.isTauri }));
 let updates: Updates | undefined;
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   updates?.dispose();
 });
 
@@ -128,6 +130,18 @@ it("uses the installed version as the card title without a separate description"
         "Keep Buzz up to date with the latest features and fixes.",
       ),
     ).toBeNull();
+    const heading = screen.getByRole("heading", {
+      name: "Version 1.2.3",
+      level: 3,
+    });
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("heading", { name: "버전 1.2.3", level: 3 })).toBe(
+      heading,
+    );
+    act(() => setLanguage("en"));
+    expect(
+      screen.getByRole("heading", { name: "Version 1.2.3", level: 3 }),
+    ).toBe(heading);
     expect(native.getVersion).toHaveBeenCalledOnce();
   } finally {
     native.isTauri.mockReturnValue(false);
@@ -238,4 +252,38 @@ it("keeps focus through download, install and refused restart", async () => {
       install.resolve();
     });
   }
+});
+
+it("translates the same focused update action without restarting a held check or translating diagnostics", async () => {
+  const pending = deferred<null>();
+  const check = vi
+    .fn<UpdatePlatform["check"]>()
+    .mockResolvedValueOnce(null)
+    .mockReturnValueOnce(pending.promise)
+    .mockResolvedValue(null);
+  renderSettings({ check });
+  await afterBackgroundCheck(check);
+  const action = screen.getByRole("button", { name: "Check for updates" });
+  const status = screen.getByRole("status");
+  action.focus();
+  fireEvent.click(action);
+  await waitFor(() => expect(check).toHaveBeenCalledTimes(2));
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("heading", { name: "소프트웨어 업데이트" }),
+  ).toBeVisible();
+  expect(screen.getByRole("status")).toBe(status);
+  expect(status).toHaveTextContent("업데이트를 확인하고 있습니다…");
+  expect(action).toHaveFocus();
+  expect(check).toHaveBeenCalledTimes(2);
+  await act(async () => pending.reject(new Error("Check for updates")));
+  expect(screen.getByRole("button", { name: "다시 시도" })).toBe(action);
+  expect(status).toHaveTextContent("업데이트 실패: Check for updates");
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Retry" })).toBe(action);
+  expect(status).toHaveTextContent("Update failed: Check for updates");
+  expect(action).toHaveFocus();
+  fireEvent.click(action);
+  await screen.findByText("You're on the latest version.");
+  expect(check).toHaveBeenCalledTimes(3);
 });

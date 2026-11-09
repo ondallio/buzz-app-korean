@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 // Who Share sends an agent to: people by direct message, or a channel the
 // viewer belongs to, found with one search as Share access does.
 import { useSyncExternalStore, type Ref } from "react";
@@ -39,6 +40,7 @@ export function AgentShareRecipients({
   onQueryChange(query: string): void;
   onChange(targets: ShareTarget[]): void;
 }) {
+  useLanguage();
   const directory = usePeople(session, query);
   const list = useSyncExternalStore(
     session.channels.subscribeList,
@@ -119,33 +121,40 @@ export function AgentShareRecipients({
     <>
       <SearchField
         inputRef={inputRef}
-        label="Search people and channels"
-        placeholder="Send to people or a channel"
+        label={t("mentionPicker.shareSearch")}
+        placeholder={t("mentionPicker.sharePlaceholder")}
+        clearLabel={t("mentionPicker.shareClear")}
         value={query}
         disabled={disabled}
         onValueChange={onQueryChange}
         maxLength={256}
       />
       <div className={`${styles.results} buzz-thin-scrollbar`}>
-        {group(`Sending to · ${chosen.length}`, [...chosen], true)}
-        {group("People", people)}
-        {group("Channels", channels)}
+        {group(
+          t("mentionPicker.sendingTo", { count: chosen.length }),
+          [...chosen],
+          true,
+        )}
+        {group(t("mentionPicker.people"), people)}
+        {group(t("mentionPicker.channels"), channels)}
         {directory.loading && !people.length ? (
           <p
             role="status"
             className={`${styles.note} text-body-sm text-subtle`}
           >
-            {needle ? "Searching…" : "Loading people…"}
+            {needle
+              ? t("mentionPicker.searching")
+              : t("mentionPicker.loadingPeople")}
           </p>
         ) : (
           !people.length &&
           !channels.length && (
             <p className={`${styles.note} text-body-sm text-subtle`}>
               {directory.tooShort
-                ? `Type at least ${SEARCH_MIN_CHARS} characters to search people.`
+                ? t("mentionPicker.minCharacters", { count: SEARCH_MIN_CHARS })
                 : needle
-                  ? "No people or channels match your search."
-                  : "No one else to send to yet."}
+                  ? t("mentionPicker.noTargets")
+                  : t("mentionPicker.noOthers")}
             </p>
           )
         )}

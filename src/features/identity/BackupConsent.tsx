@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useEffect,
   useRef,
@@ -183,8 +184,9 @@ export function BackupPrompt({
   /** The consent wait is over, by this answer or another. */
   ended?: boolean;
 }) {
+  useLanguage();
   const [saving, setSaving] = useState<boolean>();
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<string | true>();
   const sync = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (ended && saving === undefined && error === undefined) onClose();
@@ -202,18 +204,14 @@ export function BackupPrompt({
         () => onClose(automatic),
         (reason) => {
           setSaving(undefined);
-          setError(
-            typeof reason === "string"
-              ? reason
-              : "Could not save your choice. Try again.",
-          );
+          setError(typeof reason === "string" ? reason : true);
         },
       );
   };
   return (
     <AlertDialog
-      title="Sync your identity with Builderlab?"
-      description="Buzz will save an encrypted copy of your identity key with your Builderlab account. That copy can restore your identity, including in other apps where you use the same key."
+      title={t("identityMore.backupTitle")}
+      description={t("identityMore.backupDescription")}
       onClose={onClose}
       initialFocus={sync}
       finalFocus={finalFocus}
@@ -226,7 +224,7 @@ export function BackupPrompt({
             loading={saving === false}
             onClick={() => answer(false)}
           >
-            I will manage my own key
+            {t("identityMore.manageOwnKey")}
           </Button>
           <Button
             ref={sync}
@@ -236,12 +234,16 @@ export function BackupPrompt({
             loading={saving === true}
             onClick={() => answer(true)}
           >
-            Sync with Builderlab
+            {t("identityMore.syncBuilderlab")}
           </Button>
         </>
       }
     >
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p role="alert">
+          {error === true ? t("identityMore.backupSaveFailed") : error}
+        </p>
+      )}
     </AlertDialog>
   );
 }

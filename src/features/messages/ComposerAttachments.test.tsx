@@ -7,6 +7,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
 import { assert, afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ConversationPresentation } from "../conversation/ConversationPresentation";
 import { ComposerAttachments } from "./ComposerAttachments";
@@ -136,6 +137,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -940,4 +942,66 @@ it("keeps the local thumbnail until the uploaded image has loaded", () => {
   fireEvent.load(incoming);
   expect(sources()).toEqual([canonical]);
   expect(view.container.querySelector("img")).toBe(incoming);
+});
+
+import { setLanguage } from "../../shared/i18n";
+it("retains attachment selection and original file names while the mounted preview changes language", async () => {
+  setLanguage("en");
+  const remove = vi.fn();
+  const items = [
+    {
+      id: "image",
+      file: new File(["png"], "사용자-photo.png", { type: "image/png" }),
+      status: "uploading" as const,
+    },
+    {
+      id: "pdf",
+      file: new File(["pdf"], "report.pdf", { type: "application/pdf" }),
+      status: "queued" as const,
+    },
+  ];
+  render(
+    <ComposerAttachments
+      items={items}
+      disabled={false}
+      remove={remove}
+      retry={vi.fn()}
+      media={() => undefined}
+    />,
+  );
+  const preview = screen.getByRole("button", {
+    name: "Preview 사용자-photo.png",
+  });
+  fireEvent.click(preview);
+  const dialog = screen.getByRole("dialog", { name: "Attachment preview" });
+  const next = screen.getByRole("button", { name: "Next attachment" });
+  next.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("dialog", { name: "첨부 파일 미리보기" })).toBe(
+    dialog,
+  );
+  expect(screen.getByRole("button", { name: "다음 첨부 파일" })).toBe(next);
+  expect(next).toHaveFocus();
+  expect(dialog).toHaveTextContent("사용자-photo.png");
+  fireEvent.click(next);
+  expect(dialog).toHaveTextContent("report.pdf");
+  expect(dialog).toHaveTextContent(
+    "이 파일 형식은 미리보기를 지원하지 않습니다.",
+  );
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("dialog", { name: "Attachment preview" })).toBe(
+    dialog,
+  );
+  expect(dialog).toHaveTextContent("report.pdf");
+  fireEvent.keyDown(dialog, { key: "Escape" });
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Preview report.pdf" }),
+    ),
+  );
+  expect(items.map((item) => [item.id, item.file.name, item.status])).toEqual([
+    ["image", "사용자-photo.png", "uploading"],
+    ["pdf", "report.pdf", "queued"],
+  ]);
+  expect(remove).not.toHaveBeenCalled();
 });

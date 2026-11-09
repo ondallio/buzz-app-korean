@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { Context } from "@deepseek-ai/cordis";
+import { setLanguage } from "../../shared/i18n";
 import { AgentsContext } from "../../features/agents/react";
 import { AgentsService, type Agents } from "../../features/agents/service";
 import {
@@ -20,6 +21,7 @@ import {
   renderHook,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { finalizeEvent, generateSecretKey } from "nostr-tools";
 import { npubEncode } from "nostr-tools/nip19";
@@ -57,6 +59,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.useRealTimers();
   vi.unstubAllGlobals();
   Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
@@ -303,9 +306,19 @@ it("late teams preserve the highlighted recipient and all 50 installed people", 
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(50));
     // Agent knowledge may arrive late and mark a row; the rows themselves stay.
     const rows = () =>
-      screen
-        .getAllByRole("option")
-        .map((row) => row.textContent?.replace(/ Agent$/, ""));
+      screen.getAllByRole("option").map((row) => {
+        const id = row.getAttribute("data-completion-id");
+        const person = h.people.find((candidate) => candidate.pubkey === id);
+        if (!person)
+          throw new Error("Completion row lost its original recipient ID");
+        expect(
+          within(row).getByText(person.name, { exact: true }),
+        ).toBeVisible();
+        expect(row).toHaveAccessibleName(
+          new RegExp(`^${person.name}(?: Agent)?$`),
+        );
+        return id;
+      });
     const initial = rows();
     press("ArrowUp");
     expect(screen.getByRole("option", { selected: true })).toHaveTextContent(
@@ -1457,3 +1470,105 @@ it("projects confirmed synced teams through the real service without colliding w
     await h.context.fiber.dispose();
   }
 });
+
+it.each(["legacy", "saved"] as const)(
+  "localizes %s team captions from raw metadata without changing inline provider results",
+  async (kind) => {
+    const saved = kind === "saved" ? await savedTeamFixture() : undefined;
+    const h = saved ?? fixture({ count: 2, team: 2 });
+    const service = saved?.service;
+    const rawName = service ? "Raw {team} 한글" : "Team";
+    if (service)
+      await service.saveTeam({
+        name: rawName,
+        instructions: "Raw instructions",
+        members: h.people.map((person) => person.pubkey),
+      });
+    function Probe() {
+      const model = useMentionChoices(h.session, "parent", false, "", "probe");
+      const teams = useTeamMentions(h.session, "parent", false, "", model);
+      return (
+        <output data-testid="team-metadata">
+          {JSON.stringify(teams.choices.map((choice) => choice.presentation))}
+        </output>
+      );
+    }
+    const publish = vi.fn(),
+      selectTeam = vi.fn(() => true);
+    const content = (
+      <>
+        <Probe />
+        <MentionCompletion
+          session={h.session}
+          scope="test"
+          channelId="parent"
+          observation={{ revision: 1, text: "@", start: 1, end: 1 }}
+          query={{ start: 0, end: 1, query: "" }}
+          publish={publish}
+        />
+        <MentionPicker
+          session={h.session}
+          scope="test"
+          channelId="parent"
+          disabled={false}
+          select={() => true}
+          selectTeam={selectTeam}
+        />
+      </>
+    );
+    const view = render(
+      service ? (
+        <AgentsContext.Provider value={service}>
+          {content}
+        </AgentsContext.Provider>
+      ) : (
+        content
+      ),
+    );
+    try {
+      const user = userEvent.setup();
+      await user.click(
+        screen.getByRole("button", { name: "Mention a member" }),
+      );
+      const row = await screen.findByRole("button", {
+        name: new RegExp(
+          `${rawName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}.*Saved team`,
+        ),
+      });
+      await waitFor(() => expect(row).toBeEnabled());
+      expect(screen.getByTestId("team-metadata")).toHaveTextContent(
+        '[{"count":2,"outside":0}]',
+      );
+      const source = completion(publish).items.find(
+        (item) => item.label === rawName,
+      );
+      expect(source).toMatchObject({
+        label: rawName,
+        detail: "Saved team · 2 agents",
+        edit: { mentions: h.people },
+      });
+      expect(source).not.toHaveProperty("presentation");
+      const calls = publish.mock.calls.length,
+        reads = h.read.mock.calls.length;
+      act(() => setLanguage("ko"));
+      expect(
+        screen.getByRole("button", {
+          name: `${rawName} · 저장된 팀 · 에이전트 2명`,
+        }),
+      ).toBe(row);
+      expect(
+        completion(publish).items.find((item) => item.label === rawName),
+      ).toBe(source);
+      expect(publish).toHaveBeenCalledTimes(calls);
+      expect(h.read).toHaveBeenCalledTimes(reads);
+      act(() => setLanguage("en"));
+      expect(row).toHaveTextContent("Saved team · 2 agents");
+      await user.click(row);
+      expect(selectTeam).toHaveBeenCalledExactlyOnceWith(h.people);
+    } finally {
+      view.unmount();
+      h.library.dispose();
+      if (saved) await saved.context.fiber.dispose();
+    }
+  },
+);

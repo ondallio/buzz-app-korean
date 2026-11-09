@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { LanguageProviders } from "../../app/LanguageProviders";
+import { setLanguage } from "../../shared/i18n";
 import { StrictMode, type ReactNode } from "react";
 import {
   act,
@@ -24,6 +26,7 @@ import {
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  setLanguage("en");
 });
 function fixture(
   run: (
@@ -202,46 +205,53 @@ it.each([true, false])(
   },
 );
 
-it("retains the settings tab close control when an archive action remounts", () => {
-  const view = mount(fixture().relay);
-  const content = (archived: boolean) => (
-    <PanelWorkspace
-      value="settings"
-      select={() => {}}
-      items={[
-        {
-          id: "settings",
-          label: "Channel settings",
-          close: () => {},
-          content: (
-            <aside aria-label="Channel settings">
-              <button type="button">Canvas</button>
-              <button key={String(archived)} type="button">
-                {archived ? "Unarchive channel" : "Archive channel"}
-              </button>
-            </aside>
-          ),
-        },
-      ]}
-    />
-  );
-  const panel = render(content(false));
-  const trigger = panel.getByRole("button", { name: "Archive channel" });
-  const close = panel.getByRole("button", {
-    name: "Close Channel settings tab",
-  });
-  act(() =>
-    view.result.current.openLifecycle(
-      { id: "channel", name: "Channel" },
-      "archive",
-      trigger,
-    ),
-  );
-  panel.rerender(content(true));
-  expect(trigger.isConnected).toBe(false);
-  expect(view.result.current.lifecycleDialog?.focusFallback).toBe(close);
-  expect(close.isConnected).toBe(true);
-});
+it.each(["en", "ko"] as const)(
+  "retains the %s settings tab close control when an archive action remounts",
+  (language) => {
+    setLanguage(language);
+    const view = mount(fixture().relay);
+    const content = (archived: boolean) => (
+      <LanguageProviders>
+        <PanelWorkspace
+          value="settings"
+          select={() => {}}
+          items={[
+            {
+              id: "settings",
+              label: language === "ko" ? "채널 설정" : "Channel settings",
+              close: () => {},
+              content: (
+                <aside aria-label="Channel settings">
+                  <button type="button">Canvas</button>
+                  <button key={String(archived)} type="button">
+                    {archived ? "Unarchive channel" : "Archive channel"}
+                  </button>
+                </aside>
+              ),
+            },
+          ]}
+        />
+      </LanguageProviders>
+    );
+    const panel = render(content(false));
+    const trigger = panel.getByRole("button", { name: "Archive channel" });
+    const close = panel.getByRole("button", {
+      name:
+        language === "ko" ? "채널 설정 탭 닫기" : "Close Channel settings tab",
+    });
+    act(() =>
+      view.result.current.openLifecycle(
+        { id: "channel", name: "Channel" },
+        "archive",
+        trigger,
+      ),
+    );
+    panel.rerender(content(true));
+    expect(trigger.isConnected).toBe(false);
+    expect(view.result.current.lifecycleDialog?.focusFallback).toBe(close);
+    expect(close.isConnected).toBe(true);
+  },
+);
 
 it("publishes sidebar actions to a sibling menu and retires them with the session", () => {
   const h = fixture();

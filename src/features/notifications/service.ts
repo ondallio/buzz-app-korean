@@ -18,7 +18,11 @@ import {
   resolveCategorySound,
   type SoundName,
 } from "./sound";
-import { pluginNotificationText, type NotificationText } from "./content";
+import {
+  defaultNotificationText,
+  pluginNotificationText,
+  type NotificationText,
+} from "./content";
 
 export type NotificationCategoryDescriptor = Readonly<{
   id: string;
@@ -342,7 +346,7 @@ export class NotificationsService extends Service implements Notifications {
           )
         )
           return Promise.reject(new Error("Invalid notification text"));
-        const text = pluginNotificationText(input, current.label);
+        const text = pluginNotificationText(input, current.label, current.key);
         return this.admit(
           current.key,
           current.label,
@@ -361,10 +365,8 @@ export class NotificationsService extends Service implements Notifications {
     input: NotificationInput,
     valid: () => boolean,
     eligible: () => NotificationEligibility = () => true,
-    text: () => NotificationText = () => ({
-      title: "Buzz",
-      body: `New ${label.toLowerCase()}`,
-    }),
+    text: () => NotificationText = () =>
+      defaultNotificationText(category, label),
   ) {
     const viewer = this.state.viewer;
     if (this.closed || !viewer || !valid()) return false;

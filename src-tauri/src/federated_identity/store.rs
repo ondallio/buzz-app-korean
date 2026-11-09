@@ -6,11 +6,8 @@ use zeroize::{Zeroize, Zeroizing};
 /// Not keyed by app identifier: like the human key, every Buzz copy of this
 /// flavour shares each server's session per profile, and Sign out of Buzz
 /// erases them all.
-pub(crate) const SERVICE: &str = if cfg!(debug_assertions) {
-    "xyz.block.buzz.desktop.federated-session.debug"
-} else {
-    "xyz.block.buzz.desktop.federated-session"
-};
+pub(crate) const SERVICE: &str =
+    buzz_credential_store::distribution::session_service(cfg!(debug_assertions));
 const MAX_BUNDLE: usize = 1024 * 1024;
 
 pub(crate) type LoadedRecord = (Option<Zeroizing<Vec<u8>>>, Option<String>);
@@ -911,4 +908,22 @@ mod tests {
         );
         drop(inherited);
     }
+}
+
+#[test]
+fn distribution_federated_service_and_data_root_use_the_same_owner() {
+    if let Some(id) = option_env!("BUZZ_DISTRIBUTION_ID") {
+        assert_eq!(
+            SERVICE,
+            format!(
+                "{id}.federated-session{}",
+                if cfg!(debug_assertions) { ".debug" } else { "" }
+            )
+        );
+    }
+    assert!(buzz_credential_store::distribution::session_service_allowed(SERVICE));
+    assert_eq!(
+        root().unwrap().file_name().unwrap(),
+        format!(".{SERVICE}").as_str()
+    );
 }

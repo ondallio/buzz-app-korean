@@ -31,12 +31,96 @@ import { ToastProvider } from "../../shared/design-system/ui/Toast";
 import { SOLO_LABEL } from "../../features/solo/labels";
 import type { ChannelDetailsCapability } from "../../features/relay/channel-details";
 import { SIDEBAR_REVEAL_BUDGET_MS } from "../../bundled/channels/useSidebarStartup";
+import { setLanguage } from "../../shared/i18n";
 stubAvatarBrowserApis();
 afterEach(() => {
   cleanup();
   for (const owner of owners.splice(0)) owner.dispose();
   localStorage.clear();
+  setLanguage("en");
 });
+
+it("changes shell language without replacing a live rename draft, focus or the canonical Solo filter", async () => {
+  setLanguage("en");
+  const user = userEvent.setup();
+  const f = fixture(true);
+  Object.assign(f.session, {
+    channelDetails: {
+      ...f.session.channelDetails,
+      available: true,
+      load: vi.fn(async () => ({
+        channelId: id,
+        name: "Planning",
+        description: "",
+        visibility: "private",
+        labels: [SOLO_LABEL],
+        version: "original",
+        canEdit: true,
+      })),
+      save: vi.fn(async () => {}),
+    },
+  });
+  const solo = screen.getByRole("tab", { name: "Solo" });
+  await user.click(solo);
+  await user.dblClick(screen.getByRole("button", { name: /^Planning/ }));
+  const input = await screen.findByRole("textbox", { name: "Chat name" });
+  await user.clear(input);
+  await user.type(input, "사용자가 작성한 초안");
+  const opened = f.open.mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("tab", { name: "솔로" })).toBe(solo);
+  expect(solo).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("textbox", { name: "채팅 이름" })).toBe(input);
+  expect(input).toHaveAccessibleName("채팅 이름");
+  expect(input).toHaveValue("사용자가 작성한 초안");
+  expect(input).toHaveFocus();
+  expect(screen.getByRole("button", { name: "새로 만들기" })).toBeVisible();
+  expect(
+    readView<{ filter: string }>(scope, "navigation-scope", { filter: "none" })
+      .filter,
+  ).toBe("solo");
+  expect(f.open.mock.calls.length).toBe(opened);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("tab", { name: "Solo" })).toBe(solo);
+  expect(input).toHaveAccessibleName("Chat name");
+  expect(input).toHaveValue("사용자가 작성한 초안");
+  expect(input).toHaveFocus();
+});
+
+it.each(["Nexus", "Solo"])(
+  "preserves the supplied Solo title %s while translating built-in filter labels",
+  async (title) => {
+    setLanguage("en");
+    const h = createSoloRegionFixture(viewer);
+    await h.register({ title, component: () => null });
+    const view = render(
+      <ToastProvider>
+        <PrimarySidebar
+          relay={h.relay}
+          navigator={h.navigator}
+          target={conversationTarget(h.scope, "owned")}
+        >
+          {null}
+        </PrimarySidebar>
+      </ToastProvider>,
+    );
+    try {
+      const tab = screen.getByRole("tab", { name: title });
+      act(() => setLanguage("ko"));
+      expect(screen.getByRole("tab", { name: title })).toBe(tab);
+      expect(
+        screen.getAllByRole("tab").map((item) => item.textContent),
+      ).toEqual(
+        title === "Solo" ? ["전체", "Solo", "팀"] : ["전체", "팀", "Nexus"],
+      );
+      act(() => setLanguage("en"));
+      expect(screen.getByRole("tab", { name: title })).toBe(tab);
+    } finally {
+      view.unmount();
+      await h.dispose();
+    }
+  },
+);
 
 it("double-clicks a Solo row to edit its selected name, retaining a failed save for retry", async () => {
   const user = userEvent.setup();
@@ -1086,4 +1170,32 @@ it("shows Try again beside a settled failure, and Connecting while the connectio
       within(sidebar()).queryByRole("button", { name: "Try again" }),
     ).toBeNull();
   }
+});
+
+it("updates the open New menu in both languages without replacing its focused item or canonical DM destination", async () => {
+  setLanguage("en");
+  const user = userEvent.setup();
+  const f = fixture(true);
+  await user.click(screen.getByRole("button", { name: "New" }));
+  const chat = await screen.findByRole("menuitem", { name: "New chat" });
+  chat.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("menuitem", { name: "새 채팅" })).toBe(chat);
+  expect(chat).toHaveFocus();
+  expect(
+    screen.getAllByRole("menuitem").map((item) => item.textContent),
+  ).toEqual(["새 채팅", "새 작업 공간", "새 DM", "새 채널", "새 섹션"]);
+  expect(screen.getByRole("group", { name: "솔로" })).toBeVisible();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("menuitem", { name: "New chat" })).toBe(chat);
+  expect(chat).toHaveFocus();
+  await user.click(screen.getByRole("menuitem", { name: "New DM" }));
+  expect(f.open).toHaveBeenLastCalledWith({
+    version: 1,
+    kind: "page",
+    pluginId: "buzz.channels",
+    pageId: "channels",
+    scope: { viewer, communityOrigin: "https://relay.test" },
+    route: { version: 1, params: "new-message" },
+  });
 });

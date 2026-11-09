@@ -1,3 +1,13 @@
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
+import {
+  localMessage,
+  localError,
+  errorMessage,
+  resolveMessage,
+  type LocalMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { SettingsGroup } from "../../shared/design-system/ui/SettingsGroup";
 import {
   useCallback,
@@ -29,8 +39,8 @@ import { ToastNotice } from "../../shared/design-system/ui/Toast";
 import { CustomEmoji } from "./CustomEmoji";
 import styles from "./Emoji.module.css";
 
-const message = (reason: unknown, fallback: string) =>
-  reason instanceof Error && reason.message ? reason.message : fallback;
+const message = (reason: unknown, fallback: LocalMessage): DisplayMessage =>
+  reason instanceof Error && reason.message ? errorMessage(reason) : fallback;
 
 /** Desktop's custom emoji card: each member adds to their own kind-30030 set. */
 export function CustomEmojiSettings({
@@ -40,18 +50,14 @@ export function CustomEmojiSettings({
   relay: RelayData;
   active(): boolean;
 }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   return (
     <section aria-labelledby="custom-emoji-settings-title">
       <Header
         id="custom-emoji-settings-title"
-        title="Custom emoji"
-        subtitle={
-          <>
-            Share custom emoji on this relay. Use <code>:name:</code> in
-            messages and reactions.
-          </>
-        }
+        title={t("customEmoji.title")}
+        subtitle={rich("customEmoji.subtitle", { code: <code>:name:</code> })}
       />
       {connection.status === "ready" && (
         <Editor
@@ -71,6 +77,7 @@ function Editor({
   session: RelaySession;
   active(): boolean;
 }) {
+  useLanguage();
   const catalog = useSyncExternalStore(
     session.emoji.subscribe,
     session.emoji.snapshot,
@@ -82,7 +89,7 @@ function Editor({
   );
   const [query, setQuery] = useState("");
   const [removing, setRemoving] = useState<string>();
-  const [removeError, setRemoveError] = useState("");
+  const [removeError, setRemoveError] = useState<DisplayMessage>("");
   const [removed, setRemoved] = useState<string>();
   const browseRef = useRef<HTMLFieldSetElement>(null);
   const removeFocus = useRef<HTMLButtonElement | null>(null);
@@ -90,7 +97,7 @@ function Editor({
   const [image, setImage] = useState<{ url: string; filename: string }>();
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const [added, setAdded] = useState<string>();
   const input = useRef<HTMLInputElement>(null);
   const uploadButton = useRef<HTMLButtonElement>(null);
@@ -152,18 +159,18 @@ function Editor({
     setError("");
     try {
       if (!file.type.startsWith("image/"))
-        throw new Error("Choose an image file for custom emoji.");
+        throw localError("customEmoji.invalidImage");
       const prepared = await prepareAttachment(file, controller.signal);
       const result = await upload(prepared, controller.signal);
       if (!live()) return;
       if (!result.type.startsWith("image/"))
-        throw new Error("Choose an image file for custom emoji.");
+        throw localError("customEmoji.invalidImage");
       setImage({ url: result.url, filename: file.name });
       const suggested = suggestShortcode(file.name);
       if (suggested && !nameRef.current.trim()) setName(suggested);
     } catch (reason) {
       if (!controller.signal.aborted && live())
-        setError(message(reason, "Failed to upload emoji image."));
+        setError(message(reason, localMessage("customEmoji.uploadFailed")));
     } finally {
       if (uploadController.current === controller)
         uploadController.current = null;
@@ -183,7 +190,8 @@ function Editor({
       setImage(undefined);
       setAdded(stored);
     } catch (reason) {
-      if (live()) setError(message(reason, "Failed to add emoji."));
+      if (live())
+        setError(message(reason, localMessage("customEmoji.addFailed")));
     } finally {
       if (live()) setSaving(false);
     }
@@ -199,7 +207,10 @@ function Editor({
       await remove(shortcode);
       if (live()) setRemoved(shortcode);
     } catch (reason) {
-      if (live()) setRemoveError(message(reason, "Failed to remove emoji."));
+      if (live())
+        setRemoveError(
+          message(reason, localMessage("customEmoji.removeFailed")),
+        );
     } finally {
       if (live()) setRemoving(undefined);
     }
@@ -214,15 +225,15 @@ function Editor({
       onClick={() => input.current?.click()}
     >
       {uploading
-        ? "Uploading…"
+        ? t("customEmoji.uploading")
         : image
-          ? "Choose different image"
-          : "Upload image"}
+          ? t("customEmoji.chooseDifferent")
+          : t("customEmoji.uploadImage")}
     </Button>
   );
   const addPanel = canAuthor ? (
     <form
-      aria-label="Add emoji"
+      aria-label={t("customEmoji.add")}
       className="grid gap-4"
       onSubmit={(event) => {
         event.preventDefault();
@@ -237,7 +248,7 @@ function Editor({
         type="file"
         className="sr-only"
         tabIndex={-1}
-        aria-label="Upload image"
+        aria-label={t("customEmoji.uploadImage")}
         accept="image/gif,image/png,image/jpeg,image/webp"
         disabled={uploading || saving}
         onChange={(event) => {
@@ -249,12 +260,12 @@ function Editor({
       {image ? (
         <SettingsGroup layout="form">
           <div className="grid gap-2">
-            <InlineHeader title="Selected image" />
+            <InlineHeader title={t("customEmoji.selectedImage")} />
             <div className="flex flex-wrap items-center gap-3">
               {preview && (
                 <span className={styles.emojiPreview}>
                   <img
-                    alt="Selected custom emoji preview"
+                    alt={t("customEmoji.preview")}
                     src={preview}
                     draggable={false}
                   />
@@ -267,13 +278,9 @@ function Editor({
             </div>
           </div>
           <Field
-            label="Give it a name"
-            description="Type this name between colons in messages and reactions."
-            error={
-              nameInvalid
-                ? "Use only letters, numbers, hyphen, or underscore."
-                : undefined
-            }
+            label={t("customEmoji.name")}
+            description={t("customEmoji.nameHelp")}
+            error={nameInvalid ? t("customEmoji.invalidName") : undefined}
           >
             <InputGroup leading=":" trailing=":">
               <Input
@@ -289,12 +296,12 @@ function Editor({
           </Field>
           {image && !nameInvalid && replacing && (
             <p className="text-body-sm text-muted">
-              You already have :{normalized}: — saving will replace its image.
+              {t("customEmoji.replacing", { shortcode: normalized ?? "" })}
             </p>
           )}
           {error && (
             <p role="alert" className="error">
-              {error}
+              {resolveMessage(error)}
             </p>
           )}
           {image && (
@@ -310,7 +317,7 @@ function Editor({
                   setError("");
                 }}
               >
-                Clear
+                {t("customEmoji.clear")}
               </Button>
               <Button
                 ref={saveButton}
@@ -319,7 +326,7 @@ function Editor({
                 loading={saving}
                 disabled={uploading || !!removing || !normalized}
               >
-                {saving ? "Saving…" : "Save emoji"}
+                {saving ? t("customEmoji.saving") : t("customEmoji.save")}
               </Button>
             </div>
           )}
@@ -327,14 +334,14 @@ function Editor({
       ) : (
         <EmptyState
           icon={<SmileyIcon />}
-          title="Upload an image"
-          description="Upload a GIF, PNG, JPEG, or WebP. Square images work best."
+          title={t("customEmoji.uploadTitle")}
+          description={t("customEmoji.uploadHelp")}
           action={uploadAction}
         />
       )}
       {!image && error && (
         <p role="alert" className="error">
-          {error}
+          {resolveMessage(error)}
         </p>
       )}
     </form>
@@ -356,41 +363,49 @@ function Editor({
       <fieldset
         ref={showingCommunity ? undefined : browseRef}
         tabIndex={-1}
-        aria-label={showingCommunity ? "Community emoji" : "My emojis"}
+        aria-label={
+          showingCommunity ? t("customEmoji.community") : t("customEmoji.mine")
+        }
         className="grid min-w-0 gap-2"
       >
         {showingCommunity && (
           <div className={styles.emojiBrowseControls}>
-            <SearchField value={query} onValueChange={setQuery} />
+            <SearchField
+              label={t("customEmoji.searchLabel")}
+              clearLabel={t("customEmoji.clearSearch")}
+              placeholder={t("customEmoji.search")}
+              value={query}
+              onValueChange={setQuery}
+            />
           </div>
         )}
         {!showingCommunity && removeError && (
           <p role="alert" className="error">
-            {removeError}
+            {resolveMessage(removeError)}
           </p>
         )}
         {catalog.error && (
           <>
             <p role="alert">{catalog.error}</p>
             <Button onClick={() => void session.emoji.refresh()}>
-              Retry emoji
+              {t("customEmoji.retry")}
             </Button>
           </>
         )}
         {catalog.status === "error" ? null : catalog.status !== "ready" ? (
-          <p className="text-body-sm text-muted">Loading…</p>
+          <p className="text-body-sm text-muted">{t("customEmoji.loading")}</p>
         ) : !entries.length ? (
           showingCommunity ? (
             <EmptyState
               icon={<SmileyIcon />}
-              title="No results"
+              title={t("customEmoji.noResults")}
               description={null}
             />
           ) : (
             <EmptyState
               icon={<SmileyIcon />}
-              title="No emojis yet"
-              description="Add an image to use in messages and reactions."
+              title={t("customEmoji.empty")}
+              description={t("customEmoji.emptyHelp")}
               action={
                 canAuthor && (
                   <Button
@@ -399,7 +414,7 @@ function Editor({
                       setTab("add");
                     }}
                   >
-                    Add emoji
+                    {t("customEmoji.add")}
                   </Button>
                 )
               }
@@ -416,7 +431,9 @@ function Editor({
                   </span>
                   {!showingCommunity && remove && (
                     <IconButton
-                      aria-label={`Remove :${emoji.shortcode}:`}
+                      aria-label={t("customEmoji.removeNamed", {
+                        shortcode: emoji.shortcode,
+                      })}
                       icon={<TrashIcon aria-hidden="true" />}
                       loading={removing === emoji.shortcode}
                       disabled={!!removing || saving}
@@ -436,21 +453,23 @@ function Editor({
   return (
     <>
       <Tabs
-        label="Custom emoji"
+        label={t("customEmoji.title")}
         variant="panel"
         value={tab}
         onValueChange={setTab}
         items={[
-          ...(canAuthor ? [{ value: "add" as const, label: "Add emoji" }] : []),
+          ...(canAuthor
+            ? [{ value: "add" as const, label: t("customEmoji.add") }]
+            : []),
           {
             value: "mine",
             label: catalog.mine.length
-              ? `My emojis (${catalog.mine.length})`
-              : "My emojis",
+              ? t("customEmoji.mineCount", { count: catalog.mine.length })
+              : t("customEmoji.mine"),
           },
           {
             value: "community",
-            label: `Community emoji (${community.length})`,
+            label: t("customEmoji.communityCount", { count: community.length }),
           },
         ]}
         renderPanel={(value) =>
@@ -459,7 +478,7 @@ function Editor({
       />
       {added && (
         <ToastNotice
-          title={`Added :${added}:`}
+          title={t("customEmoji.added", { shortcode: added })}
           tone="success"
           timeout={5000}
           onDismiss={() => setAdded(undefined)}
@@ -467,7 +486,7 @@ function Editor({
       )}
       {removed && (
         <ToastNotice
-          title={`Removed :${removed}:`}
+          title={t("customEmoji.removed", { shortcode: removed })}
           tone="success"
           timeout={5000}
           onDismiss={() => setRemoved(undefined)}

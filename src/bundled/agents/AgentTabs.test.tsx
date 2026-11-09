@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { setLanguage } from "../../shared/i18n";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { createAgentMemories } from "../../features/agents/memory";
@@ -16,7 +23,11 @@ import { ToastProvider } from "../../shared/design-system/ui/Toast";
 import { AgentTabs } from "./AgentTabs";
 import { useAgentSettingsHost } from "./AgentSettingsHost";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 function DraftSettings({
   agent,
@@ -563,4 +574,57 @@ it("restores Settings on the first commit without briefly selecting Identity", (
   }
   render(<Probe />);
   expect(selected).toEqual(["Settings"]);
+});
+
+it("retains the selected section, dirty input and custom tab title while owned tabs change language", async () => {
+  setLanguage("en");
+  const { props, save } = editingFixture(false);
+  const type = {
+    ...props.type,
+    tabs: [
+      ...(props.type.tabs ?? []),
+      {
+        id: "custom",
+        title: "Memory",
+        component: () => <p>Raw custom content</p>,
+      },
+    ],
+  };
+  render(<AgentTabs {...props} type={type} />);
+  const input = screen.getByRole("textbox", { name: "Instructions" });
+  if (!(input instanceof HTMLInputElement))
+    throw new Error("Expected actual settings input");
+  fireEvent.change(input, { target: { value: "Raw {instruction} 한글" } });
+  input.focus();
+  input.setSelectionRange(2, 8);
+  const identity = screen.getByRole("tab", { name: "Identity" });
+  const [external, memory] = screen.getAllByRole("tab", { name: "Memory" });
+  if (!external || !memory)
+    throw new Error("Expected both external and built-in Memory tabs");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("tab", { name: "신원" })).toBe(identity);
+  expect(screen.getByRole("tab", { name: "기억" })).toBe(memory);
+  expect(screen.getByRole("tab", { name: "Memory" })).toBe(external);
+  expect(identity).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("textbox", { name: "Instructions" })).toBe(input);
+  expect(input).toHaveFocus();
+  expect(input).toHaveValue("Raw {instruction} 한글");
+  expect(input.selectionStart).toBe(2);
+  expect(input.selectionEnd).toBe(8);
+  await userEvent.setup().click(memory);
+  const confirmation = await screen.findByRole("alertdialog");
+  expect(confirmation).toHaveTextContent(
+    "탭을 전환하면 저장하지 않은 변경 사항이 사라집니다.",
+  );
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("alertdialog")).toBe(confirmation);
+  expect(confirmation).toHaveTextContent(
+    "Your unsaved changes will be lost if you switch tabs.",
+  );
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Keep editing" }));
+  expect(screen.getByRole("textbox", { name: "Instructions" })).toBe(input);
+  expect(input).toHaveValue("Raw {instruction} 한글");
+  expect(save).not.toHaveBeenCalled();
 });

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -9,6 +10,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../shared/i18n/language";
 import type { PluginManager } from "../plugins/manager";
 import { createPluginRequests } from "../plugins/requests";
 import type { Catalog, ImportPreview } from "../plugins/types";
@@ -16,7 +18,10 @@ import { foldMessages } from "../features/relay/fold";
 import { keypair, signed } from "../features/relay/testing";
 import { PluginRequestCard } from "./PluginRequestCard";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 
 // https://github.com/example-org/buzz-plugin-browser, whose manifest is this.
 const BROWSER = "https://github.com/example-org/buzz-plugin-browser";
@@ -220,4 +225,43 @@ it("returns keyboard focus to the outcome once an approved review closes", async
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   await waitFor(() => expect(screen.getByRole("status")).toHaveFocus());
+});
+
+it("keeps the same request card, raw reason and decline outcome through EN to KO to EN", async () => {
+  const { ask, show, asker, manager } = harness();
+  const { requestId } = await ask();
+  show(requestId);
+  const card = screen.getByRole("region", { name: "Plugin request: Browser" });
+  const review = within(card).getByRole("button", { name: "Review Browser" });
+  const decline = within(card).getByRole("button", { name: "Decline Browser" });
+  decline.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("region", { name: "플러그인 요청: Browser" })).toBe(
+    card,
+  );
+  expect(within(card).getByRole("button", { name: "Browser 검토" })).toBe(
+    review,
+  );
+  expect(within(card).getByRole("button", { name: "Browser 거절" })).toBe(
+    decline,
+  );
+  expect(decline).toHaveFocus();
+  expect(within(card).getByText(`Builder: ${reason}`)).toBeVisible();
+  expect(within(card).getByText("Browser 설치")).toBeVisible();
+  expect(manager.installImport).not.toHaveBeenCalled();
+  fireEvent.click(decline);
+  const status = await within(card).findByRole("status");
+  expect(status).toHaveTextContent("거절됨");
+  expect(status).toHaveFocus();
+  const decision = asker.status(requestId);
+  expect(decision).toEqual({
+    state: "declined",
+    action: "install",
+    pluginId: "example.browser",
+  });
+  act(() => setLanguage("en"));
+  expect(within(card).getByRole("status")).toBe(status);
+  expect(status).toHaveTextContent("Declined");
+  expect(status).toHaveFocus();
+  expect(asker.status(requestId)).toEqual(decision);
 });

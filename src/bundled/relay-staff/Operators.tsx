@@ -1,4 +1,10 @@
 import { useState } from "react";
+import { t, useLanguage, type TranslationKey } from "../../shared/i18n";
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { AlertDialog } from "../../shared/design-system/ui/AlertDialog";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Field } from "../../shared/design-system/ui/Field";
@@ -11,20 +17,20 @@ import type {
   StaffRole,
   StaffRoleSource,
 } from "../../features/relay-staff/contract";
-import { describe, useRead, useSession, useWrite } from "./session";
+import { useRead, useSession, useWrite } from "./session";
 import { NamesSource, Person, PeopleScope, usePeople } from "./people";
-import { containsSecretKey, Loaded, SECRET_KEY_WARNING } from "./ui";
+import { containsSecretKey, Loaded, displayStaffFailure } from "./ui";
 
 type OperatorWrite = Extract<
   StaffRequest,
   { route: "putOperator" } | { route: "deleteOperator" }
 >;
 
-const SOURCES: Record<StaffRoleSource, string> = {
-  config: "config",
-  owner_fallback: "owner (fallback)",
-  db: "db",
-};
+const SOURCES = {
+  config: "adminStaff.source.config",
+  owner_fallback: "adminStaff.source.ownerFallback",
+  db: "adminStaff.source.db",
+} as const satisfies Record<StaffRoleSource, TranslationKey>;
 const ROLES = [
   {
     label: "",
@@ -35,19 +41,35 @@ const ROLES = [
   },
 ];
 
+function roleLabel(role: string) {
+  return role === "operator"
+    ? t("adminStaff.role.operator")
+    : role === "moderator"
+      ? t("adminStaff.role.moderator")
+      : role;
+}
+
 /** Config-backed staff come from relay configuration and cannot change here. */
 const configBacked = (operator: OperatorDto) =>
   operator.sources.some((source) => source !== "db");
 
 export function Operators() {
+  useLanguage();
+  const roleGroups = ROLES.map((group) => ({
+    ...group,
+    options: group.options.map((option) => ({
+      ...option,
+      label: roleLabel(option.value),
+    })),
+  }));
   const { context, staff, canMutate } = useSession();
   const [list, reload] = useRead({ route: "listOperators" }, [context]);
   const [input, setInput] = useState("");
   const [role, setRole] = useState<StaffRole>("moderator");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   /** A change to your own entry re-checks your role. */
   const write = useWrite<OperatorWrite>("operators", (outcome, change) => {
-    if (!outcome.ok) return setError(describe(outcome.failure));
+    if (!outcome.ok) return setError(displayStaffFailure(outcome.failure));
     reload();
     if (change.route === "putOperator") setInput("");
     if (change.pubkey === context.signer) staff.reprobe(context);
@@ -70,7 +92,11 @@ export function Operators() {
     const existing = operators.find((operator) => operator.pubkey === pubkey);
     if (existing)
       return setError(
-        `Already staff as ${existing.effectiveRole}. Change their role on their row.`,
+        localMessage(
+          existing.effectiveRole === "operator"
+            ? "adminStaff.duplicateOperator"
+            : "adminStaff.duplicateModerator",
+        ),
       );
     after({ route: "putOperator", pubkey, role });
   };
@@ -82,25 +108,25 @@ export function Operators() {
           {canMutate && (
             <div className="flex flex-col gap-2 rounded-md border px-3 py-2.5">
               <p className="text-caption font-medium text-secondary">
-                Add staff
+                {t("adminStaff.addStaff")}
               </p>
               <div className="flex items-end gap-2">
                 <Field
-                  label="Public key"
-                  error={secret ? SECRET_KEY_WARNING : undefined}
+                  label={t("adminStaff.publicKey")}
+                  error={secret ? t("adminStaff.privateKey") : undefined}
                 >
                   <Input
-                    placeholder="npub or 64-hex public key"
+                    placeholder={t("adminStaff.publicKeyPlaceholder")}
                     value={input}
                     disabled={busy}
                     onChange={(event) => setInput(event.target.value)}
                   />
                 </Field>
                 <Select
-                  label="Role"
+                  label={t("adminStaff.role")}
                   variant="compact"
                   value={role}
-                  groups={ROLES}
+                  groups={roleGroups}
                   disabled={busy}
                   onValueChange={(value) => setRole(value as StaffRole)}
                 />
@@ -110,18 +136,20 @@ export function Operators() {
                   disabled={!pubkey || busy}
                   onClick={() => add(operators)}
                 >
-                  Add
+                  {t("adminStaff.add")}
                 </Button>
               </div>
             </div>
           )}
           {error && (
             <p className="text-body-sm text-danger" role="alert">
-              {error}
+              {resolveMessage(error)}
             </p>
           )}
           {operators.length === 0 ? (
-            <p className="text-body-sm text-secondary">No staff configured.</p>
+            <p className="text-body-sm text-secondary">
+              {t("adminStaff.empty")}
+            </p>
           ) : (
             <PeopleScope people={names}>
               <NamesSource />
@@ -139,26 +167,26 @@ export function Operators() {
                           pubkey={operator.pubkey}
                           detail={
                             operator.pubkey === context.signer
-                              ? "you"
+                              ? t("adminStaff.you")
                               : undefined
                           }
                         />
                       </span>
                       <span className="text-caption text-secondary">
                         {operator.sources
-                          .map((source) => SOURCES[source])
+                          .map((source) => t(SOURCES[source]))
                           .join(", ")}
                       </span>
                       {fixed || !canMutate ? (
                         <span className="text-caption">
-                          {operator.effectiveRole}
+                          {roleLabel(operator.effectiveRole)}
                         </span>
                       ) : (
                         <Select
-                          label={`Role for ${name}`}
+                          label={t("adminStaff.roleFor", { name })}
                           variant="compact"
                           value={operator.effectiveRole}
-                          groups={ROLES}
+                          groups={roleGroups}
                           disabled={busy}
                           onValueChange={(value) =>
                             value !== operator.effectiveRole &&
@@ -176,13 +204,11 @@ export function Operators() {
                           variant="ghost"
                           disabled={fixed || busy}
                           title={
-                            fixed
-                              ? "Set in relay configuration; cannot be removed here"
-                              : undefined
+                            fixed ? t("adminStaff.fixedSource") : undefined
                           }
                           onClick={() => setRemoving(operator)}
                         >
-                          Remove
+                          {t("adminStaff.remove")}
                         </Button>
                       )}
                     </li>
@@ -193,16 +219,23 @@ export function Operators() {
           )}
           {removing && (
             <AlertDialog
-              title="Remove staff?"
+              title={t("adminStaff.removeTitle")}
               description={
                 removing.pubkey === context.signer
-                  ? "You are removing your own staff access. You may not be able to undo this."
-                  : `${names.text(removing.pubkey)} (${removing.effectiveRole}) loses relay staff access.`
+                  ? t("adminStaff.removeSelf")
+                  : t(
+                      removing.effectiveRole === "operator"
+                        ? "adminStaff.removeOperator"
+                        : "adminStaff.removeModerator",
+                      { name: names.text(removing.pubkey) },
+                    )
               }
               onClose={() => setRemoving(null)}
               actions={
                 <>
-                  <Button onClick={() => setRemoving(null)}>Cancel</Button>
+                  <Button onClick={() => setRemoving(null)}>
+                    {t("adminStaff.cancel")}
+                  </Button>
                   <Button
                     variant="destructive"
                     onClick={() => {
@@ -211,7 +244,7 @@ export function Operators() {
                       after({ route: "deleteOperator", pubkey: target });
                     }}
                   >
-                    Remove
+                    {t("adminStaff.remove")}
                   </Button>
                 </>
               }

@@ -1,13 +1,23 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { useState } from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../../shared/i18n/language";
 import { WorkflowScheduleFields } from "./WorkflowScheduleFields";
 import type { TriggerConfig } from "./workflowFormTypes";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 
 function Harness({
   initial,
@@ -212,4 +222,48 @@ it("opens a saved 1-5 range as Sunday through Thursday without changing it", () 
   expect(day("Saturday")).not.toBeChecked();
   expect(trigger().cron).toBe("0 9 * * 1-5");
   expect(onUpdate).not.toHaveBeenCalled();
+});
+
+it("retains the same schedule controls and raw cron across language changes", async () => {
+  const onUpdate = vi.fn();
+  render(
+    <Harness
+      initial={{ on: "schedule", cron: "0 9 * * 2" }}
+      onUpdate={onUpdate}
+    />,
+  );
+  const repeats = screen.getByRole("radiogroup", { name: "Repeats" });
+  const weekly = preset("Weekly");
+  const monday = day("Monday");
+  const friday = day("Friday");
+  const time = screen.getByLabelText("Run time (UTC)");
+  time.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("radiogroup", { name: "반복" })).toBe(repeats);
+  expect(preset("매주")).toBe(weekly);
+  expect(weekly).toBeChecked();
+  expect(day("월요일")).toBe(monday);
+  expect(monday).toBeChecked();
+  expect(day("금요일")).toBe(friday);
+  expect(friday).not.toBeChecked();
+  expect(screen.getByLabelText("실행 시각 (UTC)")).toBe(time);
+  expect(time).toHaveValue("09:00");
+  expect(time).toHaveFocus();
+  expect(trigger()).toEqual({ on: "schedule", cron: "0 9 * * 2" });
+  expect(onUpdate).not.toHaveBeenCalled();
+  await userEvent.setup().click(friday);
+  expect(onUpdate).toHaveBeenCalledExactlyOnceWith({
+    on: "schedule",
+    cron: "0 9 * * 2,6",
+  });
+  expect(friday).toHaveFocus();
+  act(() => setLanguage("en"));
+  expect(day("Friday")).toBe(friday);
+  expect(friday).toBeChecked();
+  expect(friday).toHaveFocus();
+  expect(preset("Weekly")).toBe(weekly);
+  expect(screen.getByLabelText("Run time (UTC)")).toBe(time);
+  expect(time).toHaveValue("09:00");
+  expect(trigger()).toEqual({ on: "schedule", cron: "0 9 * * 2,6" });
+  expect(onUpdate).toHaveBeenCalledTimes(1);
 });

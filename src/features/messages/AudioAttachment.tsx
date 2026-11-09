@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { claimAudio, releaseAudio } from "../../shared/audio-playback";
 import {
   useCallback,
@@ -45,6 +46,7 @@ export function AudioAttachment({
   source: string;
   allowDownload?: boolean;
 }) {
+  useLanguage();
   const active = useConversationPresentation();
   const audio = useRef<HTMLAudioElement>(null);
   useLayoutEffect(() => {
@@ -62,14 +64,21 @@ export function AudioAttachment({
   const element = useMediaElementSource(source);
   const elementSource = element.src;
   const failed = failedSource === source || element.unavailable;
-  const playLabel = attachment.name ? `Play ${attachment.name}` : "Play audio";
+  const playLabel = attachment.name
+    ? t("mediaViewing.audio.playNamed", { name: attachment.name })
+    : t("mediaViewing.audio.play");
   const pauseLabel = attachment.name
-    ? `Pause ${attachment.name}`
-    : "Pause audio";
-  const seekLabel = attachment.name ? `Seek ${attachment.name}` : "Seek audio";
+    ? t("mediaViewing.audio.pauseNamed", { name: attachment.name })
+    : t("mediaViewing.audio.pause");
+  const seekLabel = attachment.name
+    ? t("mediaViewing.audio.seekNamed", { name: attachment.name })
+    : t("mediaViewing.audio.seek");
   const valueText =
     duration !== undefined
-      ? `${formatMediaTime(currentTime)} of ${formatMediaTime(duration)}`
+      ? t("mediaViewing.audio.position", {
+          time: formatMediaTime(currentTime),
+          duration: formatMediaTime(duration),
+        })
       : formatMediaTime(currentTime);
   const seekValue =
     duration === undefined ? 0 : Math.min(currentTime, duration);
@@ -96,7 +105,7 @@ export function AudioAttachment({
         className={`${styles.attachmentUnavailable} ${styles.audioUnavailable}`}
         role="status"
       >
-        Audio unavailable
+        {t("mediaViewing.audio.unavailable")}
       </span>
     );
 
@@ -117,7 +126,7 @@ export function AudioAttachment({
   return (
     <fieldset
       className={`${styles.audioAttachment} ${mediaStyles.controls}`}
-      aria-label={attachment.name || "Audio playback"}
+      aria-label={attachment.name || t("mediaViewing.audio.region")}
     >
       {/* biome-ignore lint/a11y/useMediaCaption: signed attachment metadata has no caption track URL. */}
       <audio

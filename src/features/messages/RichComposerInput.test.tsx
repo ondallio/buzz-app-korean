@@ -3,7 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { act, cleanup, render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createRef, useLayoutEffect, useState } from "react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, onTestFinished, vi } from "vitest";
 import type { ComposerFormat, ComposerInputElement } from "./composer-dom";
 import { composerMarkdown } from "./composer-markdown";
 import type { ComposerSession } from "./composer-session";
@@ -17,6 +17,7 @@ import {
 import { mentionDraft, type MentionDraft } from "./mention-draft";
 import { MessageMarkdown } from "./MessageMarkdown";
 import { RichComposerInput } from "./RichComposerInput";
+import { createAgentDirectory } from "../identity-names/testing";
 import { bindNames } from "../identity-names/service";
 import type { Profile } from "../relay/contracts";
 import type { CustomEmoji } from "../relay/emoji";
@@ -42,9 +43,13 @@ vi.mock("../relay/message-content", async (importOriginal) => {
 });
 
 composerDOMFixture();
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
-function mount(initial?: MentionDraft) {
+function mount(initial?: MentionDraft, scopedNames = false) {
   const ref = createRef<ComposerInputElement>();
   let draft = initial ?? mentionDraft("");
   let commits = 0;
@@ -82,9 +87,17 @@ function mount(initial?: MentionDraft) {
       },
     },
   };
+  const providers = [createAgentDirectory()];
+  const names = bindNames(
+    source as never,
+    scopedNames
+      ? { snapshot: () => providers, subscribe: () => () => {} }
+      : undefined,
+  );
+  onTestFinished(() => names.dispose());
   const session = {
     ...source,
-    names: bindNames(source as never),
+    names,
   } as unknown as ComposerSession;
   // Stands in for MessageComposer, which re-renders whenever the editor
   // reports a draft or a toolbar state.
@@ -269,4 +282,41 @@ it("types into a mention-heavy draft without redrawing its chips, which still fo
   expect(
     new Set(renders.mock.calls.map(([props]) => props.address.id)),
   ).toEqual(new Set([first.pubkey]));
+});
+
+import { setLanguage } from "../../shared/i18n";
+it("relabels memoized mention qualifiers without changing authored mention data, the editor selection or chip nodes", () => {
+  setLanguage("en");
+  const people = placeholderPeople(2).map((person) => ({
+    ...person,
+    name: "같은 user",
+  }));
+  const initial = longMentionDraft(people);
+  const h = mount(initial, true);
+  const editor = h.input;
+  const chips = Array.from(
+    editor.querySelectorAll<HTMLElement>('[aria-label*="public key ending"]'),
+  );
+  expect(chips).toHaveLength(2);
+  editor.focus();
+  editor.setSelectionRange(editor.value.length, editor.value.length);
+  const caret = editor.selectionStart;
+  act(() => setLanguage("ko"));
+  expect(
+    Array.from(editor.querySelectorAll('[aria-label*="공개 키 끝자리"]')),
+  ).toEqual(chips);
+  expect(
+    chips.every((chip) =>
+      chip.getAttribute("aria-label")?.includes("같은 user"),
+    ),
+  ).toBe(true);
+  expect(editor).toHaveFocus();
+  expect(editor.selectionStart).toBe(caret);
+  expect(h.draft()).toEqual(initial);
+  act(() => setLanguage("en"));
+  expect(
+    Array.from(editor.querySelectorAll('[aria-label*="public key ending"]')),
+  ).toEqual(chips);
+  expect(editor.selectionStart).toBe(caret);
+  expect(h.draft()).toEqual(initial);
 });

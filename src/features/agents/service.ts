@@ -1,3 +1,4 @@
+import { localError } from "../../shared/i18n/deferred-message";
 import { followUpQueue } from "../messages/follow-up-queue";
 import type {} from "../navigation/service";
 import {
@@ -1816,9 +1817,7 @@ export class AgentsService extends Service implements Agents {
   private async checkExecution(key: AgentKey, type: string) {
     if (!(await this.executions.inspect(key))) return;
     if (!this.types().find((kind) => kind.key === type)?.execution)
-      throw new Error(
-        "This runtime does not support the saved execution binding",
-      );
+      throw localError("agentsErrors.runtimeBindingUnsupported");
     await this.executions.check(key, type);
   }
   private async checkExecutionType(pubkey: string, type: string) {
@@ -4208,12 +4207,14 @@ export class AgentsService extends Service implements Agents {
     // A hosted agent's key is its pubkey.
     if (!identity)
       return this.exclusive(key, () => this.saveHosted(key, change));
-    if (!this.native) throw new Error("No such agent on this device");
+    if (!this.native) throw localError("agentsErrors.noAgent");
     const { pubkey } = identity;
     if (change.config !== undefined && this.runners.transitioning(key))
-      throw new Error(`${identity.name}'s provider is already changing`);
+      throw localError("agentsErrors.providerChanging", {
+        name: identity.name,
+      });
     const name = change.name?.trim();
-    if (name === "") throw new Error("Name the agent");
+    if (name === "") throw localError("agentsErrors.nameRequired");
     // Its config is its home record's, in every community; the rest is this
     // membership's own. Synced sides save to the relay first: an edit that
     // isn't saved there changes nothing here and stays in the editor.
@@ -4310,9 +4311,7 @@ export class AgentsService extends Service implements Agents {
     if (
       SIDES.some((side) => applies(side) && binding[side]?.mode === "migrating")
     )
-      throw new Error(
-        "This agent's config is moving to the community; try again shortly",
-      );
+      throw localError("agentsErrors.configMoving");
   }
   /** A hosted agent's name and picture are its provider's to publish; the app
    * then lists it under them. Its settings are the provider's, not saved here. */
@@ -4326,7 +4325,7 @@ export class AgentsService extends Service implements Agents {
     )
       throw new Error("A hosted agent's settings save through its provider");
     const name = change.name === undefined ? agent.name : change.name.trim();
-    if (!name) throw new Error("Name the agent");
+    if (!name) throw localError("agentsErrors.nameRequired");
     const picture =
       change.picture === undefined
         ? agent.picture
@@ -4454,13 +4453,13 @@ export class AgentsService extends Service implements Agents {
       (entry) => entry.pubkey === pubkey && entry.place === "hosted",
     );
     if (agent?.unfinished && !unfinished)
-      throw new Error("Finish the agent's setup first");
+      throw localError("agentsErrors.setupRequired");
     const remote =
       agent && this.types().find((entry) => entry.key === agent.type)?.remote;
     const origin = agent && originOf(agent.relay);
     const binding = agent && this.bindingOf(agent);
     if (!agent || !remote || !origin || !binding)
-      throw new Error("No such agent on this device");
+      throw localError("agentsErrors.noAgent");
     return { agent, remote, origin, binding };
   }
 
@@ -4470,13 +4469,11 @@ export class AgentsService extends Service implements Agents {
     change?: Readonly<{ config: unknown }>,
   ) {
     const identity = this.liveMember(key);
-    if (!this.native || !identity)
-      throw new Error("No such agent on this device");
+    if (!this.native || !identity) throw localError("agentsErrors.noAgent");
     const kinds = new Map(this.types().map((kind) => [kind.key, kind]));
     const kind = kinds.get(type);
-    if (!kind) throw new Error("That agent type is not available");
-    if (kind.remote)
-      throw new Error("A hosted provider cannot take over a local agent key");
+    if (!kind) throw localError("agentsErrors.missingType");
+    if (kind.remote) throw localError("agentsErrors.hostedKey");
     await this.checkExecutionType(identity.pubkey, type);
     if (type === identity.type) return [];
     this.refuseWhileMoving(identity);
@@ -4506,7 +4503,9 @@ export class AgentsService extends Service implements Agents {
   ): Promise<T> {
     const { pubkey } = identity;
     if (this.retyping.has(pubkey))
-      throw new Error(`${identity.name}'s provider is already changing`);
+      throw localError("agentsErrors.providerChanging", {
+        name: identity.name,
+      });
     this.retyping.add(pubkey);
     try {
       const home = this.communityConfigs.get(this.configHome(identity));
@@ -4515,9 +4514,7 @@ export class AgentsService extends Service implements Agents {
           (type) => type.key === identity.type,
         );
         if (identity.protection && !previous?.retire)
-          throw new Error(
-            "The protected runtime cannot safely change its type",
-          );
+          throw localError("agentsErrors.protectedTypeChange");
         for (const member of this.identities)
           if (member.pubkey === pubkey && !member.deleted)
             await previous?.retire?.(member.key);
@@ -4544,7 +4541,7 @@ export class AgentsService extends Service implements Agents {
     const head = this.configStore.state(settings.subject).head;
     if (head && settingsType(head) === type) return;
     const live = this.communityConfigs.get(this.configHome(identity));
-    if (!live) throw new Error("Connect to the community to change its type");
+    if (!live) throw localError("agentsErrors.connectForType");
     const saved = await live.save(
       this.configAgent({ ...identity, type }, config),
       config,
@@ -4566,7 +4563,7 @@ export class AgentsService extends Service implements Agents {
   ) {
     await this.checkExecutionType(identity.pubkey, type);
     const native = this.native;
-    if (!native) throw new Error("No such agent on this device");
+    if (!native) throw localError("agentsErrors.noAgent");
     const { pubkey } = identity;
     await native.setType(pubkey, type);
     try {
@@ -4645,13 +4642,11 @@ export class AgentsService extends Service implements Agents {
 
   previewRetype(key: AgentKey, type: string): RetypePreview {
     const identity = this.liveMember(key);
-    if (!this.native || !identity)
-      throw new Error("No such agent on this device");
+    if (!this.native || !identity) throw localError("agentsErrors.noAgent");
     const kinds = new Map(this.types().map((kind) => [kind.key, kind]));
     const kind = kinds.get(type);
-    if (!kind) throw new Error("That agent type is not available");
-    if (kind.remote)
-      throw new Error("A hosted provider cannot take over a local agent key");
+    if (!kind) throw localError("agentsErrors.missingType");
+    if (kind.remote) throw localError("agentsErrors.hostedKey");
     if (type === identity.type)
       return {
         config: this.settingsOf(identity).config,
@@ -5029,8 +5024,7 @@ export class AgentsService extends Service implements Agents {
     });
   }
   private async exclusive<T>(pubkey: string, step: () => Promise<T>) {
-    if (this.busy.has(pubkey))
-      throw new Error("Wait for the agent's last change to finish");
+    if (this.busy.has(pubkey)) throw localError("agentsErrors.waitForChange");
     this.busy.add(pubkey);
     try {
       return await step();

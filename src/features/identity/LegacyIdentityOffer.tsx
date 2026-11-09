@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AlertDialog } from "../../shared/design-system/ui/AlertDialog";
 import { Button } from "../../shared/design-system/ui/Button";
+import { t, useLanguage } from "../../shared/i18n";
 import type { Identity } from "./service";
 
 /**
@@ -13,6 +14,7 @@ import type { Identity } from "./service";
  * OS prompt follows it. A successful import lifts the gate with no setup.
  */
 export function useLegacyIdentityOffer(identity: Identity, open: boolean) {
+  useLanguage();
   const state = useSyncExternalStore(identity.subscribe, identity.snapshot);
   const missing = state.status === "missing";
   // Old Buzz's data folder is here, and the offer has not been dismissed.
@@ -35,8 +37,8 @@ export function useLegacyIdentityOffer(identity: Identity, open: boolean) {
   const dismiss = () => setOffered(false);
   return (
     <AlertDialog
-      title="Continue with your Buzz identity?"
-      description="Old Buzz was used on this device. Continue with the identity it saved instead of setting up a new one. Your computer may ask you to allow access."
+      title={t("identity.legacy.title")}
+      description={t("identity.legacy.description")}
       onClose={dismiss}
       pending={state.busy}
       initialFocus={proceed}
@@ -45,7 +47,7 @@ export function useLegacyIdentityOffer(identity: Identity, open: boolean) {
       actions={
         <>
           <Button type="button" disabled={state.busy} onClick={dismiss}>
-            Not now
+            {t("identity.notNow")}
           </Button>
           <Button
             ref={proceed}
@@ -57,7 +59,7 @@ export function useLegacyIdentityOffer(identity: Identity, open: boolean) {
               void identity.importLegacy();
             }}
           >
-            Continue
+            {t("identity.continue")}
           </Button>
         </>
       }

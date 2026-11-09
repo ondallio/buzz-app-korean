@@ -3,6 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { stubAvatarBrowserApis } from "../../features/agents/avatar-testing";
 stubAvatarBrowserApis();
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -24,9 +25,12 @@ import { ToastProvider } from "../../shared/design-system/ui/Toast";
 import { AgentCardAttachment, isAgentCard } from "./AgentCardAttachment";
 import { agentTarget } from "./routes";
 
+import { setLanguage } from "../../shared/i18n";
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  setLanguage("en");
+  localStorage.clear();
 });
 
 const echo = {
@@ -242,4 +246,76 @@ it("reads a card again when chosen after its read failed", async () => {
   await user.click(button);
   expect(await screen.findByRole("dialog", { name: "Ada" })).toBeVisible();
   expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+it("retranslates a failed card without refetching or changing its source/name", async () => {
+  const fetch = vi.fn(
+    async (_input: RequestInfo | URL, _init?: RequestInit) => {
+      throw new Error("offline");
+    },
+  );
+  vi.stubGlobal("fetch", fetch);
+  show({ ...card, name: "Message.agent.png" });
+  const button = await screen.findByRole("button", {
+    name: "Message, shared agent. Couldn’t load. Try again",
+  });
+  button.focus();
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("button", {
+      name: "Message, 공유된 에이전트. 불러오지 못했습니다. 다시 시도해 주세요",
+    }),
+  ).toBe(button);
+  expect(button).toHaveFocus();
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(fetch.mock.calls[0]?.[0]).toBe("buzz-media://ada.png");
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("button", {
+      name: "Message, shared agent. Couldn’t load. Try again",
+    }),
+  ).toBe(button);
+  expect(fetch).toHaveBeenCalledOnce();
+});
+
+it("keeps an import toast live after the card unmounts without repeating the import", async () => {
+  await serve(await ada());
+  const user = userEvent.setup();
+  const navigator = { open: vi.fn(async () => ({})) };
+  const calls = agents.port.mock.calls.length;
+  const view = render(
+    <AgentCardAttachment
+      attachment={card}
+      source="buzz-media://ada.png"
+      agents={agents}
+      relay={relay}
+      navigator={navigator as unknown as Navigation}
+      canOpen={() => false}
+      open={() => false}
+    />,
+    { wrapper: ToastProvider },
+  );
+  await user.click(
+    await screen.findByRole("button", { name: "Ada, shared agent" }),
+  );
+  await user.click(
+    within(screen.getByRole("dialog", { name: "Ada" })).getByRole("button", {
+      name: "Import",
+    }),
+  );
+  expect(await screen.findByText("Added Ada to your agents.")).toBeVisible();
+  const action = screen.getByRole("button", { name: "Open" });
+  view.rerender(null);
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByText("Ada 에이전트를 내 에이전트에 추가했습니다."),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: "열기" })).toBe(action);
+  expect(agents.port.mock.calls.length).toBe(calls + 1);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Open" })).toBe(action);
+  fireEvent.click(action);
+  expect(navigator.open).toHaveBeenCalledExactlyOnceWith(
+    agentTarget("e".repeat(64)),
+  );
 });

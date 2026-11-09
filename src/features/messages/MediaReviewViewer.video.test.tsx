@@ -2,6 +2,7 @@
 import "@testing-library/jest-dom/vitest";
 import {
   cleanup,
+  act,
   fireEvent,
   render,
   screen,
@@ -11,12 +12,14 @@ import {
 import { afterEach, expect, it, vi } from "vitest";
 import { createRelaySession } from "../relay/session";
 import { keypair, message, signed } from "../relay/testing";
+import { setLanguage } from "../../shared/i18n";
 import { MediaReviewViewer } from "./MediaReviewViewer";
 
 const owners: ReturnType<typeof createRelaySession>[] = [];
 afterEach(() => {
   cleanup();
   for (const owner of owners.splice(0)) owner.dispose();
+  setLanguage("en");
   localStorage.clear();
   vi.restoreAllMocks();
 });
@@ -368,4 +371,99 @@ it("preserves Space in the composer and on focused controls", async () => {
   }
   expect(play).not.toHaveBeenCalled();
   expect(pause).not.toHaveBeenCalled();
+});
+
+it("keeps the same video/time/controls and excludes Korean comments from media keyboard handling", async () => {
+  setLanguage("en");
+  setupReview();
+  const timeline = await screen.findByRole("slider", {
+    name: "Video timeline",
+  });
+  const video = document.querySelector("video");
+  if (!video) throw new Error("Missing actual video");
+  Object.defineProperty(video, "duration", { configurable: true, value: 120 });
+  fireEvent.loadedMetadata(video);
+  video.currentTime = 25;
+  fireEvent.timeUpdate(video);
+  const play = vi.spyOn(video, "play").mockResolvedValue(undefined);
+  const pause = vi.spyOn(video, "pause").mockImplementation(() => {});
+  const close = screen.getByRole("button", { name: "Close fullscreen viewer" });
+  close.focus();
+  const originalSource = video.getAttribute("src");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "전체 화면 뷰어 닫기" })).toBe(
+    close,
+  );
+  expect(close).toHaveFocus();
+  expect(screen.getByRole("slider", { name: "동영상 타임라인" })).toBe(
+    timeline,
+  );
+  expect(document.querySelector("video")).toBe(video);
+  expect(video.getAttribute("src")).toBe(originalSource);
+  expect(video.currentTime).toBe(25);
+  const comments = screen.getByRole("complementary", { name: "미디어 댓글" });
+  expect(fireEvent.keyDown(comments, { key: "ArrowRight" })).toBe(true);
+  expect(video.currentTime).toBe(25);
+  expect(fireEvent.keyDown(comments, { key: " " })).toBe(true);
+  expect(play).not.toHaveBeenCalled();
+  expect(pause).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "재생 속도: 1x" }));
+  const speedMenu = screen.getByRole("menu", { name: /^재생 속도:/ });
+  expect(
+    fireEvent.keyDown(
+      within(speedMenu).getByRole("menuitemradio", { name: "2x" }),
+      { key: "ArrowLeft" },
+    ),
+  ).toBe(true);
+  expect(video.currentTime).toBe(25);
+  fireEvent.keyDown(speedMenu, { key: "Escape" });
+  expect(
+    screen.getByRole("dialog", { name: "동영상 보기" }),
+  ).toBeInTheDocument();
+  fireEvent.keyDown(close, { key: "ArrowRight" });
+  expect(video.currentTime).toBe(35);
+  expect(timeline).toHaveAttribute("aria-valuetext", "00:35 / 02:00");
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Close fullscreen viewer" })).toBe(
+    close,
+  );
+  expect(screen.getByRole("slider", { name: "Video timeline" })).toBe(timeline);
+  expect(video.currentTime).toBe(35);
+});
+
+it("keeps a retained playback fallback live across language changes and clears it only on playback", async () => {
+  setLanguage("en");
+  setupReview();
+  await screen.findByRole("slider", { name: "Video timeline" });
+  const video = document.querySelector("video");
+  if (!video) throw new Error("Missing actual video");
+  video.currentTime = 19;
+  const play = vi
+    .spyOn(video, "play")
+    .mockRejectedValueOnce(new Error("Raw NotAllowedError"));
+  const button = screen.getByRole("button", { name: "Play video" });
+  fireEvent.click(button);
+  const notice = await screen.findByText(
+    "Playback paused. Press play to try again.",
+  );
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByText(
+      "재생이 일시 정지되었습니다. 재생 버튼을 눌러 다시 시도하세요.",
+    ),
+  ).toBe(notice);
+  expect(screen.getByRole("button", { name: "동영상 재생" })).toBe(button);
+  expect(video.currentTime).toBe(19);
+  expect(play).toHaveBeenCalledOnce();
+  act(() => setLanguage("en"));
+  expect(screen.getByText("Playback paused. Press play to try again.")).toBe(
+    notice,
+  );
+  play.mockResolvedValue(undefined);
+  fireEvent.click(button);
+  expect(play).toHaveBeenCalledTimes(2);
+  fireEvent.play(video);
+  expect(
+    screen.queryByText("Playback paused. Press play to try again."),
+  ).not.toBeInTheDocument();
 });

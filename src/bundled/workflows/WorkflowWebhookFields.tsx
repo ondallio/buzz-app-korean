@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { TrashIcon } from "../../shared/design-system/icons";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Field } from "../../shared/design-system/ui/Field";
@@ -20,10 +21,11 @@ export function WorkflowWebhookFields({
   urlError: string | undefined;
   headersError: string | undefined;
 }) {
+  useLanguage();
   const headers = step.headers ?? [];
   return (
     <>
-      <Field label="Webhook URL" error={urlError}>
+      <Field label={t("workflowFields.webhookUrl")} error={urlError}>
         <Input
           value={step.url ?? ""}
           disabled={disabled}
@@ -32,7 +34,7 @@ export function WorkflowWebhookFields({
         />
       </Field>
       <Select
-        label="HTTP method"
+        label={t("workflowFields.httpMethod")}
         variant="field"
         value={step.method ?? ""}
         disabled={disabled}
@@ -40,7 +42,7 @@ export function WorkflowWebhookFields({
           {
             label: "",
             options: [
-              { value: "", label: "Relay default" },
+              { value: "", label: t("workflowFields.relayDefault") },
               ...[
                 "GET",
                 "POST",
@@ -56,15 +58,15 @@ export function WorkflowWebhookFields({
         onValueChange={(method) => update({ method })}
       />
       <p className="text-body-sm text-subtle">
-        The relay checks permission and destination safety. Webhook steps
-        require a channel owner or admin. Configuration, including headers, is
-        visible to channel members. Do not put secrets here.
+        {t("workflowFields.webhookHelp")}
       </p>
       <div className="workflow-options">
-        <span className="text-label-sm">Headers</span>
+        <span className="text-label-sm">{t("workflowFields.headers")}</span>
         {headers.map((header, index) => (
           <div className="workflow-header-row" key={header.id}>
-            <Field label={`Header ${index + 1} name`}>
+            <Field
+              label={t("workflowFields.headerName", { number: index + 1 })}
+            >
               <Input
                 disabled={disabled}
                 value={header.name}
@@ -77,7 +79,9 @@ export function WorkflowWebhookFields({
                 }
               />
             </Field>
-            <Field label={`Header ${index + 1} value`}>
+            <Field
+              label={t("workflowFields.headerValue", { number: index + 1 })}
+            >
               <Input
                 disabled={disabled}
                 value={header.value}
@@ -91,7 +95,9 @@ export function WorkflowWebhookFields({
               />
             </Field>
             <IconButton
-              aria-label={`Remove header ${index + 1}`}
+              aria-label={t("workflowFields.removeHeader", {
+                number: index + 1,
+              })}
               icon={<TrashIcon size={16} aria-hidden="true" />}
               disabled={disabled}
               onClick={() =>
@@ -117,10 +123,10 @@ export function WorkflowWebhookFields({
             })
           }
         >
-          Add header
+          {t("workflowFields.addHeader")}
         </Button>
       </div>
-      <Field label="Request body (optional)">
+      <Field label={t("workflowFields.requestBody")}>
         <Textarea
           variant="code"
           rows={4}

@@ -1,0 +1,221 @@
+export const en = {
+  "appearance.previewLabel": "Appearance preview",
+  "appearance.previewCompact":
+    "Illustrated preview of your current mode, accent, contrast, and Compact flat-list messages use the full conversation width.",
+  "appearance.previewWide":
+    "Illustrated preview of your current mode, accent, contrast, and Default bubble messages at wide width.",
+  "appearance.previewNarrow":
+    "Illustrated preview of your current mode, accent, contrast, and Default bubble messages at narrow width.",
+  "appearance.appearance": "Appearance",
+  "appearance.interface": "Interface",
+  "appearance.mode": "Mode",
+  "appearance.system": "System",
+  "appearance.light": "Light",
+  "appearance.dark": "Dark",
+  "appearance.interface_size": "Interface size",
+  "appearance.decrease_interface_size": "Decrease interface size",
+  "appearance.increase_interface_size": "Increase interface size",
+  "appearance.reset_interface_size": "Reset interface size",
+  "appearance.accent_color": "Accent color",
+  "appearance.vibe_level": "Vibe level",
+  "appearance.chillin": "Chillin’",
+  "appearance.buzzin": "Buzzin’",
+  "appearance.clock": "Clock",
+  "appearance.system_uses_your_device_s_time_format":
+    "System uses your device’s time format.",
+  "appearance.12_hour": "12-hour",
+  "appearance.24_hour": "24-hour",
+  "appearance.show_seconds": "Show seconds",
+  "appearance.conversations": "Conversations",
+  "appearance.message_density": "Message density",
+  "appearance.compact_shows_conversations_as_a_flat_list_that_fits_more_messages_on_screen":
+    "Compact shows conversations as a flat list that fits more messages on screen.",
+  "appearance.density": "Density",
+  "appearance.default": "Default",
+  "appearance.compact": "Compact",
+  "appearance.message_width": "Message width",
+  "appearance.width": "Width",
+  "appearance.narrow": "Narrow",
+  "appearance.wide": "Wide",
+  "appearance.message_timestamps": "Message timestamps",
+  "appearance.hidden_times_stay_available_to_screen_readers":
+    "Hidden times stay available to screen readers.",
+  "appearance.timestamps": "Timestamps",
+  "appearance.show": "Show",
+  "appearance.hide_in_solo_chats": "Hide in Solo chats",
+  "appearance.hide": "Hide",
+  "appearance.show_people_by": "Show people by",
+  "appearance.how_people_with_verified_names_appear_to_you_search_profiles_and_previews_show_both":
+    "How people with verified names appear to you. Search, profiles, and previews show both.",
+  "appearance.name": "Name",
+  "appearance.username": "Username",
+  "appearance.full_name": "Full name",
+  "appearance.follow_up_behavior": "Follow-up behavior",
+  "appearance.in_solo_send_follow_ups_immediately_or_queue_them_until_the_agent_finishes_its_previous_response":
+    "In Solo, send follow-ups immediately or queue them until the agent finishes its previous response.",
+  "appearance.behavior": "Behavior",
+  "appearance.send_immediately": "Send immediately",
+  "appearance.queue": "Queue",
+  "appearance.open_threads_in": "Open threads in",
+  "appearance.new_threads_open_here_already_open_threads_stay_where_you_placed_them":
+    "New threads open here. Already-open threads stay where you placed them.",
+  "appearance.pane": "Pane",
+  "appearance.side_pane": "Side pane",
+  "appearance.main_pane": "Main pane",
+  "appearance.allow_automatic_spelling_correction":
+    "Allow automatic spelling correction",
+  "appearance.lets_macos_correct_misspelled_words_in_messages_turn_correction_on_or_off_from_the_message_box_s_spelling_and_grammar_menu":
+    "Lets macOS correct misspelled words in messages. Turn correction on or off from the message box’s Spelling and Grammar menu.",
+  "appearance.show_unread_first_in_search": "Show unread first in search",
+  "appearance.with_nothing_typed_search_leads_with_unread_channels_and_dms_and_selects_the_newest":
+    "With nothing typed, search leads with unread channels and DMs and selects the newest.",
+  "appearance.message_width_wasn_t_saved": "Message width wasn’t saved",
+  "appearance.retry_saving_message_width": "Retry saving message width",
+  "appearance.follow_up_preference_wasn_t_saved":
+    "Follow-up preference wasn’t saved",
+  "appearance.this_choice_is_active_but_could_not_be_saved_on_this_device":
+    "This choice is active, but could not be saved on this device.",
+  "appearance.retry_saving_follow_up_behavior":
+    "Retry saving follow-up behavior",
+  "appearance.clock_preference_wasn_t_saved": "Clock preference wasn’t saved",
+  "appearance.this_choice_is_active_but_could_not_be_saved_on_this_device_try_again":
+    "This choice is active, but could not be saved on this device. Try again.",
+  "appearance.retry_saving_clock_preference": "Retry saving clock preference",
+  "appearance.spelling_preference_wasn_t_saved":
+    "Spelling preference wasn’t saved",
+  "appearance.retry_saving_spelling_correction":
+    "Retry saving spelling correction",
+  "appearance.search_preference_wasn_t_saved": "Search preference wasn’t saved",
+  "appearance.retry_saving_search_preference": "Retry saving search preference",
+  "appearance.thread_preference_wasn_t_saved": "Thread preference wasn’t saved",
+  "appearance.retry_saving_thread_placement": "Retry saving thread placement",
+  "appearance.vibe_level_wasn_t_saved": "Vibe level wasn’t saved",
+  "appearance.retry_saving_vibe_level": "Retry saving vibe level",
+  "appearance.message_density_wasn_t_saved": "Message density wasn’t saved",
+  "appearance.retry_saving_message_density": "Retry saving message density",
+  "appearance.accent_color_wasn_t_saved": "Accent color wasn’t saved",
+  "appearance.retry_saving_accent_color": "Retry saving accent color",
+  "appearance.interface_size_wasn_t_saved": "Interface size wasn’t saved",
+  "appearance.retry_saving_interface_size": "Retry saving interface size",
+  "appearance.appearance_wasn_t_saved": "Appearance wasn’t saved",
+  "appearance.retry_saving_appearance": "Retry saving appearance",
+  "appearance.color_honey": "Honey",
+  "appearance.color_cobalt": "Cobalt",
+  "appearance.color_iris": "Iris",
+  "appearance.color_magenta": "Magenta",
+  "appearance.color_citrus": "Citrus",
+  "appearance.color_mono": "Mono",
+  "appearance.accent_accessible": "{color} accent color",
+} as const;
+export const ko: Record<keyof typeof en, string> = {
+  "appearance.previewLabel": "화면 설정 미리보기",
+  "appearance.previewCompact":
+    "현재 모드, 강조 색상, 대비를 보여주는 미리보기입니다. 간결한 목록의 메시지는 대화창 너비를 모두 사용합니다.",
+  "appearance.previewWide":
+    "현재 모드, 강조 색상, 대비를 보여주는 미리보기입니다. 기본 말풍선을 넓은 너비로 표시합니다.",
+  "appearance.previewNarrow":
+    "현재 모드, 강조 색상, 대비를 보여주는 미리보기입니다. 기본 말풍선을 좁은 너비로 표시합니다.",
+  "appearance.appearance": "화면 설정",
+  "appearance.interface": "인터페이스",
+  "appearance.mode": "모드",
+  "appearance.system": "시스템 설정",
+  "appearance.light": "밝게",
+  "appearance.dark": "어둡게",
+  "appearance.interface_size": "인터페이스 크기",
+  "appearance.decrease_interface_size": "인터페이스 축소",
+  "appearance.increase_interface_size": "인터페이스 확대",
+  "appearance.reset_interface_size": "인터페이스 크기 초기화",
+  "appearance.accent_color": "강조 색상",
+  "appearance.vibe_level": "색 대비",
+  "appearance.chillin": "차분하게",
+  "appearance.buzzin": "선명하게",
+  "appearance.clock": "시간 표시",
+  "appearance.system_uses_your_device_s_time_format":
+    "시스템 설정은 기기의 시간 표시 형식을 따릅니다.",
+  "appearance.12_hour": "12시간제",
+  "appearance.24_hour": "24시간제",
+  "appearance.show_seconds": "초 표시",
+  "appearance.conversations": "대화",
+  "appearance.message_density": "메시지 밀도",
+  "appearance.compact_shows_conversations_as_a_flat_list_that_fits_more_messages_on_screen":
+    "촘촘하게 표시하면 대화를 평평한 목록으로 보여 주어 화면에서 더 많은 메시지를 볼 수 있습니다.",
+  "appearance.density": "밀도",
+  "appearance.default": "기본",
+  "appearance.compact": "촘촘하게",
+  "appearance.message_width": "메시지 너비",
+  "appearance.width": "너비",
+  "appearance.narrow": "좁게",
+  "appearance.wide": "넓게",
+  "appearance.message_timestamps": "메시지 시간",
+  "appearance.hidden_times_stay_available_to_screen_readers":
+    "시간을 숨겨도 스크린리더에서는 읽을 수 있습니다.",
+  "appearance.timestamps": "시간 표시",
+  "appearance.show": "표시",
+  "appearance.hide_in_solo_chats": "솔로 채팅에서 숨기기",
+  "appearance.hide": "숨기기",
+  "appearance.show_people_by": "이름 표시 기준",
+  "appearance.how_people_with_verified_names_appear_to_you_search_profiles_and_previews_show_both":
+    "인증된 이름이 있는 사람의 표시 방법입니다. 검색, 프로필, 미리보기에는 두 이름을 모두 표시합니다.",
+  "appearance.name": "이름",
+  "appearance.username": "사용자 이름",
+  "appearance.full_name": "전체 이름",
+  "appearance.follow_up_behavior": "후속 메시지 전송",
+  "appearance.in_solo_send_follow_ups_immediately_or_queue_them_until_the_agent_finishes_its_previous_response":
+    "솔로에서 후속 메시지를 바로 보내거나 에이전트가 이전 응답을 마칠 때까지 대기시킬 수 있습니다.",
+  "appearance.behavior": "전송 방식",
+  "appearance.send_immediately": "바로 보내기",
+  "appearance.queue": "대기시키기",
+  "appearance.open_threads_in": "스레드 표시 위치",
+  "appearance.new_threads_open_here_already_open_threads_stay_where_you_placed_them":
+    "새 스레드를 열 위치입니다. 이미 열린 스레드는 현재 위치에 유지됩니다.",
+  "appearance.pane": "패널",
+  "appearance.side_pane": "옆 패널",
+  "appearance.main_pane": "주 패널",
+  "appearance.allow_automatic_spelling_correction": "자동 맞춤법 수정 허용",
+  "appearance.lets_macos_correct_misspelled_words_in_messages_turn_correction_on_or_off_from_the_message_box_s_spelling_and_grammar_menu":
+    "macOS가 메시지의 맞춤법을 수정하도록 허용합니다. 메시지 입력란의 맞춤법 및 문법 메뉴에서 수정을 켜거나 끌 수 있습니다.",
+  "appearance.show_unread_first_in_search": "검색에서 읽지 않은 대화 먼저 표시",
+  "appearance.with_nothing_typed_search_leads_with_unread_channels_and_dms_and_selects_the_newest":
+    "검색어를 입력하지 않으면 읽지 않은 채널과 DM을 먼저 표시하고 가장 최근 항목을 선택합니다.",
+  "appearance.message_width_wasn_t_saved": "메시지 너비를 저장하지 못했습니다",
+  "appearance.retry_saving_message_width": "메시지 너비 저장 다시 시도",
+  "appearance.follow_up_preference_wasn_t_saved":
+    "후속 메시지 설정을 저장하지 못했습니다",
+  "appearance.this_choice_is_active_but_could_not_be_saved_on_this_device":
+    "선택한 설정을 적용했지만 이 기기에 저장하지 못했습니다.",
+  "appearance.retry_saving_follow_up_behavior":
+    "후속 메시지 설정 저장 다시 시도",
+  "appearance.clock_preference_wasn_t_saved":
+    "시간 표시 설정을 저장하지 못했습니다",
+  "appearance.this_choice_is_active_but_could_not_be_saved_on_this_device_try_again":
+    "선택한 설정을 적용했지만 이 기기에 저장하지 못했습니다. 다시 시도해 주세요.",
+  "appearance.retry_saving_clock_preference": "시간 표시 설정 저장 다시 시도",
+  "appearance.spelling_preference_wasn_t_saved":
+    "맞춤법 설정을 저장하지 못했습니다",
+  "appearance.retry_saving_spelling_correction": "맞춤법 설정 저장 다시 시도",
+  "appearance.search_preference_wasn_t_saved":
+    "검색 설정을 저장하지 못했습니다",
+  "appearance.retry_saving_search_preference": "검색 설정 저장 다시 시도",
+  "appearance.thread_preference_wasn_t_saved":
+    "스레드 설정을 저장하지 못했습니다",
+  "appearance.retry_saving_thread_placement": "스레드 위치 저장 다시 시도",
+  "appearance.vibe_level_wasn_t_saved": "색 대비를 저장하지 못했습니다",
+  "appearance.retry_saving_vibe_level": "색 대비 저장 다시 시도",
+  "appearance.message_density_wasn_t_saved":
+    "메시지 밀도를 저장하지 못했습니다",
+  "appearance.retry_saving_message_density": "메시지 밀도 저장 다시 시도",
+  "appearance.accent_color_wasn_t_saved": "강조 색상을 저장하지 못했습니다",
+  "appearance.retry_saving_accent_color": "강조 색상 저장 다시 시도",
+  "appearance.interface_size_wasn_t_saved":
+    "인터페이스 크기를 저장하지 못했습니다",
+  "appearance.retry_saving_interface_size": "인터페이스 크기 저장 다시 시도",
+  "appearance.appearance_wasn_t_saved": "화면 설정을 저장하지 못했습니다",
+  "appearance.retry_saving_appearance": "화면 설정 저장 다시 시도",
+  "appearance.color_honey": "허니",
+  "appearance.color_cobalt": "코발트",
+  "appearance.color_iris": "아이리스",
+  "appearance.color_magenta": "마젠타",
+  "appearance.color_citrus": "시트러스",
+  "appearance.color_mono": "모노",
+  "appearance.accent_accessible": "{color} 강조 색상",
+};

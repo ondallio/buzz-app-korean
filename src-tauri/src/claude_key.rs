@@ -23,11 +23,7 @@ use tokio::sync::Mutex;
 use zeroize::Zeroizing;
 
 #[cfg_attr(test, allow(dead_code))]
-const SERVICE: &str = if cfg!(debug_assertions) {
-    "xyz.block.buzz.desktop.claude-api-key.debug"
-} else {
-    "xyz.block.buzz.desktop.claude-api-key"
-};
+const SERVICE: &str = buzz_credential_store::distribution::claude_service(cfg!(debug_assertions));
 #[cfg_attr(test, allow(dead_code))]
 const ACCOUNT: &str = "anthropic";
 const KEY_LIMIT: usize = 512;
@@ -205,3 +201,15 @@ pub(crate) async fn claude_api_key_set(
 #[cfg(test)]
 #[path = "claude_key_tests.rs"]
 mod tests;
+
+#[test]
+fn distribution_claude_key_uses_its_own_secure_service() {
+    let prefix = option_env!("BUZZ_DISTRIBUTION_ID").unwrap_or("xyz.block.buzz.desktop");
+    assert_eq!(
+        SERVICE,
+        format!(
+            "{prefix}.claude-api-key{}",
+            if cfg!(debug_assertions) { ".debug" } else { "" }
+        )
+    );
+}

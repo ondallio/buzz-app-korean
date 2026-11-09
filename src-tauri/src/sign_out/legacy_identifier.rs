@@ -11,9 +11,9 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 pub(crate) const LEGACY: &str = "dev.local.buzz.foundation";
-pub(crate) const CURRENT: &str = "xyz.block.buzz.desktop";
+pub(crate) const CURRENT: &str = buzz_credential_store::distribution::application_identifier(false);
 /// What `just desktop` and debug bundles run as (`scripts/desktop-config.mjs`).
-pub(crate) const DEV: &str = "xyz.block.buzz.desktop.dev";
+pub(crate) const DEV: &str = buzz_credential_store::distribution::application_identifier(true);
 const BUSY: &str = "Quit every other Buzz window, then open Buzz again to finish moving its storage. Nothing was moved.";
 const AGENT_STOPPING: &str =
     "An agent is still stopping. Open Buzz again in a moment to finish moving its storage.";
@@ -24,7 +24,8 @@ const SIGN_OUT_PENDING: &str = "Open the installed Buzz to finish signing out, t
 /// identifier takes them all; development (`.dev`) only its own pending sign-out,
 /// copying the rest (`seeds`); test identifiers none.
 pub(super) fn moves(identifier: &str) -> Option<Vec<(PathBuf, PathBuf)>> {
-    if identifier != CURRENT && identifier != DEV {
+    if buzz_credential_store::distribution::ISOLATED || (identifier != CURRENT && identifier != DEV)
+    {
         return Some(Vec::new());
     }
     let data = dirs::data_dir()?;
@@ -64,7 +65,7 @@ pub(super) fn moves(identifier: &str) -> Option<Vec<(PathBuf, PathBuf)>> {
 /// last, since its copy marks the seed finished. Separate caches are left. None
 /// unless this is the development identifier.
 pub(super) fn seeds(identifier: &str) -> Option<Vec<PathBuf>> {
-    if identifier != DEV {
+    if buzz_credential_store::distribution::ISOLATED || identifier != DEV {
         return Some(Vec::new());
     }
     let data = dirs::data_dir()?;
@@ -85,7 +86,10 @@ pub(super) fn seeds(identifier: &str) -> Option<Vec<PathBuf>> {
 /// would make the next release launch refuse to start.
 pub(crate) fn agents(identifier: &str, app_data: &Path) -> PathBuf {
     let release = app_data.with_file_name(CURRENT);
-    if identifier == DEV && (release.is_dir() || !app_data.with_file_name(LEGACY).exists()) {
+    if !buzz_credential_store::distribution::ISOLATED
+        && identifier == DEV
+        && (release.is_dir() || !app_data.with_file_name(LEGACY).exists())
+    {
         return release.join(AGENTS);
     }
     app_data.join(AGENTS)

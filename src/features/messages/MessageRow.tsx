@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { requestWork, isSettledWork } from "../agents/request-work";
 import { ActivityDisclosure } from "./ActivityDisclosure";
 import { ActivityOutcome } from "./ActivityOutcome";
@@ -264,6 +265,7 @@ function MessageRowContent({
   onOpenMediaReview,
   agentPubkeys,
 }: MessageContentProps) {
+  useLanguage();
   const [avatarFocused, setAvatarFocused] = useState(false);
   // Compact is a flat list: everyone's rows start at the left, with no own surface.
   const flat = useMessageDensity() === "compact";
@@ -538,7 +540,7 @@ function MessageRowContent({
         <MenuIcon>
           <FlagIcon />
         </MenuIcon>
-        Report
+        {t("messageActions.report.menu")}
       </MenuItem>
     </>
   );
@@ -906,7 +908,7 @@ function MessageRowContent({
         <ToastNotice
           tone="success"
           timeout={5000}
-          title="Report submitted to community moderators"
+          title={t("messageActions.report.sent")}
           onDismiss={() => setReporting(undefined)}
         />
       )}

@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { decode } from "nostr-tools/nip19";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Avatar } from "../../shared/design-system/ui/Avatar";
@@ -20,8 +21,9 @@ export function WelcomeBack({
   onImport: () => void;
   onSwitchAccount: () => void;
 }) {
+  useLanguage();
   const name = profile?.name.trim();
-  const title = name || "Saved key";
+  const title = name || t("identityMore.savedKey");
   const decoded = decode(npub);
   const label =
     decoded.type === "npub" ? abbreviatedPublicKey(decoded.data) : npub;
@@ -33,16 +35,16 @@ export function WelcomeBack({
           tabIndex={-1}
           className="text-heading text-standard"
         >
-          {name ? "Welcome back" : "Continue with this key"}
+          {name ? t("identityMore.welcomeBack") : t("identityMore.continueKey")}
         </h1>
         <p className="mt-2 text-body text-subtle">
           {name
-            ? "Continue with your Buzz profile."
-            : "We found the key to your account."}
+            ? t("identityMore.continueProfileHelp")
+            : t("identityMore.foundKey")}
         </p>
         {email && (
           <p className="mt-2 break-words text-body-sm text-subtle">
-            Signed in as {email}
+            {t("identityMore.signedInAs", { email })}
           </p>
         )}
       </div>
@@ -50,7 +52,11 @@ export function WelcomeBack({
         <Button
           shape="control"
           size="row"
-          aria-label={`${name ? `Continue with ${name}` : title}, ${label}`}
+          aria-label={
+            name
+              ? t("identityMore.continueProfile", { name, key: String(label) })
+              : t("identityMore.continueSaved", { key: String(label) })
+          }
           data-return-focus={onRestore ? "restore" : "import"}
           onClick={onRestore ?? onImport}
         >
@@ -79,7 +85,7 @@ export function WelcomeBack({
         <Button shape="control" size="row" onClick={onSwitchAccount}>
           <span className="flex w-full items-center gap-3 text-left">
             <span className="min-w-0 flex-1 text-label">
-              Use a different account
+              {t("identity.failure.otherAccount")}
             </span>
             <CaretRightIcon size={20} aria-hidden="true" />
           </span>

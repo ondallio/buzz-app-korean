@@ -9,6 +9,7 @@ import {
   type IndicatorPermission,
 } from "../features/notifications/indicator";
 import { UnreadIndicatorSettings } from "./UnreadIndicatorSettings";
+import { setLanguage } from "../shared/i18n";
 
 const native = vi.hoisted(() => ({ value: true }));
 const invoke = vi.hoisted(() => vi.fn());
@@ -25,6 +26,8 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
   native.value = true;
+  setLanguage("en");
+  localStorage.clear();
 });
 function setup(initial: IndicatorPermission) {
   const permission = vi.fn(async (): Promise<IndicatorPermission> => initial);
@@ -178,4 +181,41 @@ it("shows a Dock write error and retries through the existing permission check",
     .click(screen.getByRole("button", { name: "Check Dock permission" }));
   expect(set).toHaveBeenLastCalledWith(true);
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("changes EN→KO→EN without remounting a pending Dock permission action or translating native values", async () => {
+  setLanguage("en");
+  const h = setup("enabled");
+  await act(() => h.dock.refresh());
+  let finish!: (value: IndicatorPermission) => void;
+  h.permission.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  vi.useFakeTimers();
+  const button = screen.getByRole("button", { name: "Check Dock permission" });
+  button.focus();
+  await act(async () => button.click());
+  try {
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("button", { name: "Dock 권한 확인" })).toBe(button);
+    expect(button).toHaveFocus();
+    expect(button).toHaveAttribute("aria-busy", "true");
+    expect(h.permission.mock.calls).toEqual([[false], [false]]);
+  } finally {
+    await act(async () => finish("disabled"));
+  }
+  await act(() => vi.advanceTimersByTimeAsync(500));
+  expect(h.dock.snapshot().permission).toBe("disabled");
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Dock 배지가 꺼져 있습니다.",
+  );
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Check Dock permission" })).toBe(
+    button,
+  );
+  expect(button).toHaveFocus();
+  expect(h.permission.mock.calls).toEqual([[false], [false]]);
 });

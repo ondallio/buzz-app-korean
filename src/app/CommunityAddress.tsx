@@ -1,3 +1,6 @@
+import { localMessage } from "../shared/i18n/deferred-message";
+import { TranslatedMessage } from "../shared/i18n/Message";
+import { t, useLanguage } from "../shared/i18n";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { communityDestination } from "../features/communities/destination";
 import type {
@@ -20,6 +23,7 @@ export function CommunityAddress({
   community: Membership;
   communities: CommunityReader;
 }) {
+  useLanguage();
   const icon = useSyncExternalStore(communities.subscribe, () => {
     const current =
       communities
@@ -50,6 +54,7 @@ function CopyAddress({
   community: Membership;
   icon: string | undefined;
 }) {
+  useLanguage();
   const [copied, setCopied] = useState(false);
   const [hint, setHint] = useState(false);
   const visible = useRef(false);
@@ -81,12 +86,20 @@ function CopyAddress({
         setCopied(true);
         if (!visible.current || pointerType.current === "touch") {
           toasted.current = copiedDuring === visit.current;
-          notify("Community URL copied.", "success");
+          notify(
+            <TranslatedMessage value={localMessage("settings.urlCopied")} />,
+            "success",
+          );
         }
       }
     } catch {
       if (current === attempt.current)
-        notify("Couldn’t copy the community URL.", "error");
+        notify(
+          <TranslatedMessage
+            value={localMessage("settings.communityUrlCopyFailed")}
+          />,
+          "error",
+        );
     }
   };
   return (
@@ -95,10 +108,11 @@ function CopyAddress({
         content={
           copied ? (
             <>
-              <CheckIcon size={12} aria-hidden="true" /> Copied
+              <CheckIcon size={12} aria-hidden="true" />
+              {t("settings.copied")}
             </>
           ) : (
-            "Copy"
+            t("settings.copy")
           )
         }
         follow="pointer"
@@ -113,7 +127,7 @@ function CopyAddress({
         disableHoverablePopup
       >
         <NavigationItem
-          aria-label={`Copy community URL, ${host}`}
+          aria-label={t("settings.copyCommunityUrl", { host })}
           label={host}
           icon={
             <Avatar
@@ -141,7 +155,7 @@ function CopyAddress({
         />
       </Tooltip>
       <span className="sr-only" role="status">
-        {copied ? "Community URL copied." : ""}
+        {copied ? t("settings.urlCopied") : ""}
       </span>
     </>
   );

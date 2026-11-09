@@ -11,6 +11,8 @@ import {
 } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
+import { localError } from "../../shared/i18n/deferred-message";
+import { setLanguage } from "../../shared/i18n";
 import { AvatarEditor } from "./AvatarEditor";
 import {
   emojiAvatar,
@@ -30,6 +32,7 @@ vi.mock("./avatar-upload", async (importOriginal) => ({
 }));
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.resetAllMocks();
 });
 const community = "https://a.example";
@@ -437,3 +440,71 @@ it("sizes and moves the emoji in its preview and its uploaded avatar", async () 
     0.1,
   );
 });
+
+it("keeps the avatar URL draft and validation through language changes without applying or uploading it", async () => {
+  setLanguage("en");
+  render(<Form />);
+  await open();
+  const input = screen.getByLabelText("Picture URL (optional)");
+  fireEvent.change(input, {
+    target: { value: "http://images.example/avatar.png" },
+  });
+  fireEvent.blur(input);
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Use an HTTPS image URL without credentials",
+  );
+  input.focus();
+  const tabs = screen.getByRole("tablist", { name: "Avatar source" });
+  act(() => setLanguage("ko"));
+  expect(screen.getByLabelText("이미지 URL (선택 사항)")).toBe(input);
+  expect(input).toHaveFocus();
+  expect(input).toHaveValue("http://images.example/avatar.png");
+  expect(screen.getByRole("tablist", { name: "아바타 소스" })).toBe(tabs);
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "인증 정보가 없는 HTTPS 이미지 URL을 사용하거나 아바타를 제거해 주세요. URL은 2,048자 이하여야 합니다.",
+  );
+  act(() => setLanguage("en"));
+  expect(screen.getByLabelText("Picture URL (optional)")).toBe(input);
+  fireEvent.change(input, { target: { value: next } });
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  expect(screen.getByLabelText("Draft picture")).toHaveTextContent(next);
+  expect(uploadAvatar).not.toHaveBeenCalled();
+});
+
+it.each([true, false])(
+  "keeps retained upload errors live only for app-owned provenance (%s), without repeating the upload",
+  async (owned) => {
+    setLanguage("en");
+    const message = "Choose an image smaller than 50 MiB.";
+    vi.mocked(uploadAvatar)
+      .mockRejectedValueOnce(
+        owned ? localError("profileEditing.imageSize") : new Error(message),
+      )
+      .mockResolvedValueOnce(next);
+    render(<Form />);
+    await open();
+    const url = screen.getByLabelText("Picture URL (optional)");
+    upload();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(message);
+    url.focus();
+    act(() => setLanguage("ko"));
+    expect(screen.getByLabelText("이미지 URL (선택 사항)")).toBe(url);
+    expect(url).toHaveFocus();
+    expect(screen.getByRole("alert")).toBe(alert);
+    expect(alert).toHaveTextContent(
+      owned ? "50 MiB보다 작은 이미지를 선택해 주세요." : message,
+    );
+    expect(uploadAvatar).toHaveBeenCalledTimes(1);
+    act(() => setLanguage("en"));
+    upload();
+    await waitFor(() => expect(url).toHaveValue(next));
+    expect(uploadAvatar).toHaveBeenCalledTimes(2);
+    expect(
+      vi.mocked(uploadAvatar).mock.calls.map((call) => [call[0].name, call[1]]),
+    ).toEqual([
+      ["test.png", community],
+      ["test.png", community],
+    ]);
+  },
+);

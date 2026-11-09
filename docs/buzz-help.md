@@ -479,6 +479,11 @@ revokes all of them, and a pairing unused for 30 days expires.
   the same key as another shortcut, Settings → Shortcuts marks it "Also used
   by"; change one of them to choose which fires. In the Mac app, **Buzz →
   Settings…** in the menu bar also opens Settings.
+- **Desktop language**: choose **한국어** or **English** in **Settings → Appearance →
+  Language**. The device keeps your choice across launches, and switching languages
+  preserves the current draft. Korean localization is in progress; remaining
+  untranslated interface copy uses English. Messages, names, code and saved
+  content keep their original values.
 - **Message width**: choose **Narrow** or **Wide** in **Settings → Appearance →
   Interface**. Narrow is the default; Wide gives messages and the composer
   50% more room when the pane is wide enough. The choice is saved on this device.
@@ -494,6 +499,13 @@ revokes all of them, and a pairing unused for 30 days expires.
   Text size stays with **Interface size**.
   Hover a row to highlight it and show message actions at the right
   edge. The choice applies on this device only.
+- **Language in Buzz Korean Beta**: open **Settings → Appearance → Language**
+  (**설정 → 화면 설정 → 언어**) and choose **한국어** or **English**. The choice
+  applies immediately and is saved on this device. On first use, a Korean system
+  language selects Korean; other system languages select English. If saving fails,
+  use the retry beside the setting. On macOS, an app-menu error has its own retry.
+  Translation is still in progress, so some screens may remain in English. User
+  messages, community and channel names, code and commands keep their original text.
 - **Time format**: **Settings → Appearance → Clock** chooses 12-hour or
   24-hour times. System, the default, follows the desktop app's operating
   system: the 24-hour time setting on macOS, the short time format on Windows,

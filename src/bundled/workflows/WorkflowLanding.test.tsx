@@ -1,3 +1,4 @@
+import { setLanguage } from "../../shared/i18n/language";
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import {
@@ -33,6 +34,7 @@ import {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  setLanguage("en");
 });
 const channel = (index: number): ChannelSummary => ({
   id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
@@ -2060,3 +2062,140 @@ it.each(["delete", "enable"] as const)(
     }
   },
 );
+
+it("retains the selected detail, confirmation, raw YAML and focused controls through live locale changes", async () => {
+  const { fixture, target } = landing();
+  const user = userEvent.setup();
+  const raw = "Enabled in configuration {raw}";
+  const yaml = fixtureYaml.replace("Message helper", raw);
+  act(() =>
+    fixture.definitions.update({
+      status: "ready",
+      data: { items: [{ ...fixtureDefinition, yaml }], partial: false },
+    }),
+  );
+  try {
+    const row = await screen.findByRole("button", {
+      name: /^Open Enabled in configuration \{raw\}:/,
+    });
+    const date = row.querySelector("time");
+    const stamp = date?.getAttribute("datetime");
+    await user.click(row);
+    const detail = within(target).getByRole("region", { name: raw });
+    const toggle = within(detail).getByRole("switch", {
+      name: "Enabled in configuration",
+    });
+    const run = within(detail).getByRole("button", { name: "Run now" });
+    const reads = fixture.calls.runs;
+    await user.click(toggle);
+    const dialog = screen.getByRole("alertdialog");
+    const enable = screen.getByRole("button", { name: "Turn on" });
+    enable.focus();
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("alertdialog")).toBe(dialog);
+    expect(screen.getByRole("button", { name: "활성화" })).toBe(enable);
+    expect(enable).toHaveFocus();
+    expect(
+      screen.getByText(
+        "이 채널에 새 메시지가 올 때마다 실행됩니다. 활성화하기 전에 트리거를 검토하세요.",
+      ),
+    ).toBeVisible();
+    await user.click(enable);
+    expect(fixture.calls.save).toBe(1);
+    expect(fixture.input()).toEqual({
+      channelId: fixtureChannel,
+      existing: { ...fixtureDefinition, yaml },
+      yaml: yaml.replace("enabled: false\n", ""),
+    });
+    expect(within(target).getByRole("region", { name: raw })).toBe(detail);
+    expect(within(detail).getByRole("button", { name: "지금 실행" })).toBe(run);
+    expect(run).toBeDisabled();
+    expect(row.querySelector("time")).toBe(date);
+    expect(date).toHaveAttribute("datetime", stamp);
+    expect(fixture.calls.runs).toBe(reads);
+    act(() => setLanguage("en"));
+    expect(
+      within(detail).getByRole("switch", { name: "Enabled in configuration" }),
+    ).toBe(toggle);
+    expect(toggle).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(toggle);
+    expect(fixture.calls.save).toBe(1);
+  } finally {
+    target.remove();
+  }
+});
+
+it("retains local fallback provenance while an external diagnostic identical to app copy stays raw", async () => {
+  const { fixture, target } = landing();
+  try {
+    fixture.capability.trigger = () => {
+      throw null;
+    };
+    const run = await screen.findByRole("button", {
+      name: "Run now: Message helper",
+    });
+    fireEvent.click(run);
+    await screen.findByText("Run could not be submitted.");
+    act(() => setLanguage("ko"));
+    expect(
+      await screen.findByText("실행 요청을 제출하지 못했습니다."),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "지금 실행: Message helper" }),
+    ).toBe(run);
+    fixture.capability.trigger = () => {
+      throw new Error("Run could not be submitted.");
+    };
+    fireEvent.click(run);
+    expect(
+      await screen.findByText("Run could not be submitted."),
+    ).toBeVisible();
+    act(() => setLanguage("en"));
+    expect(screen.getByText("Run could not be submitted.")).toBeVisible();
+  } finally {
+    target.remove();
+  }
+});
+
+it("keeps the same open filter and focused radio across EN KO EN without changing raw status or host reads", async () => {
+  const { fixture, target } = landing();
+  const user = userEvent.setup();
+  try {
+    const row = await screen.findByRole("button", {
+      name: /^Open Message helper:/,
+    });
+    const reads = fixture.definitions.created();
+    await user.click(screen.getByRole("button", { name: "Status" }));
+    const popup = await screen.findByRole("dialog", { name: "Status" });
+    const disabled = within(popup).getByRole("radio", { name: "Disabled" });
+    disabled.focus();
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("dialog", { name: "상태" })).toBe(popup);
+    expect(within(popup).getByRole("radio", { name: "비활성화됨" })).toBe(
+      disabled,
+    );
+    expect(disabled).toHaveFocus();
+    expect(fixture.definitions.created()).toBe(reads);
+    await user.click(disabled);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const clear = screen.getByRole("button", { name: "상태 필터 지우기" });
+    expect(screen.getByRole("button", { name: /^Message helper 열기:/ })).toBe(
+      row,
+    );
+    clear.focus();
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("button", { name: "Clear status filter" })).toBe(
+      clear,
+    );
+    expect(clear).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: "Status: Disabled" }),
+    ).toBeVisible();
+    expect(fixture.definitions.created()).toBe(reads);
+    expect(fixture.calls.save).toBe(0);
+    expect(fixture.calls.trigger).toBe(0);
+    expect(fixture.calls.delete).toBe(0);
+  } finally {
+    target.remove();
+  }
+});

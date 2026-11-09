@@ -1,3 +1,5 @@
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
 import { OnboardingBack } from "./OnboardingBack";
 import { useId, useRef, useState } from "react";
 import { npubEncode } from "nostr-tools/nip19";
@@ -40,10 +42,13 @@ export function KeyImport({
   /** Rejects with the native refusal, shown under the field. */
   onImport: (nsec: string) => Promise<void>;
 }) {
+  useLanguage();
   const [text, setText] = useState("");
   const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<string>();
+  const [failure, setFailure] = useState<
+    { raw: string } | { fallback: "file" | "import" }
+  >();
   const form = useRef<HTMLFormElement>(null);
   const formId = useId();
   const picker = useRef<HTMLInputElement>(null);
@@ -63,7 +68,7 @@ export function KeyImport({
       change(await readKeyFile(file));
     } catch (error) {
       setFailure(
-        error instanceof Error ? error.message : "Couldn’t read that file.",
+        error instanceof Error ? { raw: error.message } : { fallback: "file" },
       );
     }
   };
@@ -76,34 +81,40 @@ export function KeyImport({
       await onImport(input.nsec);
     } catch (error) {
       setFailure(
-        error instanceof Error ? error.message : "Couldn’t import this key.",
+        error instanceof Error
+          ? { raw: error.message }
+          : { fallback: "import" },
       );
     } finally {
       setBusy(false);
     }
   };
-  const message =
-    failure ??
-    (mismatch ? (
-      <>
-        That isn’t the key linked to this account. It expects{" "}
-        <code className="select-text break-all font-mono text-mono">
-          {expected}
-        </code>{" "}
-        (the key on your other device).
-      </>
-    ) : input.kind === "encrypted" ? (
-      "Password-protected backups aren’t supported here yet. Paste the nsec1 key itself."
-    ) : input.kind === "invalid" ? (
-      "That doesn’t look like a valid nsec. Paste an nsec1 key."
-    ) : undefined);
+  const message = failure
+    ? "raw" in failure
+      ? failure.raw
+      : failure.fallback === "file"
+        ? t("identityMore.readFileFailed")
+        : t("identityMore.importFailed")
+    : mismatch
+      ? rich("identityMore.keyMismatch", {
+          key: (
+            <code className="select-text break-all font-mono text-mono">
+              {expected}
+            </code>
+          ),
+        })
+      : input.kind === "encrypted"
+        ? t("identityMore.encryptedKey")
+        : input.kind === "invalid"
+          ? t("identityMore.invalidKey")
+          : undefined;
   return (
     <OnboardingScreen
       labelledBy="welcome-title"
       intro={
         busy ? (
           <div className={`${styles.importContent} items-center`}>
-            <SetupProgress label="Importing your key…" />
+            <SetupProgress label={t("identityMore.importingKey")} />
           </div>
         ) : (
           <>
@@ -122,30 +133,26 @@ export function KeyImport({
                 tabIndex={-1}
                 className="text-heading text-standard"
               >
-                Enter your private key
+                {t("identityMore.enterPrivateKey")}
               </h1>
               <p className="text-body text-subtle">
-                Paste your private key to sign in to Buzz. You can also select
-                or drop a text file with your key.
+                {t("identityMore.importDescription")}
               </p>
               {automaticBackup && (
                 <p className="text-body-sm text-subtle">
-                  Buzz will automatically sync this key with your Builderlab
-                  account
-                  {automaticBackup === "kept" &&
-                    " unless you chose to manage it yourself"}
-                  . Block can use that copy to restore your identity, including
-                  anywhere else you use it.
+                  {automaticBackup === "kept"
+                    ? t("identityMore.autoBackupKept")
+                    : t("identityMore.autoBackup")}
                 </p>
               )}
               <div className={styles.importForm}>
                 <Field
-                  label="Private key (nsec)"
+                  label={t("identityMore.privateKeyLabel")}
                   error={message}
                   description={
                     input.kind === "nsec" && (
                       <>
-                        Public identity:{" "}
+                        {t("identityMore.publicIdentityLabel")}{" "}
                         <code className="select-text break-all font-mono text-mono">
                           {input.npub}
                         </code>
@@ -161,8 +168,8 @@ export function KeyImport({
                             type="button"
                             aria-label={
                               revealed
-                                ? "Hide private key"
-                                : "Reveal private key"
+                                ? t("identityMore.hidePrivateKey")
+                                : t("identityMore.revealPrivateKey")
                             }
                             icon={revealed ? <EyeSlashIcon /> : <EyeIcon />}
                             onClick={() => setRevealed(!revealed)}
@@ -188,21 +195,21 @@ export function KeyImport({
                         size="md"
                         onClick={() => picker.current?.click()}
                       >
-                        Browse
+                        {t("identityMore.browse")}
                       </Button>
                     </div>
                   </div>
                 </Field>
                 {dragging && (
                   <p className="m-0 text-body-sm text-subtle">
-                    Drop to use this file.
+                    {t("identityMore.dropFile")}
                   </p>
                 )}
               </div>
               {onLost && (
                 <div className="flex justify-start">
                   <Button variant="link" onClick={onLost}>
-                    I lost my key
+                    {t("identityMore.lostKeyAction")}
                   </Button>
                 </div>
               )}
@@ -213,7 +220,7 @@ export function KeyImport({
               type="file"
               className="sr-only"
               tabIndex={-1}
-              aria-label="Key file"
+              aria-label={t("identityMore.keyFile")}
               accept=".txt,.key,text/plain"
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -234,7 +241,7 @@ export function KeyImport({
             variant="prominent"
             disabled={!ready}
           >
-            Continue with this key
+            {t("identityMore.continueKey")}
           </Button>
           <OnboardingBack type="button" onClick={onBack} />
         </>

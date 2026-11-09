@@ -675,8 +675,18 @@ fn a_first_launch_creates_a_missing_user_data_folder() {
 #[test]
 fn every_identifier_shares_the_all_buzz_lock_and_each_key_has_its_own() {
     let (debug, release) = (
-        Paths::resolve("dev.local.buzz.custom").unwrap(),
-        Paths::resolve("dev.local.buzz.foundation").unwrap(),
+        Paths::resolve(if buzz_credential_store::distribution::ISOLATED {
+            legacy_identifier::DEV
+        } else {
+            "dev.local.buzz.custom"
+        })
+        .unwrap(),
+        Paths::resolve(if buzz_credential_store::distribution::ISOLATED {
+            legacy_identifier::CURRENT
+        } else {
+            "dev.local.buzz.foundation"
+        })
+        .unwrap(),
     );
     assert_eq!(debug.lock, release.lock);
     assert_eq!(debug.key_lock, release.key_lock);
@@ -1664,32 +1674,48 @@ fn a_linked_legacy_folder_moves_as_the_link() {
 
 #[test]
 fn only_the_current_identifier_takes_every_folder_the_legacy_one_used() {
-    use legacy_identifier::{moves, CURRENT, LEGACY};
-    let config: serde_json::Value =
-        serde_json::from_str(include_str!("../../tauri.conf.json")).unwrap();
-    assert_eq!(config["identifier"], CURRENT);
-    assert_eq!(
-        moves("dev.local.buzz.foundation.nexus-test-012345abcdef"),
-        Some(Vec::new())
-    );
-    let (legacy, current) = (
-        Paths::resolve(LEGACY).unwrap(),
-        Paths::resolve(CURRENT).unwrap(),
-    );
-    // Older builds take the same all-Buzz lock, so the move waits for them.
-    assert_eq!(legacy.lock, current.lock);
-    let moves = current.moves;
-    assert!(moves.contains(&(legacy.marker, current.marker)));
-    for path in std::iter::once(current.app_data).chain(current.others) {
-        for path in [trash(&path), path] {
-            let old = path.with_file_name(
-                path.file_name()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .replace(CURRENT, LEGACY),
-            );
-            assert!(moves.contains(&(old, path)));
+    if buzz_credential_store::distribution::ISOLATED {
+        assert!(legacy_identifier::moves(legacy_identifier::CURRENT)
+            .unwrap()
+            .is_empty());
+        assert!(legacy_identifier::moves(legacy_identifier::DEV)
+            .unwrap()
+            .is_empty());
+        assert!(Paths::resolve(legacy_identifier::LEGACY).is_none());
+        let current = Paths::resolve(legacy_identifier::CURRENT).unwrap();
+        assert!(current.moves.is_empty() && current.seeds.is_empty());
+        assert_eq!(
+            current.app_data.file_name().unwrap(),
+            legacy_identifier::CURRENT
+        );
+    } else {
+        use legacy_identifier::{moves, CURRENT, LEGACY};
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../../tauri.conf.json")).unwrap();
+        assert_eq!(config["identifier"], CURRENT);
+        assert_eq!(
+            moves("dev.local.buzz.foundation.nexus-test-012345abcdef"),
+            Some(Vec::new())
+        );
+        let (legacy, current) = (
+            Paths::resolve(LEGACY).unwrap(),
+            Paths::resolve(CURRENT).unwrap(),
+        );
+        // Older builds take the same all-Buzz lock, so the move waits for them.
+        assert_eq!(legacy.lock, current.lock);
+        let moves = current.moves;
+        assert!(moves.contains(&(legacy.marker, current.marker)));
+        for path in std::iter::once(current.app_data).chain(current.others) {
+            for path in [trash(&path), path] {
+                let old = path.with_file_name(
+                    path.file_name()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .replace(CURRENT, LEGACY),
+                );
+                assert!(moves.contains(&(old, path)));
+            }
         }
     }
 }
@@ -1764,24 +1790,39 @@ fn an_interrupted_development_seed_finishes_at_the_next_launch() {
 
 #[test]
 fn development_launches_copy_the_installed_storage_and_take_only_their_sign_out() {
-    use legacy_identifier::{moves, seeds, CURRENT, DEV, LEGACY};
-    assert!(include_str!("../../../scripts/desktop-config.mjs").contains(&format!("\"{DEV}\"")));
-    let (legacy, dev) = (
-        Paths::resolve(LEGACY).unwrap(),
-        Paths::resolve(DEV).unwrap(),
-    );
-    assert_eq!(moves(DEV), Some(vec![(legacy.marker, dev.marker)]));
-    assert_eq!(dev.seeds.last(), dirs::data_dir().as_ref());
-    // Each folder copied is one the release build moves; caches aren't copied.
-    let release = moves(CURRENT).unwrap();
-    for base in &dev.seeds {
-        assert!(release.contains(&(base.join(LEGACY), base.join(CURRENT))));
+    if buzz_credential_store::distribution::ISOLATED {
+        let dev = Paths::resolve(legacy_identifier::DEV).unwrap();
+        assert!(dev.moves.is_empty() && dev.seeds.is_empty());
+        assert!(Paths::resolve(legacy_identifier::LEGACY).is_none());
+        assert_eq!(dev.app_data.file_name().unwrap(), legacy_identifier::DEV);
+        assert_eq!(
+            legacy_identifier::seeds(legacy_identifier::CURRENT),
+            Some(Vec::new())
+        );
+        assert_eq!(
+            legacy_identifier::seeds(legacy_identifier::LEGACY),
+            Some(Vec::new())
+        );
+    } else {
+        use legacy_identifier::{moves, seeds, CURRENT, DEV, LEGACY};
+        assert!(include_str!("../../../scripts/desktop-config.mjs").contains(&format!("\"{DEV}\"")));
+        let (legacy, dev) = (
+            Paths::resolve(LEGACY).unwrap(),
+            Paths::resolve(DEV).unwrap(),
+        );
+        assert_eq!(moves(DEV), Some(vec![(legacy.marker, dev.marker)]));
+        assert_eq!(dev.seeds.last(), dirs::data_dir().as_ref());
+        // Each folder copied is one the release build moves; caches aren't copied.
+        let release = moves(CURRENT).unwrap();
+        for base in &dev.seeds {
+            assert!(release.contains(&(base.join(LEGACY), base.join(CURRENT))));
+        }
+        // Windows keeps caches in local data, which holds WebView2's storage.
+        let cache = dirs::cache_dir().unwrap();
+        assert!(cache == dirs::data_local_dir().unwrap() || !dev.seeds.contains(&cache));
+        assert_eq!(seeds(CURRENT), Some(Vec::new()));
+        assert_eq!(seeds(LEGACY), Some(Vec::new()));
     }
-    // Windows keeps caches in local data, which holds WebView2's storage.
-    let cache = dirs::cache_dir().unwrap();
-    assert!(cache == dirs::data_local_dir().unwrap() || !dev.seeds.contains(&cache));
-    assert_eq!(seeds(CURRENT), Some(Vec::new()));
-    assert_eq!(seeds(LEGACY), Some(Vec::new()));
 }
 
 #[test]
@@ -1791,13 +1832,27 @@ fn development_builds_use_the_installed_agents_unless_legacy_storage_is_due() {
     let app_data = |identifier: &str| dir.path().join(identifier);
     // With no installed storage, as after an erase that removed agents, never
     // the stale copy in `.dev`.
-    assert_eq!(agents(DEV, &app_data(DEV)), app_data(CURRENT).join(AGENTS));
+    assert_eq!(
+        agents(DEV, &app_data(DEV)),
+        if buzz_credential_store::distribution::ISOLATED {
+            app_data(DEV).join(AGENTS)
+        } else {
+            app_data(CURRENT).join(AGENTS)
+        }
+    );
     fs::create_dir(app_data(LEGACY)).unwrap();
     // Before the installed app moves its storage, it is never created.
     assert_eq!(agents(DEV, &app_data(DEV)), app_data(DEV).join(AGENTS));
     assert!(!app_data(CURRENT).exists());
     fs::rename(app_data(LEGACY), app_data(CURRENT)).unwrap();
-    assert_eq!(agents(DEV, &app_data(DEV)), app_data(CURRENT).join(AGENTS));
+    assert_eq!(
+        agents(DEV, &app_data(DEV)),
+        if buzz_credential_store::distribution::ISOLATED {
+            app_data(DEV).join(AGENTS)
+        } else {
+            app_data(CURRENT).join(AGENTS)
+        }
+    );
     assert_eq!(
         agents(CURRENT, &app_data(CURRENT)),
         app_data(CURRENT).join(AGENTS)
@@ -1998,4 +2053,54 @@ fn pairing_revoke_all_policy_for_sign_out() {
     }
     assert!(pairings_allow(&failed(true), false), "plain sign-out");
     assert!(!pairings_allow(&failed(true), true), "sign out and erase");
+}
+
+#[test]
+fn distribution_paths_reject_mismatched_bundles_and_keep_all_owners_separate() {
+    let Some(id) = option_env!("BUZZ_DISTRIBUTION_ID") else {
+        return;
+    };
+    let paths = Paths::resolve(id).unwrap();
+    assert!(paths.moves.is_empty());
+    assert!(paths.seeds.is_empty());
+    assert!(paths
+        .lock
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .starts_with(&format!(".{id}.")));
+    assert_eq!(
+        paths.ownership.file_name().unwrap(),
+        format!("{id}.agent-ownership").as_str()
+    );
+    assert!(paths
+        .marker
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .contains(&format!("{id}.identity")));
+    assert!(Paths::resolve("xyz.block.buzz.desktop").is_none());
+    assert!(Paths::resolve("xyz.block.buzz.desktop.dev").is_none());
+    assert!(Paths::resolve("dev.local.buzz.foundation").is_none());
+}
+
+#[test]
+fn distribution_never_moves_or_seeds_official_data_or_shares_the_agent_root() {
+    if option_env!("BUZZ_DISTRIBUTION_ID").is_none() {
+        return;
+    }
+    assert!(legacy_identifier::moves(legacy_identifier::CURRENT)
+        .unwrap()
+        .is_empty());
+    assert!(legacy_identifier::seeds(legacy_identifier::DEV)
+        .unwrap()
+        .is_empty());
+    let root = tempfile::tempdir().unwrap();
+    let app = root.path().join(legacy_identifier::DEV);
+    assert_eq!(
+        legacy_identifier::agents(legacy_identifier::DEV, &app),
+        app.join(AGENTS)
+    );
 }

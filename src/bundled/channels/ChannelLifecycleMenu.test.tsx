@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { resolveMessage } from "../../shared/i18n/deferred-message";
 import { useState } from "react";
 import { ToastProvider } from "../../shared/design-system/ui/Toast";
 import { afterEach, expect, it, vi } from "vitest";
@@ -684,7 +685,7 @@ it("chat archive runs without confirmation, then Undo unarchives from its result
               setOpen(false);
             }}
             failed={(title, message) => {
-              failed(title, message);
+              failed(resolveMessage(title), message);
               setOpen(false);
             }}
             undo={() => {

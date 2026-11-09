@@ -10,12 +10,14 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../shared/design-system/ui/Toast";
+import { setLanguage } from "../../shared/i18n/language";
 import { UpdateNotice } from "./UpdateNotice";
 import { createUpdates, type Updates } from "./updates";
 
 let updates: Updates | undefined;
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   updates?.dispose();
 });
 
@@ -159,4 +161,34 @@ it("stays dismissed when the notice remounts, e.g. during community restoration"
   expect(
     await screen.findByRole("dialog", { name: "Ready to update!" }),
   ).toBeVisible();
+});
+
+it("updates the same notice, action and dismiss control during a held install", async () => {
+  const { update, install, relaunch } = await readyUpdate();
+  const dialog = screen.getByRole("dialog", { name: "Ready to update!" });
+  const action = screen.getByRole("button", { name: "Update now" });
+  const dismiss = screen.getByRole("button", {
+    name: "Dismiss update notification",
+  });
+  action.focus();
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("dialog", { name: "업데이트할 준비가 되었습니다!" }),
+  ).toBe(dialog);
+  expect(screen.getByRole("button", { name: "지금 업데이트" })).toBe(action);
+  expect(screen.getByRole("button", { name: "업데이트 알림 닫기" })).toBe(
+    dismiss,
+  );
+  expect(action).toHaveFocus();
+  expect(update.install).not.toHaveBeenCalled();
+  fireEvent.click(action);
+  expect(update.install).toHaveBeenCalledOnce();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("dialog", { name: "Ready to update!" })).toBe(dialog);
+  expect(screen.getByRole("button", { name: "Update now" })).toBe(action);
+  expect(screen.getByText("Updating")).toBeVisible();
+  expect(update.install).toHaveBeenCalledOnce();
+  expect(relaunch).not.toHaveBeenCalled();
+  await act(async () => install.resolve());
+  await waitFor(() => expect(relaunch).toHaveBeenCalledOnce());
 });

@@ -10,6 +10,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../../shared/i18n";
 import { CommunityDialog } from "./CommunityDialog";
 import { Context } from "@deepseek-ai/cordis";
 import { createCommunities, type Communities } from "./service";
@@ -32,6 +33,7 @@ vi.mock("./api", async (actual) => ({
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
@@ -1185,3 +1187,191 @@ it.each([
     expect(await screen.findByLabelText("Invite code")).toBeVisible();
   },
 );
+
+it("keeps the onboarding profile step draft and focus when the same title changes language", async () => {
+  setLanguage("en");
+  const saveProfile = vi.fn();
+  const communities = {
+    snapshot: () => ({
+      status: "ready",
+      relayAvailable: true,
+      profile: { name: "Before", picture: "" },
+    }),
+    saveProfile,
+  } as unknown as Communities;
+  const close = vi.fn();
+  const user = userEvent.setup();
+  render(
+    <CommunityDialog
+      communities={communities}
+      mode="profile"
+      onboarding
+      close={close}
+    />,
+  );
+  const input = screen.getByLabelText("Display name");
+  const heading = screen.getByRole("heading", { name: "Your profile" });
+  await user.clear(input);
+  await user.type(input, "Your profile");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("heading", { name: "내 프로필" })).toBe(heading);
+  expect(screen.getByLabelText("표시 이름")).toBe(input);
+  expect(input).toHaveFocus();
+  expect(input).toHaveValue("Your profile");
+  act(() => setLanguage("en"));
+  expect(input).toHaveFocus();
+  await user.click(screen.getByRole("button", { name: "Save profile" }));
+  expect(saveProfile).toHaveBeenCalledExactlyOnceWith({
+    name: "Your profile",
+    picture: "",
+  });
+  expect(close).toHaveBeenCalledExactlyOnceWith();
+});
+
+it("still focuses the onboarding heading when the destination advances to the profile step", async () => {
+  setLanguage("en");
+  api.inspectProfile.mockResolvedValueOnce({
+    exists: true,
+    existing: { name: "Fixture" },
+    profile: { name: "Fixture", picture: "" },
+  });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => Response.json({ name: "Fixture" })),
+  );
+  const user = userEvent.setup();
+  render(
+    <CommunityDialog
+      communities={lookupCommunities}
+      mode="join"
+      onboarding
+      close={() => {}}
+    />,
+  );
+  const heading = screen.getByRole("heading", { name: "Join a community" });
+  expect(heading).toHaveFocus();
+  await user.type(
+    screen.getByLabelText("Community URL"),
+    "wss://relay.example",
+  );
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  const profileHeading = await screen.findByRole("heading", {
+    name: "Your profile",
+  });
+  expect(profileHeading).toBe(heading);
+  await waitFor(() => expect(profileHeading).toHaveFocus());
+  expect(screen.getByLabelText("Display name")).toHaveValue("Fixture");
+});
+
+it("updates a retained local connection failure while preserving the address, focus and retry destination", async () => {
+  setLanguage("en");
+  let failed = true;
+  const fetcher = vi.fn(async (url: string) => {
+    if (String(url).endsWith("/info"))
+      return failed
+        ? Response.json({ error: "Relay unreachable" }, { status: 503 })
+        : Response.json({ name: "Fixture" });
+    return Response.json({});
+  });
+  vi.stubGlobal("fetch", fetcher);
+  api.inspectProfile.mockRejectedValue(new Error("Relay read failed (403)"));
+  const user = userEvent.setup();
+  render(
+    <CommunityDialog
+      communities={lookupCommunities}
+      mode="join"
+      close={() => {}}
+    />,
+  );
+  const input = screen.getByLabelText("Community URL");
+  await user.type(input, "wss://quiet.example");
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await waitFor(() =>
+    expect(input).toHaveAccessibleDescription(
+      "Couldn’t reach quiet.example. Check the address, or try again.",
+    ),
+  );
+  await user.click(input);
+  const calls = fetcher.mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(screen.getByLabelText("커뮤니티 URL")).toBe(input);
+  expect(input).toHaveFocus();
+  expect(input).toHaveValue("wss://quiet.example");
+  expect(input).toHaveAccessibleDescription(
+    "quiet.example에 연결하지 못했습니다. 주소를 확인하거나 다시 시도해 주세요.",
+  );
+  expect(fetcher).toHaveBeenCalledTimes(calls);
+  failed = false;
+  act(() => setLanguage("en"));
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(await screen.findByText("https://quiet.example")).toBeVisible();
+  expect(
+    fetcher.mock.calls.filter(([url]) => String(url).endsWith("/info")),
+  ).toHaveLength(2);
+});
+
+it("preserves accepted policy choices, link nodes and URLs while translating the entire consent sentence", async () => {
+  setLanguage("en");
+  const fetcher = vi.fn(async () =>
+    Response.json({
+      name: "Fixture",
+      policy: {
+        terms_markdown: "User terms",
+        privacy_markdown: "User privacy",
+        age_attestation_required: true,
+      },
+    }),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  api.inspectProfile.mockRejectedValue(new Error("Relay read failed (403)"));
+  const user = userEvent.setup();
+  render(
+    <CommunityDialog
+      communities={lookupCommunities}
+      mode="join"
+      close={() => {}}
+    />,
+  );
+  await user.type(
+    screen.getByLabelText("Community URL"),
+    "wss://policy.example",
+  );
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  const agreed = await screen.findByRole("checkbox", {
+    name: "I agree to this community’s Terms of Service and Privacy Notice.",
+  });
+  const adult = screen.getByRole("checkbox", {
+    name: "I confirm that I am at least 18 years old.",
+  });
+  const terms = screen.getByRole("link", { name: "Terms of Service" });
+  const privacy = screen.getByRole("link", { name: "Privacy Notice" });
+  await user.click(agreed);
+  await user.click(adult);
+  terms.focus();
+  const calls = fetcher.mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("checkbox", {
+      name: "이 커뮤니티의 서비스 이용약관 및 개인정보 처리방침에 동의합니다.",
+    }),
+  ).toBe(agreed);
+  expect(
+    screen.getByRole("checkbox", { name: "만 18세 이상임을 확인합니다." }),
+  ).toBe(adult);
+  expect(agreed).toBeChecked();
+  expect(adult).toBeChecked();
+  expect(screen.getByRole("link", { name: "서비스 이용약관" })).toBe(terms);
+  expect(screen.getByRole("link", { name: "개인정보 처리방침" })).toBe(privacy);
+  expect(terms).toHaveFocus();
+  expect(terms).toHaveAttribute(
+    "href",
+    "https://policy.example/api/join-policy/terms",
+  );
+  expect(privacy).toHaveAttribute(
+    "href",
+    "https://policy.example/api/join-policy/privacy",
+  );
+  expect(fetcher).toHaveBeenCalledTimes(calls);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("link", { name: "Terms of Service" })).toBe(terms);
+});

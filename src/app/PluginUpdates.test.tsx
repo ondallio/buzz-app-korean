@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import "../../tests/sonner-dom";
+import { setLanguage } from "../shared/i18n";
 import {
   act,
   cleanup,
@@ -25,10 +27,12 @@ import { createPluginInstallRequests } from "../plugins/installer";
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
+  localStorage.clear();
   vi.useRealTimers();
 });
 
-function fixture() {
+function fixture(options: { pluginName?: string } = {}) {
   const source = {
     repository: "https://example.com/plugins.git",
     reference: "main",
@@ -37,7 +41,7 @@ function fixture() {
   const plugin: PluginInfo = {
     manifest: {
       id: "example.notes",
-      name: "Notes",
+      name: options.pluginName ?? "Notes",
       apiVersion: 1,
       updates: { defaultEnabled: true },
     },
@@ -595,4 +599,41 @@ it("requires review when a fresh update removes a process artifact constraint", 
   );
   fireEvent.click(confirm);
   await waitFor(() => expect(f.installImport).toHaveBeenCalledOnce());
+});
+
+it("updates the same raw-named update notice and navigation without a new check on locale change", async () => {
+  setLanguage("en");
+  const f = fixture({ pluginName: "Raw {plugin} 한글" });
+  f.mount();
+  const notice = await screen.findByRole("dialog", {
+    name: "Update Raw {plugin} 한글",
+  });
+  const manage = within(notice).getByRole("button", {
+    name: "Manage Raw {plugin} 한글 update checks",
+  });
+  manage.focus();
+  expect(f.imports.checkGit).toHaveBeenCalledOnce();
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("dialog", { name: "Raw {plugin} 한글 업데이트" }),
+  ).toBe(notice);
+  expect(
+    screen.getByRole("button", {
+      name: "Raw {plugin} 한글 업데이트 확인 관리",
+    }),
+  ).toBe(manage);
+  expect(manage).toHaveFocus();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("dialog", { name: "Update Raw {plugin} 한글" })).toBe(
+    notice,
+  );
+  expect(f.imports.checkGit).toHaveBeenCalledOnce();
+  expect(f.installImport).not.toHaveBeenCalled();
+  fireEvent.click(manage);
+  expect(f.navigation.open).toHaveBeenCalledExactlyOnceWith({
+    version: 1,
+    kind: "settings",
+    section: "plugins",
+    pluginId: "example.notes",
+  });
 });

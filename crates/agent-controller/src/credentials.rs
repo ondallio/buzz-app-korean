@@ -13,9 +13,13 @@ mod platform;
 #[cfg(test)]
 mod tests;
 
-const SERVICE: &str = "xyz.block.buzz.desktop.agents";
-/// The service before 1.0. Reads copy a key found only there; deletes remove it too.
-const PREVIOUS_SERVICE: &str = "dev.local.buzz.foundation.agents";
+const SERVICE: &str = buzz_credential_store::distribution::AGENT_SERVICE;
+/// Official builds migrate the pre-1.0 service; distributors never access it.
+const PREVIOUS_SERVICE: &str = if buzz_credential_store::distribution::ISOLATED {
+    SERVICE
+} else {
+    "dev.local.buzz.foundation.agents"
+};
 const MAX_BLOB: usize = 2 * 1024 * 1024;
 /// Another operation, in this app or another, holds the store; it may be retried.
 pub const BUSY: &str = "Credentials are busy; retry after the current operation finishes";
@@ -214,7 +218,11 @@ impl Credentials for PlatformCredentials {
             return bundle.delete(self.keychain.as_ref(), &account);
         }
         // The previous item first: reads copy it while the current one is absent.
-        for service in [PREVIOUS_SERVICE, SERVICE] {
+        for &service in if buzz_credential_store::distribution::ISOLATED {
+            &[SERVICE][..]
+        } else {
+            &[PREVIOUS_SERVICE, SERVICE][..]
+        } {
             match self.keychain.delete(service, &account) {
                 Ok(()) | Err(Failure::Absent) => {}
                 Err(error) => return Err(error.message()),

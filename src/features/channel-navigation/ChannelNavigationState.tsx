@@ -1,3 +1,8 @@
+import { useLanguage } from "../../shared/i18n";
+import {
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import {
   ChannelLifecycleDialog,
   lifecycleNoun,
@@ -152,9 +157,10 @@ export function ChannelNavigationProvider({
   const soloNeighbors = useRef<((channelId: string) => string[]) | undefined>(
     undefined,
   );
+  useLanguage();
   const [failure, setFailure] = useState<{
     session: RelaySession;
-    title: string;
+    title: DisplayMessage;
     message: string;
   }>();
   const activityThread = useRef<ActivityThread | undefined>(undefined);
@@ -256,7 +262,7 @@ export function ChannelNavigationProvider({
                     trigger
                       ?.closest("[data-panel-workspace]")
                       ?.querySelector<HTMLElement>(
-                        'button[aria-label="Close Channel settings tab"]',
+                        'button[data-tab-close="settings"]',
                       ) ??
                     trigger
                       ?.closest("aside")
@@ -399,7 +405,7 @@ export function ChannelNavigationProvider({
         )}
       {failure?.session === connection.session && (
         <ToastNotice
-          title={failure.title}
+          title={resolveMessage(failure.title)}
           description={failure.message}
           onDismiss={() => setFailure(undefined)}
         />

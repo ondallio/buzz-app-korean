@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { setLanguage } from "../shared/i18n";
 import {
   act,
   cleanup,
@@ -20,7 +21,11 @@ import { PluginImport } from "./PluginImport";
 import userEvent from "@testing-library/user-event";
 import { cloneElement, StrictMode } from "react";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 it("opens both sources inside Add without a duplicate safety warning, and restores focus on close", async () => {
   const user = userEvent.setup();
@@ -3160,3 +3165,166 @@ it("leaves an unconstrained link editable and unpinned", async () => {
     "readonly",
   );
 });
+
+it("preserves source drafts/caret and exact pending install payload through live language changes", async () => {
+  setLanguage("en");
+  let finishRead = (_: ImportPreview) => {};
+  const reading = new Promise<ImportPreview>((resolve) => {
+    finishRead = resolve;
+  });
+  let finishInstall = (_: boolean) => {};
+  const installing = new Promise<boolean>((resolve) => {
+    finishInstall = resolve;
+  });
+  const git = vi.fn(() => reading),
+    installImport = vi.fn(() => installing),
+    change = vi.fn(async () => true);
+  const discard = vi.fn(async () => {});
+  const manager = {
+    imports: { git, discard },
+    installImport,
+    change,
+    snapshot: () => ({ error: null }),
+  } as unknown as PluginManager;
+  render(
+    <PluginImport
+      plugins={manager}
+      catalog={{ profile: "test", location: "test", plugins: [] }}
+      busy={false}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Add" }));
+  const repo = screen.getByRole("textbox", {
+    name: "Git or GitHub repository",
+  });
+  const reference = screen.getByRole("textbox", {
+    name: "Branch or tag (optional)",
+  });
+  if (!(repo instanceof HTMLInputElement))
+    throw new Error("Expected actual repository input");
+  fireEvent.change(repo, {
+    target: { value: "https://raw.example/사용자/{repo}.git" },
+  });
+  fireEvent.change(reference, { target: { value: "raw-branch/{ref}" } });
+  repo.focus();
+  repo.setSelectionRange(8, 12);
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("textbox", { name: "Git 또는 GitHub 저장소" })).toBe(
+    repo,
+  );
+  expect(repo).toHaveFocus();
+  expect(repo.selectionStart).toBe(8);
+  expect(repo.selectionEnd).toBe(12);
+  expect(reference).toHaveValue("raw-branch/{ref}");
+  fireEvent.click(screen.getByRole("button", { name: "플러그인 찾기" }));
+  await waitFor(() =>
+    expect(git).toHaveBeenCalledExactlyOnceWith(
+      "https://raw.example/사용자/{repo}.git",
+      "raw-branch/{ref}",
+    ),
+  );
+  expect(repo).toBeDisabled();
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("textbox", { name: "Git or GitHub repository" }),
+  ).toBe(repo);
+  await act(async () =>
+    finishRead({
+      token: "raw-token",
+      source: "https://raw.example/사용자/{repo}.git",
+      commit: "a".repeat(40),
+      warnings: [],
+      candidates: [
+        {
+          path: "dist/raw",
+          revision: "raw-revision",
+          manifest: {
+            id: "raw.plugin",
+            name: "Raw {plugin} 한글",
+            apiVersion: 1,
+          },
+        },
+      ],
+    }),
+  );
+  const dialog = await screen.findByRole("dialog", {
+    name: "Review Raw {plugin} 한글 Plugin access",
+  });
+  const install = within(dialog).getByRole("button", {
+    name: "Install plugin",
+  });
+  install.focus();
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("dialog", {
+      name: "Raw {plugin} 한글 플러그인 접근 권한 검토",
+    }),
+  ).toBe(dialog);
+  expect(screen.getByRole("button", { name: "플러그인 설치" })).toBe(install);
+  expect(install).toHaveFocus();
+  fireEvent.click(install);
+  expect(installImport).toHaveBeenCalledExactlyOnceWith(
+    "raw-token",
+    "dist/raw",
+  );
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Install plugin" })).toBe(install);
+  expect(install).toBeDisabled();
+  await act(async () => finishInstall(true));
+  expect(change).toHaveBeenCalledExactlyOnceWith("enable", "raw.plugin");
+  expect(discard).toHaveBeenCalledExactlyOnceWith("raw-token");
+  expect(git).toHaveBeenCalledOnce();
+  expect(installImport).toHaveBeenCalledOnce();
+});
+it.each([false, true])(
+  "keeps import Error prefix and provenance during a retained error (external:%s)",
+  async (external) => {
+    setLanguage("en");
+    const text =
+      "This repository has no plugin at missing/{path}. Nothing was installed.";
+    const git = vi.fn(async () => {
+      if (external) throw new Error(text);
+      return {
+        token: "preview",
+        source: "https://raw.example/repo",
+        commit: null,
+        warnings: [],
+        candidates: [],
+      };
+    });
+    const manager = {
+      imports: { git, discard: vi.fn(async () => {}) },
+    } as unknown as PluginManager;
+    render(
+      <PluginImport
+        plugins={manager}
+        catalog={{ profile: "test", location: "test", plugins: [] }}
+        busy={false}
+        initialGit={{
+          repository: "https://raw.example/repo",
+          reference: "raw-ref",
+          path: "missing/{path}",
+        }}
+      />,
+    );
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(`Error: ${text}`);
+    const back = screen.getByRole("button", { name: "Back" });
+    back.focus();
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("alert")).toBe(alert);
+    expect(alert).toHaveTextContent(
+      external
+        ? `Error: ${text}`
+        : "오류: 이 저장소의 missing/{path} 경로에는 플러그인이 없습니다. 설치된 항목은 없습니다.",
+    );
+    expect(screen.getByRole("button", { name: "뒤로" })).toBe(back);
+    expect(back).toHaveFocus();
+    act(() => setLanguage("en"));
+    expect(alert).toHaveTextContent(`Error: ${text}`);
+    expect(git).toHaveBeenCalledExactlyOnceWith(
+      "https://raw.example/repo",
+      "raw-ref",
+    );
+  },
+);

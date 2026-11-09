@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { isTauri } from "@tauri-apps/api/core";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import type { SettingsCard } from "../features/settings/service";
 import type { Contribution } from "../plugins/contributions";
 import {
@@ -151,4 +151,111 @@ it("lists Security after Identity only in the desktop app", () => {
   vi.mocked(isTauri).mockReturnValue(true);
   expect(ids()).toEqual(["identity", "security"]);
   vi.mocked(isTauri).mockReturnValue(false);
+});
+
+import { setLanguage } from "../shared/i18n";
+afterEach(() => setLanguage("en"));
+it("translates exact bundled navigation metadata after canonical ordering while preserving contribution names and IDs", () => {
+  const official = Object.freeze(
+    card("buzz.pairing/mobile", { title: "Pair mobile" }),
+  );
+  const custom = Object.freeze(
+    card("buzz.emoji/custom-emoji", { title: "My emoji" }),
+  );
+  const foreign = Object.freeze(
+    card("example/mobile", { title: "Pair mobile", group: "Community" }),
+  );
+  const input = Object.freeze([official, custom, foreign]);
+  const english = settingsSections(input, primary);
+  setLanguage("ko");
+  const korean = settingsSections(input, primary);
+  expect(korean.groups[0]?.label).toBe("커뮤니티");
+  expect(
+    korean.sections.find((section) => section.id === "profile")?.label,
+  ).toBe("프로필");
+  expect(
+    korean.sections.find((section) => section.id === official.key)?.label,
+  ).toBe("모바일 기기 연결");
+  expect(
+    korean.sections.find((section) => section.id === custom.key)?.label,
+  ).toBe("My emoji");
+  expect(
+    korean.sections.find((section) => section.id === foreign.key)?.label,
+  ).toBe("Pair mobile");
+  expect(
+    korean.groups.find((group) => group.id === "group:Community")?.label,
+  ).toBe("Community");
+  expect(korean.sections.map((section) => section.id)).toEqual(
+    english.sections.map((section) => section.id),
+  );
+  expect(input[0]).toBe(official);
+  expect(official.title).toBe("Pair mobile");
+  setLanguage("en");
+  expect(settingsSections(input, primary)).toEqual(english);
+});
+
+it("projects every bundled settings navigation title without changing original plugin ordering, sections or group identities", () => {
+  const titles = [
+    ["buzz.pairing/mobile", "Pair mobile", "모바일 기기 연결"],
+    ["buzz.emoji/custom-emoji", "Custom emoji", "사용자 지정 이모지"],
+    ["buzz.channels/templates", "Channel templates", "채널 템플릿"],
+    ["buzz.agents/external-apps", "External apps", "외부 앱"],
+    ["buzz.moderation/membership", "Membership", "멤버 관리"],
+    ["buzz.mesh-compute/mesh", "Shared compute", "공유 컴퓨팅"],
+    ["buzz.terminal/settings", "Terminal", "터미널"],
+    ["buzz.focus/focus", "Focus", "집중 모드"],
+    ["buzz.usage/usage", "Usage", "사용량"],
+    ["buzz.relay-staff/reports", "Reports", "신고"],
+    ["buzz.relay-staff/feedback", "Feedback", "피드백"],
+    ["buzz.relay-staff/communities", "Communities", "커뮤니티 목록"],
+    ["buzz.relay-staff/staff", "Staff", "운영진"],
+  ] as const;
+  const input = Object.freeze(
+    titles.map(([key, title]) =>
+      Object.freeze(
+        card(key, {
+          title,
+          ...(key.startsWith("buzz.relay-staff/")
+            ? { group: "Moderation" }
+            : key.startsWith("buzz.terminal/") ||
+                key.startsWith("buzz.focus/") ||
+                key.startsWith("buzz.usage/")
+              ? { group: "Plugins" }
+              : {}),
+        }),
+      ),
+    ),
+  );
+  const english = settingsSections(input, primary);
+  setLanguage("ko");
+  const korean = settingsSections(input, primary);
+  for (const [key, , label] of titles)
+    expect(korean.sections.find((section) => section.id === key)?.label).toBe(
+      label,
+    );
+  expect(
+    korean.groups.find((group) => group.id === "group:Moderation")?.label,
+  ).toBe("관리");
+  expect(korean.groups.map((group) => group.id)).toEqual(
+    english.groups.map((group) => group.id),
+  );
+  expect(korean.sections.map((section) => section.id)).toEqual(
+    english.sections.map((section) => section.id),
+  );
+  const foreign = card("example/reports", {
+    title: "Reports",
+    group: "Moderation",
+  });
+  expect(
+    settingsSections([foreign], primary).groups.find(
+      (group) => group.id === "group:Moderation",
+    )?.label,
+  ).toBe("Moderation");
+  expect(
+    settingsSections([...input, foreign], primary).groups.find(
+      (group) => group.id === "group:Moderation",
+    )?.label,
+  ).toBe("Moderation");
+  setLanguage("en");
+  expect(settingsSections(input, primary)).toEqual(english);
 });

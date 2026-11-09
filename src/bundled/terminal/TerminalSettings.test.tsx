@@ -10,6 +10,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { setLanguage } from "../../shared/i18n";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../shared/design-system/ui/Toast";
 import {
@@ -26,6 +27,7 @@ const stores: TerminalFontPreference[] = [];
 const loadFont = vi.fn<(font: string) => Promise<FontFace[]>>();
 const fontsDescriptor = Object.getOwnPropertyDescriptor(document, "fonts");
 beforeEach(() => {
+  setLanguage("en");
   loadFont.mockReset().mockResolvedValue([]);
   Object.defineProperty(document, "fonts", {
     configurable: true,
@@ -65,6 +67,7 @@ function setup() {
 }
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   for (const font of stores.splice(0)) font.dispose();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -73,6 +76,166 @@ afterEach(() => {
   else Reflect.deleteProperty(document, "fonts");
   localStorage.clear();
 });
+
+it("switches terminal labels while retaining the same raw family draft and focus", async () => {
+  const { font } = setup();
+  const input = screen.getByRole("textbox", {
+    name: "Font family",
+  }) as HTMLInputElement;
+  await userEvent.setup().type(input, "한국어 Mono");
+  await waitFor(() => expect(input).toHaveAttribute("aria-busy", "false"));
+  input.focus();
+  input.setSelectionRange(2, 4);
+  const probes = loadFont.mock.calls.length;
+  const persist = vi.spyOn(Storage.prototype, "setItem");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("textbox", { name: "글꼴 이름" })).toBe(input);
+  expect(input).toHaveValue("한국어 Mono");
+  expect(input).toHaveFocus();
+  expect(input.selectionStart).toBe(2);
+  expect(input.selectionEnd).toBe(4);
+  expect(screen.getByRole("button", { name: "적용" })).toBeEnabled();
+  expect(screen.getByText("미리 보기: ABC 0123")).toBeInTheDocument();
+  expect(font.snapshot()).toEqual({ family: null, size: 12, error: null });
+  expect(
+    persist.mock.calls.filter(([key]) => key === TERMINAL_FONT_KEY),
+  ).toEqual([]);
+  expect(loadFont).toHaveBeenCalledTimes(probes);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("textbox", { name: "Font family" })).toBe(input);
+  expect(input).toHaveFocus();
+  expect(input.selectionStart).toBe(2);
+  expect(loadFont).toHaveBeenCalledTimes(probes);
+});
+
+it("keeps the unavailable font reason and numeric validation live without another probe", async () => {
+  const { font } = setup();
+  const input = screen.getByRole("textbox", { name: "Font family" });
+  await userEvent.setup().type(input, "ASDF");
+  fireEvent.blur(input);
+  await waitFor(() =>
+    expect(input).toHaveAccessibleDescription(/Couldn’t load “ASDF”/),
+  );
+  const size = screen.getByRole("spinbutton", { name: "Font size (px)" });
+  fireEvent.change(size, { target: { value: "7" } });
+  const probes = loadFont.mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(input).toHaveAccessibleDescription(/“ASDF” 글꼴을 불러올 수 없습니다/);
+  expect(screen.getByRole("spinbutton", { name: "글꼴 크기 (px)" })).toBe(size);
+  expect(size).toHaveAccessibleDescription(/8~32 사이의 숫자/);
+  expect(screen.getByRole("button", { name: "글꼴 다시 확인" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "적용" })).toBeDisabled();
+  act(() => setLanguage("en"));
+  expect(input).toHaveAccessibleDescription(/Couldn’t load “ASDF”/);
+  expect(size).toHaveValue(7);
+  expect(loadFont).toHaveBeenCalledTimes(probes);
+  expect(font.snapshot().family).toBeNull();
+});
+
+it("translates the retained local font save failure and retries the exact preference once", async () => {
+  const { font } = setup();
+  const user = userEvent.setup();
+  await user.type(
+    screen.getByRole("textbox", { name: "Font family" }),
+    "한국어 Mono",
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Apply" })).toBeEnabled(),
+  );
+  const original = Storage.prototype.setItem;
+  const write = vi
+    .spyOn(Storage.prototype, "setItem")
+    .mockImplementation(function (this: Storage, key, value) {
+      if (key === TERMINAL_FONT_KEY) throw new Error("opaque disk detail");
+      return original.call(this, key, value);
+    });
+  await user.click(screen.getByRole("button", { name: "Apply" }));
+  const notice = await screen.findByRole("dialog");
+  const canonical =
+    "Your terminal font is active, but could not be saved on this device. Try again.";
+  expect(font.snapshot().error).toBe(canonical);
+  const attempts = write.mock.calls.filter(
+    ([key]) => key === TERMINAL_FONT_KEY,
+  ).length;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("dialog")).toBe(notice);
+  expect(notice).toHaveTextContent(
+    "터미널 글꼴을 적용했지만 이 기기에 저장하지 못했습니다",
+  );
+  expect(font.snapshot()).toEqual({
+    family: "한국어 Mono",
+    size: 12,
+    error: canonical,
+  });
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("dialog")).toBe(notice);
+  expect(notice).toHaveTextContent(canonical);
+  expect(
+    write.mock.calls.filter(([key]) => key === TERMINAL_FONT_KEY),
+  ).toHaveLength(attempts);
+  write.mockRestore();
+  const persist = vi.spyOn(Storage.prototype, "setItem");
+  await user.click(
+    screen.getByRole("button", { name: "Retry terminal font preference" }),
+  );
+  expect(localStorage.getItem(TERMINAL_FONT_KEY)).toBe("한국어 Mono");
+  expect(
+    persist.mock.calls.filter(([key]) => key === TERMINAL_FONT_KEY),
+  ).toHaveLength(1);
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+});
+
+it.each([
+  [
+    "restore",
+    "터미널 글꼴 설정을 복원할 수 없어 기본 글꼴을 사용하고 있습니다.",
+  ],
+  [
+    "reset",
+    "기본 터미널 글꼴을 사용 중이지만 이 기기에 초기화 결과를 저장하지 못했습니다.",
+  ],
+] as const)(
+  "localizes the font %s failure without changing its canonical snapshot",
+  async (mode, korean) => {
+    if (mode === "restore") {
+      const original = Storage.prototype.getItem;
+      vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (
+        this: Storage,
+        key,
+      ) {
+        if (key === TERMINAL_FONT_KEY) throw new Error("opaque read failure");
+        return original.call(this, key);
+      });
+    } else {
+      localStorage.setItem(TERMINAL_FONT_KEY, "한국어 Mono");
+      const original = Storage.prototype.removeItem;
+      vi.spyOn(Storage.prototype, "removeItem").mockImplementation(function (
+        this: Storage,
+        key,
+      ) {
+        if (key === TERMINAL_FONT_KEY) throw new Error("opaque reset failure");
+        return original.call(this, key);
+      });
+    }
+    const { font } = setup();
+    if (mode === "reset")
+      await userEvent
+        .setup()
+        .click(screen.getByRole("button", { name: "Use default" }));
+    const notice = await screen.findByRole("dialog");
+    const canonical = font.snapshot();
+    expect(canonical.family).toBeNull();
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("dialog")).toBe(notice);
+    expect(notice).toHaveTextContent(korean);
+    expect(font.snapshot()).toBe(canonical);
+    act(() => setLanguage("en"));
+    expect(notice).toHaveTextContent(canonical.error ?? "missing error");
+    expect(font.snapshot()).toBe(canonical);
+  },
+);
 
 it("blocks pending and unavailable submissions without changing the active font", async () => {
   let finish: (() => void) | undefined;
@@ -303,6 +466,29 @@ function setupOptionMeta(platform = "MacIntel") {
     </ToastProvider>,
   );
 }
+
+it("changes the Mac keyboard labels without toggling or rewriting the chosen value", async () => {
+  setupOptionMeta();
+  const toggle = screen.getByRole("switch", { name: "Use Option as Meta key" });
+  const persist = vi.spyOn(Storage.prototype, "setItem");
+  await userEvent.setup().click(toggle);
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("switch", { name: "Option 키를 Meta 키로 사용" }),
+  ).toBe(toggle);
+  expect(toggle).toBeChecked();
+  expect(localStorage.getItem("buzz-terminal-option-meta.v1")).toBe("on");
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("switch", { name: "Use Option as Meta key" })).toBe(
+    toggle,
+  );
+  expect(toggle).toBeChecked();
+  expect(
+    persist.mock.calls.filter(
+      ([key]) => key === "buzz-terminal-option-meta.v1",
+    ),
+  ).toEqual([["buzz-terminal-option-meta.v1", "on"]]);
+});
 
 it("switches Option as Meta immediately on a Mac", async () => {
   setupOptionMeta();

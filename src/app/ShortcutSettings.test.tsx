@@ -12,6 +12,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../shared/i18n";
 import { ShortcutSettings } from "./ShortcutSettings";
 import type { Shortcut } from "../features/shortcuts/bindings";
 import {
@@ -33,6 +34,7 @@ vi.mock("@tauri-apps/api/core", () => ({ isTauri: vi.fn(() => false) }));
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.restoreAllMocks();
   setEditWithUpArrowPreference(false);
   setSendWithModEnterPreference(false);
@@ -1225,3 +1227,65 @@ it.each([
     }
   },
 );
+
+it("projects exact host metadata without changing contributed titles, capture focus or persisted keys", async () => {
+  setLanguage("en");
+  const h = await harness();
+  const remove = h.shortcuts.registerHost({
+    id: "new",
+    title: "Open New menu",
+    binding: { key: "n", mod: true },
+    run: vi.fn(),
+  });
+  await h.contribute("example.counter", {
+    id: "new",
+    title: "Open New menu",
+    binding: { key: "n", mod: true, shift: true },
+    run: vi.fn(),
+  });
+  try {
+    const user = userEvent.setup();
+    render(
+      <ShortcutSettings
+        shortcuts={h.shortcuts}
+        bindings={h.bindings}
+        plugins={h.plugins}
+        apple={false}
+        desktop={false}
+      />,
+    );
+    await user.click(change("Open Settings"));
+    const input = capture("Open Settings");
+    fireEvent.keyDown(input, { key: "a" });
+    expect(within(row("Open Settings")).getByRole("alert")).toHaveTextContent(
+      "Include Control or Alt",
+    );
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("textbox", { name: "설정 열기의 새 단축키" })).toBe(
+      input,
+    );
+    expect(input).toHaveFocus();
+    expect(within(row("설정 열기")).getByRole("alert")).toHaveTextContent(
+      "일반 입력을 방해하지 않도록 Control 또는 Alt를 포함해 주세요.",
+    );
+    expect(row("새로 만들기 메뉴 열기")).toBeVisible();
+    expect(row("Open New menu")).toBeVisible();
+    expect(
+      h.shortcuts.hostSnapshot().find((shortcut) => shortcut.id === "new")
+        ?.title,
+    ).toBe("Open New menu");
+    act(() => setLanguage("en"));
+    expect(capture("Open Settings")).toBe(input);
+    fireEvent.keyDown(input, { key: "u", ctrlKey: true, shiftKey: true });
+    expect(h.bindings.snapshot().overrides.settings).toEqual({
+      key: "u",
+      mod: true,
+      shift: true,
+    });
+    expect(change("Open Settings")).toHaveFocus();
+  } finally {
+    cleanup();
+    remove();
+    await h.dispose();
+  }
+});

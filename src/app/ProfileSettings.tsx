@@ -1,3 +1,10 @@
+import {
+  localError,
+  errorMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../shared/i18n/deferred-message";
+import { t, useLanguage } from "../shared/i18n";
 import { useProfileGeneration } from "../features/relay/react";
 import { ProfileBackdrop } from "../features/profiles/ProfileBackdrop";
 import hero from "../features/profiles/ProfileHero.module.css";
@@ -92,6 +99,7 @@ export function ProfileSettings({
   community?: Membership | undefined;
   onUnsavedChange?: ((unsaved: boolean) => void) | undefined;
 }) {
+  useLanguage();
   const client = useSyncExternalStore(
     communities.subscribe,
     communities.snapshot,
@@ -137,7 +145,7 @@ export function ProfileSettings({
       mounted.current = false;
     };
   }, []);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   // A scope change discards drafts; Retry keeps the same scope's useful content.
   const profileScope = `${client.viewer ?? ""}:${communityId ?? "local"}`;
   const previousScope = useRef(profileScope);
@@ -257,43 +265,44 @@ export function ProfileSettings({
     <section aria-labelledby="profile-settings-title">
       <Header
         id="profile-settings-title"
-        title="Profile"
+        title={t("settings.profile")}
         subtitle={
           community
-            ? "Update this community’s profile. Other community profiles stay unchanged."
-            : "Used for new communities. Existing community profiles stay unchanged."
+            ? t("settings.profileCommunity")
+            : t("settings.profileDefault")
         }
       />
       <div>
         {client.status === "unavailable" ? (
-          <p role="status">
-            Your local identity is unavailable. Connect your identity to edit
-            your profile.
-          </p>
+          <p role="status">{t("settings.profileUnavailable")}</p>
         ) : community && !client.relayAvailable ? (
-          <p role="status">
-            Community profiles are not available in this build yet.
-          </p>
+          <p role="status">{t("settings.profileBuildUnavailable")}</p>
         ) : (
           <LoadingRegion
             pending={profilePending}
             label={
               client.status === "loading"
-                ? "Opening your local identity…"
-                : `Loading your profile in ${community ? communityName(community) : "this community"}…`
+                ? t("settings.openingIdentity")
+                : community
+                  ? t("settings.loadingProfile", {
+                      community: communityName(community),
+                    })
+                  : t("settings.loadingThisProfile")
             }
             feedback={
               loadStatus === "error" && community ? (
                 <div>
                   <p role="alert" className="error">
-                    Your profile in {communityName(community)} couldn’t be
-                    loaded. {loadError}
+                    {t("settings.loadProfileFailed", {
+                      community: communityName(community),
+                      error: loadError,
+                    })}
                   </p>
                   <Button
                     type="button"
                     onClick={() => setLoadAttempt((value) => value + 1)}
                   >
-                    Retry loading profile
+                    {t("settings.retryProfile")}
                   </Button>
                 </div>
               ) : undefined
@@ -305,7 +314,10 @@ export function ProfileSettings({
               inert={!previewReady}
               aria-hidden={!previewReady || undefined}
             >
-              <section aria-label="Profile preview" className={hero.hero}>
+              <section
+                aria-label={t("settings.profilePreview")}
+                className={hero.hero}
+              >
                 <ProfileBackdrop src={backdrop} />
                 <div>
                   <AvatarEditor
@@ -330,7 +342,7 @@ export function ProfileSettings({
                 <div className={styles.previewCopy}>
                   <h3 className="text-body-lg">
                     {verifiedName?.name ??
-                      (profile.name.trim() || "Your profile")}
+                      (profile.name.trim() || t("settings.yourProfile"))}
                   </h3>
                   {profile.about?.trim() ? (
                     <p className={`${styles.about} text-body-sm text-muted`}>
@@ -387,9 +399,7 @@ export function ProfileSettings({
                             !confirmed.exists ||
                             !profilesEqual(confirmed.profile, next)
                           )
-                            throw new Error(
-                              "Your profile change is not current. Your edits are retained; save again to retry.",
-                            );
+                            throw localError("settings.profileStale");
                           setLoaded(confirmed);
                         }
                         if (isCurrentProfileSave(communities, saveGeneration))
@@ -403,12 +413,7 @@ export function ProfileSettings({
                         setDraft(null);
                         setSaved(true);
                       } catch (reason) {
-                        if (mounted.current)
-                          setError(
-                            reason instanceof Error
-                              ? reason.message
-                              : String(reason),
-                          );
+                        if (mounted.current) setError(errorMessage(reason));
                       } finally {
                         if (mounted.current) {
                           setSaving(false);
@@ -431,7 +436,7 @@ export function ProfileSettings({
                   />
                   {error && (
                     <p role="alert" className="error">
-                      {error}
+                      {resolveMessage(error)}
                     </p>
                   )}
                   {hasChanges && (
@@ -448,7 +453,7 @@ export function ProfileSettings({
                           setError("");
                         }}
                       >
-                        Cancel
+                        {t("settings.cancel")}
                       </Button>
                       <Button
                         type="submit"
@@ -460,13 +465,13 @@ export function ProfileSettings({
                         }
                         variant="primary"
                       >
-                        Save
+                        {t("settings.save")}
                       </Button>
                     </div>
                   )}
                   {saved && (
                     <ToastNotice
-                      title="Profile updated"
+                      title={t("settings.profileUpdated")}
                       tone="success"
                       timeout={5000}
                       onDismiss={() => setSaved(false)}

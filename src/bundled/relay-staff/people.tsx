@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useProfileGeneration } from "../../features/relay/react";
 import {
   createContext,
@@ -167,6 +168,7 @@ export function Person({
 
 /** Where names come from, so staff don't read them as the row's community's. */
 export function NamesSource() {
+  useLanguage();
   const { context } = useSession();
   let host = context.relay;
   try {
@@ -174,7 +176,7 @@ export function NamesSource() {
   } catch {}
   return (
     <p className="text-caption text-secondary">
-      Names come from profiles in {host}.
+      {t("adminStaff.namesSource", { host })}
     </p>
   );
 }

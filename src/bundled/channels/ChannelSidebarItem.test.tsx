@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { setLanguage } from "../../shared/i18n";
 import { stubAvatarBrowserApis } from "../../features/agents/avatar-testing";
 stubAvatarBrowserApis();
 import {
@@ -21,7 +22,11 @@ import { UnreadBadge } from "./UnreadBadge";
 import { createSidebarPreferencesStore } from "../../features/relay/sidebar-preferences-store";
 import type { SidebarPreferences } from "../../features/relay/sidebar-preferences";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 const noTyping = Object.freeze([]);
 
@@ -784,4 +789,36 @@ it("keeps cached mute from quieting unread but retains confirmed mute through re
   } finally {
     store.dispose();
   }
+});
+
+it("updates temporary metadata on the same row without changing its name or channel selection", async () => {
+  const h = owner();
+  const props = itemProps(h.session, false, {
+    id: "alpha",
+    name: "User {name}",
+    channelType: "stream",
+    ttlSeconds: 604800,
+  });
+  render(<ChannelSidebarItem {...props} />);
+  const row = screen.getByRole("button", { name: /User \{name\}/ });
+  const marker = screen.getByRole("img", {
+    name: "Temporary channel. Cleans up after 7 days without activity.",
+  });
+  row.focus();
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("img", {
+      name: "임시 채널입니다. 활동이 없으면 7일 후 정리됩니다.",
+    }),
+  ).toBe(marker);
+  expect(screen.getByRole("button", { name: /User \{name\}/ })).toBe(row);
+  expect(row).toHaveFocus();
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("img", {
+      name: "Temporary channel. Cleans up after 7 days without activity.",
+    }),
+  ).toBe(marker);
+  await userEvent.setup().click(row);
+  expect(props.onSelect).toHaveBeenCalledExactlyOnceWith("alpha");
 });

@@ -17,6 +17,11 @@ import { Button } from "./Button";
 import { IconButton } from "./IconButton";
 
 const ToastHost = createContext("");
+const defaultLabels = {
+  region: "App notifications",
+  dismiss: "Dismiss notification",
+};
+const ToastLabels = createContext(defaultLabels);
 
 /** How far each mounted docked surface reaches up from the window's bottom. */
 const clearances = new Map<object, number>();
@@ -60,9 +65,12 @@ type Tone = "error" | "warning" | "info" | "success";
 export function ToastProvider({
   children,
   portalContainer,
+  labels = defaultLabels,
 }: {
   children: ReactNode;
   portalContainer?: HTMLElement | undefined;
+  /** Generic accessible copy. The host owns its language and live updates. */
+  labels?: { region: string; dismiss: string };
 }) {
   const id = useId();
   useEffect(() => {
@@ -88,33 +96,35 @@ export function ToastProvider({
     [id],
   );
   return (
-    <ToastHost value={id}>
-      {createPortal(
-        <Toaster
-          id={id}
-          position="bottom-right"
-          swipeDirections={["left", "right"]}
-          expand
-          visibleToasts={Infinity}
-          hotkey={["F6"]}
-          customAriaLabel="App notifications"
-          className="buzz-toast-viewport"
-          offset="max(var(--space-6), env(safe-area-inset-bottom))"
-          mobileOffset="var(--space-4)"
-        />,
-        portalContainer ?? document.body,
-      )}
-      {children}
-    </ToastHost>
+    <ToastLabels value={labels}>
+      <ToastHost value={id}>
+        {createPortal(
+          <Toaster
+            id={id}
+            position="bottom-right"
+            swipeDirections={["left", "right"]}
+            expand
+            visibleToasts={Infinity}
+            hotkey={["F6"]}
+            customAriaLabel={labels.region}
+            className="buzz-toast-viewport"
+            offset="max(var(--space-6), env(safe-area-inset-bottom))"
+            mobileOffset="var(--space-4)"
+          />,
+          portalContainer ?? document.body,
+        )}
+        {children}
+      </ToastHost>
+    </ToastLabels>
   );
 }
 
 type ToastCardProps = {
-  title: string;
+  title: ReactNode;
   description?: string | undefined;
   children?: ReactNode;
   tone: Tone;
-  closeLabel?: string;
+  closeLabel?: string | undefined;
   onClose?: (() => void) | undefined;
   navigation?: { label: string; open(): void } | undefined;
 };
@@ -124,10 +134,11 @@ function ToastCard({
   description,
   children,
   tone,
-  closeLabel = "Dismiss notification",
+  closeLabel,
   onClose,
   navigation,
 }: ToastCardProps) {
+  const labels = useContext(ToastLabels);
   const titleId = useId();
   const descriptionId = useId();
   return (
@@ -166,7 +177,7 @@ function ToastCard({
           <div className="buzz-toast-dismiss">
             <IconButton
               size="sm"
-              aria-label={closeLabel}
+              aria-label={closeLabel ?? labels.dismiss}
               icon={<XIcon size={16} aria-hidden="true" />}
               onClick={onClose}
             />
@@ -214,7 +225,7 @@ export function ToastNotice({
   description,
   children,
   onDismiss,
-  closeLabel = "Dismiss notification",
+  closeLabel,
   timeout = 0,
   tone = "error",
   navigation,
@@ -223,7 +234,7 @@ export function ToastNotice({
   description?: string;
   children?: ReactNode;
   onDismiss?: () => void;
-  closeLabel?: string;
+  closeLabel?: string | undefined;
   /** Zero keeps recovery visible until its source resolves or explicitly dismisses. */
   timeout?: number;
   tone?: Tone;
@@ -303,9 +314,9 @@ export function useToastDismiss() {
 export function useToastNotification() {
   const toasterId = useContext(ToastHost);
   return (
-    title: string,
+    title: ReactNode,
     tone: "success" | "error" | "info",
-    action?: { label: string; onClick(): void; timeout?: number },
+    action?: { label: ReactNode; onClick(): void; timeout?: number },
   ) =>
     String(
       toast.custom(

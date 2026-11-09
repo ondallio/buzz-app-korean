@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { Avatar } from "../../shared/design-system/ui/Avatar";
 import { Button } from "../../shared/design-system/ui/Button";
 import type { OwnedCommunity } from "./builderlab-account";
@@ -24,6 +25,7 @@ export function JoinCommunity({
   /** Offers Create a community, where the account may create one. */
   onCreate?: (() => void) | undefined;
 }) {
+  useLanguage();
   // The in-app Connect to a community landing's layout (CommunityLanding).
   return (
     <OnboardingScreen
@@ -35,21 +37,22 @@ export function JoinCommunity({
             tabIndex={-1}
             className="text-heading text-standard"
           >
-            Connect to a community
+            {t("identityMore.communityTitle")}
           </h1>
           <p className="m-0 text-body text-subtle">
-            Communities are where you work with people and agents.
-            {onCreate ? " Join an existing one or create your own." : ""}
+            {onCreate
+              ? t("identityMore.communityIntroCreate")
+              : t("identityMore.communityIntro")}
           </p>
           <div className="mt-10 mb-6 grid w-full max-w-md gap-10 text-left">
             {owned.length > 0 && (
               // min-w-0 keeps a long hostname truncating rather than widening the grid.
               <div className="flex min-w-0 flex-col gap-2">
                 <h2 className="m-0 text-body text-subtle">
-                  Communities you own
+                  {t("identityMore.ownedCommunities")}
                 </h2>
                 <ul
-                  aria-label="Communities you own"
+                  aria-label={t("identityMore.ownedCommunities")}
                   className="m-0 flex list-none flex-col gap-3 p-0"
                 >
                   {owned.map(({ host, url: origin }) => (
@@ -59,10 +62,10 @@ export function JoinCommunity({
                         {host}
                       </p>
                       <Button
-                        aria-label={`Connect to ${host}`}
+                        aria-label={t("identityMore.connectHost", { host })}
                         onClick={() => onFind(origin)}
                       >
-                        Connect
+                        {t("identityMore.connect")}
                       </Button>
                     </li>
                   ))}
@@ -83,7 +86,7 @@ export function JoinCommunity({
                   data-return-focus="create"
                   onClick={onCreate}
                 >
-                  Or create a community
+                  {t("identityMore.orCreate")}
                 </Button>
               )}
             </div>

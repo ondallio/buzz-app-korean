@@ -1,3 +1,5 @@
+import { rich } from "../../shared/i18n/rich";
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useRef, useState } from "react";
 import { AlertDialog } from "../../shared/design-system/ui/AlertDialog";
 import { Button } from "../../shared/design-system/ui/Button";
@@ -16,6 +18,7 @@ export function PairingPrompt({
 }: {
   communities: readonly string[];
 }) {
+  useLanguage();
   const [request, setRequest] = useState<PairRequest | null>(null);
   const [left, setLeft] = useState(0);
   const deny = useRef<HTMLButtonElement>(null);
@@ -82,22 +85,20 @@ export function PairingPrompt({
   };
   return (
     <AlertDialog
-      title={
-        <>
-          <strong>{request.client}</strong> wants to use Buzz as you on{" "}
-          <strong>{request.relay}</strong>
-        </>
-      }
-      description="It can post and read as you. It can’t change your profile, contacts or memberships."
+      title={rich("accessDialogs.pairingTitle", {
+        client: <strong>{request.client}</strong>,
+        relay: <strong>{request.relay}</strong>,
+      })}
+      description={t("accessDialogs.pairingDescription")}
       initialFocus={deny}
       onClose={() => answer(false)}
       actions={
         <>
           <Button ref={deny} onClick={() => answer(false)}>
-            Deny
+            {t("accessDialogs.deny")}
           </Button>
           <Button variant="prominent" onClick={() => answer(true)}>
-            Allow
+            {t("accessDialogs.allow")}
           </Button>
         </>
       }
@@ -105,11 +106,11 @@ export function PairingPrompt({
       <div className="min-w-0 space-y-2 text-body-sm">
         <p className="text-muted">
           {request.process
-            ? `Requested by ${request.process}`
-            : "Requested by an unknown process"}
+            ? t("accessDialogs.requestedBy", { process: request.process })
+            : t("accessDialogs.unknownProcess")}
         </p>
         <p className="text-muted" role="timer" aria-live="off">
-          Expires in {left} s
+          {t("accessDialogs.expires", { seconds: left })}
         </p>
       </div>
     </AlertDialog>

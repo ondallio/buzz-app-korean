@@ -9,6 +9,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../shared/i18n";
 import { CommunityAddress } from "./CommunityAddress";
 import type { CommunityReader } from "../features/communities/service";
 import { ToastProvider } from "../shared/design-system/ui/Toast";
@@ -28,6 +29,7 @@ const communities: CommunityReader = {
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -271,4 +273,45 @@ it("uses saved community artwork instead of a generic globe", () => {
     "https://images.example/bee.png",
   );
   expect(row.querySelector(".tabler-icon-world")).toBeNull();
+});
+
+it("keeps the copy action and completion state when changing language and preserves the full URL", async () => {
+  setLanguage("en");
+  const writeText = vi.fn(async () => {});
+  vi.stubGlobal("navigator", { clipboard: { writeText } });
+  render(
+    <CommunityAddress
+      communities={communities}
+      community={{ id: "https://community.example", name: "Copy" }}
+    />,
+  );
+  const button = screen.getByRole("button", {
+    name: "Copy community URL, community.example",
+  });
+  button.focus();
+  fireEvent.click(button);
+  await waitFor(() =>
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Community URL copied.",
+    ),
+  );
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("button", {
+      name: "커뮤니티 URL 복사, community.example",
+    }),
+  ).toBe(button);
+  expect(button).toHaveFocus();
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "커뮤니티 URL을 복사했습니다.",
+  );
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("button", {
+      name: "Copy community URL, community.example",
+    }),
+  ).toBe(button);
+  expect(writeText).toHaveBeenCalledExactlyOnceWith(
+    "https://community.example",
+  );
 });

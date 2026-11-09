@@ -1,6 +1,8 @@
+import { localError } from "../../shared/i18n/deferred-message";
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import {
+  act,
   cleanup,
   render,
   screen,
@@ -15,9 +17,14 @@ import type {
   RegisteredAgentType,
 } from "../../features/agents/service";
 import { RobotIcon } from "../../shared/design-system/icons";
-import { useAgentSettingsHost } from "./AgentSettingsHost";
+import { MigrationPreview, useAgentSettingsHost } from "./AgentSettingsHost";
 
-afterEach(cleanup);
+import { setLanguage } from "../../shared/i18n";
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 function fixture({
   hosted = true,
@@ -314,4 +321,147 @@ it("withholds the harness control for a hosted agent whose type is unregistered"
   expect(screen.getByLabelText("Pending change")).toHaveTextContent("false");
   expect(previewRetype).not.toHaveBeenCalled();
   expect(retype).not.toHaveBeenCalled();
+});
+
+it("keeps harness menu identity and raw choices while changing language", async () => {
+  const f = fixture();
+  const trigger = screen.getByRole("button", {
+    name: "Change harness from Echo",
+  });
+  await userEvent.setup().click(trigger);
+  const menu = await screen.findByRole("menu");
+  const echo = screen.getByRole("menuitemradio", { name: "Echo" });
+  echo.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "하네스 변경: 현재 Echo" })).toBe(
+    trigger,
+  );
+  expect(screen.getByRole("menu")).toBe(menu);
+  expect(screen.getByRole("group", { name: "로컬" })).toContainElement(echo);
+  expect(echo).toHaveFocus();
+  expect(echo).toBeChecked();
+  expect(screen.getByLabelText("Selected harness")).toHaveTextContent(
+    "local/echo",
+  );
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("group", { name: "Local" })).toContainElement(echo);
+  expect(echo).toHaveFocus();
+  expect(f.previewRetype).not.toHaveBeenCalled();
+  expect(f.retype).not.toHaveBeenCalled();
+});
+
+it("keeps a staged migration dialog and canonical target across languages", async () => {
+  const f = fixture({ hosted: false });
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole("button", { name: "Change harness from Echo" }),
+  );
+  await user.click(await screen.findByRole("menuitemradio", { name: "Next" }));
+  const dialog = await screen.findByRole("dialog", {
+    name: "Move Ada to Next?",
+  });
+  const action = within(dialog).getByRole("button", { name: "Continue" });
+  action.focus();
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("dialog", { name: "Ada을(를) Next(으)로 이동할까요?" }),
+  ).toBe(dialog);
+  expect(within(dialog).getByRole("button", { name: "계속" })).toBe(action);
+  expect(action).toHaveFocus();
+  expect(f.previewRetype).toHaveBeenCalledExactlyOnceWith(
+    "a".repeat(64),
+    "local/next",
+  );
+  expect(f.retype).not.toHaveBeenCalled();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("dialog", { name: "Move Ada to Next?" })).toBe(
+    dialog,
+  );
+  expect(action).toHaveFocus();
+  await user.click(action);
+  expect(screen.getByLabelText("Selected harness")).toHaveTextContent(
+    "local/next",
+  );
+  expect(screen.getByLabelText("Pending change")).toHaveTextContent("true");
+  expect(f.previewRetype).toHaveBeenCalledOnce();
+  expect(f.retype).not.toHaveBeenCalled();
+});
+it("translates carry outcomes but preserves authored harness, setting and warning labels", () => {
+  const source = {
+    title: "Instructions",
+    migrationWarning: "Message",
+  } as RegisteredAgentType;
+  const target = { title: "Workspace" } as RegisteredAgentType;
+  const preview = {
+    config: { mode: "reset" },
+    moved: ["instructions"],
+    dropped: ["workspace"],
+    settings: [{ id: "instructions", label: "Instructions", outcome: "reset" }],
+  } as ReturnType<Agents["previewRetype"]>;
+  const before = JSON.stringify(preview);
+  render(
+    <MigrationPreview
+      source={source}
+      target={target}
+      preview={preview}
+      discardDraft={true}
+    />,
+  );
+  const label = screen.getAllByText("Instructions")[0];
+  act(() => setLanguage("ko"));
+  expect(screen.getAllByText("Instructions")).toHaveLength(2);
+  expect(screen.getAllByText("Instructions")[0]).toBe(label);
+  expect(screen.getByText("Workspace")).toBeVisible();
+  expect(screen.getByText("지침")).toBeVisible();
+  expect(screen.getByText("이동됨")).toBeVisible();
+  expect(screen.getByText("제외됨")).toBeVisible();
+  expect(screen.getByText("초기화됨")).toBeVisible();
+  expect(screen.getByText(/Message$/)).toBeVisible();
+  expect(JSON.stringify(preview)).toBe(before);
+  act(() => setLanguage("en"));
+  expect(screen.getByText("Moves")).toBeVisible();
+  expect(screen.getAllByText("Instructions")).toHaveLength(3);
+});
+
+it("retains owned preview error provenance across languages and leaves an identical provider diagnostic raw", async () => {
+  const f = fixture({ hosted: false });
+  f.previewRetype.mockImplementationOnce(() => {
+    throw localError("agentsErrors.missingType");
+  });
+  const user = userEvent.setup();
+  const trigger = screen.getByRole("button", {
+    name: "Change harness from Echo",
+  });
+  await user.click(trigger);
+  await user.click(await screen.findByRole("menuitemradio", { name: "Next" }));
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("That agent type is not available");
+  trigger.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("alert")).toBe(alert);
+  expect(alert).toHaveTextContent("이 에이전트 유형을 사용할 수 없습니다.");
+  expect(screen.getByRole("button", { name: "하네스 변경: 현재 Echo" })).toBe(
+    trigger,
+  );
+  expect(trigger).toHaveFocus();
+  expect(f.previewRetype).toHaveBeenCalledExactlyOnceWith(
+    "a".repeat(64),
+    "local/next",
+  );
+  act(() => setLanguage("en"));
+  expect(alert).toHaveTextContent("That agent type is not available");
+  f.previewRetype.mockImplementationOnce(() => {
+    throw new Error("That agent type is not available");
+  });
+  act(() => setLanguage("ko"));
+  await user.click(trigger);
+  await user.click(await screen.findByRole("menuitemradio", { name: "Next" }));
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "That agent type is not available",
+  );
+  expect(f.previewRetype).toHaveBeenCalledTimes(2);
+  expect(f.retype).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("Selected harness")).toHaveTextContent(
+    "local/echo",
+  );
 });

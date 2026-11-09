@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Input } from "../../shared/design-system/ui/Input";
@@ -13,9 +14,15 @@ export function PrivateKey({
   /** Called once the key was revealed or copied, e.g. to gate Sign out. */
   onInteraction?: () => void;
 }) {
+  useLanguage();
   const [secret, setSecret] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<
+    | ""
+    | "identityMore.privateCopied"
+    | "identityMore.privateCopyFailed"
+    | "identityMore.privateRevealFailed"
+  >("");
   const [failed, setFailed] = useState(false);
   const generation = useRef(0);
   useEffect(() => {
@@ -53,9 +60,7 @@ export function PrivateKey({
       if (copy) {
         await writeClipboardText(value);
         if (current === generation.current)
-          setMessage(
-            "Private key copied. Keep it somewhere safe; your clipboard now contains it.",
-          );
+          setMessage("identityMore.privateCopied");
       } else setSecret(value);
       if (current === generation.current) onInteraction?.();
     } catch {
@@ -63,8 +68,8 @@ export function PrivateKey({
         setFailed(true);
         setMessage(
           copy
-            ? "Couldn’t copy your private key. Reveal it to copy manually, or retry."
-            : "Couldn’t reveal your private key. Retry when secure storage is available.",
+            ? "identityMore.privateCopyFailed"
+            : "identityMore.privateRevealFailed",
         );
       }
     } finally {
@@ -77,10 +82,10 @@ export function PrivateKey({
         className="mb-2 block text-label-sm"
         htmlFor="identity-private-key"
       >
-        Private key (nsec)
+        {t("identityMore.privateKeyLabel")}
       </label>
       <p className="text-body-sm text-muted">
-        Anyone with this key can act as you. Never share it.
+        {t("identityMore.privateWarning")}
       </p>
       <Input
         id="identity-private-key"
@@ -96,18 +101,20 @@ export function PrivateKey({
           disabled={busy && !secret}
           onClick={() => (secret ? hide() : void access(false))}
         >
-          {secret ? "Hide private key" : "Reveal private key"}
+          {secret
+            ? t("identityMore.hidePrivateKey")
+            : t("identityMore.revealPrivateKey")}
         </Button>
         <Button type="button" disabled={busy} onClick={() => void access(true)}>
-          Copy private key
+          {t("identityMore.copyPrivateKey")}
         </Button>
         {busy && (
           <Button type="button" onClick={hide}>
-            Cancel
+            {t("identity.cancel")}
           </Button>
         )}
       </div>
-      {message && <p role={failed ? "alert" : "status"}>{message}</p>}
+      {message && <p role={failed ? "alert" : "status"}>{t(message)}</p>}
     </div>
   );
 }

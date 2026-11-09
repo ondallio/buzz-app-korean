@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useRef, useState, type ReactNode, type RefObject } from "react";
 import type { ChannelSummary } from "../../features/relay/contracts";
 import type { RelaySession } from "../../features/relay/session";
@@ -43,6 +44,7 @@ export function ChannelHeaderMenu({
   menuPanels?: readonly RegisteredPanel[] | undefined;
   openMenuPanel?: ((panel: RegisteredPanel) => void) | undefined;
 }) {
+  useLanguage();
   const [open, setOpen] = useState(false);
   const finalFocus = useRef<(() => HTMLElement | false) | undefined>(undefined);
   const handoff = useChannelNavigation();
@@ -81,7 +83,7 @@ export function ChannelHeaderMenu({
       {finishConversion && (
         <MenuItem onClick={finishConversion}>
           <MenuIcon>{null}</MenuIcon>
-          Finish conversion
+          {t("channelsMenus.header.finishConversion")}
         </MenuItem>
       )}
       <MenuItem
@@ -99,7 +101,7 @@ export function ChannelHeaderMenu({
         <MenuIcon>
           <InfoIcon size={16} />
         </MenuIcon>
-        View channel details
+        {t("channelsMenus.header.details")}
       </MenuItem>
       {menuPanels?.map((panel) => (
         <MenuItem key={panel.key} onClick={() => openMenuPanel?.(panel)}>
@@ -111,7 +113,9 @@ export function ChannelHeaderMenu({
       ))}
       {!!actions?.length && <MenuSeparator />}
       {actions}
-      {readAction.state?.pending && <MenuNote role="status">Saving…</MenuNote>}
+      {readAction.state?.pending && (
+        <MenuNote role="status">{t("channelsMenus.read.saving")}</MenuNote>
+      )}
       {readAction.state?.error && (
         <MenuNote role="alert">{readAction.state.error}</MenuNote>
       )}
@@ -133,8 +137,8 @@ export function ChannelHeaderMenu({
             hint="familiar"
             ref={trigger}
             size="toolbar"
-            aria-label="Channel actions"
-            title="Channel actions"
+            aria-label={t("channelsMenus.header.actions")}
+            title={t("channelsMenus.header.actions")}
             data-highlight-expanded="false"
             icon={<DotsThreeIcon size="1rem" aria-hidden="true" />}
           />

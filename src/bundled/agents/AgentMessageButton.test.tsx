@@ -7,7 +7,12 @@ import type { RelayData } from "../../features/relay/service";
 import type { Navigation } from "../../features/navigation/controller";
 import type { ChannelSummary } from "../../features/relay/contracts";
 import { AgentMessageButton } from "./AgentMessageButton";
-afterEach(cleanup);
+import { setLanguage } from "../../shared/i18n";
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 function setup() {
   const open = vi.fn(
     async (_keys: string[], _signal: AbortSignal) => "dm-agent",
@@ -220,4 +225,60 @@ it("leaves Settings in place when an opening finishes behind it", async () => {
   expect(f.navigate).not.toHaveBeenCalled();
   expect(screen.queryByRole("alert")).toBeNull();
   expect(screen.getByRole("button", { name: "Message" })).toBeEnabled();
+});
+
+it("changes the same pending message button language without reopening the DM", async () => {
+  const f = setup();
+  let finish!: (id: string) => void;
+  f.open.mockImplementation(
+    () =>
+      new Promise<string>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  render(<AgentMessageButton {...f} pubkey="agent" navigation={undefined} />);
+  const button = screen.getByRole("button", { name: "Message" });
+  await userEvent.setup().click(button);
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "메시지" })).toBe(button);
+  expect(button).toBeDisabled();
+  expect(f.open).toHaveBeenCalledExactlyOnceWith(
+    ["agent"],
+    expect.any(AbortSignal),
+  );
+  expect(f.refresh).not.toHaveBeenCalled();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Message" })).toBe(button);
+  await act(async () => finish("dm-agent"));
+  expect(f.navigate).toHaveBeenCalledExactlyOnceWith({
+    version: 1,
+    kind: "conversation",
+    channelId: "dm-agent",
+    scope: { viewer: "owner", communityOrigin: "https://community.example" },
+  });
+});
+it("retranslates an owned retained failure but preserves identical external diagnostics", async () => {
+  const f = setup();
+  f.choices.identities = [];
+  f.choices.pending = true;
+  render(<AgentMessageButton {...f} pubkey="agent" navigation={undefined} />);
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Message" }));
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Agent details are still loading. Try again.",
+  );
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "에이전트 세부 정보를 불러오는 중입니다. 다시 시도해 주세요.",
+  );
+  f.choices.error = "Agent details are still loading. Try again.";
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "다시 시도" }));
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Agent details are still loading. Try again.",
+  );
+  expect(f.refresh).toHaveBeenCalledOnce();
+  expect(f.open).not.toHaveBeenCalled();
 });

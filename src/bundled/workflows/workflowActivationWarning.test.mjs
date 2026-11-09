@@ -177,3 +177,46 @@ test("returns no warning for malformed or unrelated definitions", () => {
     null,
   );
 });
+
+test("projects semantic frequency only after the existing warning predicate accepts it", () => {
+  const seen = [];
+  const display = {
+    title: "자주 실행",
+    description: (value) => {
+      seen.push(value);
+      return "전체 경고 문장";
+    },
+  };
+  assert.deepEqual(
+    getWorkflowActivationWarning(
+      'trigger: {on: schedule, interval: "1m 2s"}',
+      display,
+    ),
+    { title: "자주 실행", description: "전체 경고 문장" },
+  );
+  assert.deepEqual(
+    getWorkflowActivationWarning(
+      'trigger: {on: schedule, cron: "*/5 * * * *"}',
+      display,
+    ),
+    { title: "자주 실행", description: "전체 경고 문장" },
+  );
+  assert.deepEqual(seen, [
+    { kind: "interval", seconds: 62 },
+    { kind: "minutes", minutes: 5 },
+  ]);
+  assert.equal(
+    getWorkflowActivationWarning(
+      'trigger: {on: schedule, interval: "2h"}',
+      display,
+    ),
+    null,
+  );
+  assert.equal(
+    getWorkflowActivationWarning(
+      'trigger: {on: message_posted, filter: "raw-filter"}',
+      display,
+    ),
+    null,
+  );
+});

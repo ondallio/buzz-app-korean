@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { t, useLanguage, formattingLocale } from "../../shared/i18n";
+import { Children, useEffect, useMemo, useRef, useState } from "react";
+import { rich } from "../../shared/i18n/rich";
 import { channelIcon } from "../../features/channels/channel-icon";
 import {
   useChannelDirectory,
@@ -49,6 +51,7 @@ export function ChannelDirectoryResults({
   /** Opens an open channel's read-only preview, where Join lives. */
   openPreview: (channelId: string) => void;
 }) {
+  useLanguage();
   const list = useChannelRoster(session.channels);
   const ready = list.status === "ready";
   const directory = useChannelDirectory(session.channels, ready);
@@ -154,7 +157,7 @@ export function ChannelDirectoryResults({
     .slice(0, drawn)
     .map(({ channel, joined, match }) => {
       const people = members.counts.get(channel.id);
-      const detail = [joined && "Joined", channel.description]
+      const detail = [joined && t("search.joined"), channel.description]
         .filter(Boolean)
         .join(" · ");
       return {
@@ -169,10 +172,17 @@ export function ChannelDirectoryResults({
             {people !== undefined && (
               <>
                 <UserIcon size={14} aria-hidden="true" />
-                {people.toLocaleString()}
-                <span className="sr-only">
-                  {people === 1 ? " member" : " members"}
-                </span>
+                {Children.map(
+                  rich(people === 1 ? "search.member" : "search.members", {
+                    count: <>{people.toLocaleString(formattingLocale())}</>,
+                  }),
+                  (part) =>
+                    typeof part === "string" ? (
+                      <span className="sr-only">{part}</span>
+                    ) : (
+                      part
+                    ),
+                )}
               </>
             )}
           </span>
@@ -186,16 +196,24 @@ export function ChannelDirectoryResults({
   const settled = ready && !directory.loading && !failed;
   const count = rows.length;
   // One polite summary once a switch or filter settles, not per keystroke.
-  const summary = settled
-    ? needle
-      ? `${count} ${count === 1 ? "channel matches" : "channels match"}`
-      : `${count} ${count === 1 ? "channel" : "channels"} you can join`
-    : "";
-  const [announced, setAnnounced] = useState("");
+  const summaryCount = settled ? count : undefined;
+  const summaryMode = settled ? (needle ? "matches" : "join") : undefined;
+  const [announced, setAnnounced] = useState<{
+    count: number;
+    mode: "matches" | "join";
+  }>();
   useEffect(() => {
-    const timer = setTimeout(() => setAnnounced(summary), 500);
+    const timer = setTimeout(
+      () =>
+        setAnnounced(
+          summaryCount === undefined || summaryMode === undefined
+            ? undefined
+            : { count: summaryCount, mode: summaryMode },
+        ),
+      500,
+    );
     return () => clearTimeout(timer);
-  }, [summary]);
+  }, [summaryCount, summaryMode]);
   const retry = () => {
     if (list.status === "error")
       void (session.channels.refreshList
@@ -219,8 +237,9 @@ export function ChannelDirectoryResults({
       }}
       groups={[
         {
+          id: "channel-directory",
           // Typed results sit under the Channels tab that names them.
-          label: needle ? "Channels" : "Channels you can join",
+          label: needle ? t("search.channels") : t("search.joinableChannels"),
           hideLabel: !!needle,
           destinations,
           total: count,
@@ -228,7 +247,17 @@ export function ChannelDirectoryResults({
       ]}
     >
       <p className="sr-only" aria-live="polite">
-        {announced}
+        {announced &&
+          t(
+            announced.mode === "matches"
+              ? announced.count === 1
+                ? "search.channelMatches"
+                : "search.channelsMatch"
+              : announced.count === 1
+                ? "search.channelToJoin"
+                : "search.channelsToJoin",
+            { count: announced.count },
+          )}
       </p>
       {count ? (
         <div
@@ -237,45 +266,47 @@ export function ChannelDirectoryResults({
         >
           {failed && (
             <div>
-              <p>Couldn’t load all channels.</p>
+              <p>{t("search.allChannelsFailed")}</p>
               <Button size="sm" variant="ghost" onClick={retry}>
-                Retry channels
+                {t("search.retryChannels")}
               </Button>
             </div>
           )}
           {settled && directory.partial && (
-            <p>Only the newest open channels are shown.</p>
+            <p>{t("search.onlyRecentChannels")}</p>
           )}
           {/* The first page shows at once; the rest join it as they land. */}
-          {directory.loading && !failed && <p>Loading more channels…</p>}
+          {directory.loading && !failed && (
+            <p>{t("search.loadingMoreChannels")}</p>
+          )}
         </div>
       ) : (
         // Nothing to list: the message takes the reserved results space.
         <div className="search-palette-centered" aria-live="polite">
           {failed ? (
             <>
-              <p>Couldn’t load channels.</p>
+              <p>{t("shell.sidebar.loadFailed")}</p>
               <Button size="sm" variant="ghost" onClick={retry}>
-                Retry channels
+                {t("search.retryChannels")}
               </Button>
             </>
           ) : settled ? (
             needle ? (
               <>
-                <p>No matching channels.</p>
-                <p>Private channels show up once someone invites you.</p>
+                <p>{t("search.noChannels")}</p>
+                <p>{t("search.privateChannels")}</p>
               </>
             ) : (
               <p>
                 {directory.partial
                   ? // A capped read can't say nothing else is left to join.
-                    "You’ve joined all of the newest open channels."
-                  : "You’ve joined every open channel."}
+                    t("search.joinedRecent")
+                  : t("search.joinedAll")}
               </p>
             )
           ) : (
             // Rows show from the first page; this waits a second first.
-            <LoadingRegion pending label="Loading channels…">
+            <LoadingRegion pending label={t("search.loadingChannels")}>
               {null}
             </LoadingRegion>
           )}

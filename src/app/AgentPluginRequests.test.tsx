@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -9,6 +10,7 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../shared/i18n/language";
 import type { PluginManager } from "../plugins/manager";
 import { createPluginRequests } from "../plugins/requests";
 import type {
@@ -21,6 +23,7 @@ import { AgentPluginRequests } from "./AgentPluginRequests";
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   document.body.replaceChildren();
 });
 
@@ -400,3 +403,72 @@ it.each([
     );
   },
 );
+
+it("keeps an agent enable review, pending decision and retained fallback through language changes", async () => {
+  const name = "Enable {raw} 사용자";
+  const rawReason = "Requested by agents {raw} 사용자";
+  const { manager, agent, holdReview, release } = await harness([
+    installed({ manifest: { ...manifest, name } }),
+  ]);
+  const { requestId } = await agent.request({
+    action: "enable",
+    id: manifest.id,
+    reason: rawReason,
+  });
+  const request = manager.requests.pending()[0];
+  const review = await screen.findByRole("button", { name: `Review ${name}` });
+  review.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: `${name} 검토` })).toBe(review);
+  expect(review).toHaveFocus();
+  expect(screen.getByText(`${name} 활성화`)).toBeVisible();
+  expect(screen.getByText(`Builder: ${rawReason}`)).toBeVisible();
+  expect(manager.requests.pending()[0]).toBe(request);
+  fireEvent.click(review);
+  const dialog = await screen.findByRole("dialog", { name: `${name} 활성화?` });
+  const confirm = within(dialog).getByRole("button", {
+    name: "플러그인 활성화",
+  });
+  let complete!: (value: boolean) => void;
+  manager.change.mockImplementationOnce(
+    () =>
+      new Promise<boolean>((resolve) => {
+        complete = resolve;
+      }),
+  );
+  fireEvent.click(confirm);
+  try {
+    expect(confirm).toBeDisabled();
+    expect(agent.status(requestId).state).toBe("pending");
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("dialog", { name: `Enable ${name}?` })).toBe(
+      dialog,
+    );
+    expect(within(dialog).getByRole("button", { name: "Enable plugin" })).toBe(
+      confirm,
+    );
+    expect(within(dialog).getByText(rawReason)).toBeVisible();
+    expect(manager.change).toHaveBeenCalledExactlyOnceWith(
+      "enable",
+      manifest.id,
+    );
+    expect(holdReview).toHaveBeenCalledOnce();
+    expect(release).not.toHaveBeenCalled();
+    await act(async () => complete(false));
+    const error = within(dialog).getByRole("alert");
+    expect(error).toHaveTextContent("The change wasn’t confirmed. Try again.");
+    act(() => setLanguage("ko"));
+    expect(within(dialog).getByRole("alert")).toBe(error);
+    expect(error).toHaveTextContent(
+      "변경을 확인하지 못했습니다. 다시 시도해 주세요.",
+    );
+    expect(agent.status(requestId).state).toBe("pending");
+    fireEvent.click(confirm);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(manager.change).toHaveBeenNthCalledWith(2, "enable", manifest.id);
+    expect(agent.status(requestId).state).toBe("approved");
+    expect(release).toHaveBeenCalledOnce();
+  } finally {
+    await act(async () => complete(false));
+  }
+});

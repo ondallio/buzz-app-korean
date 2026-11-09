@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -16,6 +17,7 @@ import type { EventData } from "../../features/relay/events";
 import type { RelaySession } from "../../features/relay/session";
 import { ToastProvider } from "../../shared/design-system/ui/Toast";
 import { AgentShareDialog } from "./AgentShareDialog";
+import { setLanguage } from "../../shared/i18n";
 
 const desktop = vi.hoisted(() => ({ tauri: false, invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({
@@ -34,6 +36,7 @@ const design = {
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -1188,4 +1191,94 @@ it("posts to a channel the viewer belongs to, and never offers agents", async ()
   expect(directMessages.open).not.toHaveBeenCalled();
   expect(attachments.upload.mock.calls[0]?.[1]).toBe(design.id);
   expect(messages.send.mock.calls.map(([to]) => to)).toEqual([design.id]);
+});
+
+it("retains raw sharing targets and query across languages and the exact pending delivery", async () => {
+  const user = userEvent.setup();
+  const fixture = community();
+  fixture.directMessages.people.mockResolvedValue({
+    people: [{ ...bea, name: "People" }, cy],
+    hasMore: false,
+  });
+  share(fixture.session);
+  await user.click(await choice("People"));
+  const chosen = screen.getByRole("region", { name: "Sending to · 1" });
+  const person = within(chosen).getByRole("button", {
+    name: "People",
+    pressed: true,
+  });
+  const input = screen.getByRole("searchbox", {
+    name: "Search people and channels",
+  });
+  if (!(input instanceof HTMLInputElement))
+    throw new Error("Missing sharing search");
+  await user.type(input, "#des");
+  await vi.waitFor(() =>
+    expect(fixture.directMessages.people).toHaveBeenCalledTimes(1),
+  );
+  input.setSelectionRange(1, 3);
+  const reads = fixture.directMessages.people.mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("searchbox", { name: "사람과 채널 검색" })).toBe(
+    input,
+  );
+  expect(input).toHaveValue("#des");
+  expect(input).toHaveFocus();
+  expect(input.selectionStart).toBe(1);
+  expect(input.selectionEnd).toBe(3);
+  expect(screen.getByRole("region", { name: "전송 대상 · 1" })).toBe(chosen);
+  expect(
+    within(chosen).getByRole("button", { name: "People", pressed: true }),
+  ).toBe(person);
+  const clear = screen.getByRole("button", {
+    name: "사람과 채널 검색어 지우기",
+  });
+  act(() => setLanguage("en"));
+  expect(input).toHaveFocus();
+  expect(
+    screen.getByRole("button", { name: "Clear search people and channels" }),
+  ).toBe(clear);
+  expect(fixture.directMessages.people).toHaveBeenCalledTimes(reads);
+  await user.click(clear);
+  expect(input).toHaveValue("");
+  expect(input).toHaveFocus();
+  await user.click(await choice("#design"));
+  let finish: () => void = () => {
+    throw new Error("Missing delivery gate");
+  };
+  fixture.directMessages.delivered.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  await user.click(screen.getByRole("button", { name: "Send" }));
+  try {
+    await vi.waitFor(() =>
+      expect(fixture.directMessages.delivered).toHaveBeenCalledTimes(1),
+    );
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("searchbox", { name: "사람과 채널 검색" })).toBe(
+      input,
+    );
+    expect(input).toBeDisabled();
+    expect(screen.getByRole("region", { name: "전송 대상 · 2" })).toBe(chosen);
+    expect(fixture.directMessages.open).toHaveBeenCalledExactlyOnceWith(
+      [bea.pubkey],
+      expect.any(AbortSignal),
+    );
+  } finally {
+    await act(async () => finish());
+  }
+  await vi.waitFor(() =>
+    expect(fixture.messages.send).toHaveBeenCalledTimes(2),
+  );
+  expect(fixture.messages.send.mock.calls.map(([to]) => to)).toEqual([
+    "dm-b",
+    design.id,
+  ]);
+  await vi.waitFor(() => expect(fixture.journal).toEqual([]));
+  expect(fixture.attachments.upload.mock.calls[0]?.[0]?.name).toBe(
+    "Ada.agent.png",
+  );
 });

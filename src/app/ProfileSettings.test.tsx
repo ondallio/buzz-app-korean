@@ -20,6 +20,7 @@ import type {
 import * as communityApi from "../features/communities/api";
 import * as avatarUpload from "../features/profiles/avatar-upload";
 import { ToastProvider } from "../shared/design-system/ui/Toast";
+import { setLanguage } from "../shared/i18n";
 import { ProfileSettings } from "./ProfileSettings";
 import { stubAvatarBrowserApis } from "../features/agents/avatar-testing";
 
@@ -55,6 +56,7 @@ function communities(): Communities {
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -1012,4 +1014,36 @@ it("mounts the already-cached community thumbnail immediately while the profile 
     );
     owner.dispose();
   }
+});
+
+it("keeps profile draft, selection and raw save errors through language changes and retries the captured value", async () => {
+  setLanguage("en");
+  const service = communities();
+  vi.mocked(service.saveProfile).mockImplementationOnce(() => {
+    throw new Error("Profile updated");
+  });
+  const user = userEvent.setup();
+  render(<ProfileSettings communities={service} />, { wrapper: ToastProvider });
+  const name = screen.getByLabelText("Display name") as HTMLInputElement;
+  await user.clear(name);
+  await user.type(name, "Save");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(screen.getByRole("alert")).toHaveTextContent("Profile updated");
+  await user.click(name);
+  name.setSelectionRange(1, 3);
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("region", { name: "프로필 미리보기" })).toBeVisible();
+  expect(screen.getByLabelText("표시 이름")).toBe(name);
+  expect(name).toHaveFocus();
+  expect(name).toHaveValue("Save");
+  expect([name.selectionStart, name.selectionEnd]).toEqual([1, 3]);
+  expect(screen.getByRole("alert")).toHaveTextContent("Profile updated");
+  act(() => setLanguage("en"));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(service.saveProfile).toHaveBeenLastCalledWith({
+    name: "Save",
+    picture: "",
+    about: "",
+  });
+  expect(screen.getByText("Profile updated")).toBeVisible();
 });

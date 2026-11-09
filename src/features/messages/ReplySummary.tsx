@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import type { ReactNode } from "react";
 import { AvatarStack } from "../../shared/design-system/ui/AvatarStack";
 import { PencilSimpleIcon } from "../../shared/design-system/icons/index";
@@ -38,6 +39,7 @@ export function ReplySummary({
   unreadLabel?: string | undefined;
   unreadCount?: number;
 }) {
+  useLanguage();
   return (
     <>
       <AvatarStack
@@ -58,12 +60,14 @@ export function ReplySummary({
       {(count > 0 || !(hideEmptyLabel || draft)) && (
         <span>
           {count > 0
-            ? `${count} ${count === 1 ? "reply" : "replies"}`
-            : "View thread"}
+            ? t(count === 1 ? "messages.reply.one" : "messages.reply.many", {
+                count,
+              })
+            : t("messages.reply.view")}
         </span>
       )}
       {unreadCount ? (
-        <span>({unreadCount} new)</span>
+        <span>{t("messages.reply.new", { count: unreadCount })}</span>
       ) : unreadLabel ? (
         <span
           className={styles.threadUnread}
@@ -75,7 +79,7 @@ export function ReplySummary({
         <span className={styles.threadDraft} data-thread-draft="">
           {replied && <span aria-hidden="true">·</span>}
           <PencilSimpleIcon size={14} aria-hidden="true" />
-          {replied ? "Draft" : "Draft reply"}
+          {replied ? t("messages.reply.draft") : t("messages.reply.draftReply")}
         </span>
       )}
     </>

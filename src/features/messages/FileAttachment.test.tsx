@@ -10,6 +10,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { downloadNativeMedia } from "./native-download";
+import { setLanguage } from "../../shared/i18n";
 import { FileAttachment, formatFileSize } from "./FileAttachment";
 
 vi.mock("./native-download", () => ({ downloadNativeMedia: vi.fn() }));
@@ -18,6 +19,8 @@ const proxySource = "/api/relay/media?url=https%3A%2F%2Ffixture.test%2Ffile";
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
+  localStorage.clear();
   vi.resetAllMocks();
   vi.useRealTimers();
 });
@@ -340,3 +343,49 @@ it.each(["success", "failure"])(
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
   },
 );
+
+it("translates mime fallback only and preserves same-English filenames, bytes and links", () => {
+  setLanguage("en");
+  render(
+    <>
+      <FileAttachment
+        attachment={{
+          url: "https://fixture.test/a",
+          kind: "file",
+          mime: "application/pdf",
+          name: "PDF file",
+          size: 1024,
+        }}
+        source={proxySource}
+        onOpenLink={() => false}
+      />
+      <FileAttachment
+        attachment={{
+          url: "https://fixture.test/b",
+          kind: "file",
+          mime: "application/pdf",
+          size: 1024,
+        }}
+        source={proxySource}
+        onOpenLink={() => false}
+      />
+    </>,
+  );
+  const links = screen.getAllByRole("link", { name: "Download PDF file" });
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("link", { name: "PDF file 다운로드" })).toBe(
+    links[0],
+  );
+  expect(screen.getByRole("link", { name: "PDF 파일 다운로드" })).toBe(
+    links[1],
+  );
+  expect(screen.getAllByText("1 KB")).toHaveLength(2);
+  expect(links[0]).toHaveAttribute("download", "PDF file");
+  expect(links[1]).toHaveAttribute("download", "");
+  expect(links[0]).toHaveAttribute("href", proxySource);
+  expect(links[1]).toHaveAttribute("href", proxySource);
+  act(() => setLanguage("en"));
+  expect(screen.getAllByRole("link", { name: "Download PDF file" })).toEqual(
+    links,
+  );
+});

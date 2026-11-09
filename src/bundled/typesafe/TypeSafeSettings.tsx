@@ -1,19 +1,18 @@
 import { useState, useSyncExternalStore } from "react";
+import { t, useLanguage, type TranslationKey } from "../../shared/i18n";
 import { isApplePlatform } from "../../features/shortcuts/format";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Field } from "../../shared/design-system/ui/Field";
 import { Input } from "../../shared/design-system/ui/Input";
 import type { KeyState, TypeSafeKey } from "./key";
 
-const KEY_STATUS: Record<KeyState, string> = {
-  checking: "Checking for a saved key…",
-  saved: "Your TypeSafe key is saved.",
-  missing: "Add your TypeSafe API key to use TypeSafe.",
-  unreadable:
-    "Buzz could not read your saved key. Unlock your keychain, or replace or remove the key.",
-  refused:
-    "TypeSafe did not accept your key. Replace it to keep using TypeSafe.",
-};
+const KEY_STATUS = {
+  checking: "typesafeSettings.checking",
+  saved: "typesafeSettings.saved",
+  missing: "typesafeSettings.missing",
+  unreadable: "typesafeSettings.unreadable",
+  refused: "typesafeSettings.refused",
+} as const satisfies Record<KeyState, TranslationKey>;
 
 /** Sets or removes the TypeSafe key. The key goes straight to native storage
  * and is never shown again. */
@@ -30,6 +29,7 @@ export function TypeSafeSettings({
   /** Whether the key goes to the macOS Keychain, which only Buzz can read. */
   apple?: boolean;
 }) {
+  useLanguage();
   const keyState = useSyncExternalStore(
     typesafe.subscribe,
     typesafe.snapshot,
@@ -56,17 +56,17 @@ export function TypeSafeSettings({
   if (!typesafe.desktop())
     return (
       <p role="status" className="m-0 text-body-sm text-secondary">
-        Open the Buzz desktop app to use TypeSafe.
+        {t("typesafeSettings.desktop")}
       </p>
     );
   return (
     <div className="flex w-full flex-col items-start gap-3">
       <p role="status" className="m-0 text-body-sm text-secondary">
-        {KEY_STATUS[keyState]}
+        {t(KEY_STATUS[keyState])}
       </p>
       {!apple && (
         <p className="m-0 text-body-sm text-secondary">
-          Other programs you run, agent shells included, can read the saved key.
+          {t("typesafeSettings.otherPrograms")}
         </p>
       )}
       <form
@@ -77,14 +77,18 @@ export function TypeSafeSettings({
           if (value) void run(() => typesafe.save(value));
         }}
       >
-        <Field label="TypeSafe API key">
+        <Field label={t("typesafeSettings.apiKey")}>
           <Input
             type="password"
             autoComplete="new-password"
             spellCheck={false}
             disabled={busy}
             value={key}
-            placeholder={saved ? "Saved key unchanged" : "Paste a key"}
+            placeholder={
+              saved
+                ? t("typesafeSettings.unchanged")
+                : t("typesafeSettings.paste")
+            }
             onChange={(event) => setKey(event.target.value)}
           />
         </Field>
@@ -94,7 +98,7 @@ export function TypeSafeSettings({
             variant="prominent"
             disabled={busy || !key.trim()}
           >
-            {saved ? "Replace key" : "Save key"}
+            {saved ? t("typesafeSettings.replace") : t("typesafeSettings.save")}
           </Button>
           {saved && (
             <Button
@@ -103,7 +107,7 @@ export function TypeSafeSettings({
               disabled={busy}
               onClick={() => void run(() => typesafe.clear())}
             >
-              Remove key
+              {t("typesafeSettings.remove")}
             </Button>
           )}
         </div>

@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useAgentsSnapshot, useTeams } from "../../features/agents/react";
 import type { Agent, Agents, Team } from "../../features/agents/service";
@@ -29,6 +30,7 @@ export function ChannelTemplateSettings({
   agents?: Agents | undefined;
   active(): boolean;
 }) {
+  useLanguage();
   const templates = useChannelTemplates();
   const teams = useTeams(agents);
   const choices = useAgentsSnapshot(agents)?.agents ?? noAgents;
@@ -39,8 +41,8 @@ export function ChannelTemplateSettings({
     if (active()) setEditing("new");
   };
   return (
-    <section aria-label="Channel templates settings">
-      <Header title="Channel templates" />
+    <section aria-label={t("channelForms.templates.region")}>
+      <Header title={t("channelForms.templates.title")} />
       {templates.length ? (
         <div className={styles.stack}>
           <SettingsGroup>
@@ -51,12 +53,14 @@ export function ChannelTemplateSettings({
                 subtitle={summary(item, choices, teams)}
                 trailing={
                   <Button
-                    aria-label={`Edit ${item.name}`}
+                    aria-label={t("channelForms.templates.editNamed", {
+                      name: item.name,
+                    })}
                     onClick={() => {
                       if (active()) setEditing(item.id);
                     }}
                   >
-                    Edit
+                    {t("channelForms.edit")}
                   </Button>
                 }
               />
@@ -64,16 +68,21 @@ export function ChannelTemplateSettings({
           </SettingsGroup>
           <div className={styles.actions}>
             <Button onClick={newTemplate}>
-              <PlusIcon size={14} aria-hidden="true" /> New template
+              <PlusIcon size={14} aria-hidden="true" />{" "}
+              {t("channelForms.templates.new")}
             </Button>
           </div>
         </div>
       ) : (
         <EmptyState
           icon={<CopyIcon />}
-          title="No channel templates yet"
-          description="Start new channels with your agents, teams and a Canvas already in place."
-          action={<Button onClick={newTemplate}>New template</Button>}
+          title={t("channelForms.templates.emptyTitle")}
+          description={t("channelForms.templates.emptyDescription")}
+          action={
+            <Button onClick={newTemplate}>
+              {t("channelForms.templates.new")}
+            </Button>
+          }
         />
       )}
       {(editing === "new" || template) && (
@@ -124,11 +133,13 @@ function summary(
       (id) => teams.find((team) => team.id === id)?.name ?? [],
     ),
   ];
-  return (
-    [names.join(", "), template.canvas.trim() ? "Canvas" : ""]
-      .filter(Boolean)
-      .join(" · ") || "Empty"
-  );
+  return names.length
+    ? template.canvas.trim()
+      ? t("channelForms.templates.namesCanvas", { names: names.join(", ") })
+      : names.join(", ")
+    : template.canvas.trim()
+      ? t("channelForms.templates.canvas")
+      : t("channelForms.templates.empty");
 }
 
 function TemplateDialog({
@@ -142,6 +153,7 @@ function TemplateDialog({
   template?: ChannelTemplate;
   onClose(): void;
 }) {
+  useLanguage();
   const [name, setName] = useState(template?.name ?? "");
   const [chosenAgents, setChosenAgents] = useState<readonly string[]>(
     template?.agents ?? [],
@@ -196,24 +208,28 @@ function TemplateDialog({
       }
       title={
         confirmDiscard
-          ? "Discard changes?"
+          ? t("channelForms.discard.title")
           : template
-            ? "Edit template"
-            : "New template"
+            ? t("channelForms.templates.edit")
+            : t("channelForms.templates.new")
       }
       description={
-        confirmDiscard ? "Your template has unsaved changes." : undefined
+        confirmDiscard ? t("channelForms.templates.unsaved") : undefined
       }
-      closeLabel={confirmDiscard ? "Back to template" : "Close template"}
+      closeLabel={
+        confirmDiscard
+          ? t("channelForms.templates.back")
+          : t("channelForms.templates.close")
+      }
       initialFocus={input}
       actions={
         confirmDiscard ? (
           <>
             <Button ref={keepEditing} onClick={() => setConfirmDiscard(false)}>
-              Keep editing
+              {t("channelForms.discard.keep")}
             </Button>
             <Button variant="destructive" onClick={onClose}>
-              Discard changes
+              {t("channelForms.discard.action")}
             </Button>
           </>
         ) : (
@@ -223,7 +239,7 @@ function TemplateDialog({
                 variant="destructive"
                 onClick={() => act(() => channelTemplates.remove(template.id))}
               >
-                Delete
+                {t("channelForms.delete")}
               </Button>
             )}
             <Button
@@ -232,7 +248,7 @@ function TemplateDialog({
               form="channel-template-form"
               disabled={!name.trim()}
             >
-              Save template
+              {t("channelForms.templates.save")}
             </Button>
           </>
         )
@@ -255,7 +271,7 @@ function TemplateDialog({
             );
           }}
         >
-          <Field label="Name">
+          <Field label={t("channelForms.field.name")}>
             <Input
               ref={input}
               value={name}
@@ -263,7 +279,9 @@ function TemplateDialog({
             />
           </Field>
           <fieldset className={styles.teams}>
-            <legend className="text-label-sm">Agents</legend>
+            <legend className="text-label-sm">
+              {t("channelForms.templates.agents")}
+            </legend>
             {agents.length ? (
               agents.map((agent) => (
                 <Checkbox
@@ -280,11 +298,15 @@ function TemplateDialog({
                 />
               ))
             ) : (
-              <p className="m-0 text-body-sm text-secondary">No agents yet.</p>
+              <p className="m-0 text-body-sm text-secondary">
+                {t("channelForms.templates.noAgents")}
+              </p>
             )}
           </fieldset>
           <fieldset className={styles.teams}>
-            <legend className="text-label-sm">Teams</legend>
+            <legend className="text-label-sm">
+              {t("channelForms.templates.teams")}
+            </legend>
             {teams.length ? (
               teams.map((team) => (
                 <Checkbox
@@ -302,19 +324,19 @@ function TemplateDialog({
               ))
             ) : (
               <p className="m-0 text-body-sm text-secondary">
-                Make teams on the Agents page.
+                {t("channelForms.templates.makeTeams")}
               </p>
             )}
           </fieldset>
           <Field
-            label="Starting Canvas"
-            description="Markdown, copied into each new channel made from this template."
+            label={t("channelForms.templates.startingCanvas")}
+            description={t("channelForms.templates.canvasDescription")}
           >
             <Textarea
               rows={8}
               value={canvas}
               onChange={(event) => setCanvas(event.target.value)}
-              placeholder={"# Goal\n\n# Scope\n\n# Success criteria"}
+              placeholder={t("channelForms.templates.canvasPlaceholder")}
             />
           </Field>
           {error && (

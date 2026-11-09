@@ -1,3 +1,4 @@
+import { localError } from "../../shared/i18n/deferred-message";
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { stubAvatarBrowserApis } from "../../features/agents/avatar-testing";
@@ -37,7 +38,12 @@ vi.mock("../builderlab/oauth/browser", async (original) => ({
   browserLoginAvailable: () => true,
 }));
 
-afterEach(cleanup);
+import { setLanguage } from "../../shared/i18n";
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 it("keeps one provider footer across tabs and measures its changing height for the scroll area", async () => {
   const signedIn = deferred<void>();
@@ -753,4 +759,196 @@ it("retains the inline save action outside an agent pane", () => {
     "form",
     "settings",
   );
+});
+
+function languageDetails(overrides: Partial<Agents> = {}) {
+  const agent = {
+    key: "a".repeat(64),
+    pubkey: "a".repeat(64),
+    owner: "f".repeat(64),
+    name: "Message",
+    type: "test/echo",
+    place: "here",
+    relay: "wss://current.example",
+    config: {},
+    attention: {},
+    skipped: {},
+    timers: {},
+    attentionEnabled: true,
+  } satisfies Agent;
+  const type = {
+    key: agent.type,
+    pluginId: "test",
+    revision: "1",
+    id: "echo",
+    title: "Echo",
+    defaults: () => ({ config: {} }),
+  } as RegisteredAgentType;
+  const save = vi.fn(async () => {});
+  const snapshot = { agents: [agent] };
+  const agents = {
+    save,
+    subscribe: () => () => {},
+    snapshot: () => snapshot,
+    configHistory: () => undefined,
+    agentSync: () => undefined,
+    addedTabs: () => [],
+    registerTab: () => {},
+    controlAttention: () => {},
+    memberships: () => [],
+    ...overrides,
+  } as unknown as Agents;
+  render(
+    <AgentDetails
+      agents={agents}
+      agent={agent}
+      type={type}
+      types={[type]}
+      channels={[]}
+      memories={undefined}
+      onRemoved={() => {}}
+      messageAction={() => null}
+    />,
+  );
+  return { agent, save, agents };
+}
+
+it("retains the agent name draft, selection and save payload across languages", async () => {
+  const { agent, save } = languageDetails();
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole("button", { name: "Agent profile actions" }),
+  );
+  await user.click(
+    await screen.findByRole("menuitem", { name: "Change name" }),
+  );
+  const input = await screen.findByRole("textbox", { name: "Agent name" });
+  await user.clear(input);
+  await user.type(input, "Keep this 이름");
+  (input as HTMLInputElement).setSelectionRange(2, 6);
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("textbox", { name: "에이전트 이름" })).toBe(input);
+  expect(input).toHaveValue("Keep this 이름");
+  expect(input).toHaveFocus();
+  expect((input as HTMLInputElement).selectionStart).toBe(2);
+  expect((input as HTMLInputElement).selectionEnd).toBe(6);
+  expect(
+    screen.getByRole("complementary", { name: "Message 프로필" }),
+  ).toBeVisible();
+  expect(save).not.toHaveBeenCalled();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("textbox", { name: "Agent name" })).toBe(input);
+  expect(input).toHaveFocus();
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(save).toHaveBeenCalledExactlyOnceWith(agent.key, {
+    name: "Keep this 이름",
+  });
+});
+
+it.each([
+  [
+    { synced: "wss://relay.example" },
+    "Synced in relay.example",
+    "relay.example에 동기화됨",
+    undefined,
+  ],
+  [
+    { local: "unsupported" },
+    "Only on this Mac",
+    "이 Mac에만 있음",
+    "이 커뮤니티의 릴레이는 에이전트 설정을 동기화하지 않습니다.",
+  ],
+  [
+    { local: "failed" },
+    "Only on this Mac",
+    "이 Mac에만 있음",
+    "커뮤니티로 복사하지 못했습니다. Buzz가 다시 시도합니다.",
+  ],
+] as const)(
+  "projects structured agent sync state at render time (%j)",
+  async (state, en, ko, reason) => {
+    const sync = vi.fn(() => state);
+    const { save, agents } = languageDetails({ agentSync: sync });
+    await userEvent
+      .setup()
+      .click(screen.getByRole("tab", { name: "Settings" }));
+    expect(screen.getByText(en)).toBeVisible();
+    const title = screen.getByText(en);
+    act(() => setLanguage("ko"));
+    expect(screen.getByText(ko)).toBe(title);
+    if (reason) expect(screen.getByText(reason)).toBeVisible();
+    expect(agents.agentSync("a".repeat(64))).toBe(state);
+    expect(save).not.toHaveBeenCalled();
+    act(() => setLanguage("en"));
+    expect(screen.getByText(en)).toBeVisible();
+  },
+);
+it("retranslates a failed public-key copy on the same control without retrying the clipboard", async () => {
+  languageDetails();
+  const user = userEvent.setup();
+  const write = vi
+    .spyOn(navigator.clipboard, "writeText")
+    .mockRejectedValue(new Error("native diagnostic"));
+  await user.click(screen.getByRole("tab", { name: "Settings" }));
+  const copy = screen.getByRole("button", { name: "Copy public key" });
+  await user.click(copy);
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Could not copy the public key. Try again.",
+  );
+  const copiedValue = write.mock.calls[0]?.[0];
+  expect(copiedValue).toMatch(/^npub1/);
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "공개 키 복사" })).toBe(copy);
+  expect(copy).toHaveFocus();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "공개 키를 복사하지 못했습니다. 다시 시도해 주세요.",
+  );
+  expect(write).toHaveBeenCalledOnce();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Copy public key" })).toBe(copy);
+  write.mockRestore();
+});
+
+it("keeps a failed name draft and retries explicitly while retranslating only owned errors", async () => {
+  const { save, agent } = languageDetails();
+  save.mockRejectedValueOnce(localError("agentsErrors.nameRequired"));
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole("button", { name: "Agent profile actions" }),
+  );
+  await user.click(
+    await screen.findByRole("menuitem", { name: "Change name" }),
+  );
+  const input = await screen.findByRole("textbox", { name: "Agent name" });
+  await user.clear(input);
+  fireEvent.change(input, { target: { value: "Raw {name} 이름" } });
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("Name the agent");
+  input.focus();
+  (input as HTMLInputElement).setSelectionRange(2, 8);
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("alert")).toBe(alert);
+  expect(alert).toHaveTextContent("에이전트 이름을 입력해 주세요.");
+  expect(screen.getByRole("textbox", { name: "에이전트 이름" })).toBe(input);
+  expect(input).toHaveFocus();
+  expect(input).toHaveValue("Raw {name} 이름");
+  expect((input as HTMLInputElement).selectionStart).toBe(2);
+  expect((input as HTMLInputElement).selectionEnd).toBe(8);
+  expect(save).toHaveBeenCalledExactlyOnceWith(agent.key, {
+    name: "Raw {name} 이름",
+  });
+  act(() => setLanguage("en"));
+  expect(alert).toHaveTextContent("Name the agent");
+  save.mockRejectedValueOnce(new Error("Name the agent"));
+  act(() => setLanguage("ko"));
+  await user.click(screen.getByRole("button", { name: "저장" }));
+  await waitFor(() =>
+    expect(screen.getByRole("alert")).toHaveTextContent("Name the agent"),
+  );
+  expect(save).toHaveBeenCalledTimes(2);
+  expect(save.mock.calls).toEqual([
+    [agent.key, { name: "Raw {name} 이름" }],
+    [agent.key, { name: "Raw {name} 이름" }],
+  ]);
 });

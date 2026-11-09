@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -12,9 +13,17 @@ import { afterEach, expect, it } from "vitest";
 import { AgentsContext } from "../features/agents/react";
 import type { Agents } from "../features/agents/service";
 import type { PluginManifest } from "../plugins/api";
-import { PluginAccessReview } from "./PluginAccessReview";
+import {
+  PluginAccessReview,
+  pluginAccessIncreases,
+} from "./PluginAccessReview";
+import { setLanguage } from "../shared/i18n";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 const manifest = (files: boolean): PluginManifest => ({
   id: "example.files",
@@ -189,4 +198,131 @@ it("uses the existing unchanged disclosure for managed saves", () => {
   expect(
     screen.getByRole("button", { name: /Save temporary plugin files/ }),
   ).toBeVisible();
+});
+
+it("retains canonical command access, raw arguments and the same expanded focused item across languages", async () => {
+  setLanguage("en");
+  const candidate: PluginManifest = {
+    id: "raw.plugin-id",
+    name: "Raw {plugin} 한글",
+    apiVersion: 1,
+    host: {
+      commands: [
+        {
+          id: "raw-command",
+          program: "/tmp/Raw {program} 한글",
+          args: ["--raw", "사용자 {arg}\nline", "--raw"],
+          maxInputBytes: 1234,
+          maxOutputBytes: 4096,
+        },
+      ],
+    },
+  };
+  const before: PluginManifest = {
+    ...candidate,
+    host: {
+      commands: [
+        {
+          id: "raw-command",
+          program: "/tmp/Raw {program} 한글",
+          args: ["--raw", "사용자 {arg}\nline", "--raw"],
+          maxInputBytes: 1234,
+          maxOutputBytes: 1024,
+        },
+      ],
+    },
+  };
+  const serialized = JSON.stringify(candidate);
+  render(<PluginAccessReview manifest={candidate} previousManifest={before} />);
+  expect(pluginAccessIncreases(candidate, before)).toBe(true);
+  expect(pluginAccessIncreases(candidate, candidate)).toBe(false);
+  const item = screen.getByRole("button", {
+    name: /Run \/tmp\/Raw \{program\} 한글/,
+  });
+  fireEvent.click(item);
+  item.focus();
+  const region = await screen.findByRole("region", {
+    name: "Command raw-command details",
+  });
+  expect(region).toHaveTextContent("Input: up to 1234 bytes");
+  const args = within(region).getAllByRole("listitem");
+  expect(args.map((arg) => arg.textContent)).toEqual([
+    "--raw",
+    "사용자 {arg}\nline",
+    "--raw",
+    "--raw",
+    "사용자 {arg}\nline",
+    "--raw",
+  ]);
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("button", { name: /\/tmp\/Raw \{program\} 한글 실행/ }),
+  ).toBe(item);
+  expect(item).toHaveFocus();
+  expect(item).toHaveAttribute("aria-expanded", "true");
+  expect(
+    screen.getByRole("region", { name: "명령 raw-command 세부 정보" }),
+  ).toBe(region);
+  expect(region).toHaveTextContent("입력: 최대 1,234바이트");
+  expect(within(region).getAllByRole("listitem")).toEqual(args);
+  expect(JSON.stringify(candidate)).toBe(serialized);
+  expect(pluginAccessIncreases(candidate, before)).toBe(true);
+  expect(pluginAccessIncreases(candidate, candidate)).toBe(false);
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("region", { name: "Command raw-command details" }),
+  ).toBe(region);
+  expect(
+    screen.getByRole("button", { name: /Run \/tmp\/Raw \{program\} 한글/ }),
+  ).toBe(item);
+  expect(item).toHaveFocus();
+});
+
+it("keeps declaration identities and raw harness/program/URL values while every capability label follows language", () => {
+  setLanguage("en");
+  const value: PluginManifest = {
+    id: "raw.capabilities",
+    name: "Read your files",
+    apiVersion: 1,
+    host: {
+      agentExecution: ["raw/harness"],
+      agentHooks: ["raw/harness"],
+      networkOrigins: ["https://raw.example/{path}"],
+      processes: [{ id: "raw-worker", program: "raw-worker", args: ["{arg}"] }],
+      mcp: true,
+      managedFiles: true,
+      files: true,
+    },
+  };
+  const raw = JSON.stringify(value);
+  render(<PluginAccessReview manifest={value} />);
+  const labels = [
+    /Run raw\/harness on another host/,
+    /Observe and influence raw\/harness/,
+    /Connect to https:\/\/raw.example\/\{path\}/,
+    /Start raw-worker/,
+    /Provide tools to local agents/,
+    /Save temporary plugin files/,
+    /Read your files/,
+  ];
+  const items = labels.map((name) => screen.getByRole("button", { name }));
+  act(() => setLanguage("ko"));
+  const translated = [
+    /다른 호스트에서 raw\/harness 실행/,
+    /raw\/harness 관찰 및 동작 제어/,
+    /https:\/\/raw.example\/\{path\}에 연결/,
+    /raw-worker 시작/,
+    /로컬 에이전트에 도구 제공/,
+    /임시 플러그인 파일 저장/,
+    /^파일 읽기/,
+  ];
+  expect(
+    translated.map((name) => screen.getByRole("button", { name })),
+  ).toEqual(items);
+  expect(JSON.stringify(value)).toBe(raw);
+  expect(pluginAccessIncreases(value, value)).toBe(false);
+  act(() => setLanguage("en"));
+  expect(labels.map((name) => screen.getByRole("button", { name }))).toEqual(
+    items,
+  );
 });

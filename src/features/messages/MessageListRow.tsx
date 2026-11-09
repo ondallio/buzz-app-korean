@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
+import { t, useLanguage } from "../../shared/i18n";
 import { NavigationItem } from "../../shared/design-system/ui/NavigationItem";
 import styles from "./MessageListRow.module.css";
 
@@ -25,6 +26,7 @@ export function MessageListRow({
   ComponentProps<typeof NavigationItem>,
   "icon" | "label" | "trailing"
 >) {
+  useLanguage();
   return (
     <NavigationItem
       {...props}
@@ -62,7 +64,11 @@ export function MessageListRow({
       }
       trailing={
         unread ? (
-          <span className={styles.unreadSlot} role="img" aria-label="Unread">
+          <span
+            className={styles.unreadSlot}
+            role="img"
+            aria-label={t("messages.unreadLabel")}
+          >
             <span className={styles.unreadDot} />
           </span>
         ) : (

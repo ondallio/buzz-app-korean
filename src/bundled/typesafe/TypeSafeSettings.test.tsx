@@ -1,12 +1,24 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../../shared/i18n";
 import type { KeyState } from "./key";
 import { TypeSafeSettings } from "./TypeSafeSettings";
 
-afterEach(cleanup);
+beforeEach(() => setLanguage("en"));
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 
 /** The key as the form uses it, with a store that can fail. */
 function fake(desktop = true, keyState: KeyState = "missing") {
@@ -26,6 +38,127 @@ function fake(desktop = true, keyState: KeyState = "missing") {
     clear: vi.fn(async () => set("missing")),
   };
 }
+
+it("changes language without saving or changing the same password draft and selection", async () => {
+  const typesafe = fake();
+  render(<TypeSafeSettings typesafe={typesafe} active={() => true} />);
+  const input = screen.getByLabelText("TypeSafe API key") as HTMLInputElement;
+  fireEvent.change(input, { target: { value: "  fixture-{key}-한글  " } });
+  input.focus();
+  input.setSelectionRange(2, 7);
+  act(() => setLanguage("ko"));
+  expect(screen.getByLabelText("TypeSafe API 키")).toBe(input);
+  expect(input).toHaveAttribute("type", "password");
+  expect(input).toHaveValue("  fixture-{key}-한글  ");
+  expect(input).toHaveFocus();
+  expect(input.selectionStart).toBe(2);
+  expect(input.selectionEnd).toBe(7);
+  expect(screen.getByRole("button", { name: "키 저장" })).toBeEnabled();
+  expect(typesafe.save).not.toHaveBeenCalled();
+  expect(typesafe.clear).not.toHaveBeenCalled();
+  act(() => setLanguage("en"));
+  expect(screen.getByLabelText("TypeSafe API key")).toBe(input);
+  expect(input).toHaveFocus();
+  expect(input.selectionStart).toBe(2);
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Save key" }));
+  await waitFor(() => expect(input).toHaveValue(""));
+  expect(typesafe.save).toHaveBeenCalledExactlyOnceWith("fixture-{key}-한글");
+  expect(typesafe.clear).not.toHaveBeenCalled();
+});
+
+it.each([
+  ["checking", "저장된 키를 확인하고 있습니다…"],
+  ["saved", "TypeSafe 키가 저장되어 있습니다."],
+  ["missing", "TypeSafe를 사용하려면 TypeSafe API 키를 추가하세요."],
+  ["unreadable", "Buzz에서 저장된 키를 읽을 수 없습니다."],
+  ["refused", "TypeSafe에서 키를 거부했습니다."],
+] as const)(
+  "translates the finite %s state without changing or reading credential data",
+  (state, korean) => {
+    const typesafe = fake(true, state);
+    render(
+      <TypeSafeSettings
+        typesafe={typesafe}
+        active={() => true}
+        apple={false}
+      />,
+    );
+    const status = screen.getByRole("status");
+    const english = status.textContent;
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("status")).toBe(status);
+    expect(status).toHaveTextContent(korean);
+    expect(
+      screen.getByText(/다른 프로그램도 저장된 키를 읽을 수 있습니다/),
+    ).toBeInTheDocument();
+    act(() => setLanguage("en"));
+    expect(status.textContent).toBe(english);
+    expect(typesafe.snapshot()).toBe(state);
+    expect(typesafe.save).not.toHaveBeenCalled();
+    expect(typesafe.clear).not.toHaveBeenCalled();
+  },
+);
+
+it("keeps a deferred save busy and an opaque same-English failure raw across languages", async () => {
+  const typesafe = fake(true, "saved");
+  let reject: (error: Error) => void = () => {
+    throw new Error("Save did not start");
+  };
+  typesafe.save.mockImplementationOnce(
+    () =>
+      new Promise<void>((_resolve, fail) => {
+        reject = fail;
+      }),
+  );
+  render(<TypeSafeSettings typesafe={typesafe} active={() => true} />);
+  const input = screen.getByLabelText("TypeSafe API key");
+  fireEvent.change(input, { target: { value: "fixture-only" } });
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Replace key" }));
+  await waitFor(() => expect(typesafe.save).toHaveBeenCalledOnce());
+  try {
+    act(() => setLanguage("ko"));
+    expect(screen.getByLabelText("TypeSafe API 키")).toBe(input);
+    expect(input).toBeDisabled();
+    expect(input).toHaveValue("fixture-only");
+    expect(screen.getByRole("button", { name: "키 교체" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "키 제거" })).toBeDisabled();
+  } finally {
+    await act(async () =>
+      reject(
+        new Error(
+          "TypeSafe did not accept your key. Replace it to keep using TypeSafe.",
+        ),
+      ),
+    );
+  }
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent(
+    "TypeSafe did not accept your key. Replace it to keep using TypeSafe.",
+  );
+  expect(input).toBeEnabled();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("alert")).toBe(alert);
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("alert")).toBe(alert);
+  expect(alert).toHaveTextContent(
+    "TypeSafe did not accept your key. Replace it to keep using TypeSafe.",
+  );
+  expect(typesafe.save).toHaveBeenCalledExactlyOnceWith("fixture-only");
+  expect(typesafe.clear).not.toHaveBeenCalled();
+});
+
+it("localizes the desktop-only fallback without creating a password field", () => {
+  render(<TypeSafeSettings typesafe={fake(false)} active={() => true} />);
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "TypeSafe를 사용하려면 Buzz 데스크톱 앱을 여세요.",
+  );
+  expect(screen.queryByLabelText("TypeSafe API 키")).not.toBeInTheDocument();
+});
 
 it("asks for the TypeSafe key", () => {
   render(<TypeSafeSettings typesafe={fake()} active={() => true} />);

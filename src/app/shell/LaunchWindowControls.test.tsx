@@ -2,6 +2,7 @@
 import "@testing-library/jest-dom/vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../../shared/i18n";
 import { isTauri } from "@tauri-apps/api/core";
 import {
   LaunchWindowControls,
@@ -11,6 +12,8 @@ import {
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: vi.fn() }));
 afterEach(() => {
   cleanup();
+  setLanguage("en");
+  localStorage.clear();
   document.body.replaceChildren();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -98,4 +101,27 @@ it("applies the native policy on the very first launch render", () => {
     screen.getByRole("button", { name: "Close window" }),
   ).toBeInTheDocument();
   expect(root.querySelector("header")).toBeNull();
+});
+
+it("updates launch portal labels without replacing window controls or disturbing app isolation", () => {
+  setLanguage("en");
+  vi.mocked(isTauri).mockReturnValue(true);
+  vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+  document.body.innerHTML =
+    '<div id="buzz-launch"></div><div id="root" inert aria-hidden="true"></div>';
+  const root = document.getElementById("root");
+  if (!root) throw new Error("Missing test root");
+  render(<LaunchWindowControls />, { container: root });
+  const controls = screen.getByRole("group", { name: "Window controls" });
+  const close = screen.getByRole("button", { name: "Close window" });
+  close.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("group", { name: "창 제어" })).toBe(controls);
+  expect(screen.getByRole("button", { name: "창 닫기" })).toBe(close);
+  expect(close).toHaveFocus();
+  expect(root).toHaveAttribute("inert");
+  expect(root).toHaveAttribute("aria-hidden", "true");
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Close window" })).toBe(close);
+  expect(close).toHaveFocus();
 });

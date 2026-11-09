@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { useState } from "react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
+import { setLanguage } from "../../shared/i18n/language";
 import { WorkflowEditor } from "./WorkflowEditor";
 import { fixtureYaml } from "./fixtures";
 import { parse } from "yaml";
@@ -15,7 +16,10 @@ vi.stubGlobal(
     disconnect() {}
   },
 );
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 function Example({
   initial = fixtureYaml,
   onSave = () => {},
@@ -513,4 +517,213 @@ test("opening an existing workflow focuses its heading without running or saving
   await userEvent.setup().keyboard("{Enter}");
   expect(run).not.toHaveBeenCalled();
   expect(save).not.toHaveBeenCalled();
+});
+
+test("keeps the same raw name, draft and focused controls while a save is pending across locales", async () => {
+  const saved = vi.fn();
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const rawName = "Give this workflow a name.";
+  const initial = fixtureYaml.replace("Message helper", rawName);
+  function Host() {
+    const [yaml, setYaml] = useState(initial);
+    const [busy, setBusy] = useState(false);
+    return (
+      <WorkflowEditor
+        yaml={yaml}
+        initialYaml={initial}
+        onChange={setYaml}
+        busy={busy}
+        onSave={() => {
+          saved(yaml);
+          setBusy(true);
+          void gate.then(() => setBusy(false));
+        }}
+      />
+    );
+  }
+  render(<Host />);
+  const user = userEvent.setup();
+  const title = screen.getByText(rawName, { selector: "span" });
+  await waitFor(() => expect(title).toHaveFocus());
+  const dialog = screen.getByRole("dialog", { name: rawName });
+  const name = screen.getByRole("textbox", { name: "Workflow name" });
+  if (!(name instanceof HTMLInputElement))
+    throw new Error("Expected name input");
+  name.focus();
+  name.setSelectionRange(2, 7);
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("dialog", { name: rawName })).toBe(dialog);
+  expect(screen.getByRole("textbox", { name: "워크플로 이름" })).toBe(name);
+  expect(name).toHaveValue(rawName);
+  expect(name).toHaveFocus();
+  expect([name.selectionStart, name.selectionEnd]).toEqual([2, 7]);
+  const save = screen.getByRole("button", { name: "변경 사항 저장" });
+  try {
+    await user.click(save);
+    expect(saved).toHaveBeenCalledExactlyOnceWith(initial);
+    expect(screen.getByRole("button", { name: "저장 중…" })).toBe(save);
+    expect(save).toHaveAttribute("aria-disabled", "true");
+    expect(name).toBeDisabled();
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("button", { name: "Saving…" })).toBe(save);
+    expect(screen.getByRole("textbox", { name: "Workflow name" })).toBe(name);
+    expect(name).toHaveValue(rawName);
+    await user.click(save);
+    expect(saved).toHaveBeenCalledTimes(1);
+  } finally {
+    await act(async () => {
+      release();
+      await gate;
+    });
+  }
+  expect(screen.getByRole("button", { name: "Save changes" })).toBe(save);
+  expect(save).toBeEnabled();
+});
+
+test("retains the activation confirmation and saved YAML while its whole warning changes locale", async () => {
+  const save = vi.fn();
+  render(<Example onSave={save} />);
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole("switch", { name: "Enabled in configuration" }),
+  );
+  await user.click(screen.getByRole("button", { name: "Save changes" }));
+  const confirmation = screen.getByRole("alertdialog", {
+    name: "This workflow may run often",
+  });
+  const confirm = screen.getByRole("button", { name: "Save enabled workflow" });
+  confirm.focus();
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("alertdialog", {
+      name: "이 워크플로가 자주 실행될 수 있습니다",
+    }),
+  ).toBe(confirmation);
+  expect(screen.getByRole("button", { name: "활성화된 워크플로 저장" })).toBe(
+    confirm,
+  );
+  expect(confirm).toHaveFocus();
+  expect(save).not.toHaveBeenCalled();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Save enabled workflow" })).toBe(
+    confirm,
+  );
+  await user.click(confirm);
+  expect(save).toHaveBeenCalledExactlyOnceWith(
+    fixtureYaml.replace("enabled: false\n", ""),
+  );
+  expect(parse(save.mock.calls[0]?.[0]).enabled).not.toBe(false);
+  expect(parse(save.mock.calls[0]?.[0])).toMatchObject({
+    name: "Message helper",
+    steps: [
+      { id: "notify", action: "send_message", text: "Hello from a fixture" },
+    ],
+  });
+});
+
+test("keeps parser diagnostics and opaque blocked copy literal while translating the view-switch frame", async () => {
+  const initial = `${fixtureYaml}future: preserve-me\n`;
+  const blocked = "Review Recent activity before editing.";
+  const { yamlToFormState } = await import("./workflowFormTypes");
+  const parsed = yamlToFormState(initial);
+  if (parsed.ok) throw new Error("Expected real unsupported-field diagnostic");
+  render(
+    <WorkflowEditor
+      yaml={initial}
+      onChange={vi.fn()}
+      onSave={vi.fn()}
+      blocked={blocked}
+    />,
+  );
+  const user = userEvent.setup();
+  const yaml = screen.getByRole("textbox", { name: "Workflow YAML" });
+  await user.click(screen.getByRole("tab", { name: "Form" }));
+  const alert = screen.getByRole("alert");
+  expect(alert).toHaveTextContent(`Cannot switch editor view: ${parsed.error}`);
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("alert")).toBe(alert);
+  expect(alert).toHaveTextContent(
+    `편집기 보기를 전환할 수 없습니다: ${parsed.error}`,
+  );
+  expect(screen.getByText(blocked)).toBeVisible();
+  expect(screen.getByRole("textbox", { name: "워크플로 YAML" })).toBe(yaml);
+  expect(yaml).toHaveValue(initial);
+  act(() => setLanguage("en"));
+  expect(alert).toHaveTextContent(`Cannot switch editor view: ${parsed.error}`);
+});
+
+test("projects real URL and header draft issues at the parent boundary without translating raw values", async () => {
+  const rawBody = "Give every header a name or remove its row.";
+  const initial = `name: raw-request\nenabled: false\ntrigger:\n  on: webhook\nsteps:\n  - id: raw_request\n    action: call_webhook\n    url: https://example.org/{{ trigger.raw }}\n    body: '${rawBody}'\n`;
+  render(<Example initial={initial} />);
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole("button", { name: "Edit step 1: Call Webhook" }),
+  );
+  const url = screen.getByRole("textbox", { name: "Webhook URL" });
+  const body = screen.getByRole("textbox", { name: "Request body (optional)" });
+  await user.clear(url);
+  const originalError =
+    "Enter a webhook URL or template. The relay checks destination safety and permission.";
+  expect(url).toHaveAccessibleDescription(originalError);
+  const save = screen.getByRole("button", { name: "Save changes" });
+  expect(save).toBeDisabled();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("textbox", { name: "웹훅 URL" })).toBe(url);
+  expect(url).toHaveFocus();
+  expect(url).toHaveValue("");
+  expect(url).toHaveAccessibleDescription(
+    "웹훅 URL 또는 템플릿을 입력해 주세요. 릴레이가 대상의 안전성과 권한을 확인합니다.",
+  );
+  expect(screen.getByRole("textbox", { name: "요청 본문 (선택)" })).toBe(body);
+  expect(body).toHaveValue(rawBody);
+  await user.type(url, "https://example.org/{{ trigger.raw }}");
+  await user.click(screen.getByRole("button", { name: "헤더 추가" }));
+  const header = screen.getByRole("textbox", { name: "헤더 1 이름" });
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "각 헤더에 이름을 입력하거나 해당 행을 삭제해 주세요.",
+  );
+  expect(save).toBeDisabled();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("textbox", { name: "Header 1 name" })).toBe(header);
+  expect(screen.getByRole("alert")).toHaveTextContent(rawBody);
+  expect(body).toHaveValue(rawBody);
+  await user.type(header, "Header names must be unique.");
+  expect(header).toHaveValue("Header names must be unique.");
+  expect(save).toBeEnabled();
+});
+
+test("retains a blocked lossy view switch and its local message across language changes", async () => {
+  const initial = fixtureYaml.replace(
+    "on: message_posted",
+    `on: message_posted\n  filter: 'str_contains(trigger_text, "P1")'`,
+  );
+  render(<Example initial={initial} />);
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole("button", { name: "Edit trigger: Message posted" }),
+  );
+  const value = screen.getByRole("textbox", { name: "Value" });
+  await user.clear(value);
+  await user.click(screen.getByRole("tab", { name: "YAML" }));
+  const alert = screen.getByText(/^Cannot switch editor view:/);
+  expect(alert).toHaveTextContent(
+    "Correct the invalid condition or duplicate header before switching views.",
+  );
+  act(() => setLanguage("ko"));
+  expect(screen.getByText(/^편집기 보기를 전환할 수 없습니다:/)).toBe(alert);
+  expect(alert).toHaveTextContent(
+    "보기를 전환하기 전에 잘못된 조건이나 중복된 헤더를 수정해 주세요.",
+  );
+  expect(screen.getByRole("textbox", { name: "값" })).toBe(value);
+  expect(value).toHaveValue("");
+  expect(screen.queryByRole("textbox", { name: "워크플로 YAML" })).toBeNull();
+  act(() => setLanguage("en"));
+  expect(alert).toHaveTextContent(
+    "Correct the invalid condition or duplicate header before switching views.",
+  );
+  expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
 });

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { setLanguage } from "../../shared/i18n";
 import "@testing-library/jest-dom/vitest";
 import {
   act,
@@ -25,7 +26,11 @@ import { TypingIndicator } from "./TypingIndicator";
 
 import { stubAvatarBrowserApis } from "../agents/avatar-testing";
 stubAvatarBrowserApis();
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 import {
   agent,
   human,
@@ -1331,4 +1336,55 @@ it("updates the open chooser when only an agent's activity changes", async () =>
     ],
   });
   expect(within(dialog).getByText("Reading", { exact: true })).toBeVisible();
+});
+
+it("keeps actual activity controls and canonical snapshots while localizing live human/agent phrases", async () => {
+  setLanguage("en");
+  const f = fixture();
+  const open = vi.fn(() => true);
+  f.update([entry(), { pubkey: human, channelId: "channel" }]);
+  render(
+    <TypingIndicator
+      session={f.session}
+      channelId="channel"
+      openActivity={open}
+      canOpenActivity={() => true}
+    />,
+  );
+  const trigger = screen.getByRole("button", {
+    name: "Activity: Agent working",
+  });
+  const region = screen.getByRole("status", { name: "Conversation activity" });
+  expect(region).toHaveTextContent("Agent is working. Human is typing");
+  await userEvent.setup().hover(trigger);
+  const popup = await screen.findByRole("dialog", { name: "Working now" });
+  const activity = within(popup).getByRole("button", {
+    name: "View Agent activity",
+  });
+  activity.focus();
+  const snapshot = f.session.agentActivity.snapshot();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "활동: Agent 작업 중" })).toBe(
+    trigger,
+  );
+  expect(screen.getByRole("dialog", { name: "현재 작업 중" })).toBe(popup);
+  expect(screen.getByRole("status", { name: "대화 활동" })).toBe(region);
+  expect(region).toHaveTextContent("Agent 작업 중. Human 입력 중");
+  expect(within(popup).getByRole("button", { name: "Agent 활동 보기" })).toBe(
+    activity,
+  );
+  expect(activity).toHaveFocus();
+  expect(
+    within(popup).getByText("이 앱에는 입력 중 업데이트만 도착하고 있습니다."),
+  ).toBeVisible();
+  expect(f.session.agentActivity.snapshot()).toBe(snapshot);
+  expect(f.ensure).not.toHaveBeenCalled();
+  act(() => setLanguage("en"));
+  expect(
+    within(popup).getByRole("button", { name: "View Agent activity" }),
+  ).toBe(activity);
+  fireEvent.click(activity);
+  expect(open).toHaveBeenCalledWith(profileActivityViewTarget(agent), {
+    rootId: root,
+  });
 });

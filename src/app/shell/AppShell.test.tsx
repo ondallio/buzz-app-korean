@@ -60,6 +60,7 @@ afterEach(async () => {
   services = undefined;
   vi.unstubAllGlobals();
   localStorage.clear();
+  setLanguage("en");
 });
 
 it("hides and shows the channel sidebar without re-rendering its content", async () => {
@@ -993,3 +994,104 @@ it.each(["sidebar", "topbar"] as const)(
     }
   },
 );
+
+import { setLanguage } from "../../shared/i18n";
+it("projects frozen page metadata live while preserving dock selection, sidebar draft and registration lifetime", async () => {
+  setLanguage("en");
+  const current = createServices();
+  services = current;
+  const register = vi.spyOn(current.pages, "register");
+  const shortcutRegister = vi.spyOn(current.shortcuts, "registerHost");
+  const onSelect = vi.fn();
+  const mounted = vi.fn();
+  const unmounted = vi.fn();
+  function Draft() {
+    useEffect(() => {
+      mounted();
+      return unmounted;
+    }, []);
+    return <input aria-label="Unchanged draft" />;
+  }
+  const sidebar = (children: ReactNode) => (
+    <aside aria-label="Fixture sidebar">
+      {children}
+      <Draft />
+    </aside>
+  );
+  const pages = Object.freeze(
+    [
+      {
+        id: "channels",
+        pluginId: "buzz.channels",
+        title: "Channels",
+        placement: "dock" as const,
+      },
+      {
+        id: "inbox",
+        pluginId: "buzz.inbox",
+        title: "Activity",
+        placement: "dock" as const,
+      },
+      {
+        id: "other",
+        pluginId: "example",
+        title: "Activity",
+        placement: "sidebar" as const,
+      },
+    ].map((page) =>
+      Object.freeze({
+        ...page,
+        key: `${page.pluginId}/${page.id}`,
+        revision: "one",
+        primary: true,
+        component: () => null,
+      }),
+    ),
+  );
+  render(
+    <ToastProvider>
+      <AppShell
+        pages={pages}
+        selected="buzz.channels/channels"
+        navigationAttempt="stable"
+        onSelect={onSelect}
+        tone="default"
+        sidebar={sidebar}
+        communities={current.communities}
+        accountActions={current.accountActions}
+        appearance={testAppearance}
+        searchServices={current}
+      >
+        content
+      </AppShell>
+    </ToastProvider>,
+  );
+  const draft = screen.getByRole("textbox", { name: "Unchanged draft" });
+  await userEvent.setup().type(draft, "사용자 draft");
+  const dock = screen.getByRole("navigation", { name: "Apps dock" });
+  const messages = within(dock).getByRole("tab", { name: "Messages" });
+  const toggler = screen.getByRole("button", { name: "Hide sidebar" });
+  const registered = shortcutRegister.mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("navigation", { name: "앱 독" })).toBe(dock);
+  expect(within(dock).getByRole("tab", { name: "메시지" })).toBe(messages);
+  expect(messages).toHaveAttribute("aria-selected", "true");
+  expect(within(dock).getByRole("tab", { name: "활동" })).toBeVisible();
+  expect(screen.getByRole("navigation", { name: "페이지" })).toContainElement(
+    screen.getByRole("button", { name: "Activity" }),
+  );
+  expect(screen.getByRole("button", { name: "사이드바 숨기기" })).toBe(toggler);
+  expect(screen.getByRole("textbox", { name: "Unchanged draft" })).toBe(draft);
+  expect(draft).toHaveValue("사용자 draft");
+  expect(draft).toHaveFocus();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("navigation", { name: "Apps dock" })).toBe(dock);
+  expect(within(dock).getByRole("tab", { name: "Messages" })).toBe(messages);
+  expect(draft).toHaveFocus();
+  expect(mounted).toHaveBeenCalledTimes(1);
+  expect(unmounted).not.toHaveBeenCalled();
+  expect(register).not.toHaveBeenCalled();
+  expect(shortcutRegister).toHaveBeenCalledTimes(registered);
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(pages[0]?.title).toBe("Channels");
+});

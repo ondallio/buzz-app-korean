@@ -1,3 +1,4 @@
+import { t, translate, useLanguage } from "../../shared/i18n";
 import { ActivityNavigationProvider } from "./ActivityNavigation";
 import { PageNavigation } from "./PageNavigation";
 import { navigationOwner, orderPages, pagePlacement } from "./presentation";
@@ -122,6 +123,7 @@ function AppShellContent({
   creationInSidebar?: boolean;
   children: ReactNode;
 }) {
+  const language = useLanguage();
   const header = useRef<HTMLElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -226,10 +228,12 @@ function AppShellContent({
     [searchServices, creationAction, creationContainer, hasNavigation],
   );
   const toggleLabel = narrow
-    ? navigationOpen
-      ? "Hide navigation"
-      : "Show navigation"
-    : `${sidebarOpen ? "Hide" : "Show"} sidebar`;
+    ? t(
+        navigationOpen
+          ? "navigation.hideNavigation"
+          : "navigation.showNavigation",
+      )
+    : t(sidebarOpen ? "navigation.hideSidebar" : "navigation.showSidebar");
   // biome-ignore lint/correctness/useExhaustiveDependencies: Only a navigation attempt closes the drawer.
   useEffect(() => {
     if (navigationOpen && navigationToggle.current?.getClientRects().length) {
@@ -247,7 +251,10 @@ function AppShellContent({
     // Sidebars retain their documented app-link and creation slots.
     const content = sidebar
       ? sidebar(
-          <nav aria-label="Pages" className="shell-pages">
+          <nav
+            aria-label={translate(language, "navigation.pages")}
+            className="shell-pages"
+          >
             <PageNavigation
               pages={orderPages(
                 pages.filter((page) => pagePlacement(page) === "sidebar"),
@@ -267,7 +274,15 @@ function AppShellContent({
     ) : (
       content
     );
-  }, [pages, selected, sidebar, sidebarScope, onSelect, creationInNavigation]);
+  }, [
+    pages,
+    selected,
+    sidebar,
+    sidebarScope,
+    onSelect,
+    creationInNavigation,
+    language,
+  ]);
   const dockPages = orderPages(
     pages.filter((page) => page.primary && pagePlacement(page) !== "sidebar"),
     "dock",
@@ -351,7 +366,7 @@ function AppShellContent({
       </header>
 
       <div className="shell-workspace">
-        <nav className="shell-side-dock" aria-label="Apps dock">
+        <nav className="shell-side-dock" aria-label={t("navigation.dock")}>
           <div className="shell-dock-pages">
             <PageNavigation
               pages={dockPages}

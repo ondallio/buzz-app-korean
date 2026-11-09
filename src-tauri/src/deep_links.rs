@@ -3,6 +3,7 @@
 //! every authorization decision stays in TypeScript: a valid address is not
 //! authorization, and the navigation target parser remains the single gate.
 use serde::Serialize;
+use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use tauri::{ipc::Channel, Manager};
@@ -36,14 +37,18 @@ fn scheme(raw: &str) -> Option<&str> {
 impl DeepLinks {
     /// Hold one OS-delivered URL for the webview.
     fn push(&self, raw: &str) -> Result<(), String> {
-        if scheme(raw) != Some(SCHEME) {
-            return Err("Not a buzz deep-link scheme".to_owned());
-        }
+        let raw = match scheme(raw) {
+            Some(SCHEME) => Cow::Borrowed(raw),
+            Some(alias) if Some(alias) == buzz_credential_store::distribution::INGRESS_SCHEME => {
+                Cow::Owned(format!("{SCHEME}{}", &raw[alias.len()..]))
+            }
+            _ => return Err("Not a buzz deep-link scheme".to_owned()),
+        };
         let mut queue = self.0.lock().map_err(|_| "Deep link state unavailable")?;
         if queue.urls.len() >= MAX_PENDING {
             queue.urls.pop_front();
         }
-        queue.urls.push_back(raw.to_owned());
+        queue.urls.push_back(raw.into_owned());
         let pending = Pending {
             pending: queue.urls.len(),
         };
@@ -113,19 +118,24 @@ pub(crate) fn setup<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
         Ok(None) => {}
         Err(error) => eprintln!("Could not read the launch deep link: {error}"),
     }
-    // Every packaged/debug launch makes this binary the scheme handler, over any
-    // other app declaring it. Development runs leave any installed handler alone.
-    if tauri::is_dev() {
-        return;
-    }
-    #[cfg(any(windows, target_os = "linux"))]
-    if let Err(error) = app.deep_link().register_all() {
-        eprintln!("Could not register {SCHEME}:// for this binary: {error}");
-    }
-    // Launch Services otherwise picks among every bundle declaring the scheme.
-    #[cfg(target_os = "macos")]
-    if let Err(status) = claim_macos_default(&app.config().identifier) {
-        eprintln!("Could not make this app the {SCHEME}:// handler: OSStatus {status}");
+    // Official packaged/debug launches claim the canonical handler. Development
+    // and independent distributors leave the existing OS preference alone.
+    register_default_handler(tauri::is_dev(), || {
+        #[cfg(any(windows, target_os = "linux"))]
+        if let Err(error) = app.deep_link().register_all() {
+            eprintln!("Could not register {SCHEME}:// for this binary: {error}");
+        }
+        // Launch Services otherwise picks among every bundle declaring the scheme.
+        #[cfg(target_os = "macos")]
+        if let Err(status) = claim_macos_default(&app.config().identifier) {
+            eprintln!("Could not make this app the {SCHEME}:// handler: OSStatus {status}");
+        }
+    });
+}
+
+fn register_default_handler(development: bool, register: impl FnOnce()) {
+    if !development && !buzz_credential_store::distribution::ISOLATED {
+        register();
     }
 }
 
@@ -173,6 +183,52 @@ pub(crate) fn deep_link_watch<R: tauri::Runtime>(
 mod tests {
     use super::*;
     use tauri::ipc::InvokeResponseBody;
+
+    #[test]
+    fn distribution_registration_never_claims_another_apps_handler() {
+        let calls = std::cell::Cell::new(0);
+        register_default_handler(true, || calls.set(calls.get() + 1));
+        assert_eq!(calls.get(), 0);
+        register_default_handler(false, || calls.set(calls.get() + 1));
+        assert_eq!(
+            calls.get(),
+            usize::from(option_env!("BUZZ_DISTRIBUTION_ID").is_none())
+        );
+    }
+
+    #[test]
+    fn distribution_alias_normalizes_only_its_scheme_and_preserves_duplicate_payloads() {
+        let id = option_env!("BUZZ_DISTRIBUTION_ID").unwrap_or("org.example.buzz-beta");
+        let alias = format!("buzz-{id}");
+        let links = DeepLinks::default();
+        for suffix in [
+            "://message?channel=user%2Fvalue&id=abc&thread=%2523#fragment%20한글",
+            "://join?relay=wss%3A%2F%2Frelay.example%2Fa&code=a%2Bb%3Dc&policy_receipt=%252F#raw",
+        ] {
+            let raw = format!("{alias}{suffix}");
+            if option_env!("BUZZ_DISTRIBUTION_ID").is_some() {
+                links.push(&raw).unwrap();
+                links.push(&raw).unwrap();
+                assert_eq!(
+                    links.drain().unwrap(),
+                    vec![format!("buzz{suffix}"), format!("buzz{suffix}")]
+                );
+            } else {
+                assert!(links.push(&raw).is_err());
+            }
+        }
+        for raw in [
+            format!("other-{alias}://channel/general"),
+            format!("{alias}x://channel/general"),
+            format!("https://example.org/?next={alias}://channel/general"),
+            format!("%62uzz-{id}://channel/general"),
+            format!("BUZZ-{id}://channel/general"),
+            format!(" {alias}://channel/general"),
+        ] {
+            assert!(links.push(&raw).is_err(), "{raw}");
+        }
+        assert!(links.drain().unwrap().is_empty());
+    }
 
     fn channel_url(id: impl std::fmt::Display) -> String {
         format!("buzz://channel/{id}")

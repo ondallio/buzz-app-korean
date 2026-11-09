@@ -1,20 +1,21 @@
+import { t, useLanguage } from "../shared/i18n";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ChannelMessage } from "../features/relay/contracts";
 import type { PluginManager } from "../plugins/manager";
 import type { PluginRequest } from "../plugins/requests";
 import { Button } from "../shared/design-system/ui/Button";
-import { REQUEST_VERB, RequestReview } from "./AgentPluginRequests";
+import { requestTitle, RequestReview } from "./AgentPluginRequests";
 import styles from "./PluginRequestCard.module.css";
 
 type Authorize = NonNullable<
   Parameters<typeof RequestReview>[0]["authorizeGit"]
 >;
-const DONE: Record<PluginRequest["action"], string> = {
-  install: "Installed",
-  update: "Updated",
-  enable: "Enabled",
-  remove: "Deleted",
-};
+const DONE = {
+  install: "pluginRequests.installed",
+  update: "pluginRequests.updated",
+  enable: "pluginRequests.enabled",
+  remove: "pluginRequests.deleted",
+} as const;
 
 /** An agent's plugin request, in the conversation it asked from. The owner
  * reviews it here when this device holds the request; elsewhere, or after the
@@ -30,6 +31,7 @@ export function PluginRequestCard({
   authorizeGit?: Authorize | undefined;
   holdReview?: (() => () => void) | undefined;
 }) {
+  useLanguage();
   const { requests } = plugins;
   const id = message.pluginRequest?.id ?? "";
   const waiting = useSyncExternalStore(requests.subscribe, () =>
@@ -65,11 +67,11 @@ export function PluginRequestCard({
   );
   if (!request)
     return (
-      <section aria-label="Plugin request" className={styles.card}>
+      <section aria-label={t("pluginRequests.request")} className={styles.card}>
         <div className={styles.details}>
           <span className={styles.reason}>{message.content}</span>
           <span className="text-secondary">
-            No longer available on this device.
+            {t("pluginRequests.noLongerAvailable")}
           </span>
         </div>
       </section>
@@ -77,13 +79,17 @@ export function PluginRequestCard({
   const name = request.pluginName;
   return (
     <>
-      <section aria-label={`Plugin request: ${name}`} className={styles.card}>
+      <section
+        aria-label={t("pluginRequests.requestNamed", { name })}
+        className={styles.card}
+      >
         <div className={styles.details}>
-          <strong>
-            {REQUEST_VERB[request.action]} {name}
-          </strong>
+          <strong>{requestTitle(request)}</strong>
           <span className={`${styles.reason} text-secondary`}>
-            {request.requester.name}: {request.reason}
+            {t("pluginRequests.requestReason", {
+              requester: request.requester.name,
+              reason: request.reason,
+            })}
           </span>
         </div>
         <div className={styles.actions}>
@@ -92,25 +98,25 @@ export function PluginRequestCard({
               <Button
                 size="sm"
                 variant="subtle"
-                aria-label={`Decline ${name}`}
+                aria-label={t("pluginRequests.declineNamed", { name })}
                 onClick={() => {
                   declining.current = true;
                   requests.settle(waiting.id, "declined");
                 }}
               >
-                Decline
+                {t("pluginRequests.decline")}
               </Button>
               <Button
                 size="sm"
                 variant="prominent"
                 disabled={busy || configuration.status !== "ready"}
-                aria-label={`Review ${name}`}
+                aria-label={t("pluginRequests.reviewNamed", { name })}
                 onClick={(event) => {
                   trigger.current = event.currentTarget;
                   setReviewing(waiting);
                 }}
               >
-                Review
+                {t("pluginRequests.review")}
               </Button>
             </>
           ) : (
@@ -121,8 +127,8 @@ export function PluginRequestCard({
               className="text-secondary"
             >
               {decided?.state === "approved"
-                ? DONE[request.action]
-                : "Declined"}
+                ? t(DONE[request.action])
+                : t("pluginRequests.declined")}
             </span>
           )}
         </div>

@@ -1,15 +1,15 @@
-import { useState } from "react";
+import { t, useLanguage, formattingLocale } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
+import { Children, useState } from "react";
 import type { InboxReaction } from "../../features/relay/inbox-reactions";
 import { groupReactions } from "../../features/relay/fold";
 import { useReactionName } from "../../features/messages/use-reaction-name";
-import { relativeTimestamp } from "../../shared/relative-timestamp";
 import type { ComponentProps, ReactNode } from "react";
 import { channelText } from "../../features/channels/channel-icon";
 import type { ChannelSummary, Profile } from "../../features/relay/contracts";
 import type { InboxItem } from "../../features/relay/inbox";
 import type { InboxFeedSnapshot } from "../../features/relay/inbox-feed";
 import type { RelaySession } from "../../features/relay/session";
-import { workflowLabel } from "../../features/relay/workflow-attribution";
 import { messagePreview } from "../../features/notifications/content";
 import { avatarMedia } from "../../shared/avatar-source";
 import { LightningIcon } from "../../shared/design-system/icons";
@@ -20,6 +20,53 @@ import { dmLabel } from "./dm-label";
 import styles from "./Inbox.module.css";
 import rowStyles from "../../features/messages/MessageListRow.module.css";
 import { MessageListRow } from "../../features/messages/MessageListRow";
+
+/** Display-only Activity time; canonical shared timestamp output stays unchanged. */
+export function inboxTimestamp(
+  unixSeconds: number,
+  nowSeconds = Date.now() / 1000,
+) {
+  const age = Math.max(0, nowSeconds - unixSeconds);
+  if (age < 60) return t("inbox.justNow");
+  if (age < 3600) {
+    const count = Math.floor(age / 60);
+    return t(count === 1 ? "inbox.minuteOne" : "inbox.minuteMany", { count });
+  }
+  if (age < 86400) {
+    const count = Math.floor(age / 3600);
+    return t(count === 1 ? "inbox.hourOne" : "inbox.hourMany", { count });
+  }
+  if (age < 604800) {
+    const count = Math.floor(age / 86400);
+    return t(count === 1 ? "inbox.dayOne" : "inbox.dayMany", { count });
+  }
+  return t("inbox.onDate", {
+    date: new Date(unixSeconds * 1000).toLocaleDateString(formattingLocale(), {
+      month: "short",
+      day: "numeric",
+    }),
+  });
+}
+
+// Both catalogs put sender first. Keep its shrinkable strong and the remaining
+// whole-template text/glyphs in the original nonshrinking tail. The colocated
+// test binds this slot/position contract to the production templates.
+function reactionHeading(
+  sender: Exclude<ReactNode, undefined>,
+  reactions: Exclude<ReactNode, undefined>,
+) {
+  const [heading, ...tail] = Children.toArray(
+    rich("inbox.reactionCaption", { sender, reactions }),
+  ).filter((part) => part !== "");
+  return (
+    <>
+      {heading}
+      <span className={`text-body-sm text-standard ${styles.reactionTail}`}>
+        {tail}
+      </span>
+    </>
+  );
+}
 
 type ResolveName = (
   key: string,
@@ -38,8 +85,8 @@ export const incompletePreview = (
 ) =>
   ids.some((id) => id !== undefined && feed.incomplete.includes(id))
     ? feed.status === "error"
-      ? "Preview unavailable. Retry activity."
-      : "Preview updating…"
+      ? t("inbox.previewUnavailable")
+      : t("inbox.previewUpdating")
     : undefined;
 
 /** Who sent a row and where, as the Inbox page and its sidebar preview name it. */
@@ -53,16 +100,28 @@ export function rowIdentity(
   const profile = profiles.get(displayId);
   const resolved = name(
     displayId,
-    profile?.name ?? formatPublicKey(displayId) ?? "Unknown sender",
+    profile?.name ?? formatPublicKey(displayId) ?? t("inbox.unknownSender"),
     channel?.members,
   );
-  const sender = item.workflowOwnerId ? workflowLabel(resolved) : resolved;
+  const sender = item.workflowOwnerId
+    ? t("inbox.workflowCaption", { name: resolved })
+    : resolved;
   const context =
     channel?.channelType === "dm"
-      ? `DM · ${dmLabel(channel.participants, profiles, name, channel.name ?? "Direct message")}`
+      ? t("inbox.dmContext", {
+          name:
+            channel.participants?.length === 0
+              ? t("inbox.notesSelf")
+              : dmLabel(
+                  channel.participants,
+                  profiles,
+                  name,
+                  channel.name ?? t("inbox.directMessage"),
+                ),
+        })
       : channel
         ? channelText(channel)
-        : "Conversation";
+        : t("inbox.conversation");
   return { sender, context, profile };
 }
 
@@ -97,11 +156,12 @@ export function InboxRowButton({
   ComponentProps<typeof NavigationItem>,
   "icon" | "label" | "trailing" | "aria-label"
 >) {
+  useLanguage();
   const unread = hasUnread(item);
   return (
     <MessageListRow
       {...props}
-      aria-label={`Open ${sender} in ${context}`}
+      aria-label={t("inbox.openRow", { sender, context })}
       aria-describedby={previewId}
       avatar={
         <Avatar
@@ -145,7 +205,7 @@ export function ReactionRowButton({
   profiles,
   name,
   channel,
-  time = relativeTimestamp(item.createdAt),
+  time = inboxTimestamp(item.createdAt),
   ...props
 }: {
   item: InboxReaction;
@@ -155,6 +215,7 @@ export function ReactionRowButton({
   name: ResolveName;
   channel: ChannelSummary | undefined;
 } & Pick<ComponentProps<typeof NavigationItem>, "selected" | "onClick">) {
+  useLanguage();
   const reactionName = useReactionName();
   const authors = [...new Set(item.events.map((event) => event.pubkey))];
   const names = authors
@@ -162,23 +223,45 @@ export function ReactionRowButton({
     .map((id) =>
       name(
         id,
-        profiles.get(id)?.name ?? formatPublicKey(id) ?? "Someone",
+        profiles.get(id)?.name ?? formatPublicKey(id) ?? t("inbox.someone"),
         channel?.members,
       ),
     );
   const sender =
     authors.length > 3
-      ? `${names.join(", ")} and ${authors.length - 2} others`
+      ? t("inbox.senderMore", {
+          names: names.join(", "),
+          count: authors.length - 2,
+        })
       : authors.length === 3
-        ? `${names[0]}, ${names[1]} and ${names[2]}`
-        : names.join(" and ");
+        ? t("inbox.senderThree", {
+            first: names[0] ?? "",
+            second: names[1] ?? "",
+            third: names[2] ?? "",
+          })
+        : names.length === 2
+          ? t("inbox.senderTwo", {
+              first: names[0] ?? "",
+              second: names[1] ?? "",
+            })
+          : names.join(" and ");
   const profile = profiles.get(authors[0] ?? "");
   const context =
     channel?.channelType === "dm"
-      ? `DM with ${dmLabel(channel.participants, profiles, name, channel.name ?? "Direct message")}`
+      ? t("inbox.dmWith", {
+          name:
+            channel.participants?.length === 0
+              ? t("inbox.notesSelf")
+              : dmLabel(
+                  channel.participants,
+                  profiles,
+                  name,
+                  channel.name ?? t("inbox.directMessage"),
+                ),
+        })
       : channel
         ? channelText(channel)
-        : "Conversation";
+        : t("inbox.conversation");
   const reactions = groupReactions(item.events);
   const preview = messagePreview(item.message.content);
   const emojiNames = reactions
@@ -193,7 +276,11 @@ export function ReactionRowButton({
   return (
     <NavigationItem
       {...props}
-      aria-label={`${sender} reacted with ${emojiNames} to your message: ${preview}`}
+      aria-label={t("inbox.reactedAria", {
+        sender,
+        reactions: emojiNames,
+        preview,
+      })}
       icon={
         <Avatar
           size="default"
@@ -209,16 +296,13 @@ export function ReactionRowButton({
           <span className={rowStyles.heading}>
             <span className={rowStyles.identity}>
               <span className={styles.reactionHeading}>
-                <strong
-                  className={`text-label-sm text-standard ${rowStyles.sender}`}
-                >
-                  {sender}
-                </strong>
-                <span
-                  className={`text-body-sm text-standard ${styles.reactionTail}`}
-                >
-                  {"\u00a0reacted "}
-                  {reactions.map((reaction) => (
+                {reactionHeading(
+                  <strong
+                    className={`text-label-sm text-standard ${rowStyles.sender}`}
+                  >
+                    {sender}
+                  </strong>,
+                  reactions.map((reaction) => (
                     <ActivityReactionGlyph
                       key={JSON.stringify([
                         reaction.content,
@@ -227,8 +311,8 @@ export function ReactionRowButton({
                       reaction={reaction}
                       session={session}
                     />
-                  ))}
-                </span>
+                  )),
+                )}
               </span>
             </span>
             <time
@@ -243,7 +327,7 @@ export function ReactionRowButton({
             {preview}
           </span>
           <span className={`text-caption ${rowStyles.source}`}>
-            in {context}
+            {t("inbox.inContext", { context })}
           </span>
         </span>
       }

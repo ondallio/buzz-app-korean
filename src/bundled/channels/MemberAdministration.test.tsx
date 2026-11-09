@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { setLanguage } from "../../shared/i18n";
 import { createHash } from "node:crypto";
 import { schnorr } from "@noble/curves/secp256k1.js";
 import { bytesToHex } from "nostr-tools/utils";
@@ -41,6 +42,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  setLanguage("en");
+  localStorage.clear();
   vi.restoreAllMocks();
   Reflect.deleteProperty(HTMLElement.prototype, "showPopover");
   Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
@@ -2119,3 +2122,46 @@ it.each(["owner", "admin"])(
     expect(t.publish).toHaveBeenCalledOnce();
   },
 );
+
+it("keeps the same member menu, raw role and explicit write through EN to KO to EN", async () => {
+  const h = await setup("owner", "member");
+  const action = screen.getByRole("button", { name: "Actions for Morgan" });
+  await h.user.click(action);
+  const menu = await screen.findByRole("menu", { name: "Actions for Morgan" });
+  const selected = screen.getByRole("menuitemradio", { name: "Participating" });
+  selected.focus();
+  const queries = h.query.mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "Morgan 작업" })).toBe(action);
+  expect(screen.getByRole("menu", { name: "Morgan 작업" })).toBe(menu);
+  expect(screen.getByRole("menuitemradio", { name: "참여" })).toBe(selected);
+  expect(selected).toHaveFocus();
+  expect(selected).toHaveAttribute("aria-checked", "true");
+  expect(h.query).toHaveBeenCalledTimes(queries);
+  expect(h.publish).not.toHaveBeenCalled();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("menuitemradio", { name: "Participating" })).toBe(
+    selected,
+  );
+  expect(selected).toHaveFocus();
+  await h.user.click(
+    screen.getByRole("menuitemradio", { name: "Viewing only" }),
+  );
+  const confirmation = screen.getByRole("dialog", {
+    name: "Change access to Viewing only?",
+  });
+  expect(h.publish).not.toHaveBeenCalled();
+  await h.user.click(
+    within(confirmation).getByRole("button", { name: "Set to viewing only" }),
+  );
+  await vi.waitFor(() => expect(h.publish).toHaveBeenCalledOnce());
+  expect(h.publish.mock.calls[0]?.[0]).toMatchObject({
+    kind: 9000,
+    content: "",
+    tags: expect.arrayContaining([
+      ["h", id],
+      ["p", h.target.pubkey],
+      ["role", "guest"],
+    ]),
+  });
+});

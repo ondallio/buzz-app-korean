@@ -40,7 +40,7 @@ pub(crate) const AGENTS: &str = "agents";
 pub(crate) const OLD_AGENTS: &str = "agent-controller";
 /// One lock per running agent, held by its supervisor until the agent has
 /// stopped, even after Buzz exits. Shared by every Buzz, under the user data folder.
-pub(crate) const AGENT_OWNERSHIP: &str = "dev.local.buzz.agent-ownership";
+pub(crate) const AGENT_OWNERSHIP: &str = buzz_credential_store::distribution::AGENT_OWNERSHIP;
 /// What kept agents need to be identified and start again, by app data folder:
 /// the Agents list, and the earlier system's list and defaults to port from.
 /// Their keys live in the keychain. Anything else in these folders (hosting
@@ -63,7 +63,7 @@ type Kept = &'static [(&'static str, &'static [&'static str])];
 /// Named for the storage every Buzz shares whatever its identifier: the default
 /// plugin folder and the fixed agent key service. It keeps the legacy identifier
 /// so builds from before 1.0 and later ones exclude each other.
-const LOCK: &str = ".dev.local.buzz.foundation.instance.lock";
+const LOCK: &str = buzz_credential_store::distribution::INSTANCE_LOCK;
 /// How long a launch waits for an exiting or signing-out instance to let go.
 const WAIT: Duration = if cfg!(test) {
     Duration::from_secs(1)
@@ -119,6 +119,9 @@ fn key_lock_name(service: &str) -> String {
 }
 impl Paths {
     pub(crate) fn resolve(identifier: &str) -> Option<Self> {
+        if !buzz_credential_store::distribution::owns_identifier(identifier) {
+            return None;
+        }
         let data = dirs::data_dir()?;
         let app_data = data.join(identifier);
         let mut others = vec![

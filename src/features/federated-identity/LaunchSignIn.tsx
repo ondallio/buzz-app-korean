@@ -1,3 +1,4 @@
+import { t, useLanguage, formattingLocale } from "../../shared/i18n";
 import {
   useCallback,
   useEffect,
@@ -17,7 +18,7 @@ import {
 } from "../../app/launch";
 import { OnboardingScreen } from "../identity/OnboardingScreen";
 import styles from "../identity/IdentitySetup.module.css";
-import { recoveryMessage } from "./CommunitySignIn";
+import { recoveryDisplayMessage } from "./CommunitySignIn";
 import type { FederatedIdentity, SessionSnapshot } from "./service";
 
 /** Failures that mean this desktop has no native session owner at all. */
@@ -44,6 +45,7 @@ export function LaunchSignIn({
   identity: FederatedIdentity;
   children: ReactNode;
 }) {
+  useLanguage();
   const state = useSyncExternalStore(
     identity.subscribe,
     identity.snapshot,
@@ -167,6 +169,7 @@ export function LaunchSignIn({
  * LaunchSignIn takes over the window when it ends.
  */
 export function SignInEnding({ identity }: { identity: FederatedIdentity }) {
+  useLanguage();
   const state = useSyncExternalStore(
     identity.subscribe,
     identity.snapshot,
@@ -185,8 +188,8 @@ export function SignInEnding({ identity }: { identity: FederatedIdentity }) {
     !state.expiresAt
   )
     return null;
-  const name = state.authority.organization ?? "organization";
-  const ends = new Date(state.expiresAt).toLocaleString(undefined, {
+  const organization = state.authority.organization;
+  const ends = new Date(state.expiresAt).toLocaleString(formattingLocale(), {
     weekday: "short",
     hour: "numeric",
     minute: "2-digit",
@@ -194,18 +197,22 @@ export function SignInEnding({ identity }: { identity: FederatedIdentity }) {
   return (
     <ToastNotice
       tone="warning"
-      title={`Your ${name} sign-in ends ${ends}`}
+      title={
+        organization != null
+          ? t("accessDialogs.endingNamed", { organization, time: ends })
+          : t("accessDialogs.endingOrganization", { time: ends })
+      }
       description={
         renewing
-          ? "Finish signing in in your browser."
+          ? t("accessDialogs.finishBrowser")
           : failure
-            ? recoveryMessage(failure)
-            : "Sign in again to keep Buzz open."
+            ? recoveryDisplayMessage(failure)
+            : t("accessDialogs.keepOpen")
       }
     >
       {renewing ? (
         <Button size="sm" onClick={() => void identity.cancelSignIn()}>
-          Cancel
+          {t("accessDialogs.cancel")}
         </Button>
       ) : (
         <Button
@@ -226,7 +233,7 @@ export function SignInEnding({ identity }: { identity: FederatedIdentity }) {
               .finally(() => setRenewing(false));
           }}
         >
-          Sign in again
+          {t("accessDialogs.signInAgain")}
         </Button>
       )}
     </ToastNotice>
@@ -278,16 +285,13 @@ function SignInScreen({
   starting: boolean;
   dismiss(): void;
 }) {
+  useLanguage();
   const [failure, setFailure] = useState("");
   // At launch the window is inert under the launch mark, where autofocus
   // can't land; focus the primary action once the mark leaves.
   const primary = useRef<HTMLButtonElement>(null);
   useEffect(() => subscribeLaunch(() => primary.current?.focus()), []);
   const organization = state.authority?.organization ?? null;
-  const name = organization ?? "your organization";
-  const communities = organization
-    ? `${organization}’s communities`
-    : "your organization’s communities";
   const signingIn = starting || state.status === "signing-in";
   const checking = !signingIn && state.status === "restoring";
   const unreachable = state.status === "unavailable";
@@ -310,25 +314,37 @@ function SignInScreen({
   }
   const title =
     signingIn || checking
-      ? `Signing you in to ${name}`
+      ? organization != null
+        ? t("accessDialogs.signingNamed", { organization })
+        : t("accessDialogs.signingOrganization")
       : stored
-        ? "Couldn’t open your saved sign-in"
+        ? t("accessDialogs.savedSignInFailed")
         : unreachable
-          ? `Couldn’t reach ${name} sign-in`
+          ? organization != null
+            ? t("accessDialogs.unreachableNamed", { organization })
+            : t("accessDialogs.unreachableOrganization")
           : ended
-            ? `Sign in to ${name} again`
-            : `Sign in to ${name}`;
+            ? organization != null
+              ? t("accessDialogs.againNamed", { organization })
+              : t("accessDialogs.againOrganization")
+            : organization != null
+              ? t("accessDialogs.signInNamed", { organization })
+              : t("accessDialogs.signInOrganization");
   const description = checking
-    ? "Checking your sign-in…"
+    ? t("accessDialogs.checking")
     : signingIn
-      ? "Finish signing in in your browser. Buzz opens as soon as you’re done."
+      ? t("accessDialogs.finishOpen")
       : stored
-        ? recoveryMessage(state.failure ?? "")
+        ? recoveryDisplayMessage(state.failure ?? "")
         : unreachable
-          ? "Check your connection, then try again."
+          ? t("accessDialogs.checkConnection")
           : ended
-            ? `Your sign-in has ended. Sign in again to keep using ${communities}.`
-            : `Buzz uses your ${organization ? `${organization} ` : ""}account to open ${communities}.`;
+            ? organization
+              ? t("accessDialogs.endedNamed", { organization })
+              : t("accessDialogs.endedOrganization")
+            : organization
+              ? t("accessDialogs.accountNamed", { organization })
+              : t("accessDialogs.accountOrganization");
   return (
     <OnboardingScreen
       labelledBy="launch-sign-in-title"
@@ -343,13 +359,13 @@ function SignInScreen({
     >
       {problem && (
         <p role="alert" className="text-body-sm text-danger">
-          {recoveryMessage(problem)}
+          {recoveryDisplayMessage(problem)}
         </p>
       )}
       {signingIn ? (
         <>
           <p role="status" className="sr-only">
-            Waiting for you to finish signing in.
+            {t("accessDialogs.waiting")}
           </p>
           <Button
             ref={primary}
@@ -364,14 +380,14 @@ function SignInScreen({
               })
             }
           >
-            Open the sign-in page again
+            {t("accessDialogs.openAgain")}
           </Button>
           <Button
             size="lg"
             variant="ghost"
             onClick={() => run(() => identity.cancelSignIn())}
           >
-            Cancel
+            {t("accessDialogs.cancel")}
           </Button>
         </>
       ) : (
@@ -387,14 +403,14 @@ function SignInScreen({
             onClick={() => run(() => identity.signIn())}
           >
             {unreachable || checking
-              ? "Try again"
+              ? t("accessDialogs.tryAgain")
               : organization
-                ? `Sign in with ${organization}`
-                : "Sign in"}
+                ? t("accessDialogs.signInWith", { server: organization })
+                : t("accessDialogs.signIn")}
           </Button>
           {!checking && (
             <Button size="lg" variant="ghost" onClick={dismiss}>
-              Not now
+              {t("accessDialogs.notNow")}
             </Button>
           )}
         </>

@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { ACTIVITY_PAGE } from "./activity-context";
 import { ActivityNavigationIcon } from "./ActivityNavigation";
 import {
@@ -48,6 +49,7 @@ export function PageNavigation({
   /** Show inactive page previews in this navigation surface on hover-capable devices. */
   previews?: boolean;
 }) {
+  useLanguage();
   const presentation = usePagePresentation();
   const hover = useHoverPointer();
   const previewed = (page: RegisteredPage) =>
@@ -55,7 +57,7 @@ export function PageNavigation({
   if (placement === "dock") {
     return (
       <Tabs
-        label="Apps"
+        label={t("shell.pages.apps")}
         variant="dock"
         orientation="vertical"
         value={pages.some((page) => page.key === selected) ? selected : null}

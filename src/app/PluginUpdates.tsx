@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../shared/i18n";
 import {
   createContext,
   useContext,
@@ -59,6 +60,7 @@ export function PluginUpdates({
   navigation: Pick<AppServices["navigation"], "open">;
   children: ReactNode;
 }) {
+  useLanguage();
   const [store, setStore] = useState<Updates>();
   const [action, setAction] = useState<PluginUpdate>();
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -152,18 +154,23 @@ export function PluginUpdates({
               key={update.id}
               title={
                 update.error
-                  ? `Cannot check ${plugin?.manifest.name ?? update.id}`
-                  : `Update ${plugin?.manifest.name ?? update.id}`
+                  ? t("pluginManagement.updates.cannotCheck", {
+                      name: plugin?.manifest.name ?? update.id,
+                    })
+                  : t("pluginManagement.updateNamed", {
+                      name: plugin?.manifest.name ?? update.id,
+                    })
               }
               description={
-                update.error ??
-                "Save unfinished forms and stop active plugin workers first. Updating an enabled plugin reloads it immediately."
+                update.error ?? t("pluginManagement.updates.warning")
               }
               tone={update.error ? "error" : "info"}
               onDismiss={() => store?.later(update)}
-              closeLabel="Dismiss plugin update notice"
+              closeLabel={t("pluginManagement.updates.dismiss")}
               navigation={{
-                label: `Manage ${plugin?.manifest.name ?? update.id} update checks`,
+                label: t("pluginManagement.updates.manageChecks", {
+                  name: plugin?.manifest.name ?? update.id,
+                }),
                 open: () =>
                   void navigation.open({
                     version: 1,
@@ -181,13 +188,13 @@ export function PluginUpdates({
                 }
               >
                 {update.error
-                  ? "Retry"
+                  ? t("pluginManagement.retry")
                   : review
-                    ? "Review permissions"
-                    : "Update and reload"}
+                    ? t("pluginManagement.updates.reviewPermissions")
+                    : t("pluginManagement.updates.reload")}
               </Button>
               <Button size="sm" onClick={() => store?.later(update)}>
-                Later
+                {t("pluginManagement.updates.later")}
               </Button>
             </ToastNotice>
           );
@@ -219,7 +226,9 @@ export function PluginUpdates({
           return activation?.status === "failed" ? (
             <ToastNotice
               key={recovery.manifest.id}
-              title={`${recovery.manifest.name} cannot start`}
+              title={t("pluginManagement.updates.cannotStart", {
+                name: recovery.manifest.name,
+              })}
               description={`${activation.error}${recovery.rollbackBlockedReason ? ` ${recovery.rollbackBlockedReason}` : ""}`}
               tone="error"
             >
@@ -236,13 +245,13 @@ export function PluginUpdates({
                 }
                 onClick={() => plugins.retryPlugin(recovery.manifest.id)}
               >
-                Retry activation
+                {t("pluginManagement.updates.retryActivation")}
               </Button>
               <PluginMenu
                 plugin={recovery}
                 plugins={plugins}
                 busy={state.busy}
-                label="Plugin recovery actions"
+                label={t("pluginManagement.updates.recovery")}
               />
             </ToastNotice>
           ) : null;
@@ -258,6 +267,7 @@ export function PluginUpdatesMenu({
   onManage(): void;
   recommendations: number;
 }) {
+  useLanguage();
   const context = useContext(Context);
   const updates = context?.updates ?? empty;
   const count =
@@ -269,7 +279,7 @@ export function PluginUpdatesMenu({
       <MenuIcon>
         <SquaresFourIcon aria-hidden="true" size={16} />
       </MenuIcon>
-      Plugins
+      {t("pluginManagement.updates.plugins")}
       {count > 0 && (
         <MenuTrailing>
           <RecommendationCount count={count} />
@@ -288,12 +298,18 @@ export function PluginUpdatesMenu({
             disabled={context?.busy}
             onClick={() => context?.open(update)}
           >
-            {update.error ? "Retry update" : "Update"}{" "}
-            {update.candidate?.manifest.name ?? update.id}
+            {t(
+              update.error
+                ? "pluginManagement.updates.retryNamed"
+                : "pluginManagement.updateNamed",
+              { name: update.candidate?.manifest.name ?? update.id },
+            )}
           </MenuItem>
         ))}
         <MenuSeparator />
-        <MenuItem onClick={onManage}>Manage plugins</MenuItem>
+        <MenuItem onClick={onManage}>
+          {t("pluginManagement.updates.manage")}
+        </MenuItem>
       </MenuSubmenuPopup>
     </MenuSubmenu>
   );

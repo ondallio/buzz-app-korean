@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useGifDraftPreview } from "../../bundled/emoji/GifDraftPreview";
 import { useMentionArchives } from "./use-mention-archives";
 import { memo, useContext, type ReactNode } from "react";
@@ -87,6 +88,7 @@ const TokenChip = memo(function TokenChip({
   qualifier: string | undefined;
   reveal: boolean;
 }) {
+  useLanguage();
   return (
     <InlineChip
       address={{ kind, id }}
@@ -96,7 +98,9 @@ const TokenChip = memo(function TokenChip({
           ? {
               text: `· ${qualifier}`,
               reveal,
-              accessibleLabel: `public key ending ${qualifier.split("").join(" ")}`,
+              accessibleLabel: t("messages.chip.publicKeyEnding", {
+                ending: qualifier.split("").join(" "),
+              }),
             }
           : undefined
       }

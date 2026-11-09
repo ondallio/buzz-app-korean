@@ -1,3 +1,9 @@
+import { t, useLanguage } from "../shared/i18n";
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../shared/i18n/deferred-message";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AlertDialog } from "../shared/design-system/ui/AlertDialog";
 import { Button } from "../shared/design-system/ui/Button";
@@ -16,12 +22,18 @@ type Authorize = NonNullable<
   Parameters<typeof ManagedPluginReview>[0]["authorizeGit"]
 >;
 
-export const REQUEST_VERB: Record<PluginRequest["action"], string> = {
-  install: "Install",
-  update: "Update",
-  enable: "Enable",
-  remove: "Delete",
-};
+/** Formats an app-owned request title while preserving the plugin's authored name. */
+export function requestTitle(
+  request: Pick<PluginRequest, "action" | "pluginName">,
+) {
+  const keys = {
+    install: "pluginRequests.installTitle",
+    update: "pluginRequests.updateTitle",
+    enable: "pluginRequests.enableTitle",
+    remove: "pluginRequests.deleteTitle",
+  } as const;
+  return t(keys[request.action], { name: request.pluginName });
+}
 
 /** Plugin changes agents asked for. Each applies only through the same
  * review a person's own install uses. */
@@ -42,6 +54,7 @@ export function AgentPluginRequests({
   /** Where focus goes once no request remains. */
   fallbackFocus?: (() => HTMLElement | null) | undefined;
 }) {
+  useLanguage();
   const { requests } = plugins;
   const pending = useSyncExternalStore(requests.subscribe, requests.pending);
   // Held, not looked up, so settling the request never remounts the review.
@@ -84,38 +97,45 @@ export function AgentPluginRequests({
         >
           <InlineHeader
             id="agent-plugin-requests-title"
-            title="Requested by agents"
+            title={t("pluginRequests.requestedByAgents")}
           />
           <SettingsGroup>
             {pending.map((request) => (
               <PreferenceRow
                 key={request.id}
-                title={`${REQUEST_VERB[request.action]} ${request.pluginName}`}
-                subtitle={`${request.requester.name}: ${request.reason}`}
+                title={requestTitle(request)}
+                subtitle={t("pluginRequests.requestReason", {
+                  requester: request.requester.name,
+                  reason: request.reason,
+                })}
                 trailing={
                   <div className="flex gap-2">
                     <Button
                       size="sm"
                       variant="subtle"
-                      aria-label={`Decline ${request.pluginName}`}
+                      aria-label={t("pluginRequests.declineNamed", {
+                        name: request.pluginName,
+                      })}
                       onClick={() => {
                         requests.settle(request.id, "declined");
                         survivor()?.focus();
                       }}
                     >
-                      Decline
+                      {t("pluginRequests.decline")}
                     </Button>
                     <Button
                       size="sm"
                       variant="prominent"
                       disabled={busy}
-                      aria-label={`Review ${request.pluginName}`}
+                      aria-label={t("pluginRequests.reviewNamed", {
+                        name: request.pluginName,
+                      })}
                       onClick={(event) => {
                         trigger.current = event.currentTarget;
                         setReviewing(request);
                       }}
                     >
-                      Review
+                      {t("pluginRequests.review")}
                     </Button>
                   </div>
                 }
@@ -203,9 +223,10 @@ function ChangeReview({
   returnFocus: () => HTMLElement | null;
   onClose: () => void;
 }) {
+  useLanguage();
   useEffect(() => holdReview?.(), [holdReview]);
   const [working, setWorking] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
+  const [failure, setFailure] = useState<DisplayMessage | null>(null);
   const cancel = useRef<HTMLButtonElement>(null);
   const plugin = catalog.plugins.find(
     (item) => item.manifest.id === request.pluginId,
@@ -222,7 +243,8 @@ function ChangeReview({
         onClose();
       } else
         setFailure(
-          plugins.snapshot().error ?? "The change wasn’t confirmed. Try again.",
+          plugins.snapshot().error ??
+            localMessage("pluginRequests.changeUnconfirmed"),
         );
     } finally {
       setWorking(false);
@@ -232,11 +254,13 @@ function ChangeReview({
     <>
       <p className="mb-4 mt-0 break-words text-body-sm">{request.reason}</p>
       {!plugin && (
-        <p className="m-0 text-body-sm">This plugin is no longer installed.</p>
+        <p className="m-0 text-body-sm">
+          {t("pluginRequests.noLongerInstalled")}
+        </p>
       )}
       {failure && (
         <p role="alert" className="error text-body-sm">
-          {failure}
+          {resolveMessage(failure)}
         </p>
       )}
     </>
@@ -244,8 +268,10 @@ function ChangeReview({
   if (action === "remove")
     return (
       <AlertDialog
-        title={`Delete ${name}?`}
-        description={`Requested by ${request.requester.name}. Removes this plugin and its rollback history from Buzz. You can install it again later.`}
+        title={t("pluginRequests.deleteConfirmTitle", { name })}
+        description={t("pluginRequests.deleteRequestDescription", {
+          requester: request.requester.name,
+        })}
         pending={working}
         initialFocus={cancel}
         finalFocus={returnFocus}
@@ -253,14 +279,14 @@ function ChangeReview({
         actions={
           <>
             <Button ref={cancel} disabled={working} onClick={onClose}>
-              Cancel
+              {t("pluginRequests.cancel")}
             </Button>
             <Button
               variant="destructive"
               disabled={working || !plugin}
               onClick={() => void confirm()}
             >
-              Delete plugin
+              {t("pluginRequests.deletePlugin")}
             </Button>
           </>
         }
@@ -274,8 +300,10 @@ function ChangeReview({
       onOpenChange={(next) => {
         if (!next) onClose();
       }}
-      title={`Enable ${name}?`}
-      description={`Requested by ${request.requester.name}. Only enable code you trust.`}
+      title={t("pluginRequests.enableConfirmTitle", { name })}
+      description={t("pluginRequests.enableRequestDescription", {
+        requester: request.requester.name,
+      })}
       preventClose={working}
       dismissOnOutsideClick
       initialFocus={cancel}
@@ -283,7 +311,7 @@ function ChangeReview({
       actions={
         <>
           <Button ref={cancel} disabled={working} onClick={onClose}>
-            Cancel
+            {t("pluginRequests.cancel")}
           </Button>
           <Button
             variant="prominent"
@@ -291,7 +319,7 @@ function ChangeReview({
             loading={working}
             onClick={() => void confirm()}
           >
-            Enable plugin
+            {t("pluginRequests.enablePlugin")}
           </Button>
         </>
       }

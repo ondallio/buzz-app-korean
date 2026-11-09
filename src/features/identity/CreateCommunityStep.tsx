@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useState } from "react";
 import {
   CommunityAddressField,
@@ -25,6 +26,7 @@ export function CreateCommunityStep({
   onCreated: (origin: string) => void;
   onBack: () => void;
 }) {
+  useLanguage();
   const address = useCommunityAddress(account.communityAvailable, true);
   const [busy, setBusy] = useState(false);
   // A refusal belongs to the name it refused, so editing the name clears it;
@@ -55,10 +57,10 @@ export function CreateCommunityStep({
           tabIndex={-1}
           className="text-heading text-standard"
         >
-          Create a community
+          {t("identityMore.createTitle")}
         </h1>
         <p className="mt-2 text-body text-subtle">
-          Choose the address your team will use to connect.
+          {t("identityMore.createHelp")}
         </p>
       </div>
       <WireframePanel>
@@ -78,7 +80,7 @@ export function CreateCommunityStep({
           loading={busy}
           disabled={!address.ready || Boolean(refusal)}
         >
-          Create community
+          {t("identityMore.createAction")}
         </Button>
       </div>
     </form>

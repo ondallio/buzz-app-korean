@@ -1,3 +1,8 @@
+import { useContext, useEffect } from "react";
+import { languagePreference, setLanguage } from "../../shared/i18n/language";
+import { LinkPreviewContext, type LinkPreview } from "./LinkLabelContext";
+import type { Contribution } from "../../plugins/contributions";
+import type { LinkRenderer } from "./contracts";
 // @vitest-environment jsdom
 import {
   act,
@@ -18,6 +23,7 @@ import type { ThreadSnapshot } from "../relay/threads";
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.useRealTimers();
   Reflect.deleteProperty(HTMLElement.prototype, "showPopover");
 });
@@ -164,4 +170,83 @@ it("keeps a failed message preview the link's destination, and reads again when 
   expect(refresh).toHaveBeenCalledTimes(2);
   await user.click(card);
   expect(onOpenLink).toHaveBeenCalledTimes(2);
+});
+
+it("updates a stable offered preview label without withdrawing its renderer or moving focus", async () => {
+  HTMLElement.prototype.showPopover = function () {
+    this.style.display = "block";
+  };
+  const offered = vi.fn();
+  const withdrawn = vi.fn();
+  const target = "buzz://agent/new?card=av_fixture";
+  const preview: LinkPreview = {
+    get label() {
+      return languagePreference() === "ko"
+        ? "테스트 미리보기"
+        : "Fixture preview";
+    },
+    render: (open) => (
+      <button type="button" onClick={() => open(target)}>
+        Open original
+      </button>
+    ),
+  };
+  function Offer() {
+    const offer = useContext(LinkPreviewContext);
+    useEffect(() => {
+      offered();
+      offer?.(preview);
+      return () => {
+        withdrawn();
+        offer?.(undefined);
+      };
+    }, [offer]);
+    return <span>Raw link name 한국어</span>;
+  }
+  const renderer: Contribution<LinkRenderer> = {
+    id: "fixture",
+    key: "fixture/preview",
+    pluginId: "fixture",
+    revision: "one",
+    title: "Fixture",
+    matches: () => true,
+    component: Offer,
+  };
+  const entries = [renderer];
+  const session = {
+    unread: undefined,
+    channels: { list: () => ({ channels: [] }), subscribeList: () => () => {} },
+  } as unknown as RelaySession;
+  const open = vi.fn(() => true);
+  const view = render(
+    <MessageLink
+      url="https://example.com/raw"
+      registry={{ snapshot: () => entries, subscribe: () => () => {} }}
+      onOpenLink={open}
+      session={session}
+    />,
+  );
+  const user = userEvent.setup();
+  await user.tab();
+  const dialog = await screen.findByRole("dialog", { name: "Fixture preview" });
+  const button = screen.getByRole("button", { name: "Open original" });
+  button.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("dialog", { name: "테스트 미리보기" })).toBe(dialog);
+  expect(screen.getByRole("button", { name: "Open original" })).toBe(button);
+  expect(button).toHaveFocus();
+  expect(
+    screen.getByRole("link", { name: "Raw link name 한국어" }),
+  ).toHaveAttribute("href", "https://example.com/raw");
+  expect(offered).toHaveBeenCalledTimes(1);
+  expect(withdrawn).not.toHaveBeenCalled();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("dialog", { name: "Fixture preview" })).toBe(dialog);
+  expect(button).toHaveFocus();
+  await user.click(button);
+  expect(open).toHaveBeenCalledExactlyOnceWith(target);
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(withdrawn).not.toHaveBeenCalled();
+  view.unmount();
+  expect(withdrawn).toHaveBeenCalledTimes(1);
 });

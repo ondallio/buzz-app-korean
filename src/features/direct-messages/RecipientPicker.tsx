@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { Virtualizer } from "virtua";
 import { Popover } from "@base-ui/react/popover";
 import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -82,6 +83,7 @@ export function RecipientPicker({
   /** Whether the To field holds text that is not a recipient yet. */
   onTyped(typed: boolean): void;
 }) {
+  useLanguage();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(initiallyOpen);
   const input = useRef<HTMLInputElement>(null);
@@ -460,7 +462,7 @@ export function RecipientPicker({
       }}
     >
       <fieldset
-        aria-label="Recipients"
+        aria-label={t("mentionPicker.recipients")}
         className={styles.recipientHeader}
         data-appearance={appearance}
         ref={field}
@@ -486,13 +488,15 @@ export function RecipientPicker({
             }
           }}
         >
-          <label htmlFor={id}>To:</label>
+          <label htmlFor={id}>{t("mentionPicker.to")}</label>
           {labels.map((person) => (
             <span className={styles.chip} key={person.pubkey}>
               <button
                 type="button"
                 className={styles.remove}
-                aria-label={`Remove ${label(person)}`}
+                aria-label={t("mentionPicker.removeName", {
+                  name: label(person),
+                })}
                 disabled={disabled}
                 ref={(element) => {
                   if (element) controls.current.set(person.pubkey, element);
@@ -520,14 +524,16 @@ export function RecipientPicker({
               {discriminator(person) && (
                 <span className={styles.agent}>{discriminator(person)}</span>
               )}
-              {person.isAgent && <span className={styles.agent}>Agent</span>}
+              {person.isAgent && (
+                <span className={styles.agent}>{t("mentionPicker.agent")}</span>
+              )}
             </span>
           ))}
           <input
             id={id}
             ref={input}
             className={styles.toInput}
-            aria-label="Message recipients"
+            aria-label={t("mentionPicker.messageRecipients")}
             role="combobox"
             aria-expanded={open && !disabled}
             aria-controls={listed ? highlight.listId : undefined}
@@ -537,9 +543,14 @@ export function RecipientPicker({
             placeholder={
               selected.length
                 ? atLimit
-                  ? `${maxRecipients} ${maxRecipients === 1 ? "person" : "people"} selected`
-                  : "Add another person…"
-                : "Find a person…"
+                  ? t(
+                      maxRecipients === 1
+                        ? "mentionPicker.oneSelected"
+                        : "mentionPicker.manySelected",
+                      { count: maxRecipients },
+                    )
+                  : t("mentionPicker.addPerson")
+                : t("mentionPicker.findPerson")
             }
             value={query}
             disabled={disabled}
@@ -624,7 +635,9 @@ export function RecipientPicker({
             role="status"
             className="mt-1 text-body-sm text-danger"
           >
-            “{shortened(query.trim())}” is not a valid recipient
+            {t("mentionPicker.invalidRecipient", {
+              query: shortened(query.trim()),
+            })}
           </p>
         )}
         <Popover.Portal>
@@ -650,15 +663,15 @@ export function RecipientPicker({
               {atLimit ? (
                 <p role="status">
                   {maxRecipients === 1
-                    ? "One person at a time. Remove them to choose someone else."
-                    : `You can message up to ${maxRecipients} people at once.`}
+                    ? t("mentionPicker.oneAtATime")
+                    : t("mentionPicker.maxPeople", { count: maxRecipients })}
                 </p>
               ) : (
                 <div
                   className={styles.people}
                   id={highlight.listId}
                   role="listbox"
-                  aria-label="People"
+                  aria-label={t("mentionPicker.people")}
                   onPointerMove={(event) => {
                     const key = optionKey(event.target);
                     if (key) highlight.rowProps(key).onPointerMove(event);
@@ -701,13 +714,18 @@ export function RecipientPicker({
                     !candidates.length && (
                       <p>
                         {directory.tooShort
-                          ? `Type at least ${SEARCH_MIN_CHARS} characters to search people.`
-                          : "No matching people."}
+                          ? t("mentionPicker.minCharacters", {
+                              count: SEARCH_MIN_CHARS,
+                            })
+                          : t("mentionPicker.noPeople")}
                       </p>
                     )}
                   {directory.loading &&
                     (!query.trim() || !candidates.length) && (
-                      <div role="status" aria-label="Loading people">
+                      <div
+                        role="status"
+                        aria-label={t("mentionPicker.loadingPeopleLabel")}
+                      >
                         <div aria-hidden="true">
                           {Array.from(
                             {
@@ -726,7 +744,7 @@ export function RecipientPicker({
                       </div>
                     )}
                   {directory.error && (
-                    <p role="alert">Could not load people.</p>
+                    <p role="alert">{t("mentionPicker.peopleFailed")}</p>
                   )}
                   {!directory.loading && directory.hasMore && (
                     <Button
@@ -735,8 +753,8 @@ export function RecipientPicker({
                       onClick={directory.loadMore}
                     >
                       {directory.error
-                        ? "Retry loading people"
-                        : "Load more people"}
+                        ? t("mentionPicker.retryPeople")
+                        : t("mentionPicker.loadMorePeople")}
                     </Button>
                   )}
                 </div>
@@ -779,6 +797,7 @@ const RecipientOption = memo(function RecipientOption({
   position: number;
   count: number;
 }) {
+  useLanguage();
   return (
     <NavigationItem
       id={id}
@@ -787,7 +806,18 @@ const RecipientOption = memo(function RecipientOption({
       role="option"
       aria-posinset={position}
       aria-setsize={count}
-      aria-label={`${[person.name, discriminator].filter(Boolean).join(" ")}${verified ? `, ${verified}` : ""}${person.isAgent ? ", Agent" : ""}`}
+      aria-label={
+        person.isAgent
+          ? verified
+            ? t("mentionPicker.verifiedAgentOption", {
+                name: [person.name, discriminator].filter(Boolean).join(" "),
+                verified,
+              })
+            : t("mentionPicker.agentOption", {
+                name: [person.name, discriminator].filter(Boolean).join(" "),
+              })
+          : `${[person.name, discriminator].filter(Boolean).join(" ")}${verified ? `, ${verified}` : ""}`
+      }
       tabIndex={-1}
       selected={active}
       aria-selected={active}
@@ -819,9 +849,13 @@ const RecipientOption = memo(function RecipientOption({
       trailing={
         discriminator || person.isAgent ? (
           <span className={styles.agent}>
-            {[discriminator, person.isAgent ? "Agent" : ""]
-              .filter(Boolean)
-              .join(" · ")}
+            {person.isAgent
+              ? discriminator
+                ? t("mentionPicker.agentIdentifier", {
+                    identifier: discriminator,
+                  })
+                : t("mentionPicker.agent")
+              : discriminator}
           </span>
         ) : undefined
       }

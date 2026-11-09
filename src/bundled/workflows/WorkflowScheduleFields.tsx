@@ -3,12 +3,12 @@ import { Field } from "../../shared/design-system/ui/Field";
 import { Radio, RadioGroup } from "../../shared/design-system/ui/RadioGroup";
 import { Input } from "../../shared/design-system/ui/Input";
 import { Select } from "../../shared/design-system/ui/Select";
+import { t, useLanguage } from "../../shared/i18n";
 import { CronExpressionInput } from "./CronExpressionInput";
 import { parseDurationSeconds } from "./workflowDuration";
 import type { TriggerConfig } from "./workflowFormTypes";
 import {
   SCHEDULE_FREQUENCIES,
-  SCHEDULE_FREQUENCY_LABELS,
   type ScheduleFormState,
   scheduleFormFromTrigger,
   scheduleTriggerFromForm,
@@ -77,6 +77,7 @@ export function WorkflowScheduleFields({
   onUpdate: (trigger: TriggerConfig) => void;
   trigger: TriggerConfig;
 }) {
+  useLanguage();
   const id = useId();
   // A custom expression that happens to read as a preset stays on the custom
   // pane while it is being edited, instead of snapping back to that preset.
@@ -110,7 +111,7 @@ export function WorkflowScheduleFields({
 
   return (
     <div className="workflow-schedule">
-      <Field label="Repeats">
+      <Field label={t("workflowForm.repeats")}>
         <RadioGroup
           value={schedule.frequency}
           disabled={disabled}
@@ -136,7 +137,7 @@ export function WorkflowScheduleFields({
                   variant="card"
                   value={frequency}
                   disabled={disabled}
-                  label={SCHEDULE_FREQUENCY_LABELS[frequency]}
+                  label={t(`workflowForm.frequency.${frequency}`)}
                 />
               </div>
             ))}
@@ -146,9 +147,11 @@ export function WorkflowScheduleFields({
 
       {schedule.frequency === "weekly" && (
         <fieldset className="workflow-pills">
-          <legend className="buzz-field-label">Repeat on</legend>
+          <legend className="buzz-field-label">
+            {t("workflowForm.repeatOn")}
+          </legend>
           <div className="workflow-pill-grid" data-columns="7">
-            {WEEKDAYS.map(([value, label, shortLabel]) => {
+            {WEEKDAYS.map(([value]) => {
               const inputId = `${id}-weekday-${value}`;
               return (
                 <div key={value} className="workflow-pill" data-shape="round">
@@ -156,7 +159,7 @@ export function WorkflowScheduleFields({
                     type="checkbox"
                     className="sr-only workflow-pill-input"
                     id={inputId}
-                    aria-label={label}
+                    aria-label={t(`workflowForm.weekday.${value}`)}
                     value={value}
                     checked={selectedWeekdays.has(value)}
                     disabled={disabled}
@@ -177,7 +180,7 @@ export function WorkflowScheduleFields({
                     }}
                   />
                   <label htmlFor={inputId} className="workflow-pill-label">
-                    {shortLabel}
+                    {t(`workflowForm.weekdayShort.${value}`)}
                   </label>
                 </div>
               );
@@ -190,7 +193,7 @@ export function WorkflowScheduleFields({
         <div className="workflow-field">
           <Select
             variant="field"
-            label="Day of month"
+            label={t("workflowForm.monthDay")}
             value={schedule.monthDay}
             groups={MONTH_DAY_GROUPS}
             disabled={disabled}
@@ -198,7 +201,7 @@ export function WorkflowScheduleFields({
           />
           {monthWarning && (
             <p role="status" className="text-body-sm text-warning">
-              {monthWarning}
+              {t("workflowForm.monthWarning")}
             </p>
           )}
         </div>
@@ -206,7 +209,7 @@ export function WorkflowScheduleFields({
 
       {usesTime && (
         <label htmlFor={`${id}-time`} className="workflow-field">
-          Run time (UTC)
+          {t("workflowForm.runTime")}
           <Input
             id={`${id}-time`}
             type="time"
@@ -227,7 +230,9 @@ export function WorkflowScheduleFields({
 
       {schedule.frequency === "custom_interval" && (
         <div className="workflow-field">
-          <label htmlFor={`${id}-interval`}>Existing interval</label>
+          <label htmlFor={`${id}-interval`}>
+            {t("workflowForm.existingInterval")}
+          </label>
           <Input
             id={`${id}-interval`}
             aria-describedby={`${id}-interval-help`}
@@ -243,12 +248,11 @@ export function WorkflowScheduleFields({
             id={`${id}-interval-help`}
             className="text-body-sm text-secondary"
           >
-            Keep this legacy interval or choose a repeat option above. All
-            schedules use UTC.
+            {t("workflowForm.intervalHelp")}
           </span>
           {legacyIntervalWarning && (
             <p role="status" className="text-body-sm text-warning">
-              {legacyIntervalWarning}
+              {t("workflowForm.intervalWarning")}
             </p>
           )}
         </div>

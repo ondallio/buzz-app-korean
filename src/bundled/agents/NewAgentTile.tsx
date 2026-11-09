@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import type { ComponentProps, Ref } from "react";
 import { CaretDownIcon } from "../../shared/design-system/icons";
 import { SurfaceButton } from "../../shared/design-system/ui/SurfaceButton";
@@ -25,7 +26,7 @@ export function NewAgentTile({
   fullWidth = false,
   variant = "tile",
   labelRef,
-  label = "New agent",
+  label,
   art = artwork,
   crew,
   description,
@@ -49,10 +50,12 @@ export function NewAgentTile({
   /** A quieter label, for a tile beside a more important one. */
   secondary?: boolean;
 }) {
+  useLanguage();
+  const displayLabel = label ?? t("agentsBrowse.newAgent");
   if (variant === "button")
     return (
       <Button {...props} type="button" variant="prominent" size="sm">
-        {label}
+        {displayLabel}
         <CaretDownIcon
           size={14}
           className="buzz-dropdown-chevron"
@@ -118,7 +121,7 @@ export function NewAgentTile({
         className={`${styles.newLabel} text-label-sm`}
         data-tone={secondary ? "secondary" : undefined}
       >
-        {label}
+        {displayLabel}
       </span>
     </SurfaceButton>
   );

@@ -1,3 +1,10 @@
+import {
+  localMessage,
+  errorMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
+import { t, useLanguage } from "../../shared/i18n";
 import { createPortal } from "react-dom";
 import { Popover } from "@base-ui/react/popover";
 import { useEffect, useLayoutEffect, useId, useRef, useState } from "react";
@@ -18,7 +25,7 @@ import { InputGroup } from "../../shared/design-system/ui/InputGroup";
 import { ScrollEdgeMaterial } from "../../shared/design-system/ui/ScrollEdgeMaterial";
 import { Tabs } from "../../shared/design-system/ui/Tabs";
 import {
-  avatarPictureError,
+  avatarPictureErrorMessage,
   emojiAvatar,
   emojiAvatarScale,
   paintEmojiAvatar,
@@ -90,6 +97,7 @@ const outsideEditor = (popup: HTMLElement | null, target: EventTarget | null) =>
 
 /** One draft editor for humans and agents; the enclosing form owns profile Save. */
 export function AvatarEditor(props: Props) {
+  useLanguage();
   const setupAnchor = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(!!props.inlinePicker);
   const [draftPreview, setDraftPreview] = useState<DraftPreview | null>(null);
@@ -102,7 +110,7 @@ export function AvatarEditor(props: Props) {
     props.size === "compact" ? "small" : undefined,
     props.size === "compact" ? props.thumbnailMedia : undefined,
   );
-  const pictureError = avatarPictureError(props.value);
+  const pictureError = avatarPictureErrorMessage(props.value);
   const errorId = useId();
   // The empty and filled triggers swap as the draft preview changes. One id
   // lets Base UI follow the mounted one, for Tab and return focus.
@@ -196,7 +204,7 @@ export function AvatarEditor(props: Props) {
                 <button
                   type="button"
                   className={`${styles.dottedTrigger} ${styles.emptyCircle}`}
-                  aria-label="Add avatar"
+                  aria-label={t("profileEditing.addAvatar")}
                   disabled={props.disabled}
                 />
               }
@@ -226,7 +234,7 @@ export function AvatarEditor(props: Props) {
                 <button
                   type="button"
                   className={styles.dottedTrigger}
-                  aria-label="Edit avatar"
+                  aria-label={t("profileEditing.editAvatar")}
                   disabled={props.disabled}
                 />
               }
@@ -241,7 +249,7 @@ export function AvatarEditor(props: Props) {
               {draftPreview?.emoji ? null : preview ? (
                 <img
                   src={preview}
-                  alt="Avatar preview"
+                  alt={t("profileEditing.avatarPreview")}
                   data-avatar-shape="squircle"
                 />
               ) : (
@@ -287,7 +295,11 @@ export function AvatarEditor(props: Props) {
               >
                 <Avatar
                   src={preview}
-                  alt={open ? "Avatar preview" : "Avatar"}
+                  alt={t(
+                    open
+                      ? "profileEditing.avatarPreview"
+                      : "profileEditing.avatar",
+                  )}
                   fallback={props.name}
                   size="fill"
                   loading="eager"
@@ -309,7 +321,7 @@ export function AvatarEditor(props: Props) {
                       minWidth: 0,
                       minHeight: 0,
                     }}
-                    aria-label="Edit avatar"
+                    aria-label={t("profileEditing.editAvatar")}
                     aria-describedby={pictureError ? errorId : undefined}
                     icon={
                       (draftPreview?.picture ?? props.value) ||
@@ -355,7 +367,9 @@ export function AvatarEditor(props: Props) {
                 data-buzz-ui=""
                 className={`popover-surface ${styles.popup}`}
               >
-                <Popover.Title className="sr-only">Edit avatar</Popover.Title>
+                <Popover.Title className="sr-only">
+                  {t("profileEditing.editAvatar")}
+                </Popover.Title>
                 {draft}
               </Popover.Popup>
             </Popover.Positioner>
@@ -381,6 +395,7 @@ function EmojiPreview({
   /** Leave room for the edit badge, as the profile avatar does. */
   cutout?: boolean;
 }) {
+  useLanguage();
   const artwork = (
     <div
       data-avatar-shape={shape}
@@ -407,7 +422,7 @@ function EmojiPreview({
     <div
       role="slider"
       tabIndex={move ? 0 : -1}
-      aria-label="Emoji position"
+      aria-label={t("profileEditing.emojiPosition")}
       aria-orientation="vertical"
       aria-disabled={!move || undefined}
       // Up is positive, matching the arrow keys.
@@ -416,8 +431,13 @@ function EmojiPreview({
       aria-valuenow={Math.round(-offset * 100)}
       aria-valuetext={
         offset
-          ? `${Math.round(Math.abs(offset) * 100)}% ${offset > 0 ? "down" : "up"}`
-          : "Centered"
+          ? t(
+              offset > 0
+                ? "profileEditing.positionDown"
+                : "profileEditing.positionUp",
+              { count: Math.round(Math.abs(offset) * 100) },
+            )
+          : t("profileEditing.centered")
       }
       data-emoji-position=""
       className={styles.emojiPreview}
@@ -505,6 +525,7 @@ function AvatarDraft({
   onPreview(value: DraftPreview | null): void;
   sizeTarget: HTMLElement | null;
 }) {
+  useLanguage();
   const [customColorOpen, setCustomColorOpen] = useState(false);
   const customColorTrigger = useRef<HTMLButtonElement>(null);
   const wasCustomColorOpen = useRef(false);
@@ -551,7 +572,7 @@ function AvatarDraft({
   // A share of the image height that the preview drags; positive is down.
   const [offset, setOffset] = useState(0);
   const [pulse, setPulse] = useState(0);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
@@ -610,8 +631,8 @@ function AvatarDraft({
       if (!request.signal.aborted)
         setError(
           reason instanceof Error
-            ? reason.message
-            : "Image upload failed. Try again.",
+            ? errorMessage(reason)
+            : localMessage("profileEditing.uploadFailed"),
         );
     } finally {
       if (!request.signal.aborted) {
@@ -620,7 +641,7 @@ function AvatarDraft({
       }
     }
   }
-  const pictureError = avatarPictureError(picture);
+  const pictureError = avatarPictureErrorMessage(picture);
   // Validate late: show the URL error after blur or an attempt to apply it,
   // then keep it current so it clears as soon as the URL is fixed.
   // An invalid saved URL is not a new attempt, so it shows at once.
@@ -642,13 +663,13 @@ function AvatarDraft({
         else applyPicture();
       }}
     >
-      Done
+      {t("profileEditing.done")}
     </Button>
   );
 
   const sizeSlider = (
     <label className={styles.emojiScale}>
-      <span className="text-label-sm">Emoji size</span>
+      <span className="text-label-sm">{t("profileEditing.emojiSize")}</span>
       <input
         type="range"
         min={1}
@@ -677,10 +698,10 @@ function AvatarDraft({
           <CloudUploadIcon size={24} aria-hidden="true" />
           <span>
             {busy
-              ? "Uploading…"
+              ? t("profileEditing.uploading")
               : dragging
-                ? "Drop image here"
-                : "Drop or browse"}
+                ? t("profileEditing.dropHere")
+                : t("profileEditing.dropBrowse")}
           </span>
         </button>
         <input
@@ -688,7 +709,7 @@ function AvatarDraft({
           type="file"
           className="sr-only"
           tabIndex={-1}
-          aria-label="Upload an image"
+          aria-label={t("profileEditing.uploadImage")}
           accept="image/png,image/jpeg,image/gif,image/webp,image/heic,image/heif"
           disabled={disabled || busy || !community}
           onChange={(event) => {
@@ -698,7 +719,7 @@ function AvatarDraft({
           }}
         />
         <Field
-          label="Picture URL (optional)"
+          label={t("profileEditing.pictureUrl")}
           labelVisibility="hidden"
           error={checkPicture ? pictureError : undefined}
         >
@@ -709,7 +730,7 @@ function AvatarDraft({
             <Input
               ref={urlInput}
               type="url"
-              placeholder="Paste an image URL"
+              placeholder={t("profileEditing.pasteImageUrl")}
               maxLength={2048}
               disabled={disabled || busy}
               value={picture}
@@ -749,13 +770,18 @@ function AvatarDraft({
             onClose={() => setCustomColorOpen(false)}
           />
         ) : (
-          <fieldset className={styles.swatches} aria-label="Avatar background">
+          <fieldset
+            className={styles.swatches}
+            aria-label={t("profileEditing.avatarBackground")}
+          >
             {colors.map((swatch) => (
               <button
                 key={swatch}
                 type="button"
                 className={styles.swatch}
-                aria-label={`Use ${swatch} background`}
+                aria-label={t("profileEditing.useBackground", {
+                  color: swatch,
+                })}
                 aria-pressed={color.toUpperCase() === swatch}
                 disabled={disabled || busy}
                 style={{ backgroundColor: swatch }}
@@ -766,7 +792,7 @@ function AvatarDraft({
               ref={customColorTrigger}
               type="button"
               className={styles.customColor}
-              aria-label="Custom background color"
+              aria-label={t("profileEditing.customColor")}
               aria-pressed={!colors.includes(color.toUpperCase())}
               disabled={disabled || busy}
               onClick={() => setCustomColorOpen(true)}
@@ -781,7 +807,7 @@ function AvatarDraft({
       {sizeTarget && mode !== "image" && createPortal(sizeSlider, sizeTarget)}
       <fieldset
         ref={panels}
-        aria-label="Avatar picker"
+        aria-label={t("profileEditing.avatarPicker")}
         className={styles.picker}
         data-dragging={dragging || undefined}
         onDragEnter={(event) => {
@@ -814,12 +840,12 @@ function AvatarDraft({
       >
         <Tabs
           value={mode}
-          label="Avatar source"
+          label={t("profileEditing.avatarSource")}
           variant="panel"
           items={[
-            { value: "image", label: "Image" },
-            { value: "emoji", label: "Emoji" },
-            { value: "background", label: "Background" },
+            { value: "image", label: t("profileEditing.image") },
+            { value: "emoji", label: t("profileEditing.emoji") },
+            { value: "background", label: t("profileEditing.background") },
           ]}
           onValueChange={(next) => {
             if (!busy && !disabled) {
@@ -832,18 +858,17 @@ function AvatarDraft({
         />
         {busy && (
           <p role="status" className="text-body-sm">
-            Uploading avatar…
+            {t("profileEditing.uploadingAvatar")}
           </p>
         )}
         {error && (
           <p role="alert" className="text-body-sm text-danger">
-            {error}
+            {resolveMessage(error)}
           </p>
         )}
         {!community && (
           <p className="text-body-sm text-subtle">
-            Select a community in the sidebar to upload an image or emoji. Your
-            local default can use a public HTTPS image URL.
+            {t("profileEditing.selectCommunity")}
           </p>
         )}
         {!(mode === "background" && customColorOpen) && (
@@ -857,7 +882,7 @@ function AvatarDraft({
                   disabled={(!value && !picture) || disabled || busy}
                   onClick={() => done("")}
                 >
-                  Remove avatar
+                  {t("profileEditing.removeAvatar")}
                 </Button>
               )}
               {actionTarget
@@ -882,6 +907,7 @@ export function AvatarEmojiPicker({
   onSelect(value: string, animate: boolean): void;
   disabled: boolean;
 }) {
+  useLanguage();
   const host = useRef<HTMLDivElement>(null);
   const pointer = useRef(false);
   const callback = useRef<(value: string) => void>(() => {});
@@ -977,7 +1003,7 @@ export function AvatarEmojiPicker({
   if (error)
     return (
       <p role="alert" className={emojiStyles.emojiStatus}>
-        Could not load the emoji picker. Reopen it to retry.
+        {t("profileEditing.emojiLoadFailed")}
       </p>
     );
   return (

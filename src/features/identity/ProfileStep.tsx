@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useState } from "react";
 import type { inspectProfile } from "../communities/api";
 import type { FoundCommunity } from "../communities/find-community";
@@ -28,16 +29,17 @@ export function ProfileStep({
   /** Publishes the trimmed draft and finishes the join; a rejection keeps the step. */
   onContinue: (profile: PersonalProfile) => Promise<void>;
 }) {
+  useLanguage();
   const [draft, setDraft] = useState<PersonalProfile>(() =>
     read.exists ? read.profile : { name: defaultName, picture: "", about: "" },
   );
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ReturnType<typeof publishFailure>>();
   const canContinue = canSaveProfile(draft) && !busy && !uploading;
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
-    setError("");
+    setError(undefined);
     try {
       await action();
     } catch (reason) {
@@ -66,11 +68,11 @@ export function ProfileStep({
           tabIndex={-1}
           className="text-heading text-standard"
         >
-          Set up your profile
+          {t("identityMore.profileTitle")}
         </h1>
         <p className="mt-2 break-all text-body text-subtle">{found.url}</p>
         <p className="mt-2 text-body text-subtle">
-          Enter a name for your community profile. You can change it later.
+          {t("identityMore.profileHelp")}
         </p>
       </div>
       <WireframePanel>
@@ -85,9 +87,13 @@ export function ProfileStep({
           autoFocus
         />
       </WireframePanel>
-      {error && (
+      {error && (error.kind !== "raw" || error.message) && (
         <p role="alert" className="text-body text-danger">
-          {error}
+          {error.kind === "denied"
+            ? t("identityMore.profileDenied", { host: error.host })
+            : error.kind === "offline"
+              ? t("identity.failure.unreachable")
+              : error.message}
         </p>
       )}
       <div data-onboarding-actions="">
@@ -98,7 +104,7 @@ export function ProfileStep({
           loading={busy}
           disabled={!canContinue}
         >
-          Continue
+          {t("identity.continue")}
         </Button>
       </div>
     </form>
@@ -111,8 +117,8 @@ export function ProfileStep({
  * shown as is. */
 function publishFailure(host: string, error: unknown) {
   if (readErrorKind(error) === "denied")
-    return `${host} no longer admits this key. Ask a community administrator to restore your access.`;
+    return { kind: "denied", host } as const;
   return error instanceof Error
-    ? error.message
-    : "Could not reach the relay. Check your connection and try again.";
+    ? ({ kind: "raw", message: error.message } as const)
+    : ({ kind: "offline" } as const);
 }

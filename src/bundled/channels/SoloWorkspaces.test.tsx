@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { setLanguage } from "../../shared/i18n";
 import {
   act,
   cleanup,
@@ -31,6 +32,7 @@ const owners: ReturnType<typeof createRelaySession>[] = [];
 afterEach(() => {
   for (const owner of owners.splice(0)) owner.dispose();
   cleanup();
+  setLanguage("en");
   localStorage.clear();
 });
 
@@ -361,55 +363,81 @@ it("opens the exact project from an empty project's New chat row", async () => {
   }
 });
 
-it("marks a chat read from its row menu and reports a failed save", async () => {
-  const h = fixture();
-  const store = h.store();
-  const user = userEvent.setup();
-  const markChannelRead = vi
-    .fn()
-    .mockRejectedValueOnce(new Error("Read state unavailable"))
-    .mockResolvedValue(undefined);
-  const snapshot = (channelId: string, observedCount: number) => ({
-    target: { kind: "channel", channelId },
-    observedCount,
-    attentionCount: 0,
-    manual: "none",
-    coverage: "observed",
-    freshness: "observed",
-  });
-  const unreadChat = snapshot("chat", 3);
-  const readChat = snapshot("other", 0);
-  const unread = {
-    sync: () => ({ capability: "frontier-sync" }),
-    snapshot: (target: { channelId: string }) =>
-      target.channelId === "chat" ? unreadChat : readChat,
-    subscribe: () => () => {},
-    markChannelRead,
-    markUnreadLocal: vi.fn(),
-  };
-  render(h.view(store.queries, "viewer:community", unread));
-  try {
-    const actions = screen.getByRole("button", {
-      name: "Actions for Planning",
+it.each([
+  {
+    kind: "external",
+    error: new Error("Read state unavailable"),
+    english: "Read state unavailable",
+    korean: "Read state unavailable",
+  },
+  {
+    kind: "owned fallback",
+    error: undefined,
+    english: "Read state couldn’t be saved. Try again.",
+    korean: "읽음 상태를 저장하지 못했습니다. 다시 시도하세요.",
+  },
+  {
+    kind: "same-English external",
+    error: new Error("Read state couldn’t be saved. Try again."),
+    english: "Read state couldn’t be saved. Try again.",
+    korean: "Read state couldn’t be saved. Try again.",
+  },
+])(
+  "marks a chat read from its row menu and reports a failed save ($kind)",
+  async ({ error, english, korean }) => {
+    const h = fixture();
+    const store = h.store();
+    const user = userEvent.setup();
+    const markChannelRead = vi
+      .fn()
+      .mockRejectedValueOnce(error)
+      .mockResolvedValue(undefined);
+    const snapshot = (channelId: string, observedCount: number) => ({
+      target: { kind: "channel", channelId },
+      observedCount,
+      attentionCount: 0,
+      manual: "none",
+      coverage: "observed",
+      freshness: "observed",
     });
-    await user.click(actions);
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Mark as read" }),
-    );
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Read state unavailable",
-    );
-    await user.click(actions);
-    await user.click(
-      await screen.findByRole("menuitem", { name: "Mark as read" }),
-    );
-    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
-    expect(screen.queryByRole("menu")).toBeNull();
-    expect(markChannelRead).toHaveBeenNthCalledWith(2, "chat");
-  } finally {
-    store.dispose();
-  }
-});
+    const unreadChat = snapshot("chat", 3);
+    const readChat = snapshot("other", 0);
+    const unread = {
+      sync: () => ({ capability: "frontier-sync" }),
+      snapshot: (target: { channelId: string }) =>
+        target.channelId === "chat" ? unreadChat : readChat,
+      subscribe: () => () => {},
+      markChannelRead,
+      markUnreadLocal: vi.fn(),
+    };
+    render(h.view(store.queries, "viewer:community", unread));
+    try {
+      const actions = screen.getByRole("button", {
+        name: "Actions for Planning",
+      });
+      await user.click(actions);
+      await user.click(
+        await screen.findByRole("menuitem", { name: "Mark as read" }),
+      );
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent(english);
+      act(() => setLanguage("ko"));
+      expect(screen.getByRole("alert")).toBe(alert);
+      expect(alert).toHaveTextContent(korean);
+      act(() => setLanguage("en"));
+      expect(alert).toHaveTextContent(english);
+      await user.click(actions);
+      await user.click(
+        await screen.findByRole("menuitem", { name: "Mark as read" }),
+      );
+      await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+      expect(screen.queryByRole("menu")).toBeNull();
+      expect(markChannelRead).toHaveBeenNthCalledWith(2, "chat");
+    } finally {
+      store.dispose();
+    }
+  },
+);
 
 it("toggles a deferred collapse intent and protects a failed rename from workspace deletion", async () => {
   const h = fixture();

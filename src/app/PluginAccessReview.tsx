@@ -1,3 +1,10 @@
+import {
+  t,
+  useLanguage,
+  formattingLocale,
+  languagePreference,
+} from "../shared/i18n";
+import { rich } from "../shared/i18n/rich";
 import { type Ref, useContext, useSyncExternalStore } from "react";
 import { AgentsContext } from "../features/agents/react";
 import type { RegisteredAgentType } from "../features/agents/service";
@@ -17,6 +24,10 @@ import styles from "./PluginImport.module.css";
 const noSubscribe = () => () => {};
 const noTypes = () => EMPTY_TYPES;
 const EMPTY_TYPES: readonly RegisteredAgentType[] = [];
+const byteCount = (count: number) =>
+  languagePreference() === "en"
+    ? String(count)
+    : new Intl.NumberFormat(formattingLocale()).format(count);
 
 function ProgramDetails({
   program,
@@ -25,19 +36,30 @@ function ProgramDetails({
   program: string;
   args: readonly string[];
 }) {
+  useLanguage();
   return (
     <>
       <p className="mb-2 mt-1">
-        Program: <code className={styles.sourcePath}>{program}</code>
+        {rich("pluginManagement.access.program", {
+          program: <code className={styles.sourcePath}>{program}</code>,
+        })}
       </p>
-      <p className="mb-1 mt-0">Arguments{args.length ? ":" : ": none"}</p>
+      <p className="mb-1 mt-0">
+        {t(
+          args.length
+            ? "pluginManagement.access.arguments"
+            : "pluginManagement.access.noArguments",
+        )}
+      </p>
       {args.length > 0 && (
         <ol className="m-0 list-decimal space-y-2 pl-6">
           {args.map((argument, index) => (
             <li
               // biome-ignore lint/suspicious/noArrayIndexKey: Argument position is its identity; repeated values are valid.
               key={index}
-              aria-label={`Argument ${index + 1}`}
+              aria-label={t("pluginManagement.access.argument", {
+                index: index + 1,
+              })}
             >
               <pre className="m-0 whitespace-pre-wrap break-words">
                 <code className={styles.sourcePath}>{argument}</code>
@@ -58,39 +80,46 @@ function hostDeclarations(
     ...(manifest.host?.agentExecution ?? []).map((harness) => ({
       key: `agentExecution:${harness}`,
       signature: `Agent execution: ${harness}`,
-      title: "Agent execution:",
-      label: `Run ${types.find((type) => type.key === harness)?.title ?? harness} on another host`,
-      hint: "Can run native agent code and read files on that host. Buzz keeps the agent's identity.",
+      title: t("pluginManagement.access.executionTitle"),
+      label: t("pluginManagement.access.executionLabel", {
+        name: types.find((type) => type.key === harness)?.title ?? harness,
+      }),
+      hint: t("pluginManagement.access.executionHint"),
       icon: PlugIcon,
       details: <code className={styles.sourcePath}>{harness}</code>,
     })),
     ...(manifest.host?.agentHooks ?? []).map((harness) => ({
       key: `agentHooks:${harness}`,
       signature: `Agent hooks: ${harness}`,
-      title: "Agent hooks:",
-      label: `Observe and influence ${types.find((type) => type.key === harness)?.title ?? harness}`,
-      hint: "Can read hook events and change or block agent actions.",
+      title: t("pluginManagement.access.hooksTitle"),
+      label: t("pluginManagement.access.hooksLabel", {
+        name: types.find((type) => type.key === harness)?.title ?? harness,
+      }),
+      hint: t("pluginManagement.access.hooksHint"),
       icon: PlugIcon,
       details: <code className={styles.sourcePath}>{harness}</code>,
     })),
     ...(manifest.host?.commands ?? []).map((command) => ({
       key: `command:${command.id}`,
       signature: `Command ${command.id}: ${JSON.stringify([command.program, ...command.args])} · input: ${command.maxInputBytes === undefined ? "none" : `up to ${command.maxInputBytes} bytes`} · output: up to ${command.maxOutputBytes ?? 4096} bytes`,
-      title: `Command ${command.id}:`,
-      label: `Run ${command.program}`,
-      hint: "Run a program on your computer.",
+      title: t("pluginManagement.access.command", { id: command.id }),
+      label: t("pluginManagement.access.run", { program: command.program }),
+      hint: t("pluginManagement.access.commandHint"),
       icon: TerminalWindowIcon,
       details: (
         <>
           <ProgramDetails program={command.program} args={command.args} />
           <p className="mb-0 mt-2">
-            Input:{" "}
             {command.maxInputBytes === undefined
-              ? "none"
-              : `up to ${command.maxInputBytes} bytes`}
+              ? t("pluginManagement.access.inputNone")
+              : t("pluginManagement.access.inputBytes", {
+                  count: byteCount(command.maxInputBytes),
+                })}
           </p>
           <p className="m-0">
-            Output: up to {command.maxOutputBytes ?? 4096} bytes
+            {t("pluginManagement.access.outputBytes", {
+              count: byteCount(command.maxOutputBytes ?? 4096),
+            })}
           </p>
         </>
       ),
@@ -98,10 +127,10 @@ function hostDeclarations(
     ...(manifest.host?.networkOrigins ?? []).map((origin) => ({
       key: `origin:${origin}`,
       signature: `HTTPS origin: ${origin}`,
-      title: "HTTPS origin:",
-      name: `HTTPS origin ${origin}`,
-      label: `Connect to ${origin}`,
-      hint: "Buzz can make HTTPS requests to this address for the plugin.",
+      title: t("pluginManagement.access.originTitle"),
+      name: t("pluginManagement.access.originName", { origin }),
+      label: t("pluginManagement.access.originLabel", { origin }),
+      hint: t("pluginManagement.access.originHint"),
       icon: GlobeIcon,
       details: <code className={styles.sourcePath}>{origin}</code>,
     })),
@@ -109,9 +138,11 @@ function hostDeclarations(
       (operation) => ({
         key: `federated:${operation.method} ${operation.path}`,
         signature: `Federated authority ${manifest.host?.federatedIdentity?.authority}: ${operation.method} ${operation.path}`,
-        title: `Federated authority ${manifest.host?.federatedIdentity?.authority}:`,
+        title: t("pluginManagement.access.federatedTitle", {
+          authority: String(manifest.host?.federatedIdentity?.authority),
+        }),
         label: `${operation.method} ${operation.path}`,
-        hint: "Buzz can call this route with your community session for the plugin.",
+        hint: t("pluginManagement.access.federatedHint"),
         icon: GlobeIcon,
         details: <code className={styles.sourcePath}>{operation.path}</code>,
       }),
@@ -119,33 +150,42 @@ function hostDeclarations(
     ...(manifest.host?.processes ?? []).map((process) => ({
       key: `process:${process.id}`,
       signature: `Process ${process.id}: ${JSON.stringify([process.program, ...(process.args ?? [])])}${process.bundled ? " (bundled with Buzz)" : ""} · artifact: ${JSON.stringify(process.artifact ?? null)} and any further arguments · stdin, full user access`,
-      title: `Process ${process.id}:`,
-      label: `Start ${process.program}`,
-      hint: "Can start a background process with additional arguments, using your account’s full access.",
+      title: t("pluginManagement.access.processTitle", { id: process.id }),
+      label: t("pluginManagement.access.processLabel", {
+        program: process.program,
+      }),
+      hint: t("pluginManagement.access.processHint"),
       icon: TerminalWindowIcon,
       details: (
         <>
           <ProgramDetails program={process.program} args={process.args ?? []} />
-          {process.bundled && <p className="mb-0 mt-2">Bundled with Buzz.</p>}
+          {process.bundled && (
+            <p className="mb-0 mt-2">{t("pluginManagement.access.bundled")}</p>
+          )}
           {process.artifact && (
             <div className="mt-2 break-all">
               <p className="m-0">
-                Executable artifact: <code>{process.artifact.path}</code>
+                {rich("pluginManagement.access.artifact", {
+                  path: <code>{process.artifact.path}</code>,
+                })}
               </p>
               <p className="m-0">
-                SHA-256: <code>{process.artifact.sha256}</code>
+                {rich("pluginManagement.access.sha256", {
+                  hash: <code>{process.artifact.sha256}</code>,
+                })}
               </p>
               {process.artifact.siblings?.map((sibling) => (
                 <p className="m-0" key={sibling.name}>
-                  Sibling <code>{sibling.name}</code>:{" "}
-                  <code>{sibling.sha256}</code>
+                  {rich("pluginManagement.access.sibling", {
+                    name: <code>{sibling.name}</code>,
+                    hash: <code>{sibling.sha256}</code>,
+                  })}
                 </p>
               ))}
             </div>
           )}
           <p className="mb-0 mt-2">
-            Allows further arguments and standard input, with your account’s
-            full access.
+            {t("pluginManagement.access.processAccess")}
           </p>
         </>
       ),
@@ -156,14 +196,12 @@ function hostDeclarations(
             key: "mcp",
             signature:
               "MCP servers: tools served to local agents over loopback HTTP",
-            title: "MCP servers:",
-            label: "Provide tools to local agents",
-            hint: "Exposes plugin tools through Buzz’s local MCP server.",
+            title: t("pluginManagement.access.mcpTitle"),
+            label: t("pluginManagement.access.mcpLabel"),
+            hint: t("pluginManagement.access.mcpHint"),
             icon: PlugIcon,
             details: (
-              <p className="m-0">
-                Tools served to local agents over loopback HTTP.
-              </p>
+              <p className="m-0">{t("pluginManagement.access.mcpDetails")}</p>
             ),
           },
         ]
@@ -174,18 +212,13 @@ function hostDeclarations(
             key: "managedFiles",
             signature:
               "Managed files: temporary private saves · no file reading",
-            title: "Managed files:",
-            label: "Save temporary plugin files",
-            hint: "Save up to 16 MiB at a time in host-selected private storage, without file-reading access.",
+            title: t("pluginManagement.access.managedTitle"),
+            label: t("pluginManagement.access.managedLabel"),
+            hint: t("pluginManagement.access.managedHint"),
             icon: FolderOpenIcon,
             details: (
               <p className="m-0">
-                Shared storage is limited to 64 MiB and 16 files; any plugin can
-                fill it. Files normally remain for 24 hours, survive plugin
-                unload and app restart, and are removed on a later save after
-                expiry. Explicit app-data erase or user deletion can remove them
-                sooner. This does not grant file reading or arbitrary-path
-                writes.
+                {t("pluginManagement.access.managedDetails")}
               </p>
             ),
           },
@@ -197,15 +230,12 @@ function hostDeclarations(
             key: "files",
             signature:
               "Files: read any file and resolve folders · full user access",
-            title: "Files:",
-            label: "Read your files",
-            hint: "Can read any file your account can, and create folders it resolves.",
+            title: t("pluginManagement.access.filesTitle"),
+            label: t("pluginManagement.access.filesLabel"),
+            hint: t("pluginManagement.access.filesHint"),
             icon: FolderOpenIcon,
             details: (
-              <p className="m-0">
-                Reads files and resolves folders with your account’s full
-                access.
-              </p>
+              <p className="m-0">{t("pluginManagement.access.filesDetails")}</p>
             ),
           },
         ]
@@ -238,6 +268,7 @@ export function PluginAccessReview({
   unchangedTrigger?: Ref<HTMLButtonElement>;
   onShowUnchanged?: () => void;
 }) {
+  useLanguage();
   const agents = useContext(AgentsContext);
   const types = useSyncExternalStore(
     agents?.subscribe ?? noSubscribe,
@@ -280,7 +311,15 @@ export function PluginAccessReview({
     const previous = changed
       ? previousDetails.find((item) => item.key === grant.key)
       : undefined;
-    const changeLabel = changed ? (previous ? " (changed)" : " (added)") : "";
+    const changeLabel = (label: string) =>
+      changed
+        ? t(
+            previous
+              ? "pluginManagement.access.changed"
+              : "pluginManagement.access.added",
+            { label },
+          )
+        : label;
     const Icon = grant.icon;
     return {
       value: grant.signature,
@@ -289,9 +328,9 @@ export function PluginAccessReview({
           <Icon size={20} aria-hidden="true" className="shrink-0 text-muted" />
           <span className="min-w-0">
             <span className="block font-medium">
-              {removed ? "Removed: " : ""}
-              {grant.label}
-              {changeLabel}
+              {removed
+                ? t("pluginManagement.access.removed", { label: grant.label })
+                : changeLabel(grant.label)}
             </span>
             <span className="block text-muted">{grant.hint}</span>
           </span>
@@ -299,20 +338,30 @@ export function PluginAccessReview({
       ),
       content: (
         <section
-          aria-label={`${removed ? "Removed " : ""}${"name" in grant ? grant.name : grant.title.slice(0, -1)} details`}
+          aria-label={t(
+            removed
+              ? "pluginManagement.access.removedDetails"
+              : "pluginManagement.access.details",
+            {
+              name: String(
+                "name" in grant ? grant.name : grant.title.slice(0, -1),
+              ),
+            },
+          )}
           // biome-ignore lint/a11y/noNoninteractiveTabindex: Scroll owner supports keyboard access to long command details.
           tabIndex={0}
           className={styles.technicalDetails}
         >
-          <p className="m-0 font-medium">
-            {grant.title}
-            {changeLabel}
-          </p>
+          <p className="m-0 font-medium">{changeLabel(grant.title)}</p>
           {previous && (
             <>
-              <p className="mb-2 mt-3 text-label">Previously</p>
+              <p className="mb-2 mt-3 text-label">
+                {t("pluginManagement.access.previously")}
+              </p>
               {previous.details}
-              <p className="mb-2 mt-3 text-label">After this update</p>
+              <p className="mb-2 mt-3 text-label">
+                {t("pluginManagement.access.afterUpdate")}
+              </p>
             </>
           )}
           {grant.details}
@@ -321,7 +370,7 @@ export function PluginAccessReview({
     };
   }
   const allDeclarations = (
-    <section aria-label="Declared scopes">
+    <section aria-label={t("pluginManagement.access.declared")}>
       {(updating ? unchangedDetails : declaredDetails).length ? (
         <Accordion
           animate
@@ -331,36 +380,57 @@ export function PluginAccessReview({
           )}
         />
       ) : (
-        <p className="m-0">No additional capabilities declared.</p>
+        <p className="m-0">{t("pluginManagement.access.noAdditional")}</p>
       )}
     </section>
   );
 
   if (unchangedOnly) return allDeclarations;
   return (
-    <section aria-label="Computer access" className="text-body-sm">
+    <section
+      aria-label={t("pluginManagement.access.computer")}
+      className="text-body-sm"
+    >
       {updating && (
-        <section aria-label="Declared access changes" className="mb-4">
+        <section
+          aria-label={t("pluginManagement.access.changes")}
+          className="mb-4"
+        >
           <p className="mt-0 mb-2 text-label">
             {hasAccessChanges
-              ? "Declared access changes"
-              : "No declared access changes"}
+              ? t("pluginManagement.access.changes")
+              : t("pluginManagement.access.noChanges")}
           </p>
           {(
             [
-              ["Added", addedDetails],
-              ["Changed", changedDetails],
-              ["Removed", removedDetails],
+              [
+                "Added",
+                addedDetails,
+                "pluginManagement.access.addedGroup",
+                "pluginManagement.access.addedDeclarations",
+              ],
+              [
+                "Changed",
+                changedDetails,
+                "pluginManagement.access.changedGroup",
+                "pluginManagement.access.changedDeclarations",
+              ],
+              [
+                "Removed",
+                removedDetails,
+                "pluginManagement.access.removedGroup",
+                "pluginManagement.access.removedDeclarations",
+              ],
             ] as const
           ).map(
-            ([label, grants]) =>
+            ([label, grants, heading, declarations]) =>
               grants.length > 0 && (
                 <section
                   key={label}
-                  aria-label={`${label} declarations`}
+                  aria-label={t(declarations)}
                   className="mt-3"
                 >
-                  <p className="mt-0 mb-2 text-label">{label}</p>
+                  <p className="mt-0 mb-2 text-label">{t(heading)}</p>
                   <Accordion
                     animate
                     key={`${manifest.id}-${label}`}
@@ -375,8 +445,7 @@ export function PluginAccessReview({
       )}
       {updating ? (
         <p className="mt-0 mb-4 text-body-sm text-muted" role="note">
-          Plugins can access your computer beyond these declarations. Only
-          update code you trust.
+          {t("pluginManagement.access.updateTrust")}
         </p>
       ) : (
         <Accordion
@@ -393,29 +462,28 @@ export function PluginAccessReview({
                     aria-hidden="true"
                   />
                   <span>
-                    <span className="block font-medium">Computer access</span>
+                    <span className="block font-medium">
+                      {t("pluginManagement.access.computer")}
+                    </span>
                     <span className="block text-muted">
-                      Can access files and run programs on your computer.
+                      {t("pluginManagement.access.computerHint")}
                     </span>
                   </span>
                 </span>
               ),
               content: (
                 <section
-                  aria-label="Plugin safety"
+                  aria-label={t("pluginManagement.access.safety")}
                   className="max-w-prose pl-8 text-body"
                 >
                   <h4 className="mb-2 mt-0 text-label">
-                    Access beyond this list
+                    {t("pluginManagement.access.beyondTitle")}
                   </h4>
                   <p className="m-0">
-                    Plugins aren’t sandboxed. They can access your computer
-                    beyond these declarations, even when no additional
-                    capabilities are listed.
+                    {t("pluginManagement.access.notSandboxed")}
                   </p>
                   <p className="mb-0 mt-3 text-muted">
-                    These declarations describe what the plugin asks Buzz to do.
-                    They don’t limit what its code can do.
+                    {t("pluginManagement.access.notLimits")}
                   </p>
                 </section>
               ),
@@ -431,7 +499,7 @@ export function PluginAccessReview({
               size="inline"
               onClick={onShowUnchanged}
             >
-              View unchanged declarations
+              {t("pluginManagement.access.unchanged")}
             </Button>
           )
         : allDeclarations}

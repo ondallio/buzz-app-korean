@@ -1,4 +1,6 @@
-import { workflowLabel } from "../../features/relay/workflow-attribution";
+import { localMessage } from "../../shared/i18n/deferred-message";
+import { t, useLanguage, formattingLocale } from "../../shared/i18n";
+import { ko, enUS } from "react-day-picker/locale";
 import {
   useIdentityNames,
   useNamesRevision,
@@ -156,23 +158,24 @@ function useSearchAnnouncement(
   people: boolean,
   messages: boolean,
 ) {
-  const [announcement, setAnnouncement] = useState("");
+  useLanguage();
+  const [announcement, setAnnouncement] = useState(0);
   useEffect(() => {
-    const sources = [
-      channels && "channels",
-      people && "people",
-      messages && "messages",
-    ].filter(Boolean);
-    setAnnouncement((previous) => {
-      if (!sources.length) return "";
-      const names =
-        sources.length === 3
-          ? `${sources.slice(0, 2).join(", ")}, and ${sources[2]}`
-          : sources.join(" and ");
-      return previous || `Searching ${names}…`;
-    });
+    const mask = (channels ? 1 : 0) | (people ? 2 : 0) | (messages ? 4 : 0);
+    setAnnouncement((previous) => (mask ? previous || mask : 0));
   }, [channels, people, messages]);
-  return announcement;
+  const keys = [
+    "",
+    "search.searchingChannels",
+    "search.searchingPeople",
+    "search.searchingChannelsPeople",
+    "search.searchingMessages",
+    "search.searchingChannelsMessages",
+    "search.searchingPeopleMessages",
+    "search.searchingAll",
+  ] as const;
+  const key = keys[announcement];
+  return key ? t(key) : "";
 }
 
 export function SearchResults({
@@ -212,6 +215,7 @@ export function SearchResults({
   /** The sidebar's view scope, whose hidden DMs search leaves out too. */
   sidebarScope?: string | undefined;
 } & SearchInputProps) {
+  const language = useLanguage();
   const resolveName = useIdentityNames(session.names);
   const list = useChannelList(session.channels);
   const parsed = useMemo(() => parseSearchOperators(query.trim()), [query]);
@@ -346,7 +350,7 @@ export function SearchResults({
         operand,
         text: operand,
         edit: operand,
-        label: `Remove date ${operand}`,
+        label: localMessage("search.removeDate", { date: operand }),
       },
     );
   const localDate = (day: Date) =>
@@ -395,7 +399,7 @@ export function SearchResults({
               : `during:${date}`;
     return {
       key: `date:${label}`,
-      label,
+      label: datePresetLabel(label),
       detail: operand.slice(operand.indexOf(":") + 1),
       icon: CalendarIcon,
       run: () => completeDate(operand),
@@ -412,6 +416,14 @@ export function SearchResults({
       ),
     [channels, profiles, resolveName],
   );
+  const displayedConversationName = (channel: ChannelSummary) =>
+    channel.channelType === "dm" && channel.participants?.length === 0
+      ? t("search.notesSelf")
+      : (names.get(channel.id) ?? channel.name);
+  const displayedName = (id: string) => {
+    const channel = channels.find((item) => item.id === id);
+    return channel ? displayedConversationName(channel) : undefined;
+  };
   const operatorChannel = parsed.in ? normalizeInChannel(parsed.in) : "";
   // `in:@person` names your direct message with them, by key, `me` or name.
   const operatorPerson = operatorChannel.startsWith("@")
@@ -514,7 +526,9 @@ export function SearchResults({
           .map((channel) => ({
             key: `in:${channel.id}`,
             label: channel.name,
-            detail: channel.archived ? "Archived channel" : "Channel",
+            detail: channel.archived
+              ? t("search.archivedChannel")
+              : t("search.channel"),
             icon: ChatCircleIcon,
             // The id keeps the choice exact past any namesake; the chip shows
             // its name.
@@ -527,7 +541,9 @@ export function SearchResults({
                   operand: `in:${channel.id}`,
                   text: `in:#${channel.name}`,
                   edit: `in:#${channel.name}`,
-                  label: `Remove channel ${channel.name}`,
+                  label: localMessage("search.removeChannel", {
+                    name: channel.name,
+                  }),
                   title: channel.id,
                 },
               ),
@@ -741,7 +757,13 @@ export function SearchResults({
                     text: `${operator}:@${profile.name}`,
                     // Its first word reopens the picker on this person.
                     edit: `${operator}:@${profile.name.split(/\s/)[0]}`,
-                    label: `Remove ${conversation ? "conversation with" : "author"} ${profile.name}`,
+                    label: conversation
+                      ? localMessage("search.removeConversation", {
+                          name: profile.name,
+                        })
+                      : localMessage("search.removeAuthor", {
+                          name: profile.name,
+                        }),
                     title: npubEncode(pubkey),
                   },
                 );
@@ -1094,13 +1116,13 @@ export function SearchResults({
   const soloDetail = (channel: ChannelSummary) => {
     const agent = newChatAmong(channel.members);
     return agent && !matchingAll.includes(channel)
-      ? `Chat with ${agent.label}`
-      : "Chat";
+      ? t("search.chatWith", { name: agent.label })
+      : t("search.chat");
   };
   const conversationDestination = (
     channel: ChannelSummary,
   ): SearchDestination => {
-    const label = names.get(channel.id) ?? channel.name;
+    const label = displayedConversationName(channel);
     const matches = needle ? matchName(label, needle)?.positions : undefined;
     const key = `channel:${channel.id}`;
     return {
@@ -1109,19 +1131,19 @@ export function SearchResults({
       ...(matches ? { matches } : {}),
       detail: channel.archived
         ? channel.channelType === "solo"
-          ? "Archived chat"
-          : "Archived channel"
+          ? t("search.archivedChat")
+          : t("search.archivedChannel")
         : channel.readOnly && !channel.cached && channel.viewerRole !== "guest"
           ? channel.channelType === "solo"
             ? channel.joinRole === "guest"
-              ? "View-only chat"
-              : "Public chat · not joined"
-            : "Public channel · not joined"
+              ? t("search.viewOnly")
+              : t("search.publicChat")
+            : t("search.publicChannel")
           : channel.channelType === "dm"
-            ? "Direct message"
+            ? t("search.dm")
             : channel.channelType === "solo"
               ? soloDetail(channel)
-              : "Conversation",
+              : t("search.conversation"),
       icon: ChatCircleIcon,
       run: choose(key, () => openConversation(channel.id)),
     };
@@ -1135,7 +1157,7 @@ export function SearchResults({
           ...destination,
           detail: [
             destination.detail,
-            `${count} ${count === 1 ? "member" : "members"}`,
+            t(count === 1 ? "search.member" : "search.members", { count }),
           ]
             .filter(Boolean)
             .join(" · "),
@@ -1146,6 +1168,7 @@ export function SearchResults({
   const [personOpen, setPersonOpen] = useState<{
     name: string;
     error?: string;
+    failure?: "agent" | "open";
   }>();
   const personAttempt = useRef<
     { key: string; controller: AbortController } | undefined
@@ -1195,7 +1218,7 @@ export function SearchResults({
     ) {
       setPersonOpen({
         name,
-        error: "This agent is not ready to message in this community.",
+        failure: "agent",
       });
       return;
     }
@@ -1214,10 +1237,9 @@ export function SearchResults({
       if (!controller.signal.aborted)
         setPersonOpen({
           name,
-          error:
-            reason instanceof Error
-              ? reason.message
-              : "Could not open the conversation. Try again.",
+          ...(reason instanceof Error
+            ? { error: reason.message }
+            : { failure: "open" as const }),
         });
     } finally {
       if (personAttempt.current?.controller === controller)
@@ -1248,10 +1270,10 @@ export function SearchResults({
         person.fullName,
         person.username && `@${person.username}`,
         newSession
-          ? "New chat"
+          ? t("shell.new.chat")
           : dm
-            ? "Direct message"
-            : "Start a direct message",
+            ? t("search.dm")
+            : t("search.startDm"),
       ]
         .filter(Boolean)
         .join(" · "),
@@ -1345,14 +1367,16 @@ export function SearchResults({
       profiles.get(displayId)?.name ?? displayId.slice(0, 10),
       channel.members ?? noMembers,
     );
-    const name = thread.workflowOwnerId ? workflowLabel(resolved) : resolved;
+    const name = thread.workflowOwnerId
+      ? t("search.workflowOwner", { name: resolved })
+      : resolved;
     return {
       ...destination,
       detailIcon: MessageReplyIcon,
-      detailIconLabel: "Thread reply",
+      detailIconLabel: t("search.threadReply"),
       detail: thread.preview.trim()
         ? `${name}: ${thread.preview}`
-        : `${name} replied in a thread`,
+        : t("search.repliedThread", { name }),
       run: choose(destination.key, () =>
         openConversation(channel.id, thread.latestMessageId, thread.rootId),
       ),
@@ -1371,8 +1395,13 @@ export function SearchResults({
       ? [
           {
             key: `scope:${currentChannel.id}`,
-            label: `Search ${currentChannel.channelType === "dm" ? "conversation with" : "in"} ${names.get(currentChannel.id) ?? currentChannel.name}`,
-            detail: "Search messages in this conversation",
+            label: t(
+              currentChannel.channelType === "dm"
+                ? "search.searchConversation"
+                : "search.searchIn",
+              { name: displayedConversationName(currentChannel) },
+            ),
+            detail: t("search.searchMessagesConversation"),
             icon: ChatCircleIcon,
             run: () => {
               cancelPersonOpen();
@@ -1394,9 +1423,9 @@ export function SearchResults({
     return {
       key: message.id,
       label: message.preview,
-      detail: `${names.get(message.channelId) ?? channel?.name ?? "Conversation"} · ${message.workflowOwnerId ? workflowLabel(name) : name} · ${new Date(message.createdAt * 1000).toLocaleDateString()}`,
+      detail: `${displayedName(message.channelId) ?? (channel ? displayedConversationName(channel) : t("search.conversation"))} · ${message.workflowOwnerId ? t("search.workflowOwner", { name }) : name} · ${new Date(message.createdAt * 1000).toLocaleDateString(formattingLocale())}`,
       detailIcon: channel && channelIcon(channel),
-      detailIconLabel: channel && channelIconLabel(channel),
+      detailIconLabel: channel && searchIconLabel(channel),
       icon: ChatCircleIcon,
       run: () => {
         cancelPersonOpen();
@@ -1410,8 +1439,8 @@ export function SearchResults({
         {
           key: "more-messages",
           label: search.loadingMore
-            ? "Loading more messages…"
-            : "Show more messages",
+            ? t("search.loadingMoreMessages")
+            : t("search.showMoreMessages"),
           icon: ChatCircleIcon,
           run: () => {
             cancelPersonOpen();
@@ -1441,13 +1470,13 @@ export function SearchResults({
     list.status === "loading"
       ? undefined
       : operatorChannelAmbiguous
-        ? `More than one conversation is named “${operatorChannel}”. Search in that conversation instead.`
-        : `No conversation named “${operatorChannel}”.`;
+        ? t("search.ambiguousConversation", { name: operatorChannel })
+        : t("search.noConversation", { name: operatorChannel });
   const messageEmpty =
     operatorLookupPending || search.loading
       ? undefined
       : operatorLookupError || search.error
-        ? "Message search is unavailable."
+        ? t("search.messagesUnavailable")
         : operatorChannelProblem
           ? operatorChannelProblem
           : query.trim()
@@ -1456,13 +1485,18 @@ export function SearchResults({
               : search.tooShort
                 ? // Only the last word is matched as a prefix, so name it
                   // once earlier words make the whole query long enough.
-                  `Type at least ${MESSAGE_SEARCH_MIN_CHARS} characters${/\s/.test(parsed.text.trim()) ? " in the last word" : ""} to search messages.`
+                  t(
+                    /\s/.test(parsed.text.trim())
+                      ? "search.minLastWord"
+                      : "search.minMessages",
+                    { count: MESSAGE_SEARCH_MIN_CHARS },
+                  )
                 : search.onlyExclusions
-                  ? "Add a word or “phrase” to search for alongside -exclusions."
-                  : "No matching messages in accessible conversations."
+                  ? t("search.exclusions")
+                  : t("search.noMessages")
             : scopedChannelId
-              ? "Type to search messages in this conversation."
-              : "Type to search messages in this community.";
+              ? t("search.typeConversation")
+              : t("search.typeCommunity");
   // A retry removes its own focused button. Return focus to the combobox,
   // which owns keyboard navigation, before the retry starts.
   const retryFromInput = (retry: () => unknown) => () => {
@@ -1478,14 +1512,14 @@ export function SearchResults({
             empty: authorChoices.length
               ? undefined
               : authorSuggestions?.query !== query
-                ? "Searching people…"
+                ? t("search.searchingPeople")
                 : authorSuggestions.lookupFailed
-                  ? "People search is unavailable. Try a longer name."
+                  ? t("search.peopleUnavailable")
                   : authorNeedle && !searchable(authorNeedle)
-                    ? `Type at least ${SEARCH_MIN_CHARS} characters to search people.`
+                    ? t("search.minPeople", { count: SEARCH_MIN_CHARS })
                     : authorNeedle
-                      ? "No matching people. Try a different name."
-                      : "Type a name to search people.",
+                      ? t("search.noPeople")
+                      : t("search.typeName"),
           },
           {
             label: "Agents",
@@ -1499,7 +1533,7 @@ export function SearchResults({
               : {
                   label: "Channels",
                   destinations: channelChoices,
-                  empty: "No matching channels.",
+                  empty: t("search.noChannels"),
                 },
           ]
         : scopedChannelId || hasOperator
@@ -1508,7 +1542,7 @@ export function SearchResults({
                 label: messageOrder,
                 rank: Infinity,
                 destinations: messageRows,
-                headingStatus: slowMessages ? "Searching…" : undefined,
+                headingStatus: slowMessages ? t("search.searching") : undefined,
                 empty: messageEmpty,
               },
             ]
@@ -1527,8 +1561,8 @@ export function SearchResults({
                         destinations: recent,
                         empty:
                           list.status === "loading"
-                            ? "Loading recent conversations…"
-                            : "No recent activity yet.",
+                            ? t("search.loadingRecent")
+                            : t("search.noRecent"),
                       },
                     ]
                   : []),
@@ -1562,12 +1596,16 @@ export function SearchResults({
                     label: "Channels",
                     destinations: channelResults.map(channelDestination),
                     best: Math.min(...channelResults.map(channelRank)),
-                    headingStatus: slowChannels ? "Searching…" : undefined,
+                    headingStatus: slowChannels
+                      ? t("search.searching")
+                      : undefined,
                   },
                   {
                     label: "People",
                     destinations: personResults,
-                    headingStatus: slowPeople ? "Searching…" : undefined,
+                    headingStatus: slowPeople
+                      ? t("search.searching")
+                      : undefined,
                     best: Math.min(...personResults.map(({ score }) => score)),
                   },
                   {
@@ -1579,16 +1617,30 @@ export function SearchResults({
                   },
                   {
                     label: "Pages",
-                    // PageSearch already ranked these by text and underlined
-                    // them; here usage and earlier choices adjust the order.
+                    // Keep name-only ranking here: detail matches affect
+                    // inclusion, while usage and earlier choices adjust order.
                     destinations: byMatch(pages, (page) =>
-                      rankOf(page.label, page.key),
+                      searchOrder(usage, picked, {
+                        key: page.key,
+                        rank:
+                          page.labelMatchRank ??
+                          rankName(page.label) ??
+                          MatchRank.inOrder + 1,
+                      }),
                     ).map((page) => ({
                       ...page,
                       run: choose(page.key, page.run),
                     })),
                     best: Math.min(
-                      ...pages.map((page) => rankOf(page.label, page.key)),
+                      ...pages.map((page) =>
+                        searchOrder(usage, picked, {
+                          key: page.key,
+                          rank:
+                            page.labelMatchRank ??
+                            rankName(page.label) ??
+                            MatchRank.inOrder + 1,
+                        }),
+                      ),
                     ),
                   },
                 ]
@@ -1622,7 +1674,9 @@ export function SearchResults({
                   label: messageOrder,
                   rank: Infinity,
                   destinations: messageRows,
-                  headingStatus: slowMessages ? "Searching…" : undefined,
+                  headingStatus: slowMessages
+                    ? t("search.searching")
+                    : undefined,
                   empty:
                     directMessageResults.length ||
                     chatResults.length ||
@@ -1658,7 +1712,9 @@ export function SearchResults({
       displayQuery={displayQuery}
       onDisplayQueryChange={updateDisplayQuery}
       input={input}
-      label={scopedChannelId ? "Search this conversation" : "Search Buzz"}
+      label={
+        scopedChannelId ? t("search.conversationSearch") : t("search.buzz")
+      }
       scopeAction={
         scopedChannelId && session.searchSort && parsed.text ? (
           <MenuRoot>
@@ -1667,8 +1723,8 @@ export function SearchResults({
                 <IconButton
                   {...props}
                   variant="ghost"
-                  aria-label="Sort messages"
-                  title="Sort messages"
+                  aria-label={t("search.sortMessages")}
+                  title={t("search.sortMessages")}
                   icon={<ArrowsDownUpIcon size={16} aria-hidden="true" />}
                 />
               )}
@@ -1676,7 +1732,7 @@ export function SearchResults({
             <MenuPopup
               align="end"
               size="compact"
-              aria-label="Sort messages"
+              aria-label={t("search.sortMessages")}
               finalFocus={input}
             >
               <MenuRadioGroup
@@ -1686,10 +1742,10 @@ export function SearchResults({
                 }
               >
                 <MenuRadioItem value="relevance" closeOnClick>
-                  Most relevant
+                  {t("search.relevance")}
                 </MenuRadioItem>
                 <MenuRadioItem value="newest" closeOnClick>
-                  Most recent
+                  {t("search.recentOrder")}
                 </MenuRadioItem>
               </MenuRadioGroup>
             </MenuPopup>
@@ -1700,14 +1756,18 @@ export function SearchResults({
         scopedChannelId && onScopeChange
           ? {
               label:
-                names.get(scopedChannelId) ??
+                displayedName(scopedChannelId) ??
                 session.channels.get?.(scopedChannelId)?.name ??
-                "Conversation",
+                t("search.conversation"),
               onRemove: () => onScopeChange(),
             }
           : undefined
       }
-      groups={groups}
+      groups={groups.map((group) => ({
+        ...group,
+        id: group.label,
+        label: groupLabel(group.label),
+      }))}
       open={open}
       highlightEmpty={!scopedChannelId && !query.trim() && unread.length > 0}
       // Enter before any row, or on search actions alone, waits for a
@@ -1734,7 +1794,8 @@ export function SearchResults({
       {dateOperator === "on" && (
         <Calendar
           mode="single"
-          aria-label="Choose a day"
+          locale={language === "ko" ? ko : enUS}
+          aria-label={t("search.chooseDay")}
           onSelect={(day) => {
             if (day) completeDate(`on:${localDate(day)}`);
             input.current?.focus();
@@ -1746,11 +1807,11 @@ export function SearchResults({
         aria-live="polite"
       >
         {list.status === "loading" && query.trim() && !list.channels.length && (
-          <p>Loading joined conversations…</p>
+          <p>{t("search.loadingJoined")}</p>
         )}
         {list.status === "error" && (
           <div>
-            <p>Couldn’t load all joined conversations.</p>
+            <p>{t("search.joinedFailed")}</p>
             <Button
               size="sm"
               variant="ghost"
@@ -1760,17 +1821,15 @@ export function SearchResults({
                   : session.channels.ensureList(),
               )}
             >
-              Retry conversations
+              {t("search.retryConversations")}
             </Button>
           </div>
         )}
-        {list.coverage === "partial" && (
-          <p>Conversation names include only loaded joined conversations.</p>
-        )}
+        {list.coverage === "partial" && <p>{t("search.joinedPartial")}</p>}
         {query.trim() &&
           !scopedChannelId &&
           (publicChannels.partial || operatorPublicChannels.partial) && (
-            <p>Only the newest open channels were searched.</p>
+            <p>{t("search.channelsPartial")}</p>
           )}
         {!scopedChannelId && publicChannels.error && (
           <div>
@@ -1780,7 +1839,7 @@ export function SearchResults({
               variant="ghost"
               onClick={retryFromInput(publicChannels.retry)}
             >
-              Retry channels
+              {t("search.retryChannels")}
             </Button>
           </div>
         )}
@@ -1792,25 +1851,31 @@ export function SearchResults({
               variant="ghost"
               onClick={retryFromInput(operatorPublicChannels.retry)}
             >
-              Retry channels
+              {t("search.retryChannels")}
             </Button>
           </div>
         )}
         {personOpen && (
-          <p role={personOpen.error ? "alert" : undefined}>
+          <p
+            role={personOpen.error || personOpen.failure ? "alert" : undefined}
+          >
             {personOpen.error ??
-              `Opening your conversation with ${personOpen.name}…`}
+              (personOpen.failure === "agent"
+                ? t("search.agentNotReady")
+                : personOpen.failure === "open"
+                  ? t("search.openFailed")
+                  : t("search.openingConversation", { name: personOpen.name }))}
           </p>
         )}
         {peopleActive && personDirectory.error && (
           <div>
-            <p>Couldn’t search community people.</p>
+            <p>{t("search.peopleFailed")}</p>
             <Button
               size="sm"
               variant="ghost"
               onClick={retryFromInput(personDirectory.retry)}
             >
-              Retry people
+              {t("search.retryPeople")}
             </Button>
           </div>
         )}
@@ -1823,7 +1888,7 @@ export function SearchResults({
               variant="ghost"
               onClick={retryFromInput(search.retry)}
             >
-              Retry messages
+              {t("search.retryMessages")}
             </Button>
           </div>
         )}
@@ -1833,4 +1898,48 @@ export function SearchResults({
       </p>
     </SearchChoices>
   );
+}
+
+function datePresetLabel(source: string): string {
+  const keys = {
+    Today: "date.today",
+    Yesterday: "date.yesterday",
+    "This week": "search.thisWeek",
+    "Last week": "search.lastWeek",
+    "This month": "search.thisMonth",
+    "This year": "search.thisYear",
+  } as const;
+  const key = keys[source as keyof typeof keys];
+  return key ? t(key) : source;
+}
+function groupLabel(source: string): string {
+  const keys = {
+    People: "search.people",
+    Agents: "search.agents",
+    Dates: "search.dates",
+    Channels: "search.channels",
+    "Most relevant": "search.relevance",
+    "Most recent": "search.recentOrder",
+    Unread: "search.unread",
+    "This conversation": "search.thisConversation",
+    "Recent activity": "search.recentActivity",
+    Chats: "search.chats",
+    "Direct messages": "search.dms",
+    Pages: "search.pages",
+  } as const;
+  const key = Object.hasOwn(keys, source)
+    ? keys[source as keyof typeof keys]
+    : undefined;
+  return key ? t(key) : source;
+}
+
+function searchIconLabel(channel: ChannelSummary): string {
+  const label = channelIconLabel(channel);
+  return label === "Chat"
+    ? t("search.chat")
+    : label === "Direct message"
+      ? t("search.dm")
+      : label === "Private channel"
+        ? t("search.privateChannelLabel")
+        : t("search.publicChannelLabel");
 }

@@ -1,3 +1,4 @@
+import { setLanguage } from "../../shared/i18n";
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import {
@@ -28,6 +29,7 @@ const setupProps = () => ({
 });
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.restoreAllMocks();
   localStorage.clear();
   store.dispose();
@@ -1145,4 +1147,135 @@ it("creates a plain channel from a template that adds nothing here", async () =>
       },
     }),
   );
+});
+
+it("keeps raw creation draft/group and the same pending submit through EN→KO→EN", async () => {
+  let finish!: () => void;
+  const create = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const close = vi.fn();
+  render(
+    <CreateChannelDialog
+      {...setupProps()}
+      destinations={[{ id: "raw-group", name: "User {group} 한글" }]}
+      initialGroup="raw-group"
+      open
+      onOpenChange={close}
+      onCreate={create}
+    />,
+  );
+  const name = screen.getByRole("textbox", { name: "Name" });
+  const description = screen.getByRole("textbox", { name: "Description" });
+  fireEvent.change(name, { target: { value: "raw-name" } });
+  fireEvent.change(description, {
+    target: { value: "Raw {description} 한글" },
+  });
+  if (!(name instanceof HTMLInputElement))
+    throw new Error("Expected name field");
+  name.focus();
+  name.setSelectionRange(2, 5);
+  const submit = screen.getByRole("button", { name: "Create channel" });
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("dialog", { name: "User {group} 한글에 채널 만들기" }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "이름" })).toBe(name);
+  expect(name).toHaveFocus();
+  expect([name.selectionStart, name.selectionEnd]).toEqual([2, 5]);
+  expect(screen.getByRole("textbox", { name: "설명" })).toBe(description);
+  expect(screen.getByRole("button", { name: "채널 만들기" })).toBe(submit);
+  await userEvent.setup().click(submit);
+  try {
+    expect(create).toHaveBeenCalledExactlyOnceWith({
+      name: "raw-name",
+      description: "Raw {description} 한글",
+      visibility: "open",
+      setup: { agents: [], canvas: "", groupId: "raw-group", templateId: "" },
+    });
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("button", { name: "Create channel" })).toBe(submit);
+    expect(submit).toHaveAttribute("aria-busy", "true");
+    expect(create).toHaveBeenCalledTimes(1);
+  } finally {
+    await act(async () => finish());
+  }
+  expect(close).toHaveBeenCalledExactlyOnceWith(false);
+});
+
+it.each([
+  [undefined, "채널을 만들지 못했습니다."],
+  [
+    new Error("The channel could not be created."),
+    "The channel could not be created.",
+  ],
+] as const)(
+  "retains error provenance and the same editable draft after creation failure %s",
+  async (reason, korean) => {
+    const create = vi.fn<() => Promise<void>>().mockRejectedValue(reason);
+    render(
+      <CreateChannelDialog
+        {...setupProps()}
+        open
+        onOpenChange={() => {}}
+        onCreate={create}
+      />,
+    );
+    const input = screen.getByRole("textbox", { name: "Name" });
+    fireEvent.change(input, { target: { value: "raw-name" } });
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Create channel" }));
+    const error = await screen.findByRole("alert");
+    expect(error).toHaveTextContent("The channel could not be created.");
+    if (!(input instanceof HTMLInputElement))
+      throw new Error("Expected name field");
+    input.focus();
+    input.setSelectionRange(2, 4);
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("alert")).toBe(error);
+    expect(error).toHaveTextContent(korean);
+    expect(screen.getByRole("textbox", { name: "이름" })).toBe(input);
+    expect(input).toHaveValue("raw-name");
+    expect(input).toHaveFocus();
+    expect([input.selectionStart, input.selectionEnd]).toEqual([2, 4]);
+    act(() => setLanguage("en"));
+    expect(error).toHaveTextContent("The channel could not be created.");
+    expect(create).toHaveBeenCalledExactlyOnceWith({
+      name: "raw-name",
+      visibility: "open",
+    });
+  },
+);
+
+it("localizes the proven local description validator while retaining its reserved token and submitted draft", () => {
+  const create = vi.fn(async () => {});
+  render(
+    <CreateChannelDialog
+      {...setupProps()}
+      open
+      onOpenChange={() => {}}
+      onCreate={create}
+    />,
+  );
+  fireEvent.change(screen.getByRole("textbox", { name: "Name" }), {
+    target: { value: "raw-name" },
+  });
+  const description = screen.getByRole("textbox", { name: "Description" });
+  fireEvent.change(description, {
+    target: { value: "Raw Buzz Huddle (user text)" },
+  });
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByText(
+      '설명에서 "Buzz Huddle ("를 제거하세요. Buzz에서 허들용으로 사용하는 문구입니다.',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "설명" })).toBe(description);
+  expect(description).toHaveValue("Raw Buzz Huddle (user text)");
+  expect(screen.getByRole("button", { name: "채널 만들기" })).toBeDisabled();
+  expect(create).not.toHaveBeenCalled();
 });

@@ -10,7 +10,8 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useMemo, useState, type ComponentProps } from "react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../../shared/i18n/language";
 import type { RelayEvent } from "../relay/events";
 import {
   ARTIFACT_KIND,
@@ -26,7 +27,11 @@ import type { Agents, ConfigHistory } from "./service";
 import type { HistorySelection } from "./history-presentation";
 import { HISTORY_PAGE } from "./agent-config-history";
 
-afterEach(cleanup);
+beforeEach(() => setLanguage("en"));
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 const channel = "9b353519-f4fe-4757-aef4-bec6cc0ae54c";
 const d = "5b1d3b52-6c4e-5a0b-8e3c-1f2a3b4c5d6e";
 const expected = { channel, d, type: "buzz.agent.instructions" as const };
@@ -126,7 +131,24 @@ it("shows recent versions relatively and older dates with an exact timestamp", (
     expect(time).toHaveAttribute("datetime", "2026-11-03T18:00:00.000Z");
     expect(time.getAttribute("title")).toMatch(/2026/);
     expect(time.getAttribute("title")).toMatch(/:00:00/);
-    expect(screen.getByText("Oct 27, 2025")).toBeVisible();
+    const oldDate = new Date(old.created_at * 1000);
+    const oldTime = screen.getByText(
+      new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }).format(oldDate),
+    );
+    expect(oldTime).toBeVisible();
+    expect(oldTime.tagName).toBe("TIME");
+    expect(oldTime).toHaveAttribute("datetime", "2025-10-27T18:00:00.000Z");
+    expect(oldTime).toHaveAttribute(
+      "title",
+      new Intl.DateTimeFormat("en-US", {
+        dateStyle: "full",
+        timeStyle: "long",
+      }).format(oldDate),
+    );
   } finally {
     clock.mockRestore();
   }

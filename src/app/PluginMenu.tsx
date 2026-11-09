@@ -1,3 +1,9 @@
+import { t, useLanguage } from "../shared/i18n";
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../shared/i18n/deferred-message";
 import { useRef, useState } from "react";
 import type { PluginInfo } from "../plugins/types";
 import type { PluginManager } from "../plugins/manager";
@@ -19,7 +25,7 @@ export function PluginMenu({
   plugin,
   plugins,
   busy,
-  label = "More plugin actions",
+  label,
   toggle,
   onRemoved,
   openUpdateSettings = false,
@@ -32,16 +38,19 @@ export function PluginMenu({
   toggle?: { label: string; disabled: boolean; run(): void };
   openUpdateSettings?: boolean;
 }) {
+  useLanguage();
   const deleteTrigger = useRef<HTMLButtonElement>(null);
   const cancelDelete = useRef<HTMLButtonElement>(null);
   const rollBack = useRef<HTMLButtonElement>(null);
   const updateChoice = useRef<HTMLDivElement>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<DisplayMessage | null>(null);
   const [confirmRollback, setConfirmRollback] = useState(false);
   const [rollingBack, setRollingBack] = useState(false);
-  const [rollbackError, setRollbackError] = useState<string | null>(null);
+  const [rollbackError, setRollbackError] = useState<DisplayMessage | null>(
+    null,
+  );
   const [showAccess, setShowAccess] = useState(false);
   if (plugin.source !== "external") return null;
   return (
@@ -56,7 +65,9 @@ export function PluginMenu({
           render={
             <IconButton
               ref={deleteTrigger}
-              aria-label={label}
+              aria-label={
+                label === undefined ? t("pluginRequests.moreActions") : label
+              }
               size="sm"
               disabled={busy}
               icon={<DotsThreeIcon size={16} aria-hidden="true" />}
@@ -65,14 +76,16 @@ export function PluginMenu({
         />
         <MenuPopup
           align="end"
-          aria-label="Plugin actions"
+          aria-label={t("pluginRequests.pluginActions")}
           finalFocus={
             confirmDelete || confirmRollback || showAccess
               ? false
               : deleteTrigger
           }
         >
-          <MenuItem onClick={() => setShowAccess(true)}>Review access</MenuItem>
+          <MenuItem onClick={() => setShowAccess(true)}>
+            {t("pluginRequests.reviewAccess")}
+          </MenuItem>
           {plugin.manifest.updates &&
             plugin.updateSource &&
             "repository" in plugin.updateSource && (
@@ -89,7 +102,7 @@ export function PluginMenu({
                   )
                 }
               >
-                Check for updates automatically
+                {t("pluginRequests.autoUpdate")}
               </MenuCheckboxItem>
             )}
           {toggle && (
@@ -105,7 +118,7 @@ export function PluginMenu({
                 setConfirmRollback(true);
               }}
             >
-              Roll back
+              {t("pluginRequests.rollback")}
             </MenuItem>
           )}
           {plugin.source === "external" && (
@@ -117,7 +130,7 @@ export function PluginMenu({
                 setConfirmDelete(true);
               }}
             >
-              Delete
+              {t("pluginRequests.delete")}
             </MenuItem>
           )}
         </MenuPopup>
@@ -125,16 +138,22 @@ export function PluginMenu({
       <Dialog
         open={showAccess}
         onOpenChange={setShowAccess}
-        title="What this plugin can do"
+        title={t("pluginRequests.accessTitle")}
         finalFocus={deleteTrigger}
-        actions={<Button onClick={() => setShowAccess(false)}>Done</Button>}
+        actions={
+          <Button onClick={() => setShowAccess(false)}>
+            {t("pluginRequests.done")}
+          </Button>
+        }
       >
         <PluginAccessReview manifest={plugin.manifest} />
       </Dialog>
       {confirmRollback && (
         <AlertDialog
-          title={`Roll back ${plugin.manifest.name}?`}
-          description="Restore the previous installed version. You can update again from the source folder or repository."
+          title={t("pluginRequests.rollbackTitle", {
+            name: plugin.manifest.name,
+          })}
+          description={t("pluginRequests.rollbackDescription")}
           pending={busy || rollingBack}
           initialFocus={rollBack}
           finalFocus={deleteTrigger}
@@ -145,7 +164,7 @@ export function PluginMenu({
                 disabled={busy || rollingBack}
                 onClick={() => setConfirmRollback(false)}
               >
-                Cancel
+                {t("pluginRequests.cancel")}
               </Button>
               <Button
                 ref={rollBack}
@@ -172,29 +191,31 @@ export function PluginMenu({
                     else
                       setRollbackError(
                         plugins.snapshot().error ??
-                          "Plugin rollback wasn’t confirmed. Try again.",
+                          localMessage("pluginRequests.rollbackUnconfirmed"),
                       );
                   } finally {
                     setRollingBack(false);
                   }
                 }}
               >
-                Roll back
+                {t("pluginRequests.rollback")}
               </Button>
             </>
           }
         >
           {rollbackError && (
             <p role="alert" className="error text-body-sm">
-              {rollbackError}
+              {resolveMessage(rollbackError)}
             </p>
           )}
         </AlertDialog>
       )}
       {confirmDelete && (
         <AlertDialog
-          title={`Delete ${plugin.manifest.name}?`}
-          description="Removes this plugin and its rollback history from Buzz. You can install it again later."
+          title={t("pluginRequests.deleteConfirmTitle", {
+            name: plugin.manifest.name,
+          })}
+          description={t("pluginRequests.deleteDescription")}
           pending={busy || deleting}
           finalFocus={deleteTrigger}
           initialFocus={cancelDelete}
@@ -206,7 +227,7 @@ export function PluginMenu({
                 disabled={busy || deleting}
                 onClick={() => setConfirmDelete(false)}
               >
-                Cancel
+                {t("pluginRequests.cancel")}
               </Button>
               <Button
                 variant="destructive"
@@ -222,21 +243,21 @@ export function PluginMenu({
                     } else
                       setDeleteError(
                         plugins.snapshot().error ??
-                          "Plugin deletion wasn’t confirmed. Try again.",
+                          localMessage("pluginRequests.deleteUnconfirmed"),
                       );
                   } finally {
                     setDeleting(false);
                   }
                 }}
               >
-                Delete plugin
+                {t("pluginRequests.deletePlugin")}
               </Button>
             </>
           }
         >
           {deleteError && (
             <p role="alert" className="error text-body-sm">
-              {deleteError}
+              {resolveMessage(deleteError)}
             </p>
           )}
         </AlertDialog>

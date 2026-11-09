@@ -5,9 +5,17 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import type { SessionSnapshot } from "./service";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
-import { CommunitySignIn } from "./CommunitySignIn";
+import { setLanguage } from "../../shared/i18n";
+import {
+  CommunitySignIn,
+  recoveryMessage,
+  SIGN_IN_TIMED_OUT,
+} from "./CommunitySignIn";
 import { federatedFixture } from "./testing";
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 it.each(["storage-unavailable", "storage-denied"])(
   "gives secure-storage recovery instead of exposing %s",
   (failure) => {
@@ -294,3 +302,80 @@ it.each([
     expect(retry).toHaveBeenCalledOnce();
   },
 );
+
+it("updates retained code-based recovery in place without changing canonical producer messages or starting a new sign-in", async () => {
+  setLanguage("en");
+  const h = federatedFixture();
+  vi.mocked(h.service.signIn).mockRejectedValueOnce(new Error("storage-busy"));
+  const retry = vi.fn();
+  render(
+    <CommunitySignIn
+      identity={h.service}
+      error="Federated sign-in is required"
+      retry={retry}
+    />,
+  );
+  const button = screen.getByRole("button", {
+    name: "Sign in with builderlab.example",
+  });
+  await userEvent.setup().click(button);
+  const alert = screen.getByRole("alert");
+  expect(alert).toHaveTextContent(
+    "Secure storage is busy. Close another Buzz instance and try again.",
+  );
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("button", { name: "builderlab.example(으)로 로그인" }),
+  ).toBe(button);
+  expect(button).toHaveFocus();
+  expect(screen.getByRole("alert")).toBe(alert);
+  expect(alert).toHaveTextContent(
+    "보안 저장소가 사용 중입니다. 다른 Buzz 창을 닫고 다시 시도해 주세요.",
+  );
+  expect(h.service.signIn).toHaveBeenCalledExactlyOnceWith();
+  expect(recoveryMessage("storage-busy")).toBe(
+    "Secure storage is busy. Close another Buzz instance and try again.",
+  );
+  expect(recoveryMessage("sign-in-timed-out")).toBe(
+    "Sign-in timed out. Try again.",
+  );
+  expect(SIGN_IN_TIMED_OUT).toBe("Sign-in timed out. Try again.");
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("button", { name: "Sign in with builderlab.example" }),
+  ).toBe(button);
+  await userEvent.setup().click(button);
+  expect(retry).toHaveBeenCalledExactlyOnceWith();
+});
+
+it("translates the entire retained account-switch failure while preserving its original sign-out attempt", async () => {
+  setLanguage("en");
+  const h = federatedFixture();
+  h.publish({ status: "signed-in", email: "user@example.org" });
+  vi.mocked(h.service.signOut).mockRejectedValueOnce(new Error("storage-busy"));
+  render(
+    <CommunitySignIn
+      identity={h.service}
+      error="binding-mismatch"
+      retry={vi.fn()}
+    />,
+  );
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "Switch account" }));
+  const alert = screen.getByRole("alert");
+  expect(alert).toHaveTextContent(
+    "Couldn’t switch your builderlab.example account. Secure storage is busy. Close another Buzz instance and try again.",
+  );
+  const retry = screen.getByRole("button", { name: "Try again" });
+  retry.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("alert")).toBe(alert);
+  expect(alert).toHaveTextContent(
+    "builderlab.example 계정을 전환하지 못했습니다. 보안 저장소가 사용 중입니다. 다른 Buzz 창을 닫고 다시 시도해 주세요.",
+  );
+  expect(screen.getByRole("button", { name: "다시 시도" })).toBe(retry);
+  expect(retry).toHaveFocus();
+  expect(h.service.signOut).toHaveBeenCalledExactlyOnceWith();
+  expect(h.service.signIn).not.toHaveBeenCalled();
+});

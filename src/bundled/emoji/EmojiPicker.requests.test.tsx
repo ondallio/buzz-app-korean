@@ -13,9 +13,11 @@ import { createRelaySession } from "../../features/relay/session";
 import { relayGifRequests } from "../../features/relay/gifs";
 import { createGifShortcut } from "./gif-shortcut";
 import { EmojiPicker } from "./EmojiPicker";
+import { setLanguage } from "../../shared/i18n/language";
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   localStorage.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -402,6 +404,156 @@ it("keeps the newest composer shortcut target when older discovery completes", a
     await screen.findByRole("searchbox", { name: "Search GIFs" });
     expect(newerSupports).toHaveBeenCalledOnce();
   } finally {
+    owner.dispose();
+  }
+});
+
+it("keeps the GIF request and focused query through language changes, then inserts the exact provider Markdown", async () => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  const owner = createRelaySession(null);
+  const asset = {
+    url: "https://example.test/raw.gif",
+    width: 100,
+    height: 100,
+    size: 20,
+  };
+  let finish: (value: import("../../features/relay/gifs").KlipyGif[]) => void =
+    () => {
+      throw new Error("Missing GIF gate");
+    };
+  const search = vi.fn(
+    (_community: string, _query: string, _signal?: AbortSignal) =>
+      new Promise<import("../../features/relay/gifs").KlipyGif[]>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const supports = vi.fn(async () => true);
+  const insert = vi.fn();
+  render(
+    <EmojiPicker
+      session={owner.session}
+      scope={`https://example.test:${"ab".repeat(32)}`}
+      disabled={false}
+      insert={insert}
+      gifRequests={{ supports, search }}
+    />,
+  );
+  try {
+    fireEvent.click(screen.getByRole("button", { name: "Emoji and GIFS" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "GIF" }));
+    const input = await screen.findByRole("searchbox", { name: "Search GIFs" });
+    input.focus();
+    await vi.waitFor(() => expect(search).toHaveBeenCalledTimes(1));
+    const signal = search.mock.calls[0]?.[2];
+    fireEvent.change(input, { target: { value: "x" } });
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("searchbox", { name: "GIF 검색" })).toBe(input);
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue("x");
+    const clear = screen.getByRole("button", { name: "GIF 검색 지우기" });
+    fireEvent.click(clear);
+    expect(input).toHaveValue("");
+    expect(input).toHaveFocus();
+    expect(
+      screen.getByRole("status", { name: "GIF 불러오는 중" }),
+    ).toBeVisible();
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(signal?.aborted).toBe(false);
+    await act(async () =>
+      finish([
+        {
+          id: 3,
+          slug: "raw",
+          title: "Hello {raw} 한국어",
+          preview: asset,
+          original: asset,
+        },
+      ]),
+    );
+    const choice = await screen.findByRole("button", {
+      name: "Hello {raw} 한국어 선택",
+    });
+    expect(choice).toHaveAttribute("title", "Hello {raw} 한국어");
+    act(() => setLanguage("en"));
+    expect(
+      screen.getByRole("button", { name: "Choose Hello {raw} 한국어" }),
+    ).toBe(choice);
+    expect(supports).toHaveBeenCalledTimes(1);
+    expect(search).toHaveBeenCalledTimes(1);
+    fireEvent.click(choice);
+    expect(insert).toHaveBeenCalledExactlyOnceWith(
+      "![Hello {raw} 한국어](https://example.test/raw.gif)",
+    );
+  } finally {
+    finish([]);
+    cleanup();
+    owner.dispose();
+  }
+});
+
+it("translates retained discovery failure without retrying and keeps external GIF errors literal", async () => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  const owner = createRelaySession(null);
+  const supports = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("external discovery detail"))
+    .mockResolvedValue(true);
+  const search = vi
+    .fn()
+    .mockRejectedValue(new Error("Could not check GIF availability."));
+  render(
+    <form>
+      <input aria-label="Draft" />
+      <EmojiPicker
+        session={owner.session}
+        scope={`https://example.test:${"ab".repeat(32)}`}
+        disabled={false}
+        insert={vi.fn()}
+        gifRequests={{ supports, search }}
+      />
+    </form>,
+  );
+  try {
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Draft" }), {
+      key: "g",
+      ctrlKey: true,
+    });
+    await screen.findByText("Could not check GIF availability.");
+    const input = screen.getByRole("searchbox", { name: "Search GIFs" });
+    input.focus();
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("searchbox", { name: "GIF 검색" })).toBe(input);
+    expect(input).toHaveFocus();
+    expect(input).toHaveAccessibleDescription(
+      "GIF 사용 가능 여부를 확인하지 못했습니다.",
+    );
+    expect(supports).toHaveBeenCalledTimes(1);
+    expect(search).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "GIF 사용 가능 여부 다시 확인" }),
+    );
+    await screen.findByText("Could not check GIF availability.");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Could not check GIF availability.",
+    );
+    expect(screen.getByRole("button", { name: "다시 시도" })).toBeVisible();
+    expect(input).toHaveFocus();
+    expect(supports).toHaveBeenCalledTimes(2);
+    expect(search).toHaveBeenCalledTimes(1);
+  } finally {
+    cleanup();
     owner.dispose();
   }
 });

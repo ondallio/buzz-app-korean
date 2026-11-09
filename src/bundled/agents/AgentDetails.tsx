@@ -1,3 +1,11 @@
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
+import {
+  errorMessage,
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Input } from "../../shared/design-system/ui/Input";
 import {
@@ -131,6 +139,7 @@ export function AgentDetails({
   communities?: CommunityReader | undefined;
   openSettings?: ((section: string) => void) | undefined;
 }) {
+  useLanguage();
   const ProfileActions = type?.ProfileActions ?? Fragment;
   const { pack, src: backdrop } = useAgentPortraitSource(agent, agent.relay);
   const tabbed = !!usePanelTabHost();
@@ -234,7 +243,7 @@ export function AgentDetails({
   }, [signInVisible, closeIdentityEditors]);
   const [name, setName] = useState(agent.name);
   const [namePending, setNamePending] = useState(false);
-  const [nameError, setNameError] = useState("");
+  const [nameError, setNameError] = useState<DisplayMessage>("");
   // The name editor sits outside the sections, so it reports to the host.
   useAgentSaveState(editingName && name !== agent.name, namePending);
   const nameInput = useRef<HTMLInputElement>(null);
@@ -242,7 +251,8 @@ export function AgentDetails({
   const namePrompt = useNamePrompt(nameInput);
   useShake(nameEditor, namePrompt.attempts);
   const nameMessage =
-    nameError || (namePrompt.attempts ? "Add a name to save your agent" : "");
+    resolveMessage(nameError) ||
+    (namePrompt.attempts ? t("agentsDetails.nameRequired") : "");
   const nameMessageId = useId();
   useEffect(() => {
     if (!editingName) return;
@@ -272,7 +282,7 @@ export function AgentDetails({
       await agents.save(agent.key, { name: name.trim() });
       finishName();
     } catch (reason) {
-      setNameError(reason instanceof Error ? reason.message : String(reason));
+      setNameError(errorMessage(reason));
     } finally {
       setNamePending(false);
     }
@@ -286,7 +296,7 @@ export function AgentDetails({
       setEditingName(true);
     }
   };
-  const [copyError, setCopyError] = useState("");
+  const [copyError, setCopyError] = useState<DisplayMessage>("");
   const npub = canonicalPublicKey(agent.pubkey);
   const settings = useAgentSettingsHost({ agents, agent, type, types });
   useEffect(() => {
@@ -312,7 +322,7 @@ export function AgentDetails({
         <div ref={content} className={styles.detailsScroll}>
           {!tabbed && (
             <IconButton
-              aria-label="Close"
+              aria-label={t("agentsDetails.close")}
               size="sm"
               icon={<XIcon size={16} />}
               onClick={onRemoved}
@@ -320,7 +330,7 @@ export function AgentDetails({
           )}
           <motion.aside
             className={`${hero.hero} ${hero.panelHero} ${styles.identityCard}`}
-            aria-label={`${agent.name} identity`}
+            aria-label={t("agentsDetails.identity", { name: agent.name })}
             initial={false}
             animate={{
               "--agent-artwork-grayscale": signInVisible ? 1 : 0,
@@ -381,8 +391,8 @@ export function AgentDetails({
                   <Input
                     appearance="heading"
                     ref={nameInput}
-                    aria-label="Agent name"
-                    placeholder="Name your agent"
+                    aria-label={t("agentsDetails.name")}
+                    placeholder={t("agentsDetails.namePlaceholder")}
                     aria-invalid={namePrompt.attempts > 0 || undefined}
                     aria-describedby={nameMessage ? nameMessageId : undefined}
                     value={name}
@@ -435,7 +445,7 @@ export function AgentDetails({
                       disabled={namePending}
                       onClick={finishName}
                     >
-                      Cancel
+                      {t("agentsDetails.cancel")}
                     </Button>
                     <Button
                       size="sm"
@@ -444,7 +454,7 @@ export function AgentDetails({
                       loading={namePending}
                       onClick={() => void saveName()}
                     >
-                      Save
+                      {t("agentsDetails.save")}
                     </Button>
                   </motion.div>
                 ) : (
@@ -453,7 +463,7 @@ export function AgentDetails({
                       render={
                         <IconButton
                           ref={identityMenu}
-                          aria-label="Agent profile actions"
+                          aria-label={t("agentsDetails.profileActions")}
                           variant={backdrop ? "glass" : "subtle"}
                           size="sm"
                           icon={<DotsThreeIcon aria-hidden="true" />}
@@ -467,10 +477,10 @@ export function AgentDetails({
                       }
                     >
                       <MenuItem onClick={() => openIdentity("avatar")}>
-                        Change avatar
+                        {t("agentsDetails.changeAvatar")}
                       </MenuItem>
                       <MenuItem onClick={() => openIdentity("name")}>
-                        Change name
+                        {t("agentsDetails.changeName")}
                       </MenuItem>
                     </MenuPopup>
                   </MenuRoot>
@@ -498,15 +508,17 @@ export function AgentDetails({
           </motion.aside>
           <section
             className={styles.work}
-            aria-label={`${agent.name} settings`}
+            aria-label={t("agentsDetails.settings", { name: agent.name })}
           >
             {!type && (
               <p className="m-0 mb-4 text-body-sm text-secondary">
-                Enable the plugin that provides this agent's type in{" "}
-                <SettingsSectionLink section="plugins" open={openSettings}>
-                  Manage plugins
-                </SettingsSectionLink>{" "}
-                to change its settings.
+                {rich("agentsDetails.enablePlugin", {
+                  link: (
+                    <SettingsSectionLink section="plugins" open={openSettings}>
+                      {t("agentsDetails.managePlugins")}
+                    </SettingsSectionLink>
+                  ),
+                })}
               </p>
             )}
             <AgentTabs
@@ -529,10 +541,10 @@ export function AgentDetails({
               communities={communities}
               settingsContent={
                 <div>
-                  <InlineHeader title="Agent details" level={4} />
+                  <InlineHeader title={t("agentsDetails.details")} level={4} />
                   <SettingsGroup>
                     <PreferenceRow
-                      title="Public key"
+                      title={t("agentsDetails.publicKey")}
                       subtitle={
                         <code title={npub}>
                           {formatPublicKey(agent.pubkey, 8)}
@@ -540,7 +552,11 @@ export function AgentDetails({
                       }
                       trailing={
                         <IconButton
-                          aria-label={copied ? "Copied" : "Copy public key"}
+                          aria-label={t(
+                            copied
+                              ? "agentsDetails.copied"
+                              : "agentsDetails.copyPublicKey",
+                          )}
                           size="sm"
                           icon={<CopyIcon size={16} aria-hidden="true" />}
                           disabled={!npub}
@@ -552,7 +568,7 @@ export function AgentDetails({
                               .then(() => setCopied(true))
                               .catch(() =>
                                 setCopyError(
-                                  "Could not copy the public key. Try again.",
+                                  localMessage("agentsDetails.copyFailed"),
                                 ),
                               );
                           }}
@@ -572,21 +588,23 @@ export function AgentDetails({
                     <AgentArchiveRetry agents={agents} agent={agent} />
                     {inSeveral(agents, agent) && (
                       <PreferenceRow
-                        title="Remove from this community"
+                        title={t("agentsDetails.removeHere")}
                         subtitle={
                           agent.deleting
-                            ? "Its Remove didn't finish, so it stays stopped here. Remove it again to finish."
-                            : `Also in ${agents
-                                .memberships(agent.pubkey)
-                                .filter(
-                                  (membership) =>
-                                    membership.key !== agent.key &&
-                                    !membership.deleting,
-                                )
-                                .map(({ origin }) =>
-                                  origin.replace(/^https:\/\//, ""),
-                                )
-                                .join(", ")}, where it stays.`
+                            ? t("agentsDetails.removeIncomplete")
+                            : t("agentsDetails.alsoIn", {
+                                communities: agents
+                                  .memberships(agent.pubkey)
+                                  .filter(
+                                    (membership) =>
+                                      membership.key !== agent.key &&
+                                      !membership.deleting,
+                                  )
+                                  .map(({ origin }) =>
+                                    origin.replace(/^https:\/\//, ""),
+                                  )
+                                  .join(", "),
+                              })
                         }
                         trailing={
                           <AgentRemoveHere
@@ -597,10 +615,10 @@ export function AgentDetails({
                               <Button
                                 size="compact"
                                 variant="outline"
-                                aria-label="Remove from this community"
+                                aria-label={t("agentsDetails.removeHere")}
                                 onClick={open}
                               >
-                                Remove
+                                {t("agentsDetails.remove")}
                               </Button>
                             )}
                           />
@@ -608,11 +626,11 @@ export function AgentDetails({
                       />
                     )}
                     <PreferenceRow
-                      title="Delete agent"
+                      title={t("agentsDetails.deleteAgent")}
                       subtitle={
                         agent.deleting &&
                         !inSeveral(agents, agent) &&
-                        "Its Delete didn't finish, so it stays stopped. Delete it again to finish."
+                        t("agentsDetails.deleteIncomplete")
                       }
                       trailing={
                         <AgentDelete
@@ -623,10 +641,10 @@ export function AgentDetails({
                             <Button
                               size="compact"
                               variant="destructive"
-                              aria-label="Delete agent"
+                              aria-label={t("agentsDetails.deleteAgent")}
                               onClick={open}
                             >
-                              Delete
+                              {t("agentsDetails.delete")}
                             </Button>
                           )}
                         />
@@ -635,7 +653,7 @@ export function AgentDetails({
                   </SettingsGroup>
                   {copyError && (
                     <p role="alert" className="mt-2 text-body-sm text-danger">
-                      {copyError}
+                      {resolveMessage(copyError)}
                     </p>
                   )}
                 </div>
@@ -667,6 +685,7 @@ function SharedSettingsNotice({
   agent: Agent;
   communities: CommunityReader | undefined;
 }) {
+  useLanguage();
   const known = useSyncExternalStore(
     communities?.subscribe ?? noSubscribe,
     () => communities?.snapshot(),
@@ -689,9 +708,14 @@ function SharedSettingsNotice({
           render={
             <Button variant="plain" size="inline" style={{ maxWidth: "100%" }}>
               <span className="flex min-w-0 flex-wrap items-center justify-center gap-1 whitespace-normal text-subtle">
-                Shared across
-                <AvatarStack items={items} size="mini" />
-                <span className="sr-only">{names}</span>
+                {rich("agentsDetails.sharedAcross", {
+                  communities: (
+                    <>
+                      <AvatarStack items={items} size="mini" />
+                      <span className="sr-only">{names}</span>
+                    </>
+                  ),
+                })}
               </span>
             </Button>
           }
@@ -699,14 +723,13 @@ function SharedSettingsNotice({
         <PopoverPopup
           side="top"
           align="center"
-          aria-label={`${agent.name}’s shared settings`}
+          aria-label={t("agentsDetails.sharedSettings", { name: agent.name })}
         >
           <p className="m-0 text-body-sm text-subtle">
-            {agent.name}’s name, instructions, and settings are shared across
-            these communities:
+            {t("agentsDetails.sharedDescription", { name: agent.name })}
           </p>
           <ul
-            aria-label="Communities"
+            aria-label={t("agentsDetails.communities")}
             className="m-0 mt-2 grid list-none gap-2 p-0"
           >
             {items.map((item) => (
@@ -733,13 +756,31 @@ function SharedSettingsNotice({
 
 /** Where the agent's config lives; nothing while that is still settling. */
 function AgentSyncRow({ agents, agent }: { agents: Agents; agent: Agent }) {
+  useLanguage();
   const line = useSyncLine(
     agents,
     () => agents.agentSync(agent.pubkey),
     "agent",
   );
-  return line ? (
-    <PreferenceRow title={line.title} subtitle={line.reason} />
+  const state = agents.agentSync(agent.pubkey);
+  const host = (relay: string) => relay.replace(/^\w+:\/\//, "");
+  return line && state ? (
+    <PreferenceRow
+      title={
+        "synced" in state
+          ? t("agentsDetails.synced", { host: host(state.synced) })
+          : t("agentsDetails.local")
+      }
+      subtitle={
+        "conflict" in state
+          ? t("agentsDetails.conflict", { host: host(state.conflict) })
+          : "local" in state && state.local === "unsupported"
+            ? t("agentsDetails.syncUnsupported")
+            : "local" in state && state.local === "failed"
+              ? t("agentsDetails.syncFailed")
+              : undefined
+      }
+    />
   ) : null;
 }
 

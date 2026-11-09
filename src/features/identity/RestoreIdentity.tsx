@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { OnboardingBack } from "./OnboardingBack";
 import { useState } from "react";
 import { npubEncode } from "nostr-tools/nip19";
@@ -30,6 +31,7 @@ export function RestoreIdentity({
   /** No backup holds `expectedPubkey`: leave recovery for the import page. */
   onImport?: (() => void) | undefined;
 }) {
+  useLanguage();
   const [selected, setSelected] = useState<{
     recovery: RecoveryState;
     handle: string;
@@ -56,44 +58,47 @@ export function RestoreIdentity({
   return (
     <section
       className="flex flex-1 flex-col gap-4"
-      aria-label="Restore from backup"
+      aria-label={t("identityMore.restoreBackup")}
     >
       {recovery.status === "waiting" ? (
-        <p role="status">Sign in in your browser to find your backups…</p>
+        <p role="status">{t("identityMore.findBackups")}</p>
       ) : recovery.status === "saving" ? (
-        <p role="status">Saving your identity securely…</p>
+        <p role="status">{t("identityMore.savingIdentity")}</p>
       ) : recovery.status === "canceling" ? (
-        <p role="status">Canceling recovery…</p>
+        <p role="status">{t("identityMore.cancelingRecovery")}</p>
       ) : recovery.status === "error" ? (
         <p role="alert">{recovery.error}</p>
       ) : mismatched ? (
         <p role="alert">
           {failed
-            ? "Some of your backups couldn’t be recovered, and the ones that were don’t hold the key linked to this account."
-            : "None of your backups holds the key linked to this account, so nothing was restored."}
+            ? t("identityMore.someBackupsMismatch")
+            : t("identityMore.noBackupsMatch")}
         </p>
       ) : candidates.length === 0 ? (
         <p role={recovery.failedCount ? "alert" : "status"}>
           {recovery.failedCount
-            ? "Your backups couldn’t be recovered. Try again."
-            : "No backups were found for this account."}
+            ? t("identityMore.backupsFailed")
+            : t("identityMore.backupsNotFound")}
         </p>
       ) : (
         <>
           <p>
             {current
-              ? "Choose the Buzz identity to restore on this device."
+              ? t("identityMore.chooseIdentity")
               : recovery.currentPubkey
-                ? "Your current identity isn’t in these backups. You can choose a previous identity."
-                : "Choose the Buzz identity to restore on this device."}
+                ? t("identityMore.currentNotBackedUp")
+                : t("identityMore.chooseIdentity")}
           </p>
-          <p>This won’t change the identity linked to your account.</p>
+          <p>{t("identityMore.linkedUnchanged")}</p>
           {recovery.failedCount > 0 && (
-            <p role="status">Some backups couldn’t be recovered.</p>
+            <p role="status">{t("identityMore.someBackupsFailed")}</p>
           )}
-          <Field label="Identity to restore" nativeLabel={false}>
+          <Field
+            label={t("identityMore.identityToRestore")}
+            nativeLabel={false}
+          >
             <RadioGroup
-              aria-label="Identity to restore"
+              aria-label={t("identityMore.identityToRestore")}
               value={handle ?? null}
               onValueChange={(value) =>
                 value && setSelected({ recovery, handle: value })
@@ -107,8 +112,8 @@ export function RestoreIdentity({
                   description={
                     <>
                       {candidate.pubkey === current?.pubkey
-                        ? "Current identity"
-                        : "Previous identity"}
+                        ? t("identityMore.currentIdentity")
+                        : t("identityMore.previousIdentity")}
                       <code className="block break-all text-mono">
                         {npubEncode(candidate.pubkey)}
                       </code>
@@ -122,7 +127,11 @@ export function RestoreIdentity({
       )}
       <div data-onboarding-actions="">
         <OnboardingBack
-          aria-label={recovery.status === "waiting" ? "Cancel" : "Back"}
+          aria-label={
+            recovery.status === "waiting"
+              ? t("identity.cancel")
+              : t("identity.back")
+          }
           disabled={
             recovery.status === "saving" || recovery.status === "canceling"
           }
@@ -135,7 +144,7 @@ export function RestoreIdentity({
             disabled={!handle}
             onClick={() => handle && void identity.installRecovery(handle)}
           >
-            Restore this identity
+            {t("identityMore.restoreThis")}
           </Button>
         ) : mismatched && onImport ? (
           <>
@@ -144,7 +153,7 @@ export function RestoreIdentity({
               variant={failed ? "subtle" : "prominent"}
               onClick={onImport}
             >
-              Enter your private key
+              {t("identityMore.enterPrivateKey")}
             </Button>
             {failed && (
               <Button
@@ -152,7 +161,7 @@ export function RestoreIdentity({
                 variant="prominent"
                 onClick={() => void identity.beginRecovery()}
               >
-                Try recovery again
+                {t("identityMore.retryRecovery")}
               </Button>
             )}
           </>
@@ -163,7 +172,7 @@ export function RestoreIdentity({
             variant="primary"
             onClick={() => void identity.beginRecovery()}
           >
-            Try recovery again
+            {t("identityMore.retryRecovery")}
           </Button>
         ) : null}
       </div>

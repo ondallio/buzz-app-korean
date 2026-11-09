@@ -1,4 +1,6 @@
-import { useEffect } from "react";
+import { TranslatedMessage } from "../../shared/i18n/Message";
+import { localMessage } from "../../shared/i18n/deferred-message";
+import { useEffect, useEffectEvent } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { AppServices } from "../../app/services";
@@ -10,7 +12,7 @@ import {
   completionSourceKey,
   completionTarget,
   completionTitle,
-  completionToast,
+  completionToastMessage,
   shouldShowForegroundCompletion,
 } from "./agent-completions";
 import { playNotificationSound, resolveCategorySound } from "./sound";
@@ -24,6 +26,9 @@ export function AgentCompletionNotifications({
   >;
 }) {
   const notify = useToastNotification();
+  const notifyLatest = useEffectEvent((...args: Parameters<typeof notify>) =>
+    notify(...args),
+  );
   useEffect(
     () =>
       bindAgentCompletionNotifications(services.agentActivity, {
@@ -56,17 +61,26 @@ export function AgentCompletionNotifications({
             playNotificationSound(
               resolveCategorySound(preferences.sounds, "agent"),
             );
-          notify(
-            completionToast(agentName(services, work.agent), work),
+          notifyLatest(
+            <TranslatedMessage
+              value={completionToastMessage(
+                agentName(services, work.agent),
+                work,
+              )}
+            />,
             work.state === "error" ? "error" : "success",
             {
-              label: "View",
+              label: (
+                <TranslatedMessage
+                  value={localMessage("notifications.completion.action")}
+                />
+              ),
               onClick: () => void services.navigation.open(target),
             },
           );
         },
       }),
-    [notify, services],
+    [services],
   );
   return null;
 }
@@ -74,9 +88,9 @@ export function AgentCompletionNotifications({
 function agentName(
   services: Pick<AppServices, "agents">,
   pubkey: string,
-): string {
+): string | undefined {
   return (
     services.agents.local().agents.find((agent) => agent.pubkey === pubkey)
-      ?.name ?? "Agent"
+      ?.name ?? undefined
   );
 }

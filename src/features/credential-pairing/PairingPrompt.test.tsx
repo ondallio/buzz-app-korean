@@ -6,6 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../../shared/i18n";
 import { PairingPrompt } from "./PairingPrompt";
 import type { PairRequest } from "./service";
 
@@ -26,6 +27,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.useRealTimers();
 });
 
@@ -180,4 +182,40 @@ it("is mounted once under a development remount", async () => {
   await vi.waitFor(() => expect(prompts()).toEqual([{ mounted: true }]));
   unmount();
   expect(prompts()).toEqual([{ mounted: true }, { mounted: false }]);
+});
+
+it("keeps the same pending request, timer and focused denial across language changes without answering or re-registering", async () => {
+  setLanguage("en");
+  vi.useFakeTimers();
+  render(<PairingPrompt communities={["wss://relay.example"]} />);
+  await ask(request);
+  await vi.waitFor(() => expect(prompts().at(-1)).toEqual({ mounted: true }));
+  const dialog = screen.getByRole("alertdialog");
+  const deny = screen.getByRole("button", { name: "Deny" });
+  deny.focus();
+  await act(() => vi.advanceTimersByTimeAsync(1000));
+  const timer = screen.getByRole("timer");
+  expect(timer).toHaveTextContent("Expires in 119 s");
+  const calls = vi.mocked(invoke).mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("alertdialog")).toBe(dialog);
+  expect(screen.getByRole("button", { name: "거부" })).toBe(deny);
+  expect(deny).toHaveFocus();
+  expect(dialog).toHaveAccessibleName(
+    "buzz-cli에서 wss://relay.example/의 Buzz를 나를 대신해 사용하려고 합니다",
+  );
+  expect(screen.getByRole("timer")).toBe(timer);
+  expect(timer).toHaveTextContent("119초 후 만료");
+  expect(invoke).toHaveBeenCalledTimes(calls);
+  await act(() => vi.advanceTimersByTimeAsync(1000));
+  expect(timer).toHaveTextContent("118초 후 만료");
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Deny" })).toBe(deny);
+  expect(deny).toHaveFocus();
+  expect(timer).toHaveTextContent("Expires in 118 s");
+  act(() => deny.click());
+  expect(invoke).toHaveBeenLastCalledWith("credential_pair_answer", {
+    id: "r1",
+    approve: false,
+  });
 });

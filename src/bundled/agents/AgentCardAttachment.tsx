@@ -1,3 +1,6 @@
+import { t, useLanguage } from "../../shared/i18n";
+import { localMessage } from "../../shared/i18n/deferred-message";
+import { TranslatedMessage } from "../../shared/i18n/Message";
 // An agent card sent in a conversation, drawn as the agent's card from the
 // Marketplace: choosing it opens Add rather than the picture.
 import { useEffect, useRef, useState } from "react";
@@ -62,6 +65,7 @@ export function AgentCardAttachment({
   /** Opens an agent of yours on the Agents page; absent, nothing offers to. */
   navigator?: Navigation | undefined;
 }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const { types } = useAgents(agents);
   // `undefined` while the card is read; `null` when it holds no agent.
@@ -106,7 +110,8 @@ export function AgentCardAttachment({
       );
     return () => controller.abort();
   }, [source, attempt]);
-  const name = (attachment.name ?? "").replace(CARD, "") || "Agent";
+  const name =
+    (attachment.name ?? "").replace(CARD, "") || t("agentsDetails.agent");
   // Not a card after all: show the picture it is.
   if (shared === null)
     return <img className={styles.picture} src={source} alt={name} />;
@@ -116,7 +121,10 @@ export function AgentCardAttachment({
       <SurfaceButton
         ref={trigger}
         className={`${cardStyles.card} ${cardStyles.agentCard}`}
-        aria-label={`${shared?.name ?? name}, shared agent${failed ? ". Couldn’t load. Try again" : ""}`}
+        aria-label={t(
+          failed ? "agentsDetails.failedCard" : "agentsDetails.sharedCard",
+          { name: shared?.name ?? name },
+        )}
         aria-haspopup="dialog"
         disabled={!shared && !failed}
         onClick={() => {
@@ -127,7 +135,7 @@ export function AgentCardAttachment({
       >
         <SharedAgentCardContent
           agent={shared ?? { name, model: "" }}
-          {...(failed && { detail: "Couldn’t load. Try again" })}
+          {...(failed && { detail: t("agentsDetails.loadFailed") })}
           community={
             connection.status === "ready" ? connection.origin : undefined
           }
@@ -142,9 +150,20 @@ export function AgentCardAttachment({
             setAdding(false);
             const show = opener(agent);
             notify(
-              `Added ${agent.name} to your agents.`,
+              <TranslatedMessage
+                value={localMessage("agentsDetails.added", {
+                  name: agent.name,
+                })}
+              />,
               "success",
-              show && { label: "Open", onClick: show },
+              show && {
+                label: (
+                  <TranslatedMessage
+                    value={localMessage("agentsDetails.open")}
+                  />
+                ),
+                onClick: show,
+              },
             );
           }}
           {...(navigator && {

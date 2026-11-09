@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { t, useLanguage } from "../../shared/i18n";
 import { Header } from "../../shared/design-system/ui/Header";
 import { PreferenceRow } from "../../shared/design-system/ui/PreferenceRow";
 import { Select } from "../../shared/design-system/ui/Select";
@@ -53,6 +54,7 @@ export function FocusSettings({
   preferences: Preferences;
   active(): boolean;
 }) {
+  useLanguage();
   const current = useSyncExternalStore(
     preferences.subscribe,
     preferences.snapshot,
@@ -62,20 +64,33 @@ export function FocusSettings({
     if (active()) preferences.set(change);
   };
   return (
-    <section aria-label="Focus settings">
-      <Header title="Focus" />
+    <section aria-label={t("statusFocus.settings")}>
+      <Header title={t("statusFocus.focus")} />
       <SettingsGroup>
         <Choice<FocusLength>
-          title="Default length"
-          subtitle="Used by the Focus shortcut, ⌥F by default, and selected when you open Focus from the profile menu."
+          title={t("statusFocus.defaultLength")}
+          subtitle={t("statusFocus.defaultHelp")}
           value={current.length}
-          options={focusLengths}
+          options={focusLengths.map(([value]) => [
+            value,
+            t(
+              value === "1800"
+                ? "statusFocus.minutes30"
+                : value === "3600"
+                  ? "statusFocus.hour1"
+                  : value === "7200"
+                    ? "statusFocus.hours2"
+                    : "statusFocus.restToday",
+            ),
+          ])}
           onChange={(length) => set({ length })}
         />
       </SettingsGroup>
       {error && (
         <p role="alert" className="text-body-sm text-danger">
-          {error}
+          {error === "Focus settings could not be saved on this device."
+            ? t("statusFocus.settingsSaveFailed")
+            : error}
         </p>
       )}
     </section>

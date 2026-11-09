@@ -1,3 +1,8 @@
+import {
+  localMessage,
+  resolveMessage,
+} from "../../shared/i18n/deferred-message";
+import { t } from "../../shared/i18n";
 import type {
   LocalAgentSource,
   LocalWork,
@@ -32,31 +37,70 @@ export function completionTarget(
 }
 
 export function completionTitle(
-  agentName: string,
+  agentName: string | undefined,
   work: Pick<LocalWork, "state">,
 ) {
-  return work.state === "error"
-    ? `${agentName} encountered an error`
-    : `${agentName} is done`;
+  return resolveMessage(
+    completionToastMessage(agentName, { state: work.state }),
+  );
 }
 
 export function completionBody(
   work: Pick<LocalWork, "state" | "error" | "conversationName">,
 ) {
-  const destination = work.conversationName
-    ? `View in ${work.conversationName}`
-    : "View conversation";
-  return work.state === "error" && work.error
-    ? `${destination} · ${work.error}`
-    : destination;
+  if (work.state === "error" && work.error) {
+    return work.conversationName
+      ? t("notifications.completion.errorBodyIn", {
+          conversation: work.conversationName,
+          error: work.error,
+        })
+      : t("notifications.completion.errorBody", { error: work.error });
+  }
+  return work.conversationName
+    ? t("notifications.completion.viewIn", {
+        conversation: work.conversationName,
+      })
+    : t("notifications.completion.view");
 }
 
 export function completionToast(
   agentName: string,
   work: Pick<LocalWork, "state" | "conversationName">,
 ) {
-  const title = completionTitle(agentName, work);
-  return work.conversationName ? `${title} in ${work.conversationName}` : title;
+  return resolveMessage(completionToastMessage(agentName, work));
+}
+
+/** A complete ephemeral toast message; fallback agent wording remains live too. */
+export function completionToastMessage(
+  agentName: string | undefined,
+  work: Pick<LocalWork, "state" | "conversationName">,
+) {
+  if (agentName === undefined) {
+    if (!work.conversationName)
+      return work.state === "error"
+        ? localMessage("notifications.completion.unknownError")
+        : localMessage("notifications.completion.unknownDone");
+    return work.state === "error"
+      ? localMessage("notifications.completion.unknownErrorIn", {
+          conversation: work.conversationName,
+        })
+      : localMessage("notifications.completion.unknownDoneIn", {
+          conversation: work.conversationName,
+        });
+  }
+  if (!work.conversationName)
+    return work.state === "error"
+      ? localMessage("notifications.completion.error", { agent: agentName })
+      : localMessage("notifications.completion.done", { agent: agentName });
+  return work.state === "error"
+    ? localMessage("notifications.completion.errorIn", {
+        agent: agentName,
+        conversation: work.conversationName,
+      })
+    : localMessage("notifications.completion.doneIn", {
+        agent: agentName,
+        conversation: work.conversationName,
+      });
 }
 
 export function shouldShowForegroundCompletion(state: {

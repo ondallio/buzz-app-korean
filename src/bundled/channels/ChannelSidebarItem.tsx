@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { UserStatusDisplay } from "../../features/user-status/StatusDisplay";
 import { useIsPresent } from "motion/react";
 import {
@@ -170,6 +171,7 @@ function ChannelSidebarItemCore({
   ordinary: boolean;
   muted: boolean;
 }) {
+  useLanguage();
   const present = useIsPresent();
   const peer =
     channel.channelType === "dm" && channel.participants?.length === 1
@@ -212,7 +214,9 @@ function ChannelSidebarItemCore({
                 className={styles.dmCount}
                 data-dm-identity=""
                 data-dm-participant-count=""
-                title={`${channel.participants?.length} other participants`}
+                title={t("channelsMenus.row.otherParticipants", {
+                  count: channel.participants?.length ?? 0,
+                })}
                 aria-hidden="true"
               >
                 {channel.participants?.length}
@@ -306,7 +310,9 @@ function ChannelSidebarItemCore({
       }}
       selected={selected}
       presenceDescription={
-        presence === "unknown" ? undefined : `Presence: ${presence}`
+        presence === "unknown"
+          ? undefined
+          : t(`channelsMenus.row.presence.${presence}`)
       }
       onPrepare={(id) => session.channels.prepare?.(id)}
       onSelect={onSelect}
@@ -347,7 +353,7 @@ function ChannelSidebarItemCore({
     >
       {rendered}
       <MenuPopup
-        aria-label={`Actions for ${channel.name}`}
+        aria-label={t("channelsMenus.row.actions", { name: channel.name })}
         anchor={menuOpen ? menuAnchor : undefined}
         finalFocus={() => menuFinalFocus?.(channel.id) ?? false}
       >
@@ -402,7 +408,10 @@ function ContributedChannelRow({
 
 /** Quiet lifetime metadata; the working badge takes the trailing slot while agents work. */
 function TemporaryMarker({ ttlSeconds }: { ttlSeconds: number }) {
-  const label = `Temporary channel. Cleans up after ${channelDurationLabel(ttlSeconds)} without activity.`;
+  useLanguage();
+  const label = t("channelsMenus.row.temporary", {
+    duration: channelDurationLabel(ttlSeconds),
+  });
   return (
     <span
       className={styles.temporaryMarker}

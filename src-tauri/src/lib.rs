@@ -22,6 +22,7 @@ mod agent_state;
 mod app_agents;
 mod decisions;
 mod deep_links;
+mod distribution_profile;
 mod dock;
 mod huddle_window;
 use huddle_window::{
@@ -81,6 +82,8 @@ mod workspace_folder;
 use legacy_communities::legacy_communities;
 use os_idle::get_os_idle_seconds;
 use repositories_folder::repositories_folder_validate;
+#[cfg(target_os = "macos")]
+mod native_language;
 mod relaunch;
 mod relay;
 mod relay_admin;
@@ -765,6 +768,9 @@ fn commands<R: tauri::Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Sen
         media_stream_base,
         get_os_idle_seconds,
         system_clock::system_hour_cycle,
+        system_clock::system_language,
+        #[cfg(target_os = "macos")]
+        native_language::set_desktop_language,
         workspace_pick_folder,
         repositories_folder_validate,
         legacy_communities,
@@ -872,6 +878,9 @@ fn commands<R: tauri::Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Sen
 pub fn run() {
     credential_service::drop_inherited();
     let context = app_context();
+    if !buzz_credential_store::distribution::owns_identifier(&context.config().identifier) {
+        sign_out::exit_with("Distribution build and application identifier do not match");
+    }
     // Reject unsafe test launch settings before any identity or pending erase work.
     let native_mcp = native_mcp::plugin(
         context.config(),
@@ -988,9 +997,12 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             reshow::install(app.handle());
             #[cfg(target_os = "macos")]
-            if let Some(home) = dirs::home_dir() {
-                if let Err(error) = legacy_cli_shortcut::remove_stale(&home.join(".local/bin")) {
-                    eprintln!("Could not remove old Buzz's CLI shortcut: {error}");
+            if !buzz_credential_store::distribution::ISOLATED {
+                if let Some(home) = dirs::home_dir() {
+                    if let Err(error) = legacy_cli_shortcut::remove_stale(&home.join(".local/bin"))
+                    {
+                        eprintln!("Could not remove old Buzz's CLI shortcut: {error}");
+                    }
                 }
             }
             tauri::async_runtime::spawn(host_command::load_login_shell_path());
@@ -1176,8 +1188,10 @@ pub fn run() {
         .manage(DeepLinks::default())
         // Plugin storage lives in this identifier's app data, so development
         // builds keep theirs apart from the installed app.
-        .manage(PluginManager(Manager::from_env(
+        .manage(PluginManager(distribution_profile::plugin_manager(
             dirs::data_dir().map(|dir| dir.join(&identifier)),
+            buzz_credential_store::distribution::ISOLATED,
+            |name| std::env::var_os(name),
         )))
         .invoke_handler({
             let application_commands = commands::<tauri::Wry>();

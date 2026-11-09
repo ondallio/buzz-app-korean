@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import type { RelaySession } from "../../features/relay/session";
@@ -8,9 +15,14 @@ import type {
   ChannelDetailsCapability,
   DetailsAttempt,
 } from "../../features/relay/channel-details";
+import { setLanguage } from "../../shared/i18n";
 import { SoloChatName } from "./SoloChatName";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 function setup(overrides: Partial<ChannelDetailsCapability> = {}) {
   const save = vi.fn(async () => {});
@@ -88,7 +100,14 @@ it("retains an oversized draft without writing on Enter or blur", async () => {
   await waitFor(() => expect(input).toHaveFocus());
   await f.user.paste("a".repeat(121));
   await f.user.keyboard("{Enter}");
-  expect(screen.getByRole("alert")).toHaveTextContent("at most 120");
+  const error = screen.getByRole("alert");
+  expect(error).toHaveTextContent("at most 120");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("textbox", { name: "채팅 이름" })).toBe(input);
+  expect(screen.getByRole("alert")).toBe(error);
+  expect(error).toHaveTextContent("채팅 이름은 120자 이내로 입력하세요.");
+  expect(input).toHaveValue("a".repeat(121));
+  act(() => setLanguage("en"));
   await f.user.click(screen.getByRole("button", { name: "Elsewhere" }));
   expect(f.save).not.toHaveBeenCalled();
   expect(f.close).not.toHaveBeenCalled();
@@ -155,6 +174,15 @@ it("quietly disables the name while a real pending receipt is saving", async () 
       "aria-busy",
       "true",
     );
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("textbox", { name: "채팅 이름" })).toBe(input);
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue("New name");
+    expect(
+      screen.getByRole("form", { name: "Plan 이름 변경" }),
+    ).toHaveAttribute("aria-busy", "true");
+    expect(save).toHaveBeenCalledOnce();
+    act(() => setLanguage("en"));
     expect(screen.queryByText("Saving name…")).toBeNull();
     expect(
       screen.queryByRole("button", { name: "Reload chat details" }),
@@ -236,3 +264,70 @@ it.each(["ineligible", "unrelated attempt"])(
     expect(f.save).not.toHaveBeenCalled();
   },
 );
+
+it("preserves the same raw rename draft, caret and save request through EN to KO to EN", async () => {
+  const h = setup();
+  const input = screen.getByRole("textbox", {
+    name: "Chat name",
+  }) as HTMLInputElement;
+  await waitFor(() => expect(input).toHaveFocus());
+  fireEvent.change(input, { target: { value: "Raw {name} 한글" } });
+  input.setSelectionRange(1, 4);
+  const loads = vi.mocked(h.details.load).mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("textbox", { name: "채팅 이름" })).toBe(input);
+  expect(input).toHaveFocus();
+  expect(input).toHaveValue("Raw {name} 한글");
+  expect([input.selectionStart, input.selectionEnd]).toEqual([1, 4]);
+  expect(screen.getByRole("form", { name: "Plan 이름 변경" })).toBeVisible();
+  expect(h.details.load).toHaveBeenCalledTimes(loads);
+  expect(h.save).not.toHaveBeenCalled();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("textbox", { name: "Chat name" })).toBe(input);
+  expect(input).toHaveFocus();
+  await h.user.keyboard("{Enter}");
+  await waitFor(() => expect(h.close).toHaveBeenCalledWith(true));
+  expect(h.save).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ name: "Plan" }),
+    expect.objectContaining({
+      name: "Raw {name} 한글",
+      description: "Keep this",
+      ttlSeconds: 600,
+      labels: ["buzz.solo"],
+    }),
+    expect.any(AbortSignal),
+  );
+});
+
+it("preserves an external diagnostic identical to local copy and retries only on request", async () => {
+  const load = vi
+    .fn<ChannelDetailsCapability["load"]>()
+    .mockRejectedValueOnce(new Error("This chat can’t be renamed."))
+    .mockResolvedValue({
+      channelId: "chat",
+      name: "Restored",
+      description: "Raw {name}",
+      visibility: "private",
+      labels: ["buzz.solo"],
+      ttlSeconds: 600,
+      version: "two",
+      canEdit: true,
+    });
+  const h = setup({ load });
+  const input = screen.getByRole("textbox", { name: "Chat name" });
+  const error = await screen.findByRole("alert");
+  expect(error).toHaveTextContent("This chat can’t be renamed.");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("textbox", { name: "채팅 이름" })).toBe(input);
+  expect(error).toHaveTextContent("This chat can’t be renamed.");
+  expect(load).toHaveBeenCalledOnce();
+  await h.user.click(
+    screen.getByRole("button", { name: "채팅 세부 정보 다시 불러오기" }),
+  );
+  await waitFor(() => expect(input).toHaveValue("Restored"));
+  expect(input).toHaveFocus();
+  expect(load).toHaveBeenCalledTimes(2);
+  expect(h.save).not.toHaveBeenCalled();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("textbox", { name: "Chat name" })).toBe(input);
+});

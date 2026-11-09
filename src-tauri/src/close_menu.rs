@@ -103,6 +103,7 @@ pub(crate) fn menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             ])?;
         }
     }
+    crate::native_language::install(app, &menu)?;
     install_tab_keys(app);
     Ok(menu)
 }

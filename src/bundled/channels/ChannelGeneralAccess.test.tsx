@@ -1,3 +1,4 @@
+import { setLanguage } from "../../shared/i18n";
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -10,7 +11,11 @@ import type {
 import type { ChannelDetails } from "../../features/relay/channel-details-protocol";
 import { ChannelGeneralAccess } from "./ChannelGeneralAccess";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 it.each(["public", "private"] as const)(
   "shows verified %s access to readers without invoking the editing capability",
@@ -583,3 +588,33 @@ it.each([true, false])(
     expect(h.save).not.toHaveBeenCalled();
   },
 );
+
+it("keeps canonical access values and the same confirmation controls across locale changes", async () => {
+  const h = harness();
+  render(<ChannelGeneralAccess capability={h.capability} channelId="alpha" />);
+  const user = userEvent.setup();
+  const control = await select(user, "General access", "Private");
+  const cancel = screen.getByRole("button", { name: "Cancel" });
+  cancel.focus();
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("alertdialog", { name: "기본 접근 권한을 변경할까요?" }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "취소" })).toBe(cancel);
+  expect(cancel).toHaveFocus();
+  expect(control).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "접근 권한 변경" }));
+  await waitFor(() => expect(h.save).toHaveBeenCalledOnce());
+  expect(h.save).toHaveBeenCalledWith(
+    base,
+    expect.objectContaining({ visibility: "private", joinRole: "guest" }),
+    expect.any(AbortSignal),
+  );
+  expect(await screen.findByRole("combobox", { name: "기본 접근 권한" })).toBe(
+    control,
+  );
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("combobox", { name: "General access" })).toBe(
+    control,
+  );
+});

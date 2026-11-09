@@ -1,3 +1,8 @@
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import type { Conversation } from "../../features/conversation/service";
 import { prepareSoloMove } from "../../features/channel-navigation/solo-navigation";
 import { useSoloNavigation } from "../../features/channel-navigation/solo-navigation-react";
@@ -105,6 +110,7 @@ export function SoloToolbar({
   onMove,
   membershipInHeader = false,
 }: SoloToolbarProps & { membershipInHeader?: boolean }) {
+  useLanguage();
   const menus = useSyncExternalStore(
     chatMenus?.subscribe ?? noSubscription,
     () => chatMenus?.snapshot(),
@@ -122,7 +128,7 @@ export function SoloToolbar({
   const [sharing, setSharing] = useState<{ visit: AbortSignal | undefined }>();
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const owner = useSoloOwner(session, channel);
-  const [readError, setReadError] = useState<string>();
+  const [readError, setReadError] = useState<DisplayMessage>();
   const preferences = session.soloPreferences;
   const canOpenActions =
     !channel.cached && (!channel.readOnly || channel.viewerRole === "guest");
@@ -135,18 +141,18 @@ export function SoloToolbar({
           shape="capsule"
           onClick={() => soloNavigationFor(session)?.reveal(channel.id)}
         >
-          In {region.title}
+          {t("channelsMenus.solo.inRegion", { name: region.title })}
         </Button>
       )}
       {channel.archived ? (
-        <span>Archived</span>
+        <span>{t("channelsMenus.solo.archived")}</span>
       ) : (
         <>
           {!membershipInHeader && (
             <ChannelMembersButton
               session={session}
               channelId={channel.id}
-              label="Share access"
+              label={t("channelsMenus.solo.share")}
               owner={owner}
               navigator={navigator}
               signal={signal}
@@ -164,20 +170,20 @@ export function SoloToolbar({
                 hint="familiar"
                 ref={actionsTrigger}
                 size="toolbar"
-                aria-label="Chat actions"
-                title="Chat actions"
+                aria-label={t("channelsMenus.solo.actions")}
+                title={t("channelsMenus.solo.actions")}
                 icon={<DotsThreeIcon size="1rem" aria-hidden="true" />}
               />
             }
           />
-          <MenuPopup aria-label="Chat actions" align="end">
+          <MenuPopup aria-label={t("channelsMenus.solo.actions")} align="end">
             {onOpen && (
               <>
                 <MenuItem onClick={onOpen}>
                   <MenuIcon>
                     <ArrowSquareOutIcon size={14} />
                   </MenuIcon>
-                  Open in main view
+                  {t("channelsMenus.solo.openMain")}
                 </MenuItem>
                 <MenuSeparator />
               </>
@@ -250,8 +256,8 @@ export function SoloToolbar({
       )}
       {readError && (
         <ToastNotice
-          title="Read state couldn’t be saved"
-          description={readError}
+          title={t("channelsMenus.read.failureTitle")}
+          description={resolveMessage(readError)}
           onDismiss={() => setReadError(undefined)}
         />
       )}
@@ -276,6 +282,7 @@ export function SoloToolbar({
  * the store keeps a move record for it, pending or failed, and until its
  * failure is dismissed. */
 export function useSoloMoveRecovery(session: RelaySession) {
+  useLanguage();
   const preferences = session.soloPreferences;
   const placement = useSyncExternalStore(
     preferences.subscribe,
@@ -314,7 +321,7 @@ export function useSoloMoveRecovery(session: RelaySession) {
       tracked.has(channelId) && (
         <ToastNotice
           key={`${id}:${error}`}
-          title="Chat wasn’t moved"
+          title={t("channelsMenus.solo.moveFailure")}
           description={error}
           onDismiss={() => {
             preferences.dismissMoveError(channelId);
@@ -329,7 +336,7 @@ export function useSoloMoveRecovery(session: RelaySession) {
               track(channelId, preferences.retryMove(channelId))
             }
           >
-            Retry move
+            {t("channelsMenus.solo.retryMove")}
           </Button>
         </ToastNotice>
       ),

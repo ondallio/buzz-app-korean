@@ -13,6 +13,7 @@ import { StrictMode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ConversationPresentation } from "../conversation/ConversationPresentation";
 import { VoiceNoteCard } from "../../bundled/voice-notes/VoiceNoteCard";
+import { setLanguage } from "../../shared/i18n";
 import { AudioAttachment } from "./AudioAttachment";
 
 // No media listener: `media_stream_base` reports none.
@@ -55,6 +56,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  setLanguage("en");
+  localStorage.clear();
 });
 
 it("toggles the accessible play control name", () => {
@@ -881,4 +884,45 @@ it("shares playback ownership with voice-note plugin cards in both directions", 
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+it("changes the same audio controls across EN→KO→EN without reloading, seeking or changing user text", async () => {
+  setLanguage("en");
+  const name = "User {name} 原文.mp3";
+  const { container } = render(
+    <AudioAttachment
+      attachment={{
+        url: "https://fixture.test/audio.mp3",
+        name,
+        kind: "audio",
+        duration: 83,
+      }}
+      source={source}
+    />,
+  );
+  const audio = container.querySelector("audio");
+  if (!audio) throw new Error("Missing actual audio element");
+  const button = screen.getByRole("button", { name: `Play ${name}` });
+  const seek = screen.getByRole("slider", { name: `Seek ${name}` });
+  audio.currentTime = 17.25;
+  fireEvent.timeUpdate(audio);
+  button.focus();
+  const originalSource = audio.getAttribute("src");
+  const beforePlay = play.mock.calls.length,
+    beforePause = pause.mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: `${name} 재생` })).toBe(button);
+  expect(screen.getByRole("slider", { name: `${name} 탐색` })).toBe(seek);
+  expect(button).toHaveFocus();
+  expect(audio.currentTime).toBe(17.25);
+  expect(seek).toHaveAttribute("aria-valuetext", "1:23 중 0:17");
+  expect(container.querySelector("audio")).toBe(audio);
+  expect(audio.getAttribute("src")).toBe(originalSource);
+  expect(play).toHaveBeenCalledTimes(beforePlay);
+  expect(pause).toHaveBeenCalledTimes(beforePause);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: `Play ${name}` })).toBe(button);
+  expect(seek).toHaveAttribute("aria-valuetext", "0:17 of 1:23");
+  fireEvent.change(seek, { target: { value: "24.5" } });
+  expect(audio.currentTime).toBe(24.5);
 });

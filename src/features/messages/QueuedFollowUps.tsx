@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useContext,
   useLayoutEffect,
@@ -33,6 +34,7 @@ export function QueuedFollowUps({
   focusComposer(): void;
   onEdit?(id: string): void;
 }) {
+  useLanguage();
   const queue = followUpQueue(session);
   const entries = useSyncExternalStore(queue.subscribe, queue.snapshot).filter(
     (entry) => entry.channelId === channelId,
@@ -67,7 +69,7 @@ export function QueuedFollowUps({
     <section
       ref={section}
       className={styles.queue}
-      aria-label="Queued follow-ups"
+      aria-label={t("messageActions.queue.label")}
     >
       {storageError && (
         <p role="alert" className="text-body-sm text-danger">
@@ -79,19 +81,21 @@ export function QueuedFollowUps({
           <li key={entry.id} className={styles.row}>
             <div className={styles.content}>
               <QueuePreview
-                text={entry.text || "Attachment"}
+                text={entry.text || t("messageActions.queue.attachment")}
                 onFocus={() => {
                   focused.current = { id: entry.id, action: "preview" };
                 }}
               />
               {entry.sending && !entry.error && (
-                <p className="text-caption">Sending…</p>
+                <p className="text-caption">
+                  {t("messageActions.queue.sending")}
+                </p>
               )}
               {entry.restored && !entry.sending && !entry.error && (
                 <p className="text-caption">
                   {entry.predecessorRemoved
-                    ? "Paused because an earlier message was handled in another window. Send when ready."
-                    : "Saved before restart. Send when ready."}
+                    ? t("messageActions.queue.predecessor")
+                    : t("messageActions.queue.restored")}
                 </p>
               )}
               {entry.error && (
@@ -110,7 +114,7 @@ export function QueuedFollowUps({
                 variant="subtle"
                 shape="round"
                 size="xs"
-                aria-label="Remove queued message"
+                aria-label={t("messageActions.queue.remove")}
                 icon={<XIcon size={12} strokeWidth={2} />}
                 onClick={() => {
                   queue.remove(entry.id);
@@ -121,7 +125,7 @@ export function QueuedFollowUps({
                 onFocus={() => {
                   focused.current = { id: entry.id, action: "edit" };
                 }}
-                aria-label="Edit queued message"
+                aria-label={t("messageActions.queue.edit")}
                 variant="subtle"
                 size="xs"
                 shape="round"
@@ -243,6 +247,7 @@ function QueuedSend({
   recipients: readonly string[];
   channelId: string;
 }) {
+  useLanguage();
   const agents = useContext(AgentsContext);
   const state = useSessionState(agents, recipients, {
     channelId,
@@ -250,7 +255,7 @@ function QueuedSend({
   const compacting = state === "compacting";
   return (
     <Tooltip
-      content="Wait for compaction to finish, or interrupt it."
+      content={t("messageActions.queue.compacting")}
       {...(!compacting ? { open: false } : {})}
       disableHoverablePopup
     >
@@ -277,7 +282,7 @@ function QueuedSend({
         size="xs"
         shape="round"
         style={accentButtonStyle}
-        aria-label="Send"
+        aria-label={t("messageActions.queue.send")}
         icon={<ArrowUpIcon size={12} strokeWidth={2.5} />}
         disabled={props.disabled || compacting}
         focusableWhenDisabled={compacting || undefined}

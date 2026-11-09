@@ -28,7 +28,11 @@ import type { Contribution } from "../plugins/contributions";
 import { createPluginInstallRequests } from "../plugins/installer";
 import { createPluginRequests } from "../plugins/requests";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 // Settings reads agent plugin requests from every plugin manager.
 const noRequests = createPluginRequests({
   catalog: () => undefined,
@@ -351,8 +355,17 @@ it.each([false, true])("groups plugins (Essentials=%s)", async (essentials) => {
   expect(
     within(content)
       .getAllByRole("heading", { level: 3 })
-      .map((heading) => heading.textContent),
-  ).toEqual(["Communication3 plugins", "Agents1 plugin", "Other1 plugin"]);
+      .map(
+        (heading) => heading.querySelector('[aria-hidden="true"]')?.textContent,
+      ),
+  ).toEqual(["3", "1", "1"]);
+  within(content)
+    .getAllByRole("heading", { level: 3 })
+    .forEach((heading, index) => {
+      expect(heading).toHaveAccessibleName(
+        ["Communication3 plugins", "Agents1 plugin", "Other1 plugin"][index],
+      );
+    });
   const communication = within(content)
     .getByRole("heading", {
       name: /^Communication/,
@@ -892,7 +905,7 @@ it("sorts Essentials first and names alphabetically", () => {
     ],
   };
   act(publish);
-  const group = screen.getByRole("region", { name: "Agents4plugins" });
+  const group = screen.getByRole("region", { name: "Agents 4 plugins" });
   expect(
     within(group)
       .getAllByRole("button", { name: /^View .* details$/ })
@@ -1022,7 +1035,7 @@ it("omits filter tab semantics when the catalog is unavailable", () => {
 
 it("keeps external Essentials tags from granting curated markers or priority", () => {
   reviewPluginFixture();
-  const group = screen.getByRole("region", { name: "Agents2plugins" });
+  const group = screen.getByRole("region", { name: "Agents 2 plugins" });
   expect(
     within(group)
       .getAllByRole("button", { name: /^View .* details$/ })
@@ -3261,4 +3274,141 @@ it("reviews a requested plugin artifact in place of the add dialog and cancels i
   expect(git).not.toHaveBeenCalled();
   view.unmount();
   await expect(outcome).resolves.toBe("cancelled");
+});
+
+import { setLanguage } from "../shared/i18n";
+it("updates standalone navigation around a retained contributed draft without changing its registration or selection", async () => {
+  setLanguage("en");
+  const entry = Object.freeze({
+    ...card("draft", "Appearance", "Plugins"),
+    component: () => <input aria-label="User draft" defaultValue="" />,
+  });
+  const { cards } = registry([entry]);
+  const original = cards.snapshot();
+  const register = vi.spyOn(cards, "register");
+  render(<Settings {...host} cards={cards} />);
+  const contributed = screen
+    .getAllByRole("button", { name: "Appearance" })
+    .at(-1);
+  if (!contributed) throw new Error("Missing contributed settings entry");
+  await userEvent.setup().click(contributed);
+  const draft = await screen.findByRole("textbox", { name: "User draft" });
+  await userEvent.setup().type(draft, "사용자 원문 draft");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("navigation", { name: "설정 항목" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "설정", level: 1 })).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "Appearance", current: "page" }),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: "화면 설정" })).toBeVisible();
+  expect(screen.getByRole("textbox", { name: "User draft" })).toBe(draft);
+  expect(draft).toHaveValue("사용자 원문 draft");
+  expect(draft).toHaveFocus();
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("navigation", { name: "Settings sections" }),
+  ).toBeVisible();
+  expect(draft).toHaveValue("사용자 원문 draft");
+  expect(draft).toHaveFocus();
+  expect(cards.snapshot()).toBe(original);
+  expect(register).not.toHaveBeenCalled();
+});
+
+it("translates host plugin controls without changing authored names, query, focus or settings lifecycle", async () => {
+  const { manager } = reviewPluginFixture();
+  const user = userEvent.setup();
+  const input = screen.getByRole("searchbox", {
+    name: "Search plugins",
+  }) as HTMLInputElement;
+  await user.type(input, "Zebra");
+  input.setSelectionRange(1, 3);
+  const row = screen.getByRole("button", {
+    name: "View Zebra external details",
+  });
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("searchbox", { name: "플러그인 검색" })).toBe(input);
+  expect(input).toHaveFocus();
+  expect(input).toHaveValue("Zebra");
+  expect(
+    screen.getByRole("region", { name: "에이전트 플러그인 1개" }),
+  ).toBeVisible();
+  expect([input.selectionStart, input.selectionEnd]).toEqual([1, 3]);
+  expect(
+    screen.getByRole("button", { name: "Zebra external 세부 정보 보기" }),
+  ).toBe(row);
+  expect(screen.getByText("Zebra external", { exact: true })).toBeVisible();
+  expect(manager.change).not.toHaveBeenCalled();
+  fireEvent.click(row);
+  const close = screen.getByRole("button", { name: "플러그인 세부 정보 닫기" });
+  expect(close).toHaveFocus();
+  expect(
+    screen.getByRole("complementary", { name: "Zebra external 세부 정보" }),
+  ).toBeVisible();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Close plugin details" })).toBe(
+    close,
+  );
+  expect(close).toHaveFocus();
+  expect(
+    screen.getByRole("complementary", { name: "Zebra external details" }),
+  ).toBeVisible();
+  expect(manager.change).not.toHaveBeenCalled();
+});
+
+it("keeps authored plugin text literal even when it matches a host translation", () => {
+  const { external, publish, manager } = reviewPluginFixture();
+  act(() => {
+    external.manifest.name = "Manage plugins";
+    publish();
+  });
+  act(() => setLanguage("ko"));
+  const row = screen.getByRole("button", {
+    name: "Manage plugins 세부 정보 보기",
+  });
+  expect(
+    within(row).getByText("Manage plugins", { exact: true }),
+  ).toBeVisible();
+  const toggle = screen.getByRole("button", {
+    name: "Manage plugins 비활성화",
+  });
+  fireEvent.click(toggle);
+  expect(manager.change).toHaveBeenCalledExactlyOnceWith(
+    "disable",
+    "example.external",
+  );
+  fireEvent.click(row);
+  expect(
+    screen.getByRole("heading", { name: "Manage plugins", level: 2 }),
+  ).toBeVisible();
+  expect(screen.getByText("example.external", { exact: true })).toBeVisible();
+});
+
+it("keeps the same open external plugin menu and focused item when its host label changes", async () => {
+  const { manager } = reviewPluginFixture();
+  const user = userEvent.setup();
+  const trigger = screen.getByRole("button", {
+    name: "More actions for Zebra external",
+  });
+  trigger.focus();
+  await user.keyboard("{ArrowDown}");
+  const menu = await screen.findByRole("menu", { name: "Plugin actions" });
+  await waitFor(() =>
+    expect(menu).toContainElement(document.activeElement as HTMLElement),
+  );
+  const focused = document.activeElement;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "Zebra external 추가 작업" })).toBe(
+    trigger,
+  );
+  expect(screen.getByRole("menu", { name: "플러그인 작업" })).toBe(menu);
+  expect(document.activeElement).toBe(focused);
+  expect(manager.change).not.toHaveBeenCalled();
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("button", { name: "More actions for Zebra external" }),
+  ).toBe(trigger);
+  expect(screen.getByRole("menu", { name: "Plugin actions" })).toBe(menu);
+  expect(document.activeElement).toBe(focused);
+  await user.keyboard("{Escape}");
+  expect(trigger).toHaveFocus();
 });

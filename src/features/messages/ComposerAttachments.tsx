@@ -1,3 +1,4 @@
+import { formattingLocale, t, useLanguage } from "../../shared/i18n";
 import type {
   AttachmentRenderer,
   ContributionReader,
@@ -56,6 +57,7 @@ export function ComposerAttachments({
   /** The section finished animating out after the last item was removed. */
   onExitComplete?: (() => void) | undefined;
 }) {
+  useLanguage();
   const active = useConversationPresentation();
   const mixed = items.some((item) => {
     const { image, video } = draftAttachmentMedia(item);
@@ -82,7 +84,7 @@ export function ComposerAttachments({
         {shown && (
           <motion.section
             key="attachments"
-            aria-label="Attachments"
+            aria-label={t("messages.attachment.label")}
             className={styles.attachments}
             initial={instant ? false : { height: 0, overflow: "hidden" }}
             animate={{
@@ -188,6 +190,7 @@ function GifItem({
   disabled: boolean;
   remove(): void;
 }) {
+  useLanguage();
   const { instant, appearance } = useItemAppearance();
   const [failed, setFailed] = useState<string>();
   const source = gif.source && failed !== gif.source ? gif.source : undefined;
@@ -219,7 +222,7 @@ function GifItem({
           type="button"
           disabled={disabled}
           data-remove-action=""
-          aria-label={`Remove ${gif.title}`}
+          aria-label={t("messages.attachment.remove", { name: gif.title })}
           onClick={remove}
           icon={<XIcon size={16} />}
         />
@@ -245,6 +248,7 @@ function AttachmentItem({
   remove(id: string): void;
   retry(id: string): void;
 }) {
+  useLanguage();
   const { instant, appearance } = useItemAppearance();
   const { source, image, video } = useDraftAttachmentSource(item, media);
   const previewButton = useRef<HTMLButtonElement>(null);
@@ -259,15 +263,15 @@ function AttachmentItem({
   const bytes = item.uploaded?.size ?? item.file.size;
   const size =
     bytes < 1024 * 1024
-      ? `${Math.max(1, Math.round(bytes / 1024))} KB`
-      : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      ? `${new Intl.NumberFormat(formattingLocale(), { useGrouping: false }).format(Math.max(1, Math.round(bytes / 1024)))} KB`
+      : `${new Intl.NumberFormat(formattingLocale(), { useGrouping: false, minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(bytes / (1024 * 1024))} MB`;
   const uploadFailed = item.status === "error";
   const status = {
-    queued: "Queued",
-    preparing: "Preparing…",
-    uploading: "Uploading…",
-    ready: "Ready",
-    error: "Upload failed",
+    queued: t("messages.attachment.queued"),
+    preparing: t("messages.attachment.preparing"),
+    uploading: t("messages.attachment.uploading"),
+    ready: t("messages.attachment.ready"),
+    error: t("messages.attachment.failed"),
   }[item.status];
   // Preparation has no byte total; transfer progress comes from the host.
   const busy =
@@ -298,7 +302,7 @@ function AttachmentItem({
                   disabled={disabled}
                   onClick={() => remove(item.id)}
                 >
-                  Remove voice note
+                  {t("messages.attachment.removeVoice")}
                 </button>
               </div>
             }
@@ -312,7 +316,7 @@ function AttachmentItem({
               disabled={disabled}
               onClick={() => retry(item.id)}
             >
-              Retry voice note upload
+              {t("messages.attachment.retryVoice")}
             </button>
           </>
         )}
@@ -333,7 +337,9 @@ function AttachmentItem({
           data-draft-preview={item.id}
           className={styles.preview}
           type="button"
-          aria-label={`Preview ${item.file.name}`}
+          aria-label={t("messages.attachment.preview", {
+            name: item.file.name,
+          })}
           onClick={(event) => {
             prepareReviewEntrance(event);
             preview(event.currentTarget);
@@ -392,7 +398,9 @@ function AttachmentItem({
             style={{ width: "100%", height: "100%", borderRadius: "inherit" }}
             ref={previewButton}
             data-draft-preview={item.id}
-            aria-label={`Preview ${item.file.name}`}
+            aria-label={t("messages.attachment.preview", {
+              name: item.file.name,
+            })}
             onClick={(event) => preview(event.currentTarget)}
             icon={<FileTypeIcon name={item.file.name} mime={item.file.type} />}
           />
@@ -411,12 +419,16 @@ function AttachmentItem({
           <span className="sr-only">{item.file.name}: </span>
           {uploadFailed ? size : `${size} · ${status}`}
         </span>
-        {failed && <span className="sr-only">Preview unavailable</span>}
+        {failed && (
+          <span className="sr-only">
+            {t("messages.attachment.previewUnavailable")}
+          </span>
+        )}
       </div>
       {uploadFailed && (
         <p className={styles.error} role="alert">
           <span className="sr-only">{item.file.name}: </span>
-          {item.error || "Upload failed. Retry or remove it to send."}
+          {item.error || t("messages.attachment.retryOrRemove")}
         </p>
       )}
       <div
@@ -428,7 +440,9 @@ function AttachmentItem({
             <Button
               size="sm"
               disabled={disabled}
-              aria-label={`Retry ${item.file.name}`}
+              aria-label={t("messages.attachment.retry", {
+                name: item.file.name,
+              })}
               onClick={(event) => {
                 // Retry replaces this control. Hand off only focus that it owns.
                 if (document.activeElement === event.currentTarget)
@@ -436,16 +450,18 @@ function AttachmentItem({
                 retry(item.id);
               }}
             >
-              Retry
+              {t("messages.attachment.retryButton")}
             </Button>
             <Button
               size="sm"
               variant="ghost"
               disabled={disabled}
-              aria-label={`Remove ${item.file.name}`}
+              aria-label={t("messages.attachment.remove", {
+                name: item.file.name,
+              })}
               onClick={() => remove(item.id)}
             >
-              Remove
+              {t("messages.attachment.removeButton")}
             </Button>
           </>
         ) : (
@@ -456,8 +472,10 @@ function AttachmentItem({
             type="button"
             disabled={disabled}
             data-remove-action={!busy ? "" : undefined}
-            aria-label={`Remove ${item.file.name}`}
-            title={busy ? "Cancel upload and remove attachment" : undefined}
+            aria-label={t("messages.attachment.remove", {
+              name: item.file.name,
+            })}
+            title={busy ? t("messages.attachment.cancelRemove") : undefined}
             onClick={() => remove(item.id)}
             icon={
               busy ? (
@@ -465,7 +483,12 @@ function AttachmentItem({
                   <span
                     className={styles.progress}
                     role="progressbar"
-                    aria-label={`${item.status === "queued" ? "Queued" : "Uploading"} ${item.file.name}`}
+                    aria-label={t(
+                      item.status === "queued"
+                        ? "messages.attachment.queuedName"
+                        : "messages.attachment.uploadingName",
+                      { name: item.file.name },
+                    )}
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={
@@ -478,11 +501,11 @@ function AttachmentItem({
                     aria-valuetext={
                       item.transfer
                         ? item.transfer.sent === item.transfer.total
-                          ? "Transfer complete; waiting for server confirmation"
+                          ? t("messages.attachment.transferComplete")
                           : undefined
                         : item.status === "queued"
-                          ? "Queued"
-                          : "Preparing upload"
+                          ? t("messages.attachment.queued")
+                          : t("messages.attachment.preparingUpload")
                     }
                   >
                     <svg

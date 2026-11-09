@@ -1,7 +1,17 @@
 // @vitest-environment jsdom
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { pngChunks, snapshotChunk } from "../messages/image-metadata";
-import { avatarPreview, uploadAvatar } from "./avatar-upload";
+import { setLanguage } from "../../shared/i18n";
+import {
+  errorMessage,
+  resolveMessage,
+} from "../../shared/i18n/deferred-message";
+import {
+  avatarPictureError,
+  avatarPictureErrorMessage,
+  avatarPreview,
+  uploadAvatar,
+} from "./avatar-upload";
 
 const uploadAttachment = vi.fn(async (file: File) => ({
   type: file.type,
@@ -150,4 +160,43 @@ it("forwards the requested size so previews share the message-row thumbnail URL"
   );
   // The editor keeps the original for its large frame.
   expect(avatarPreview(picture, community)).toBe(proxied(picture));
+});
+
+afterEach(() => setLanguage("en"));
+it("keeps canonical avatar validation while translating only its proven display result", () => {
+  setLanguage("ko");
+  expect(avatarPictureError("http://images.example/a.png")).toBe(
+    "Use an HTTPS image URL without credentials (up to 2,048 characters), or remove the avatar.",
+  );
+  expect(avatarPictureErrorMessage("http://images.example/a.png")).toBe(
+    "인증 정보가 없는 HTTPS 이미지 URL을 사용하거나 아바타를 제거해 주세요. URL은 2,048자 이하여야 합니다.",
+  );
+  expect(avatarPictureError("https://images.example/a.png")).toBeUndefined();
+  expect(
+    avatarPictureErrorMessage("https://images.example/a.png"),
+  ).toBeUndefined();
+});
+it("keeps app-owned upload failure diagnostics canonical while display changes language and external errors remain literal", async () => {
+  setLanguage("en");
+  uploadAttachment.mockClear();
+  const failure = await uploadAvatar(
+    new File(["inert"], "sample.txt", { type: "text/plain" }),
+    "https://relay.example.test",
+    new AbortController().signal,
+  ).catch((error: unknown) => error);
+  expect(failure).toBeInstanceOf(Error);
+  expect((failure as Error).message).toBe(
+    "Choose a PNG, JPEG, GIF, WebP or HEIC image.",
+  );
+  const display = errorMessage(failure);
+  setLanguage("ko");
+  expect(resolveMessage(display)).toBe(
+    "PNG, JPEG, GIF, WebP 또는 HEIC 이미지를 선택해 주세요.",
+  );
+  expect(
+    resolveMessage(
+      errorMessage(new Error("Choose a PNG, JPEG, GIF, WebP or HEIC image.")),
+    ),
+  ).toBe("Choose a PNG, JPEG, GIF, WebP or HEIC image.");
+  expect(uploadAttachment).not.toHaveBeenCalled();
 });

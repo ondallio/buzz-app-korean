@@ -241,6 +241,20 @@ export function useTeamMentions(
           name: value.name,
           recipients,
           disabled,
+          // UI facts reuse this eligibility result; provider detail stays canonical.
+          presentation: Object.freeze({
+            count: recipients.length,
+            outside,
+            destination: !outside
+              ? undefined
+              : channel?.channelType === "dm"
+                ? "dm"
+                : inviteAgents
+                  ? channel && channel.channelType !== "solo"
+                    ? "channel"
+                    : "chat"
+                  : "outside",
+          } as const),
           detail:
             disabled ??
             [`Saved team · ${recipients.length} agents`, consequence]

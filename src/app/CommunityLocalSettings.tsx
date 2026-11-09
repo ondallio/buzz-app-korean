@@ -1,3 +1,12 @@
+import {
+  localMessage,
+  localError,
+  errorMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../shared/i18n/deferred-message";
+import { TranslatedMessage } from "../shared/i18n/Message";
+import { t, useLanguage } from "../shared/i18n";
 import { useRef, useState } from "react";
 import { CommunityDialog } from "../features/communities/CommunityDialog";
 import { CommunityRepositoriesSettings } from "./CommunityRepositoriesSettings";
@@ -25,19 +34,23 @@ export function CommunityLocalSettings({
   community: Membership;
   viewer: string | undefined;
 }) {
+  useLanguage();
   const notify = useToastNotification();
   const address = communityDestination(community.id).url;
   const [copying, setCopying] = useState(false);
-  const [copyError, setCopyError] = useState("");
+  const [copyError, setCopyError] = useState<DisplayMessage>("");
   const copyUrl = async () => {
     if (copying) return;
     setCopying(true);
     setCopyError("");
     try {
       await writeClipboardText(address);
-      notify("Community URL copied.", "success");
+      notify(
+        <TranslatedMessage value={localMessage("settings.urlCopied")} />,
+        "success",
+      );
     } catch {
-      setCopyError("Couldn’t copy the URL. Select it and copy manually.");
+      setCopyError(localMessage("settings.urlCopyFailed"));
     } finally {
       setCopying(false);
     }
@@ -45,17 +58,14 @@ export function CommunityLocalSettings({
   const [editingConnection, setEditingConnection] = useState(false);
   const nameInput = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const [saved, setSaved] = useState(false);
   const value = draft ?? community.localName ?? "";
   const changed = value.trim() !== (community.localName ?? "");
   const save = (value: string) => {
     setSaved(false);
     try {
-      if (!viewer)
-        throw new Error(
-          "Your account is unavailable. Open Local settings again.",
-        );
+      if (!viewer) throw localError("settings.accountUnavailable");
       communities.setLocalName(community.id, viewer, value);
       setDraft(null);
       setError("");
@@ -65,8 +75,8 @@ export function CommunityLocalSettings({
     } catch (error) {
       setError(
         error instanceof Error
-          ? error.message
-          : "Couldn’t save the display name. Try again.",
+          ? errorMessage(error)
+          : localMessage("settings.localNameSaveFailed"),
       );
     }
   };
@@ -74,8 +84,8 @@ export function CommunityLocalSettings({
     <section aria-labelledby="community-local-settings-title">
       <Header
         id="community-local-settings-title"
-        title="Local settings"
-        subtitle="Settings only apply on this device."
+        title={t("settings.localSettings")}
+        subtitle={t("settings.localDescription")}
       />
       <form
         onSubmit={(event) => {
@@ -85,9 +95,9 @@ export function CommunityLocalSettings({
       >
         <SettingsGroup layout="form">
           <Field
-            label="Display name"
-            description="This name is only visible to you. Other users can’t see your display name for this community."
-            error={error}
+            label={t("settings.displayName")}
+            description={t("settings.displayNameDescription")}
+            error={resolveMessage(error)}
           >
             <Input
               ref={nameInput}
@@ -108,7 +118,7 @@ export function CommunityLocalSettings({
               disabled={!community.localName && !draft}
               onClick={() => save("")}
             >
-              Reset name
+              {t("settings.resetName")}
             </Button>
             <Button
               type="button"
@@ -120,15 +130,15 @@ export function CommunityLocalSettings({
                 nameInput.current?.focus();
               }}
             >
-              Cancel
+              {t("settings.cancel")}
             </Button>
             <Button type="submit" variant="primary" disabled={!changed}>
-              Save
+              {t("settings.save")}
             </Button>
           </div>
           {saved && (
             <p role="status" className="m-0 text-body-sm text-muted">
-              Display name saved on this device.
+              {t("settings.localNameSaved")}
             </p>
           )}
         </SettingsGroup>
@@ -141,14 +151,14 @@ export function CommunityLocalSettings({
       <div className="mt-section-gap">
         <SettingsGroup layout="form">
           <Field
-            label="Community address"
-            description="This is the relay URL you use to connect to this community."
+            label={t("settings.communityAddress")}
+            description={t("settings.communityAddressDescription")}
           >
             <Input value={address} readOnly />
           </Field>
           {copyError && (
             <p role="alert" className="m-0 text-body-sm text-danger">
-              {copyError}
+              {resolveMessage(copyError)}
             </p>
           )}
           <div className="flex flex-wrap justify-end gap-3">
@@ -158,7 +168,7 @@ export function CommunityLocalSettings({
               loading={copying}
               onClick={() => void copyUrl()}
             >
-              Copy URL
+              {t("settings.copyUrl")}
             </Button>
             <Button
               type="button"
@@ -166,7 +176,7 @@ export function CommunityLocalSettings({
               disabled={!viewer || !communities.snapshot().relayAvailable}
               onClick={() => setEditingConnection(true)}
             >
-              Edit connection
+              {t("settings.editConnection")}
             </Button>
           </div>
         </SettingsGroup>

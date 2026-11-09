@@ -33,9 +33,18 @@ import type { LiveCallbacks } from "../../features/relay/live";
 import { entityTarget, type EntityRoute } from "../../features/repos/routes";
 import type { GitSnapshot } from "../../features/repos/git";
 import type { RelayData, RelaySnapshot } from "../../features/relay/service";
-import { createRelaySession } from "../../features/relay/session";
+import {
+  createRelaySession,
+  type RelaySession,
+} from "../../features/relay/session";
 import { matchesEvent } from "../../features/relay/projection";
 import { RepoPage } from "./RepoPage";
+import { setLanguage } from "../../shared/i18n/language";
+import * as clipboard from "../../shared/clipboard";
+import {
+  clockPreference,
+  setClockPreference,
+} from "../../shared/clock-preference";
 
 const key = new Uint8Array(32).fill(5),
   owner = getPublicKey(key);
@@ -100,6 +109,7 @@ const git = {
 const disposals: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
   cleanup();
+  setLanguage("en");
   for (const dispose of disposals.splice(0)) await dispose();
   window.history.replaceState(null, "", "/");
   vi.restoreAllMocks();
@@ -136,7 +146,7 @@ function setup(
   let live: LiveCallbacks | undefined;
   const ctx = new Context();
   const host = provideNavigation(ctx);
-  const readGit = vi.fn(
+  const readGit = vi.fn<NonNullable<RelaySession["projectGit"]>["read"]>(
     async (input: GitRead): Promise<GitSnapshot> => ({
       ...git,
       ...(input.commit
@@ -634,4 +644,168 @@ it("reads a repository refused while signed out again once the organization sign
     ).not.toBeInTheDocument(),
   );
   expect(t.readGit).toHaveBeenCalledTimes(2);
+});
+
+it("keeps the repository and focused tabs through language changes with exact clipboard URL and no new reads", async () => {
+  const h = setup({ type: "repo", owner, dtag: "repo" });
+  h.mount();
+  await screen.findByText("Actual README");
+  await expect(h.promise).resolves.toEqual({ status: "opened" });
+  const files = screen.getByRole("tab", { name: "Files" });
+  const heading = screen.getByRole("heading", { name: "Real repository" });
+  const reads = h.readGit.mock.calls.length;
+  const queries = h.query.mock.calls.length;
+  files.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("tab", { name: "파일" })).toBe(files);
+  expect(files).toHaveFocus();
+  expect(screen.getByRole("heading", { name: "Real repository" })).toBe(
+    heading,
+  );
+  expect(screen.getByText("Actual README")).toBeVisible();
+  expect(h.readGit).toHaveBeenCalledTimes(reads);
+  expect(h.query).toHaveBeenCalledTimes(queries);
+  let finish: () => void = () => {
+    throw new Error("Missing clipboard gate");
+  };
+  const copy = vi.spyOn(clipboard, "writeClipboardText").mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "링크 복사" }));
+  const exact = copy.mock.calls[0]?.[0];
+  expect(exact).toContain("buzz://");
+  try {
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("tab", { name: "Files" })).toBe(files);
+  } finally {
+    await act(async () => finish());
+  }
+  await screen.findByText("Link copied");
+  act(() => setLanguage("ko"));
+  expect(screen.getByText("링크를 복사했습니다.")).toBeVisible();
+  expect(copy).toHaveBeenCalledExactlyOnceWith(exact);
+  expect(h.readGit).toHaveBeenCalledTimes(reads);
+  expect(h.query).toHaveBeenCalledTimes(queries);
+});
+
+it("keeps a held Git read and selected raw commit through a Korean loading surface", async () => {
+  const h = setup({
+    type: "repo",
+    owner,
+    dtag: "repo",
+    tab: "commits",
+    commit: git.head,
+  });
+  let finish: (value: GitSnapshot) => void = () => {
+    throw new Error("Missing Git gate");
+  };
+  h.readGit.mockImplementation(
+    () =>
+      new Promise<GitSnapshot>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  h.mount();
+  await waitFor(() => expect(h.readGit).toHaveBeenCalledTimes(1));
+  const request = h.readGit.mock.calls[0]?.[0];
+  const signal = h.readGit.mock.calls[0]?.[1];
+  try {
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("status")).toHaveTextContent("저장소 불러오는 중…");
+    expect(h.host.navigation.snapshot().status).toBe("opening");
+    expect(h.readGit).toHaveBeenCalledTimes(1);
+    expect(signal?.aborted).toBe(false);
+  } finally {
+    await act(async () => finish({ ...git, diff: "+raw code 사용자 {name}" }));
+  }
+  expect(
+    await screen.findByRole("region", { name: "커밋 변경 사항" }),
+  ).toHaveTextContent("+raw code 사용자 {name}");
+  await expect(h.promise).resolves.toEqual({ status: "opened" });
+  expect(h.readGit).toHaveBeenCalledExactlyOnceWith(request, signal);
+  expect(request).toMatchObject({ owner, dtag: "repo", commit: git.head });
+});
+
+it("localizes the trusted issue status and date while preserving the event and independent clock choice", async () => {
+  const closed = finalizeEvent(
+    {
+      kind: 1632,
+      created_at: 3,
+      content: "",
+      tags: [["e", issue.id, "", "root"]],
+    },
+    key,
+  );
+  const events = [repo, issue, pr, closed];
+  const before = JSON.stringify(events);
+  const h = setup(
+    { type: "issue", owner, dtag: "repo", id: issue.id },
+    false,
+    true,
+    events,
+  );
+  const previousClock = clockPreference();
+  const view = h.mount();
+  await screen.findByRole("heading", { name: "Selected issue" });
+  await expect(h.promise).resolves.toEqual({ status: "opened" });
+  const time = view.container.querySelector("time");
+  expect(time).not.toBeNull();
+  expect(time?.parentElement).toHaveTextContent(/^Closed/);
+  const reads = h.query.mock.calls.length;
+  try {
+    act(() => {
+      setClockPreference({ hourCycle: "h23" });
+      setLanguage("ko");
+    });
+    expect(view.container.querySelector("time")).toBe(time);
+    expect(time?.parentElement).toHaveTextContent(/^닫힘/);
+    expect(time?.textContent).toBe(
+      new Date(issue.created_at * 1000).toLocaleString("ko-KR", {
+        hourCycle: "h23",
+      }),
+    );
+    expect(screen.getByText("The issue body")).toBeVisible();
+    expect(JSON.stringify(events)).toBe(before);
+    act(() => setLanguage("en"));
+    expect(time?.parentElement).toHaveTextContent(/^Closed/);
+    expect(time?.textContent).toBe(
+      new Date(issue.created_at * 1000).toLocaleString("en-US", {
+        hourCycle: "h23",
+      }),
+    );
+    expect(h.query).toHaveBeenCalledTimes(reads);
+  } finally {
+    act(() => setClockPreference(previousClock));
+  }
+});
+
+it("keeps the loaded raw file and return action across language changes", async () => {
+  const h = setup({ type: "repo", owner, dtag: "repo", tab: "files" });
+  h.mount();
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "README.md" }));
+  await screen.findByRole("heading", { name: "README.md" });
+  const code = screen.getByText("actual file");
+  const reads = h.readGit.mock.calls.length;
+  const queries = h.query.mock.calls.length;
+  act(() => setLanguage("ko"));
+  const back = screen.getByRole("button", { name: "모든 파일" });
+  back.focus();
+  expect(screen.getByText("actual file")).toBe(code);
+  expect(h.readGit).toHaveBeenCalledTimes(reads);
+  expect(h.query).toHaveBeenCalledTimes(queries);
+  expect(h.readGit.mock.calls.at(-1)?.[0].path).toBe("README.md");
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "All files" })).toBe(back);
+  expect(back).toHaveFocus();
+  await user.click(back);
+  expect(
+    await screen.findByRole("button", { name: "README.md" }),
+  ).toBeVisible();
+  expect(h.readGit.mock.calls.at(-1)?.[0].path).toBeUndefined();
 });

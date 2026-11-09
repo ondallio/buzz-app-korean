@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { setLanguage } from "../../shared/i18n";
 import { stubAvatarBrowserApis } from "../../features/agents/avatar-testing";
 stubAvatarBrowserApis();
 import {
@@ -62,7 +63,11 @@ function AgentBrowse(
   );
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 const echo = {
   key: "test/echo",
@@ -570,4 +575,54 @@ it("reloads a catalog refused while signed out once the organization signs in", 
   expect(await screen.findByText("Shared helper")).toBeVisible();
   expect(read).toHaveBeenCalledTimes(2);
   recovery.dispose();
+});
+
+it("keeps a shared import's raw instructions, selected harness and same pending action across languages", async () => {
+  setLanguage("en");
+  const read = vi.fn().mockResolvedValue([shared]);
+  const props = importing();
+  let finish = (_: { agent: Agent; notes: never[] }) => {};
+  props.agents.port.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  render(<AgentBrowse relay={community(read)} {...props} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Shared helper" }));
+  fireEvent.click(screen.getByRole("button", { name: "Import" }));
+  const dialog = screen.getByRole("dialog", { name: "Shared helper" });
+  const input = within(dialog).getByRole("textbox", { name: "Instructions" });
+  if (!(input instanceof HTMLTextAreaElement))
+    throw new Error("Expected actual instructions textarea");
+  fireEvent.change(input, { target: { value: "Raw {instructions}\n둘째 줄" } });
+  input.focus();
+  input.setSelectionRange(2, 7);
+  const harness = within(dialog).getByRole("combobox", { name: "Harness" });
+  const action = within(dialog).getByRole("button", { name: "Import" });
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("dialog", { name: "Shared helper" })).toBe(dialog);
+  expect(within(dialog).getByRole("combobox", { name: "하네스" })).toBe(
+    harness,
+  );
+  expect(harness).toHaveTextContent("Echo");
+  expect(input).toHaveFocus();
+  expect(input.selectionStart).toBe(2);
+  expect(input.selectionEnd).toBe(7);
+  expect(within(dialog).getByRole("button", { name: "가져오기" })).toBe(action);
+  fireEvent.click(action);
+  expect(props.agents.port).toHaveBeenCalledExactlyOnceWith({
+    source: "shared",
+    type: "test/echo",
+    name: "Shared helper",
+    instructions: "Raw {instructions}\n둘째 줄",
+    config: { model: "test-model" },
+  });
+  act(() => setLanguage("en"));
+  expect(within(dialog).getByRole("button", { name: "Import" })).toBe(action);
+  expect(action).toBeDisabled();
+  await act(async () => finish({ agent: imported, notes: [] }));
+  expect(props.onImported).toHaveBeenCalledExactlyOnceWith(imported);
+  expect(props.agents.port).toHaveBeenCalledOnce();
+  expect(read).toHaveBeenCalledOnce();
 });

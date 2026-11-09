@@ -1,3 +1,9 @@
+import { languagePreference } from "../shared/i18n";
+import type { Language } from "../shared/i18n/language";
+import {
+  ownedSettingsLabel,
+  ownedSettingsGroupLabel,
+} from "../shared/i18n/owned-labels";
 // One Settings section policy for the standalone and shell presentations and
 // route classification. Visibility and authorization stay with settingsCards.
 import { isTauri } from "@tauri-apps/api/core";
@@ -109,6 +115,7 @@ export const isBuiltInSettingsSection = (id: string) => builtIn.has(id);
 export function settingsSections(
   cards: readonly Contribution<SettingsCard>[],
   community: Community | undefined,
+  language: Language = languagePreference(),
 ) {
   const section = (
     card: Contribution<SettingsCard>,
@@ -212,9 +219,22 @@ export function settingsSections(
         .map((card) => section(card)),
     })),
   ];
+  const localizedGroups = groups.map((group) => ({
+    ...group,
+    label: ownedSettingsGroupLabel(
+      group.id,
+      group.label,
+      group.sections,
+      language,
+    ),
+    sections: group.sections.map((section) => ({
+      ...section,
+      label: ownedSettingsLabel(section.id, section.label, language),
+    })),
+  }));
   return {
-    groups,
-    sections: groups.flatMap((group) => group.sections),
+    groups: localizedGroups,
+    sections: localizedGroups.flatMap((group) => group.sections),
     defaultSection: community ? "profile" : "appearance",
   };
 }

@@ -10,6 +10,7 @@ import {
 } from "../../features/profiles/target";
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { setLanguage } from "../../shared/i18n";
 import closeRequest from "../../../src-tauri/src/close-request.js?raw";
 import { stubAvatarBrowserApis } from "../../features/agents/avatar-testing";
 stubAvatarBrowserApis();
@@ -75,6 +76,7 @@ vi.mock("../../features/profiles/avatar-upload", async (actual) => ({
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   localStorage.clear();
   vi.unstubAllGlobals();
 });
@@ -6954,4 +6956,203 @@ describe("a team Save that finishes after its editor is gone", () => {
       f.dispose();
     }
   });
+});
+
+it("retains team selection, draft/caret and the exact pending save across languages", async () => {
+  setLanguage("en");
+  const user = userEvent.setup();
+  const ada = agent("Raw {agent} 한글", 1);
+  const h = setup([ada]);
+  await user.click(screen.getByRole("tab", { name: "Your teams" }));
+  await user.click(screen.getByRole("button", { name: "New team" }));
+  await user.click(
+    await screen.findByRole("menuitem", { name: "Create a new team" }),
+  );
+  const input = screen.getByRole("textbox", { name: "Name" });
+  if (!(input instanceof HTMLInputElement))
+    throw new Error("Expected actual team name input");
+  fireEvent.change(input, { target: { value: "Raw {team} 한글" } });
+  fireEvent.change(screen.getByRole("textbox", { name: "Instructions" }), {
+    target: { value: "Raw {instructions}\n지침" },
+  });
+  const member = screen.getByRole("checkbox", { name: ada.name });
+  await user.click(member);
+  input.focus();
+  input.setSelectionRange(3, 7);
+  const tab = screen.getByRole("tab", { name: "Your teams" });
+  const form = screen.getByRole("form", { name: "New team" });
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("tab", { name: "내 팀" })).toBe(tab);
+  expect(tab).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("form", { name: "새 팀" })).toBe(form);
+  expect(screen.getByRole("textbox", { name: "이름" })).toBe(input);
+  expect(input).toHaveFocus();
+  expect(input.selectionStart).toBe(3);
+  expect(input.selectionEnd).toBe(7);
+  expect(screen.getByRole("checkbox", { name: ada.name })).toBe(member);
+  expect(member).toBeChecked();
+  const original = h.agents.saveTeam.getMockImplementation();
+  if (!original) throw new Error("Expected actual save fixture");
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  h.agents.saveTeam.mockImplementationOnce(async (change) => {
+    await gate;
+    return original(change);
+  });
+  const save = screen.getByRole("button", { name: "팀 만들기" });
+  fireEvent.click(save);
+  expect(h.agents.saveTeam).toHaveBeenCalledExactlyOnceWith({
+    draft: expect.any(String),
+    name: "Raw {team} 한글",
+    instructions: "Raw {instructions}\n지침",
+    members: [ada.pubkey],
+  });
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Create team" })).toBe(save);
+  expect(save).toHaveAttribute("aria-busy", "true");
+  expect(input).toHaveValue("Raw {team} 한글");
+  await act(async () => release());
+  expect(h.agents.saveTeam).toHaveBeenCalledOnce();
+});
+it("keeps a completed team import's raw snapshot and diagnostics live without another operation", async () => {
+  setLanguage("en");
+  const user = userEvent.setup();
+  const h = setup([]);
+  h.agents.portable.mockResolvedValue({
+    agents: portable,
+    teams: [nightShift],
+    warnings: [],
+    here: [],
+  });
+  h.agents.portTeam.mockResolvedValueOnce({
+    team: {
+      id: "raw-team",
+      name: "Saved {team} 한글",
+      instructions: "",
+      members: [],
+    },
+    imported: [agent("Bea", 2)],
+    failed: [{ name: "Raw {member}", error: "Provider raw {error}" }],
+    elsewhere: ["Remote {name}"],
+    foreign: ["Foreign {name}"],
+  });
+  await openImport(user);
+  const action = await screen.findByRole("button", {
+    name: "Import as Echo, team Night Shift",
+  });
+  await user.click(action);
+  onImport();
+  const alert = screen.getByRole("alert");
+  expect(alert).toHaveTextContent(
+    "Imported team Saved {team} 한글 with Bea. Couldn't import Raw {member}: Provider raw {error}.",
+  );
+  const reads = h.agents.portable.mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("alert")).toBe(alert);
+  expect(alert).toHaveTextContent(
+    "Saved {team} 한글 팀을 가져왔으며 Bea도 함께 가져왔습니다.",
+  );
+  for (const raw of [
+    "Raw {member}",
+    "Provider raw {error}",
+    "Remote {name}",
+    "Foreign {name}",
+  ])
+    expect(alert).toHaveTextContent(raw);
+  act(() => setLanguage("en"));
+  expect(alert).toHaveTextContent(
+    "Imported team Saved {team} 한글 with Bea. Couldn't import Raw {member}: Provider raw {error}.",
+  );
+  expect(h.agents.portTeam).toHaveBeenCalledExactlyOnceWith({
+    id: nightShift.id,
+    type: "test/echo",
+  });
+  expect(h.agents.portable).toHaveBeenCalledTimes(reads);
+});
+
+it("localizes canonical team sync and destructive confirmation without changing stored metadata", async () => {
+  const user = userEvent.setup();
+  const rawName = "Raw {team} 한글";
+  const team = {
+    id: "raw-team-id",
+    name: rawName,
+    instructions: "Raw {instructions}",
+    members: [],
+  };
+  const view = setup([], { teams: [team] });
+  await user.click(screen.getByRole("tab", { name: "Your teams" }));
+  await user.click(screen.getByRole("button", { name: rawName }));
+  const form = screen.getByRole("form", { name: `Edit ${rawName}` });
+  view.agents.teamSync.mockReturnValue({ local: "failed" });
+  act(() => view.notify());
+  expect(form).toHaveTextContent(
+    "Only on this Mac. Moving it to the community failed; Buzz will try again.",
+  );
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("form", { name: `${rawName} 수정` })).toBe(form);
+  expect(form).toHaveTextContent(
+    "이 Mac에만 있음. 커뮤니티로 옮기지 못했습니다. Buzz가 다시 시도합니다.",
+  );
+  view.agents.teamSync.mockReturnValue({
+    conflict: "wss://raw-host.example:4321/path",
+  });
+  act(() => view.notify());
+  expect(form).toHaveTextContent(
+    "raw-host.example:4321/path에 이미 이 팀의 다른 사본이 있습니다.",
+  );
+  await user.click(screen.getByRole("button", { name: "팀 삭제" }));
+  const dialog = await screen.findByRole("alertdialog", {
+    name: `${rawName}을(를) 삭제할까요?`,
+  });
+  expect(dialog).toHaveAccessibleDescription(
+    "에이전트는 삭제되지 않지만 팀의 지침을 더 이상 받지 않습니다. 되돌릴 수 없습니다.",
+  );
+  const cancel = within(dialog).getByRole("button", { name: "취소" });
+  cancel.focus();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("alertdialog", { name: `Delete ${rawName}?` })).toBe(
+    dialog,
+  );
+  expect(cancel).toHaveFocus();
+  expect(within(dialog).getByRole("button", { name: "Cancel" })).toBe(cancel);
+  expect(view.agents.snapshot().teams).toEqual([team]);
+  expect(view.agents.saveTeam).not.toHaveBeenCalled();
+  expect(view.agents.removeTeam).not.toHaveBeenCalled();
+});
+
+it("projects app-owned summary branches while retaining identical provider prose and a focused action menu", async () => {
+  const user = userEvent.setup();
+  const local = {
+    ...agent("Raw {agent} 한글", 1),
+    config: { reply: "Type unavailable" },
+  };
+  const missing = { ...agent("Missing {type}", 2), type: "external/missing" };
+  const view = setup([local, missing]);
+  const cell = screen.getByRole("gridcell", { name: local.name });
+  const missingCell = screen.getByRole("gridcell", { name: missing.name });
+  expect(within(cell).getByText("Type unavailable")).toBeVisible();
+  fireEvent.contextMenu(cell);
+  const menu = await screen.findByRole("menu", {
+    name: `Actions for ${local.name}`,
+  });
+  const copy = within(menu).getByRole("menuitem", { name: "Copy public key" });
+  copy.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("menu", { name: `${local.name} 작업` })).toBe(menu);
+  expect(within(menu).getByRole("menuitem", { name: "공개 키 복사" })).toBe(
+    copy,
+  );
+  expect(copy).toHaveFocus();
+  expect(within(cell).getByText("Type unavailable")).toBeVisible();
+  expect(within(missingCell).getByText("유형을 사용할 수 없음")).toBeVisible();
+  act(() => setLanguage("en"));
+  expect(copy).toHaveFocus();
+  expect(within(menu).getByRole("menuitem", { name: "Copy public key" })).toBe(
+    copy,
+  );
+  await user.keyboard("{Escape}");
+  expect(view.agents.save).not.toHaveBeenCalled();
+  expect(view.agents.register).not.toHaveBeenCalled();
 });

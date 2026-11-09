@@ -13,6 +13,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { createRelaySession } from "../relay/session";
 import type { UserStatus } from "../relay/user-status";
 import { StatusEditor } from "./StatusEditor";
+import { setLanguage } from "../../shared/i18n";
 
 const owners: ReturnType<typeof createRelaySession>[] = [];
 afterEach(() => {
@@ -21,6 +22,60 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  setLanguage("en");
+});
+
+it("translates preset labels while retaining raw draft, pending payload and identical external errors", async () => {
+  setLanguage("en");
+  const now = Date.now();
+  vi.spyOn(Date, "now").mockReturnValue(now);
+  const user = userEvent.setup();
+  const { save, close } = setup();
+  let fail: (error: Error) => void = () => {
+    throw new Error("Missing save gate");
+  };
+  save.mockImplementation(
+    () =>
+      new Promise<void>((_, reject) => {
+        fail = reject;
+      }),
+  );
+  const input = screen.getByRole("textbox", { name: "Status message" });
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("textbox", { name: "상태 메시지" })).toBe(input);
+  await user.click(screen.getByRole("button", { name: "회의 중" }));
+  expect(input).toHaveValue("In a meeting");
+  fireEvent.change(input, { target: { value: "In a meeting {raw} 한글" } });
+  input.focus();
+  if (!(input instanceof HTMLInputElement))
+    throw new Error("Missing status input");
+  input.setSelectionRange(2, 5);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("textbox", { name: "Status message" })).toBe(input);
+  expect(input).toHaveFocus();
+  expect([input.selectionStart, input.selectionEnd]).toEqual([2, 5]);
+  act(() => setLanguage("ko"));
+  await user.click(screen.getByRole("button", { name: "상태 저장" }));
+  const deadline = new Date(now);
+  deadline.setHours(24, 0, 0, 0);
+  expect(save).toHaveBeenCalledExactlyOnceWith({
+    text: "In a meeting {raw} 한글",
+    emoji: "🗣️",
+    expiresAt: deadline.getTime() / 1000,
+  });
+  expect(input).toBeDisabled();
+  act(() => setLanguage("en"));
+  expect(input).toHaveValue("In a meeting {raw} 한글");
+  expect(save).toHaveBeenCalledOnce();
+  await act(async () =>
+    fail(new Error("Choose a date and time in the future.")),
+  );
+  const error = screen.getByRole("alert");
+  act(() => setLanguage("ko"));
+  expect(error).toHaveTextContent("Choose a date and time in the future.");
+  expect(input).toBeEnabled();
+  expect(close).not.toHaveBeenCalled();
+  expect(save).toHaveBeenCalledOnce();
 });
 function setup(current?: UserStatus) {
   const owner = createRelaySession(null);

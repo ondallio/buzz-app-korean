@@ -1,3 +1,5 @@
+import { t } from "../../shared/i18n";
+import { localError } from "../../shared/i18n/deferred-message";
 import { prepareAttachment } from "../messages/prepare-attachment";
 import { mediaUrl } from "../relay/transport";
 import type { UploadProgress } from "../relay/attachments";
@@ -15,6 +17,13 @@ export function avatarPictureError(value: string): string | undefined {
   )
     return undefined;
   return "Use an HTTPS image URL without credentials (up to 2,048 characters), or remove the avatar.";
+}
+
+/** Localizes only the shared policy result for this input, leaving its canonical API unchanged. */
+export function avatarPictureErrorMessage(value: string): string | undefined {
+  return avatarPictureError(value) === undefined
+    ? undefined
+    : t("profileEditing.pictureError");
 }
 
 export function avatarPreview(
@@ -45,20 +54,20 @@ export async function uploadAvatar(
   progress?: UploadProgress,
 ): Promise<string> {
   if (!/^image\/(png|jpeg|gif|webp|heic|heif)$/.test(file.type))
-    throw new Error("Choose a PNG, JPEG, GIF, WebP or HEIC image.");
+    throw localError("profileEditing.unsupportedFormat");
   if (!file.size || file.size > 50 * 1024 * 1024)
-    throw new Error("Choose an image smaller than 50 MiB.");
+    throw localError("profileEditing.imageSize");
   const transport = await connectCommunityTransport(
     communityDestination(community).id,
     signal,
   );
   if (!transport.uploadAttachment)
-    throw new Error("Image uploads are unavailable on this connection.");
+    throw localError("profileEditing.uploadUnavailable");
   const prepared = await prepareAttachment(file, signal, true);
   const result = await transport.uploadAttachment(prepared, signal, progress);
   signal.throwIfAborted();
   if (!result.type.startsWith("image/") || !avatarSource(result.url))
-    throw new Error("The server did not return an avatar image.");
+    throw localError("profileEditing.invalidImageResponse");
   return result.url;
 }
 
@@ -79,8 +88,7 @@ export function paintEmojiAvatar(
   const probe = document.createElement("canvas").getContext("2d", {
     willReadFrequently: true,
   });
-  if (!context || !probe)
-    throw new Error("Emoji images are unavailable in this browser.");
+  if (!context || !probe) throw localError("profileEditing.emojiUnavailable");
   // Measure the artwork once, then paint it at the font size that fits, so
   // even a zoomed emoji is drawn at full resolution.
   const paint = (
@@ -134,7 +142,7 @@ export async function emojiAvatar(
   offset = 0,
 ): Promise<File> {
   if (!emoji || emoji.length > 64 || !/^#[0-9a-f]{6}$/i.test(color))
-    throw new Error("Choose an emoji and a background color.");
+    throw localError("profileEditing.chooseEmojiColor");
   const canvas = document.createElement("canvas");
   paintEmojiAvatar(canvas, emoji, color, scale, offset);
   const blob = await new Promise<Blob>((resolve, reject) =>
@@ -142,7 +150,7 @@ export async function emojiAvatar(
       (value) =>
         value
           ? resolve(value)
-          : reject(new Error("Could not prepare the emoji image.")),
+          : reject(localError("profileEditing.emojiPrepareFailed")),
       "image/png",
     ),
   );

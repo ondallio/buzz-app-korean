@@ -31,8 +31,9 @@ import { foldProfiles } from "../../features/relay/profiles";
 import { StrictMode, useState, useSyncExternalStore } from "react";
 import { createSession, SessionProvider, useRead, useWrite } from "./session";
 import { createStaff, type Staff, type StaffTarget } from "./staff";
-import { useRetry } from "./ui";
+import { Failure, useRetry } from "./ui";
 import { SEARCH_DEBOUNCE_MS } from "../../shared/search-debounce";
+import { setLanguage } from "../../shared/i18n";
 
 const signer = "a".repeat(64);
 const member = "b".repeat(64);
@@ -146,6 +147,7 @@ const sent = (route: StaffRequest["route"]) =>
   calls.filter((c) => c.route === route);
 
 beforeEach(() => {
+  setLanguage("en");
   calls = [];
   contexts = [];
   saved = [];
@@ -175,7 +177,10 @@ beforeEach(() => {
       }),
   };
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 
 async function openCommunityActions() {
   fireEvent.click(await screen.findByRole("tab", { name: "Communities" }));
@@ -3775,4 +3780,455 @@ it("a gateway sign-in page on the role check is unreachable, not denied", async 
   await waitFor(() => expect(staff.visible()).toBe("error"));
   const context = staff.context();
   expect(context && staff.access(context)?.state).toBe("unreachable");
+});
+
+it("staff localization retains the same raw key, role, focus and explicit request across languages", async () => {
+  routes.probe = () => probe({ role: "operator", canStaff: true });
+  routes.listOperators = () =>
+    ok([{ pubkey: member, effectiveRole: "moderator", sources: ["db"] }]);
+  routes.putOperator = () => ok(null);
+  mount();
+  fireEvent.click(await screen.findByRole("tab", { name: "Staff" }));
+  const input = await screen.findByLabelText("Public key");
+  if (!(input instanceof HTMLInputElement))
+    throw new Error("Expected key input");
+  const role = screen.getByRole("combobox", { name: "Role" });
+  const rowRole = screen.getByRole("combobox", {
+    name: `Role for ${formatPublicKey(member)}`,
+  });
+  const key = npubEncode(other);
+  fireEvent.change(input, { target: { value: key } });
+  input.focus();
+  input.setSelectionRange(3, 9);
+  const before = [...calls];
+  act(() => setLanguage("ko"));
+  expect(screen.getByLabelText("공개 키")).toBe(input);
+  expect(input).toHaveValue(key);
+  expect(input).toHaveFocus();
+  expect([input.selectionStart, input.selectionEnd]).toEqual([3, 9]);
+  expect(screen.getByRole("combobox", { name: "역할" })).toBe(role);
+  expect(role).toHaveTextContent("중재자");
+  expect(
+    screen.getByRole("combobox", { name: `${formatPublicKey(member)}의 역할` }),
+  ).toBe(rowRole);
+  expect(rowRole).toHaveTextContent("중재자");
+  expect(calls).toEqual(before);
+  expect(sent("putOperator")).toHaveLength(0);
+  act(() => setLanguage("en"));
+  expect(screen.getByLabelText("Public key")).toBe(input);
+  expect(screen.getByRole("combobox", { name: "Role" })).toBe(role);
+  expect(role).toHaveTextContent("moderator");
+  expect(input).toHaveFocus();
+  fireEvent.click(screen.getByRole("button", { name: "Add" }));
+  await waitFor(() =>
+    expect(sent("putOperator")).toEqual([
+      { route: "putOperator", pubkey: other, role: "moderator" },
+    ]),
+  );
+});
+
+it("staff localization never admits moderators or nonstaff while language changes", async () => {
+  const { staff } = mount();
+  await screen.findByRole("tab", { name: "Reports" });
+  const before = [...calls];
+  act(() => setLanguage("ko"));
+  expect(screen.queryByRole("tab", { name: "Staff" })).not.toBeInTheDocument();
+  expect(staff.operatorVisible()).toBe(false);
+  expect(calls).toEqual(before);
+  expect(sent("listOperators")).toHaveLength(0);
+  cleanup();
+  routes.probe = () => fail({ category: "forbidden", status: 403 });
+  const denied = mount();
+  await noEntries(denied.staff);
+  const deniedCalls = [...calls];
+  act(() => setLanguage("en"));
+  await noEntries(denied.staff);
+  expect(calls).toEqual(deniedCalls);
+  expect(sent("listOperators")).toHaveLength(0);
+});
+
+it("staff localization keeps the open role options and sends their canonical value", async () => {
+  routes.probe = () => probe({ role: "operator", canStaff: true });
+  routes.listOperators = () =>
+    ok([{ pubkey: member, effectiveRole: "moderator", sources: ["db"] }]);
+  routes.putOperator = () => ok(null);
+  mount();
+  fireEvent.click(await screen.findByRole("tab", { name: "Staff" }));
+  await screen.findByLabelText("Public key");
+  const trigger = screen.getByRole("combobox", {
+    name: `Role for ${formatPublicKey(member)}`,
+  });
+  fireEvent.click(trigger);
+  const moderator = await screen.findByRole("option", { name: "moderator" });
+  const operator = screen.getByRole("option", { name: "operator" });
+  operator.focus();
+  const before = [...calls];
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("option", { name: "중재자" })).toBe(moderator);
+  expect(screen.getByRole("option", { name: "릴레이 운영자" })).toBe(operator);
+  expect(operator).toHaveFocus();
+  expect(moderator).toHaveAttribute("aria-selected", "true");
+  expect(calls).toEqual(before);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("option", { name: "operator" })).toBe(operator);
+  expect(operator).toHaveFocus();
+  fireEvent.pointerDown(operator);
+  fireEvent.mouseDown(operator);
+  fireEvent.pointerUp(operator);
+  fireEvent.mouseUp(operator);
+  fireEvent.click(operator);
+  act(() => setLanguage("ko"));
+  await waitFor(() =>
+    expect(sent("putOperator")).toEqual([
+      { route: "putOperator", pubkey: member, role: "operator" },
+    ]),
+  );
+});
+
+it.each(["operator", "moderator"] as const)(
+  "staff localization retains its local duplicate-%s feedback without a write",
+  async (role) => {
+    routes.probe = () => probe({ role: "operator", canStaff: true });
+    routes.listOperators = () =>
+      ok([{ pubkey: member, effectiveRole: role, sources: ["db"] }]);
+    mount();
+    fireEvent.click(await screen.findByRole("tab", { name: "Staff" }));
+    const input = await screen.findByLabelText("Public key");
+    fireEvent.change(input, { target: { value: member } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(
+      `Already staff as ${role}. Change their role on their row.`,
+    );
+    input.focus();
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("alert")).toBe(alert);
+    expect(alert).toHaveTextContent(
+      role === "operator"
+        ? "이미 릴레이 운영자로 등록되어 있습니다. 해당 행에서 역할을 변경하세요."
+        : "이미 중재자로 등록되어 있습니다. 해당 행에서 역할을 변경하세요.",
+    );
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue(member);
+    act(() => setLanguage("en"));
+    expect(alert).toHaveTextContent(
+      `Already staff as ${role}. Change their role on their row.`,
+    );
+    expect(sent("putOperator")).toHaveLength(0);
+  },
+);
+
+it.each(["moderator", "operator"] as const)(
+  "staff localization retains fixed-source permissions and a named %s removal target",
+  async (role) => {
+    const fixed = "c".repeat(64);
+    const rawName = "Role for {name} 한글";
+    routes.probe = () => probe({ role: "operator", canStaff: true });
+    routes.listOperators = () =>
+      ok([
+        {
+          pubkey: fixed,
+          effectiveRole: "operator",
+          sources: ["config", "owner_fallback"],
+        },
+        { pubkey: member, effectiveRole: role, sources: ["db"] },
+      ]);
+    routes.deleteOperator = () => ok({ deleted: member });
+    const ensured: string[][] = [];
+    mountWithProfiles(new Map([[member, { name: rawName }]]), ensured);
+    fireEvent.click(await screen.findByRole("tab", { name: "Staff" }));
+    await screen.findByText(rawName);
+    const buttons = screen.getAllByRole("button", { name: "Remove" });
+    const fixedButton = buttons[0],
+      remove = buttons[1];
+    if (!fixedButton || !remove) throw new Error("Expected both staff rows");
+    expect(fixedButton).toBeDisabled();
+    fireEvent.click(remove);
+    const dialog = screen.getByRole("alertdialog", { name: "Remove staff?" });
+    const confirm = within(dialog).getByRole("button", { name: "Remove" });
+    confirm.focus();
+    const before = [...calls],
+      profileBefore = [...ensured];
+    act(() => setLanguage("ko"));
+    expect(
+      screen.getByRole("alertdialog", { name: "운영진을 제거할까요?" }),
+    ).toBe(dialog);
+    expect(within(dialog).getByRole("button", { name: "제거" })).toBe(confirm);
+    expect(dialog).toHaveTextContent(
+      `${rawName} (${formatPublicKey(member)})님의 릴레이 ${role === "operator" ? "운영자" : "중재자"} 권한이 제거됩니다.`,
+    );
+    expect(confirm).toHaveFocus();
+    expect(fixedButton).toBeDisabled();
+    expect(screen.getByText("설정, 소유자(대체 지정)")).toBeInTheDocument();
+    expect(
+      screen.getByText("이름은 team.example.com의 프로필에서 가져옵니다."),
+    ).toBeInTheDocument();
+    expect(calls).toEqual(before);
+    expect(ensured).toEqual(profileBefore);
+    act(() => setLanguage("en"));
+    expect(within(dialog).getByRole("button", { name: "Remove" })).toBe(
+      confirm,
+    );
+    expect(dialog).toHaveTextContent(
+      `${rawName} (${formatPublicKey(member)}) (${role}) loses relay staff access.`,
+    );
+    fireEvent.click(confirm);
+    await waitFor(() =>
+      expect(sent("deleteOperator")).toEqual([
+        { route: "deleteOperator", pubkey: member },
+      ]),
+    );
+  },
+);
+
+it("staff localization keeps self-removal confirmation and the reprobe target", async () => {
+  routes.probe = () => probe({ role: "operator", canStaff: true });
+  routes.listOperators = () =>
+    ok([{ pubkey: signer, effectiveRole: "operator", sources: ["db"] }]);
+  routes.deleteOperator = () => ok({ deleted: signer });
+  mount();
+  fireEvent.click(await screen.findByRole("tab", { name: "Staff" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
+  const dialog = screen.getByRole("alertdialog");
+  act(() => setLanguage("ko"));
+  expect(dialog).toHaveTextContent(
+    "내 운영진 권한을 제거합니다. 이 작업을 되돌리지 못할 수 있습니다.",
+  );
+  expect(sent("deleteOperator")).toHaveLength(0);
+  expect(sent("probe")).toHaveLength(1);
+  fireEvent.click(within(dialog).getByRole("button", { name: "제거" }));
+  await waitFor(() =>
+    expect(sent("deleteOperator")).toEqual([
+      { route: "deleteOperator", pubkey: signer },
+    ]),
+  );
+  await waitFor(() => expect(sent("probe")).toHaveLength(2));
+});
+
+it("staff localization keeps read-only staff controls absent", async () => {
+  routes.probe = () => probe({ role: "operator", authMode: "disabled" });
+  routes.listOperators = () =>
+    ok([{ pubkey: member, effectiveRole: "moderator", sources: ["db"] }]);
+  mount();
+  fireEvent.click(await screen.findByRole("tab", { name: "Staff" }));
+  const role = await screen.findByText("moderator");
+  const before = [...calls];
+  act(() => setLanguage("ko"));
+  expect(screen.getByText("중재자")).toBe(role);
+  expect(screen.queryByLabelText("공개 키")).not.toBeInTheDocument();
+  expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "제거" }),
+  ).not.toBeInTheDocument();
+  expect(calls).toEqual(before);
+});
+
+it("staff localization preserves private-key detection and refuses to send the raw input", async () => {
+  routes.probe = () => probe({ role: "operator", canStaff: true });
+  routes.listOperators = () => ok([]);
+  mount();
+  fireEvent.click(await screen.findByRole("tab", { name: "Staff" }));
+  const input = await screen.findByLabelText("Public key");
+  const fakePrivateKey = "nsec1qqqqqqqqqqqq";
+  fireEvent.change(input, { target: { value: fakePrivateKey } });
+  act(() => setLanguage("ko"));
+  expect(input).toHaveValue(fakePrivateKey);
+  expect(
+    screen.getByText("비밀 키로 보입니다. 여기에 비밀 키를 붙여넣지 마세요."),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: "추가" })).toBeDisabled();
+  expect(sent("putOperator")).toHaveLength(0);
+});
+
+it("staff localization retains the same pending controls and structured write failure", async () => {
+  routes.probe = () => probe({ role: "operator", canStaff: true });
+  routes.listOperators = () =>
+    ok([{ pubkey: member, effectiveRole: "moderator", sources: ["db"] }]);
+  const put = holdNext("putOperator", () => ok(null));
+  mount();
+  fireEvent.click(await screen.findByRole("tab", { name: "Staff" }));
+  const input = await screen.findByLabelText("Public key");
+  fireEvent.change(input, { target: { value: other } });
+  const add = screen.getByRole("button", { name: "Add" });
+  fireEvent.click(add);
+  const outcome = fail({
+    category: "ambiguous",
+    status: 502,
+    message: "raw {reason} 한글",
+  });
+  const snapshot = JSON.stringify(outcome);
+  try {
+    await put.started();
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("button", { name: "추가" })).toBe(add);
+    expect(add).toBeDisabled();
+    expect(input).toBeDisabled();
+    for (const role of screen.getAllByRole("combobox"))
+      expect(role).toBeDisabled();
+    expect(screen.getByRole("button", { name: "제거" })).toBeDisabled();
+    expect(sent("putOperator")).toEqual([
+      { route: "putOperator", pubkey: other, role: "moderator" },
+    ]);
+  } finally {
+    await put.release(outcome);
+  }
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent(
+    "릴레이에서 결과가 확인되지 않았습니다. raw {reason} 한글",
+  );
+  expect(input).toBeEnabled();
+  expect(input).toHaveValue(other);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("alert")).toBe(alert);
+  expect(alert).toHaveTextContent(
+    "The relay did not confirm the result. raw {reason} 한글",
+  );
+  expect(JSON.stringify(outcome)).toBe(snapshot);
+  expect(sent("putOperator")).toHaveLength(1);
+});
+
+it("staff localization keeps the same Retry, raw failure and focus during a held read", async () => {
+  routes.probe = () => probe({ role: "operator", canStaff: true });
+  routes.listOperators = () =>
+    fail({ message: "You do not have permission to do that." });
+  mount();
+  fireEvent.click(await screen.findByRole("tab", { name: "Staff" }));
+  const alert = await screen.findByRole("alert");
+  const retry = screen.getByRole("button", { name: "Retry" });
+  const read = holdNext("listOperators", () => ok([]));
+  retry.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "다시 시도" })).toBe(retry);
+  expect(retry).toHaveFocus();
+  expect(alert).toHaveTextContent("You do not have permission to do that.");
+  fireEvent.click(retry);
+  try {
+    await read.started();
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("button", { name: "Retry" })).toBe(retry);
+    expect(retry).toHaveFocus();
+    expect(retry).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("alert")).toBe(alert);
+    expect(sent("listOperators")).toHaveLength(2);
+  } finally {
+    await read.release(ok([]));
+  }
+  await screen.findByText("No staff configured.");
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it.each([
+  [
+    "unauthorized",
+    "opaque ignored",
+    "The relay did not accept your signature.",
+    "릴레이가 서명을 수락하지 않았습니다.",
+  ],
+  [
+    "forbidden",
+    "",
+    "You do not have permission to do that.",
+    "이 작업을 수행할 권한이 없습니다.",
+  ],
+  [
+    "forbidden",
+    "You do not have permission to do that.",
+    "You do not have permission to do that.",
+    "You do not have permission to do that.",
+  ],
+  [
+    "intercepted",
+    "opaque ignored",
+    "A network gateway (such as VPN or SSO) intercepted the request.",
+    "VPN 또는 SSO 같은 네트워크 게이트웨이가 요청을 가로챘습니다.",
+  ],
+  [
+    "ambiguous",
+    "raw {name} 한글  ",
+    "The relay did not confirm the result. raw {name} 한글",
+    "릴레이에서 결과가 확인되지 않았습니다. raw {name} 한글",
+  ],
+  [
+    "ambiguous",
+    "  ",
+    "The relay did not confirm the result.",
+    "릴레이에서 결과가 확인되지 않았습니다.",
+  ],
+  ["notSent", "Raw server reason", "Raw server reason", "Raw server reason"],
+  [
+    "unsupported",
+    "Raw route unavailable",
+    "Raw route unavailable",
+    "Raw route unavailable",
+  ],
+  ["forbidden", "  ", "  ", "  "],
+  [
+    "rejected",
+    "Raw server\nreason",
+    "Raw server\nreason",
+    "Raw server\nreason",
+  ],
+  [
+    "ambiguous",
+    "  raw\nreason  ",
+    "The relay did not confirm the result.   raw\nreason",
+    "릴레이에서 결과가 확인되지 않았습니다.   raw\nreason",
+  ],
+] as const)(
+  "staff localization projects only proven %s failure copy",
+  (category, message, english, korean) => {
+    const outcome = fail({ category, message });
+    if (outcome.ok) throw new Error("Expected failure fixture");
+    const snapshot = JSON.stringify(outcome.failure);
+    render(<Failure failure={outcome.failure} />);
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toBe(english);
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("alert")).toBe(alert);
+    expect(alert.textContent).toBe(korean);
+    act(() => setLanguage("en"));
+    expect(alert.textContent).toBe(english);
+    expect(JSON.stringify(outcome.failure)).toBe(snapshot);
+  },
+);
+
+it("staff localization keeps the same loading display without repeating its read", async () => {
+  routes.probe = () => probe({ role: "operator", canStaff: true });
+  const read = holdNext("listOperators", () => ok([]));
+  mount();
+  fireEvent.click(await screen.findByRole("tab", { name: "Staff" }));
+  try {
+    await read.started();
+    const loading = screen.getByText("Loading…");
+    act(() => setLanguage("ko"));
+    expect(screen.getByText("불러오는 중…")).toBe(loading);
+    expect(sent("listOperators")).toEqual([{ route: "listOperators" }]);
+    act(() => setLanguage("en"));
+    expect(screen.getByText("Loading…")).toBe(loading);
+  } finally {
+    await read.release(ok([]));
+  }
+  await screen.findByText("No staff configured.");
+});
+
+it("staff localization preserves a caller-owned unsupported explanation verbatim", () => {
+  const outcome = fail({
+    category: "unsupported",
+    status: 404,
+    bodyEmpty: true,
+    message: "",
+  });
+  if (outcome.ok) throw new Error("Expected failure fixture");
+  render(
+    <Failure
+      failure={outcome.failure}
+      unsupportedText="This relay doesn't support community browsing yet."
+    />,
+  );
+  const alert = screen.getByRole("alert");
+  act(() => setLanguage("ko"));
+  expect(alert).toHaveTextContent(
+    "This relay doesn't support community browsing yet.",
+  );
+  expect(screen.getByRole("alert")).toBe(alert);
 });

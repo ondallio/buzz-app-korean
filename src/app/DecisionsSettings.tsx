@@ -1,3 +1,5 @@
+import { t, useLanguage } from "../shared/i18n";
+import { rich } from "../shared/i18n/rich";
 import {
   useEffect,
   useLayoutEffect,
@@ -11,10 +13,6 @@ import { OwnedContribution } from "../plugins/OwnedContribution";
 import { Field } from "../shared/design-system/ui/Field";
 import { Header, InlineHeader } from "../shared/design-system/ui/Header";
 import { Radio, RadioGroup } from "../shared/design-system/ui/RadioGroup";
-
-/** What any provider receives. The host says it once, for every provider. */
-const DISCLOSURE =
-  "Your decisions provider receives the message text that plugins send it, including from private channels.";
 
 /** Chooses the provider that answers decisions on this device and shows the
  * selected provider's own settings. Providers are plugins. One picked before
@@ -34,6 +32,7 @@ export function DecisionsSettings({
   active(): boolean;
   onSection?: ((section: string) => void) | undefined;
 }) {
+  useLanguage();
   const backend = useSyncExternalStore(
     decisions.subscribe,
     decisions.backend,
@@ -106,16 +105,18 @@ export function DecisionsSettings({
     >
       <Header
         id="decisions-settings-title"
-        title="Decisions API"
-        subtitle={DISCLOSURE}
+        title={t("settingsHost.decisionsTitle")}
+        subtitle={t("settingsHost.decisionsDisclosure")}
       />
       {providers.length === 0 ? (
         <p role="status" className="mt-4 text-body-sm text-secondary">
-          No decision provider is turned on. Turn one on in{" "}
-          <SettingsSectionLink section="plugins" open={onSection}>
-            Manage plugins
-          </SettingsSectionLink>
-          .
+          {rich("settingsHost.noDecisionsProvider", {
+            plugins: (
+              <SettingsSectionLink section="plugins" open={onSection}>
+                {t("settingsHost.managePlugins")}
+              </SettingsSectionLink>
+            ),
+          })}
         </p>
       ) : (
         <div
@@ -124,14 +125,14 @@ export function DecisionsSettings({
         >
           {choosable && (
             <div className="w-full max-w-md">
-              <InlineHeader title="Decisions API Provider" />
+              <InlineHeader title={t("settingsHost.decisionsProvider")} />
               <Field
-                label="Decisions API Provider"
+                label={t("settingsHost.decisionsProvider")}
                 labelVisibility="hidden"
                 nativeLabel={false}
               >
                 <RadioGroup
-                  aria-label="Decisions API Provider"
+                  aria-label={t("settingsHost.decisionsProvider")}
                   value={shown?.key ?? ""}
                   onValueChange={(value) => {
                     if (!active()) return;
@@ -169,12 +170,17 @@ export function DecisionsSettings({
                   registry={{ snapshot: decisions.providers }}
                   fallback={
                     <p role="alert" className="text-body-sm text-secondary">
-                      {shown.label} settings are unavailable. You can turn its
-                      plugin off in{" "}
-                      <SettingsSectionLink section="plugins" open={onSection}>
-                        Manage plugins
-                      </SettingsSectionLink>
-                      .
+                      {rich("settingsHost.providerSettingsUnavailable", {
+                        provider: shown.label,
+                        plugins: (
+                          <SettingsSectionLink
+                            section="plugins"
+                            open={onSection}
+                          >
+                            {t("settingsHost.managePlugins")}
+                          </SettingsSectionLink>
+                        ),
+                      })}
                     </p>
                   }
                 >

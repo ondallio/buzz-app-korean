@@ -1,0 +1,103 @@
+export const en = {
+  "pluginRequests.viewMore": "View more",
+  "pluginRequests.viewLess": "View less",
+  "pluginRequests.requestedByAgents": "Requested by agents",
+  "pluginRequests.installTitle": "Install {name}",
+  "pluginRequests.updateTitle": "Update {name}",
+  "pluginRequests.enableTitle": "Enable {name}",
+  "pluginRequests.deleteTitle": "Delete {name}",
+  "pluginRequests.requestReason": "{requester}: {reason}",
+  "pluginRequests.declineNamed": "Decline {name}",
+  "pluginRequests.reviewNamed": "Review {name}",
+  "pluginRequests.decline": "Decline",
+  "pluginRequests.review": "Review",
+  "pluginRequests.changeUnconfirmed": "The change wasn’t confirmed. Try again.",
+  "pluginRequests.noLongerInstalled": "This plugin is no longer installed.",
+  "pluginRequests.deleteConfirmTitle": "Delete {name}?",
+  "pluginRequests.deleteRequestDescription":
+    "Requested by {requester}. Removes this plugin and its rollback history from Buzz. You can install it again later.",
+  "pluginRequests.cancel": "Cancel",
+  "pluginRequests.deletePlugin": "Delete plugin",
+  "pluginRequests.enableConfirmTitle": "Enable {name}?",
+  "pluginRequests.enableRequestDescription":
+    "Requested by {requester}. Only enable code you trust.",
+  "pluginRequests.enablePlugin": "Enable plugin",
+  "pluginRequests.request": "Plugin request",
+  "pluginRequests.requestNamed": "Plugin request: {name}",
+  "pluginRequests.noLongerAvailable": "No longer available on this device.",
+  "pluginRequests.installed": "Installed",
+  "pluginRequests.updated": "Updated",
+  "pluginRequests.enabled": "Enabled",
+  "pluginRequests.deleted": "Deleted",
+  "pluginRequests.declined": "Declined",
+  "pluginRequests.moreActions": "More plugin actions",
+  "pluginRequests.pluginActions": "Plugin actions",
+  "pluginRequests.reviewAccess": "Review access",
+  "pluginRequests.autoUpdate": "Check for updates automatically",
+  "pluginRequests.rollback": "Roll back",
+  "pluginRequests.delete": "Delete",
+  "pluginRequests.accessTitle": "What this plugin can do",
+  "pluginRequests.done": "Done",
+  "pluginRequests.rollbackTitle": "Roll back {name}?",
+  "pluginRequests.rollbackDescription":
+    "Restore the previous installed version. You can update again from the source folder or repository.",
+  "pluginRequests.rollbackUnconfirmed":
+    "Plugin rollback wasn’t confirmed. Try again.",
+  "pluginRequests.deleteDescription":
+    "Removes this plugin and its rollback history from Buzz. You can install it again later.",
+  "pluginRequests.deleteUnconfirmed":
+    "Plugin deletion wasn’t confirmed. Try again.",
+} as const;
+
+export const ko: Record<keyof typeof en, string> = {
+  "pluginRequests.viewMore": "더 보기",
+  "pluginRequests.viewLess": "간략히 보기",
+  "pluginRequests.requestedByAgents": "에이전트의 요청",
+  "pluginRequests.installTitle": "{name} 설치",
+  "pluginRequests.updateTitle": "{name} 업데이트",
+  "pluginRequests.enableTitle": "{name} 활성화",
+  "pluginRequests.deleteTitle": "{name} 삭제",
+  "pluginRequests.requestReason": "{requester}: {reason}",
+  "pluginRequests.declineNamed": "{name} 거절",
+  "pluginRequests.reviewNamed": "{name} 검토",
+  "pluginRequests.decline": "거절",
+  "pluginRequests.review": "검토",
+  "pluginRequests.changeUnconfirmed":
+    "변경을 확인하지 못했습니다. 다시 시도해 주세요.",
+  "pluginRequests.noLongerInstalled":
+    "이 플러그인은 더 이상 설치되어 있지 않습니다.",
+  "pluginRequests.deleteConfirmTitle": "{name} 삭제?",
+  "pluginRequests.deleteRequestDescription":
+    "{requester}의 요청입니다. Buzz에서 이 플러그인과 이전 버전 기록을 삭제합니다. 나중에 다시 설치할 수 있습니다.",
+  "pluginRequests.cancel": "취소",
+  "pluginRequests.deletePlugin": "플러그인 삭제",
+  "pluginRequests.enableConfirmTitle": "{name} 활성화?",
+  "pluginRequests.enableRequestDescription":
+    "{requester}의 요청입니다. 신뢰하는 코드만 활성화해 주세요.",
+  "pluginRequests.enablePlugin": "플러그인 활성화",
+  "pluginRequests.request": "플러그인 요청",
+  "pluginRequests.requestNamed": "플러그인 요청: {name}",
+  "pluginRequests.noLongerAvailable": "이 기기에서 더 이상 사용할 수 없습니다.",
+  "pluginRequests.installed": "설치됨",
+  "pluginRequests.updated": "업데이트됨",
+  "pluginRequests.enabled": "활성화됨",
+  "pluginRequests.deleted": "삭제됨",
+  "pluginRequests.declined": "거절됨",
+  "pluginRequests.moreActions": "플러그인 추가 작업",
+  "pluginRequests.pluginActions": "플러그인 작업",
+  "pluginRequests.reviewAccess": "접근 권한 검토",
+  "pluginRequests.autoUpdate": "자동으로 업데이트 확인",
+  "pluginRequests.rollback": "이전 버전으로 되돌리기",
+  "pluginRequests.delete": "삭제",
+  "pluginRequests.accessTitle": "이 플러그인이 할 수 있는 작업",
+  "pluginRequests.done": "완료",
+  "pluginRequests.rollbackTitle": "{name} 이전 버전으로 되돌리기?",
+  "pluginRequests.rollbackDescription":
+    "이전에 설치한 버전으로 복원합니다. 원본 폴더나 저장소에서 다시 업데이트할 수 있습니다.",
+  "pluginRequests.rollbackUnconfirmed":
+    "플러그인 이전 버전 복원을 확인하지 못했습니다. 다시 시도해 주세요.",
+  "pluginRequests.deleteDescription":
+    "Buzz에서 이 플러그인과 이전 버전 기록을 삭제합니다. 나중에 다시 설치할 수 있습니다.",
+  "pluginRequests.deleteUnconfirmed":
+    "플러그인 삭제를 확인하지 못했습니다. 다시 시도해 주세요.",
+};

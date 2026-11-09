@@ -1,3 +1,8 @@
+import { useLanguage } from "../../shared/i18n";
+import {
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { useSoloRowActivation } from "./useSoloRowActivation";
 import {
   type ReactNode,
@@ -75,6 +80,7 @@ const ConversationContext = createContext<ConversationState | undefined>(
 
 /** Stable component identity: a source update never remounts every destination. */
 export function RegionConversation(props: SoloConversationProps) {
+  useLanguage();
   const context = useContext(RegionDestinationContext);
   const handoff = useChannelNavigation();
   const root = useRef<HTMLDivElement>(null);
@@ -84,7 +90,7 @@ export function RegionConversation(props: SoloConversationProps) {
   );
   const visible = !!channel && !!context?.region.live.has(channel.id);
   const [dialog, setDialog] = useState<"rename" | "settings" | "share">();
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<DisplayMessage>();
   const focusProps = useDestinationFocus(root, props.channelId, visible);
   const focusTarget = () =>
     root.current?.querySelector<HTMLElement>("[data-solo-destination-id]") ??
@@ -213,7 +219,10 @@ export function RegionConversation(props: SoloConversationProps) {
         />
       )}
       {error && (
-        <ToastNotice title={error} onDismiss={() => setError(undefined)} />
+        <ToastNotice
+          title={resolveMessage(error)}
+          onDismiss={() => setError(undefined)}
+        />
       )}
     </div>
   );

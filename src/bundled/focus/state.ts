@@ -1,3 +1,4 @@
+import { localError } from "../../shared/i18n/deferred-message";
 import type { StatusInput } from "../../features/relay/user-status";
 
 /** Device-local and app-wide: Focus survives restarts and community switches. */
@@ -131,7 +132,7 @@ export function createFocus(
     /** Starts Focus; the deadline must be in the future. */
     start(until: number) {
       if (!Number.isSafeInteger(until) || until <= seconds())
-        throw new Error("Choose a time in the future.");
+        throw localError("statusFocus.futureFocus");
       set({ until, status: state.status });
     },
     end,

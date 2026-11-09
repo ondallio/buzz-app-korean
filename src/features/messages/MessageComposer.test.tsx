@@ -181,6 +181,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   for (const owner of owners.splice(0)) owner.dispose();
   Reflect.deleteProperty(navigator, "locks");
   vi.unstubAllGlobals();
@@ -15737,4 +15738,71 @@ describe("oversized paste feedback", () => {
       screen.getByRole("region", { name: "Chat attachments" }),
     ).toBeVisible();
   });
+});
+
+import { setLanguage } from "../../shared/i18n";
+it("keeps the same composer draft, caret, focus and canonical newline/send payload while changing language", async () => {
+  setLanguage("en");
+  const h = mount();
+  const editor = h.input();
+  const form = screen.getByRole("form", { name: "Send a message to General" });
+  await h.user.type(editor, "한글 user draft");
+  editor.setSelectionRange(2, 6);
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("textbox", { name: "#General에 메시지 보내기" }),
+  ).toBe(editor);
+  expect(screen.getByRole("form", { name: "General에 메시지 보내기" })).toBe(
+    form,
+  );
+  expect(editor).toHaveFocus();
+  expect(editor.selectionStart).toBe(2);
+  expect(editor.selectionEnd).toBe(6);
+  expect(editor.value).toBe("한글 user draft");
+  editor.setSelectionRange(editor.value.length, editor.value.length);
+  await h.user.keyboard("{Shift>}{Enter}{/Shift}");
+  expect(editor.value).toBe("한글 user draft\n");
+  fireEvent.keyDown(editor, { key: "Enter", isComposing: true });
+  fireEvent.keyDown(editor, { key: "Enter", keyCode: 229 });
+  expect(h.messages.send).not.toHaveBeenCalled();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("textbox", { name: "Message #General" })).toBe(
+    editor,
+  );
+  expect(editor).toHaveFocus();
+  expect(editor.value).toBe("한글 user draft\n");
+  act(() => setLanguage("ko"));
+  await h.user.keyboard("{Enter}");
+  expect(h.messages.send).toHaveBeenCalledExactlyOnceWith(
+    "channel",
+    "한글 user draft\n",
+    [],
+    [],
+  );
+  expect(h.onSend.mock.calls).toEqual([["channel-id"]]);
+});
+
+it("keeps an archived composer's notice and copy action translated after the originating composer unmounts", async () => {
+  setLanguage("en");
+  const h = archiveToastFixture();
+  const write = vi
+    .spyOn(navigator.clipboard, "writeText")
+    .mockResolvedValue(undefined);
+  onTestFinished(() => write.mockRestore());
+  h.fill("사용자 원문 **draft**");
+  h.remove();
+  const copy = await screen.findByRole("button", { name: "Copy text" });
+  // Give the toast a connected return target after its focused source unmounted.
+  screen.getByRole("button", { name: "Outside composer" }).focus();
+  copy.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "텍스트 복사" })).toBe(copy);
+  expect(copy).toHaveFocus();
+  fireEvent.click(copy);
+  const copied = await screen.findByText("텍스트를 복사했습니다", {
+    exact: true,
+  });
+  expect(write).toHaveBeenCalledExactlyOnceWith("사용자 원문 **draft**");
+  act(() => setLanguage("en"));
+  expect(screen.getByText("Text copied", { exact: true })).toBe(copied);
 });

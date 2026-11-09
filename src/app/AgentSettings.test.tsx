@@ -4,6 +4,7 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { ToastProvider } from "../shared/design-system/ui/Toast";
+import { setLanguage } from "../shared/i18n";
 import { AgentSettings } from "./AgentSettings";
 import {
   rememberAgentsPreference,
@@ -17,6 +18,7 @@ import {
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.restoreAllMocks();
   setRememberAgentsPreference(true);
   setKeepAwakePreference({ mode: "off", after: 60 });
@@ -210,4 +212,30 @@ it("does not prefill when storage cannot be read", () => {
     throw new Error("storage unavailable");
   });
   expect(rememberAgentsPreference()).toBe(false);
+});
+
+it("updates open keep-awake choices in place while preserving canonical modes and delay values", async () => {
+  setLanguage("en");
+  const user = userEvent.setup();
+  render(<AgentSettings keepAwakeAvailable />, { wrapper: ToastProvider });
+  const mode = screen.getByRole("combobox", { name: "Keep this Mac awake" });
+  await user.click(mode);
+  const always = await screen.findByRole("option", { name: "Always" });
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("combobox", {
+      name: "이 Mac을 잠자기 상태로 전환하지 않기",
+    }),
+  ).toBe(mode);
+  expect(screen.getByRole("option", { name: "항상" })).toBe(always);
+  await user.click(always);
+  expect(keepAwakePreference()).toEqual({ mode: "on", after: 60 });
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("combobox", { name: "Keep this Mac awake" })).toBe(
+    mode,
+  );
+  expect(mode).toHaveTextContent("Always");
+  expect(localStorage.getItem("buzz-keep-awake.v1")).toBe(
+    JSON.stringify({ mode: "on", after: 60 }),
+  );
 });

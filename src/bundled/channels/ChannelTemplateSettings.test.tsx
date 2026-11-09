@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { setLanguage } from "../../shared/i18n";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -16,6 +18,7 @@ import { ChannelTemplateSettings } from "./ChannelTemplateSettings";
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   localStorage.clear();
   vi.unstubAllGlobals();
 });
@@ -316,4 +319,48 @@ it("compares Edit template with the saved template and keeps a refused Save prot
   await user.click(screen.getByRole("button", { name: "Discard changes" }));
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(channelTemplates.snapshot()).toEqual([saved]);
+});
+
+it("keeps a template draft and selection through locale switches and saves original JSON values once", async () => {
+  setLanguage("en");
+  render(<ChannelTemplateSettings agents={agents} active={() => true} />);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "New template" }));
+  const name = screen.getByRole("textbox", { name: "Name" });
+  const canvas = screen.getByRole("textbox", { name: /Starting Canvas/ });
+  await user.type(name, "Draft {{name} 한글");
+  await user.type(canvas, "# Raw code\n{{prompt}");
+  await user.click(screen.getByRole("checkbox", { name: "Ada" }));
+  await user.click(screen.getByRole("checkbox", { name: "Docs" }));
+  if (!(name instanceof HTMLInputElement))
+    throw new Error("Expected template name input");
+  name.focus();
+  name.setSelectionRange(2, 5);
+  const snapshot = localStorage.getItem("buzz.channel-templates.v1");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("textbox", { name: "이름" })).toBe(name);
+  expect(screen.getByRole("textbox", { name: /시작 캔버스/ })).toBe(canvas);
+  expect(name).toHaveValue("Draft {name} 한글");
+  expect(canvas).toHaveValue("# Raw code\n{prompt}");
+  expect(name).toHaveFocus();
+  expect([name.selectionStart, name.selectionEnd]).toEqual([2, 5]);
+  expect(screen.getByRole("checkbox", { name: "Ada" })).toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "Docs" })).toBeChecked();
+  expect(localStorage.getItem("buzz.channel-templates.v1")).toBe(snapshot);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("textbox", { name: "Name" })).toBe(name);
+  const write = vi.spyOn(Storage.prototype, "setItem");
+  await user.click(screen.getByRole("button", { name: "Save template" }));
+  expect(channelTemplates.snapshot()).toMatchObject([
+    {
+      name: "Draft {name} 한글",
+      teams: ["t2"],
+      agents: ["a".repeat(64)],
+      canvas: "# Raw code\n{prompt}",
+    },
+  ]);
+  expect(
+    write.mock.calls.filter(([key]) => key === "buzz.channel-templates.v1"),
+  ).toHaveLength(1);
+  write.mockRestore();
 });

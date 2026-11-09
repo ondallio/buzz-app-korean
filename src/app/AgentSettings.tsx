@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../shared/i18n";
 import { useState } from "react";
 import type { PageNavigation } from "../features/navigation/service";
 import type { Agents } from "../features/agents/service";
@@ -32,8 +33,10 @@ const keepAwakeModes = [
 ] as const;
 const delayLabel = (minutes: number) =>
   minutes < 60
-    ? `${minutes} minutes`
-    : `${minutes / 60} hour${minutes === 60 ? "" : "s"}`;
+    ? t("settings.minutes", { count: minutes })
+    : t(minutes === 60 ? "settings.hour" : "settings.hours", {
+        count: minutes / 60,
+      });
 
 export function AgentSettings({
   agents,
@@ -49,6 +52,7 @@ export function AgentSettings({
   /** Only the macOS app can keep the computer awake. */
   keepAwakeAvailable?: boolean;
 }) {
+  useLanguage();
   const rememberAgents = useRememberAgentsPreference();
   const keepAwake = useKeepAwakePreference();
   const keepAwakeApplyError = useKeepAwakeApplyError();
@@ -60,7 +64,7 @@ export function AgentSettings({
     setKeepAwakeError(setKeepAwakePreference({ ...keepAwake, ...change }));
   return (
     <section aria-labelledby="agent-settings-title">
-      <Header id="agent-settings-title" title="Agent setup" />
+      <Header id="agent-settings-title" title={t("settings.agentSetup")} />
       {agents && active && (
         <AgentDefaults
           agents={agents}
@@ -69,24 +73,40 @@ export function AgentSettings({
         />
       )}
       <div className="mt-section-gap">
-        <InlineHeader title="Agent behavior" />
+        <InlineHeader title={t("settings.agentBehavior")} />
         <SettingsGroup>
           <SwitchPreferenceRow
-            label="Remember mentioned agents"
-            description="Keep the same agents selected for your next message in this channel or thread."
+            label={t("settings.rememberAgents")}
+            description={t("settings.rememberAgentsDescription")}
             checked={rememberAgents}
             onCheckedChange={changeRememberAgents}
           />
           {keepAwakeAvailable && (
             <PreferenceRow
-              title="Keep this Mac awake"
-              subtitle="So agents can keep answering. Closing the lid still puts it to sleep."
+              title={t("settings.keepAwake")}
+              subtitle={t("settings.keepAwakeDescription")}
               trailing={
                 <Select
-                  label="Keep this Mac awake"
+                  label={t("settings.keepAwake")}
                   variant="compact"
                   value={keepAwake.mode}
-                  groups={[{ label: "", options: keepAwakeModes }]}
+                  groups={[
+                    {
+                      label: "",
+                      options: keepAwakeModes.map((mode) => ({
+                        ...mode,
+                        label: t(
+                          (
+                            {
+                              off: "settings.awakeOff",
+                              auto: "settings.awakeAuto",
+                              on: "settings.awakeOn",
+                            } as const
+                          )[mode.value],
+                        ),
+                      })),
+                    },
+                  ]}
                   onValueChange={(mode) =>
                     changeKeepAwake({ mode: mode as KeepAwake["mode"] })
                   }
@@ -96,10 +116,10 @@ export function AgentSettings({
           )}
           {keepAwakeAvailable && keepAwake.mode === "auto" && (
             <PreferenceRow
-              title="Stay awake after agents finish"
+              title={t("settings.afterAgents")}
               trailing={
                 <Select
-                  label="Stay awake after agents finish"
+                  label={t("settings.afterAgents")}
                   variant="compact"
                   value={String(keepAwake.after)}
                   groups={[
@@ -122,7 +142,7 @@ export function AgentSettings({
       </div>
       {active && mentionError && (
         <ToastNotice
-          title="Agent preference wasn’t saved"
+          title={t("settings.agentSaveFailed")}
           description={mentionError}
         >
           <Button
@@ -130,7 +150,7 @@ export function AgentSettings({
             size="sm"
             onClick={() => changeRememberAgents(rememberAgents)}
           >
-            Retry saving mentioned agents
+            {t("settings.retryRememberAgents")}
           </Button>
         </ToastNotice>
       )}
@@ -140,13 +160,13 @@ export function AgentSettings({
         (keepAwakeAvailable && keepAwakeApplyError ? (
           <ToastNotice title={keepAwakeApplyError}>
             <Button type="button" size="sm" onClick={retryKeepAwake}>
-              Try again
+              {t("settings.tryAgain")}
             </Button>
           </ToastNotice>
         ) : (
           keepAwakeError && (
             <ToastNotice
-              title="Keep-awake setting wasn’t saved"
+              title={t("settings.awakeSaveFailed")}
               description={keepAwakeError}
             >
               <Button
@@ -154,7 +174,7 @@ export function AgentSettings({
                 size="sm"
                 onClick={() => changeKeepAwake(keepAwake)}
               >
-                Try again
+                {t("settings.tryAgain")}
               </Button>
             </ToastNotice>
           )

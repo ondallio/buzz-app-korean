@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useMemo, useState } from "react";
 import type { ChannelSummary } from "../../features/relay/contracts";
 import { matchName } from "../../features/search/match";
@@ -11,6 +12,7 @@ export function WorkflowChannelPicker({
   channels: readonly ChannelSummary[];
   onSelect: (id: string) => void;
 }) {
+  useLanguage();
   const [typed, setTyped] = useState("");
   // Order matches as the other pickers do, so Enter on the highlighted first
   // row picks an exact name before a longer one that contains it.
@@ -41,12 +43,12 @@ export function WorkflowChannelPicker({
         autoHighlight
       >
         <Combobox.Control
-          label="Choose a channel"
-          triggerLabel="Browse channels"
-          placeholder="Search channels…"
+          label={t("workflowFields.chooseChannel")}
+          triggerLabel={t("workflowFields.browseChannels")}
+          placeholder={t("workflowFields.searchChannels")}
           autoFocus
         />
-        <Combobox.Popup empty="No matching channels.">
+        <Combobox.Popup empty={t("workflowFields.noChannels")}>
           <Combobox.List>
             {(channel: ChannelSummary) => {
               const Icon = channelIcon(channel);

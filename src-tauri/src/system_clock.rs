@@ -1,3 +1,18 @@
+/// The first macOS preferred language. Other hosts use their webview language.
+#[tauri::command]
+pub fn system_language() -> Option<String> {
+    #[cfg(target_os = "macos")]
+    {
+        objc2_foundation::NSLocale::preferredLanguages()
+            .firstObject()
+            .map(|language| language.to_string())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        None
+    }
+}
+
 /// The system's 12- or 24-hour time setting as an `Intl` hour cycle. The
 /// webview's locale ignores it, so en-US with 24-hour time still formats
 /// "2:05 PM".

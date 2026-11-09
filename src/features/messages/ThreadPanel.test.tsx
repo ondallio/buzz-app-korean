@@ -124,6 +124,7 @@ vi.mock("./MessageComposer", () => ({
 }));
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
@@ -2521,4 +2522,45 @@ it("reveals a completed step selected by an exact thread link", async () => {
   expect(
     screen.getByRole("button", { name: /Collapse activity history/ }),
   ).toBeVisible();
+});
+
+import { setLanguage } from "../../shared/i18n";
+it("updates thread chrome and reply destination on the same live view without allocating or disposing a new thread", async () => {
+  setLanguage("en");
+  const h = messagesHarness();
+  h.render(true);
+  const thread = await screen.findByRole("complementary", { name: "Thread" });
+  const messages = await screen.findByRole("region", {
+    name: "Thread messages",
+  });
+  const composer = screen.getByRole("region", { name: "Composer" });
+  const send = within(composer).getByRole("button", {
+    name: "Send fixture reply",
+  });
+  const allocated = h.thread.mock.calls.length;
+  const disposed = h.views.map((view) => view.dispose.mock.calls.length);
+  send.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("complementary", { name: "스레드" })).toBe(thread);
+  expect(screen.getByRole("region", { name: "스레드 메시지" })).toBe(messages);
+  expect(screen.getByRole("region", { name: "Composer" })).toBe(composer);
+  expect(composer).toHaveAttribute(
+    "data-placeholder",
+    `${formatPublicKey(row.authorId)}님에게 스레드 답글 작성`,
+  );
+  expect(composer).toHaveAttribute("data-root", row.id);
+  expect(send).toHaveFocus();
+  expect(h.thread.mock.calls.length).toBe(allocated);
+  expect(h.views.map((view) => view.dispose.mock.calls.length)).toEqual(
+    disposed,
+  );
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("region", { name: "Thread messages" })).toBe(
+    messages,
+  );
+  expect(composer).toHaveAttribute(
+    "data-placeholder",
+    `Reply in thread to ${formatPublicKey(row.authorId)}`,
+  );
+  expect(send).toHaveFocus();
 });

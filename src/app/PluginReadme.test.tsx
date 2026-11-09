@@ -9,9 +9,11 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { PluginReadme } from "./PluginReadme";
+import { setLanguage } from "../shared/i18n/language";
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -90,4 +92,32 @@ it("reveals clipped links when they receive keyboard focus and resets on plugin 
     "aria-expanded",
     "false",
   );
+});
+
+it("keeps authored Markdown, the disclosure and focused link intact through EN to KO to EN", () => {
+  geometry(900);
+  const markdown =
+    "# Example\n\nView more 사용자 {raw}\n\n[View less](https://example.org/raw?q=View%20more#part)";
+  render(<PluginReadme text={markdown} />);
+  const control = screen.getByRole("button", { name: "View more" });
+  const link = screen.getByRole("link", { name: "View less" });
+  control.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "더 보기" })).toBe(control);
+  expect(control).toHaveFocus();
+  expect(control).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByText("View more 사용자 {raw}")).toBeVisible();
+  fireEvent.click(control);
+  expect(screen.getByRole("button", { name: "간략히 보기" })).toBe(control);
+  expect(control).toHaveAttribute("aria-expanded", "true");
+  act(() => link.focus());
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("link", { name: "View less" })).toBe(link);
+  expect(link).toHaveFocus();
+  expect(link).toHaveAttribute(
+    "href",
+    "https://example.org/raw?q=View%20more#part",
+  );
+  expect(screen.getByRole("button", { name: "View less" })).toBe(control);
+  expect(control).toHaveAttribute("aria-expanded", "true");
 });

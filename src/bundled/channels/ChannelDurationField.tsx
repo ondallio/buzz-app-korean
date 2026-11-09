@@ -1,3 +1,5 @@
+import { rich } from "../../shared/i18n/rich";
+import { t, useLanguage, languagePreference } from "../../shared/i18n";
 import { motion, useReducedMotion } from "motion/react";
 import { Field } from "../../shared/design-system/ui/Field";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
@@ -9,7 +11,7 @@ const durations = [86400, 604800, 1209600];
 
 /** Exact temporary lifetime in its largest whole unit, such as "7 days". */
 export function channelDurationLabel(ttlSeconds: number) {
-  const [duration, unit] =
+  const [duration, unit]: [number, string] =
     ttlSeconds === 1209600
       ? [2, "week"]
       : ttlSeconds % 86400 === 0
@@ -19,6 +21,13 @@ export function channelDurationLabel(ttlSeconds: number) {
           : ttlSeconds % 60 === 0
             ? [ttlSeconds / 60, "minute"]
             : [ttlSeconds, "second"];
+  if (languagePreference() === "ko")
+    return new Intl.NumberFormat("ko-KR", {
+      style: "unit",
+      unit,
+      unitDisplay: "long",
+      maximumFractionDigits: 20,
+    }).format(duration);
   return `${duration} ${unit}${duration === 1 ? "" : "s"}`;
 }
 
@@ -38,6 +47,7 @@ export function ChannelDurationField({
   label?: string;
   onChange(ttlSeconds: number | undefined): void;
 }) {
+  useLanguage();
   const reduceMotion = useReducedMotion();
   const instant =
     reduceMotion ||
@@ -52,7 +62,7 @@ export function ChannelDurationField({
   const label = channelDurationLabel(ttlSeconds);
   return (
     <Field
-      label={fieldLabel ?? "Duration"}
+      label={fieldLabel ?? t("channelForms.duration.title")}
       labelVisibility={fieldLabel ? "visible" : "hidden"}
       error={error}
     >
@@ -67,40 +77,55 @@ export function ChannelDurationField({
         <Radio
           value="ongoing"
           variant="card"
-          label="Ongoing"
-          description="No automatic archive."
+          label={t("channelForms.duration.ongoing")}
+          description={t("channelForms.duration.ongoingDescription")}
         />
         <div className={styles.temporary}>
           <Radio
             value="temporary"
             variant="card"
-            label={<span className={styles.temporaryLabel}>Temporary</span>}
+            label={
+              <span className={styles.temporaryLabel}>
+                {t("channelForms.duration.temporary")}
+              </span>
+            }
             description={
               <>
                 <span className="sr-only">
                   {temporary
-                    ? `Archives after ${label} without activity.`
-                    : "Archives without activity."}
+                    ? t("channelForms.duration.description", {
+                        duration: label,
+                      })
+                    : t("channelForms.duration.descriptionOngoing")}
                 </span>
                 <span aria-hidden="true">
-                  Archives{" "}
-                  <motion.span
-                    className={styles.durationReveal}
-                    initial={false}
-                    animate={{
-                      width: temporary ? "auto" : 0,
-                      opacity: temporary ? 1 : 0,
-                      whiteSpace: "nowrap",
-                      transitionEnd: {
-                        whiteSpace: temporary ? "normal" : "nowrap",
-                      },
-                    }}
-                    transition={{ ...transition, whiteSpace: { duration: 0 } }}
-                  >
-                    <strong className={styles.duration}>after {label}</strong>
-                    {"\u00a0"}
-                  </motion.span>
-                  without activity.
+                  {rich("channelForms.duration.visual", {
+                    timing: (
+                      <motion.span
+                        className={styles.durationReveal}
+                        initial={false}
+                        animate={{
+                          width: temporary ? "auto" : 0,
+                          opacity: temporary ? 1 : 0,
+                          whiteSpace: "nowrap",
+                          transitionEnd: {
+                            whiteSpace: temporary ? "normal" : "nowrap",
+                          },
+                        }}
+                        transition={{
+                          ...transition,
+                          whiteSpace: { duration: 0 },
+                        }}
+                      >
+                        <strong className={styles.duration}>
+                          {t("channelForms.duration.timing", {
+                            duration: label,
+                          })}
+                        </strong>
+                        {"\u00a0"}
+                      </motion.span>
+                    ),
+                  })}
                 </span>
               </>
             }
@@ -118,7 +143,7 @@ export function ChannelDurationField({
           >
             <div className={styles.adjustments}>
               <IconButton
-                aria-label="Decrease duration"
+                aria-label={t("channelForms.duration.decrease")}
                 icon={<MinusIcon />}
                 variant="subtle"
                 size="sm"
@@ -128,7 +153,7 @@ export function ChannelDurationField({
                 }}
               />
               <IconButton
-                aria-label="Increase duration"
+                aria-label={t("channelForms.duration.increase")}
                 icon={<PlusIcon />}
                 variant="subtle"
                 size="sm"

@@ -1,4 +1,5 @@
-import { describe, expect, test } from "vitest";
+// @vitest-environment jsdom
+import { afterEach, describe, expect, test } from "vitest";
 import type { RegisteredPage } from "../../features/pages/service";
 import {
   BellIcon,
@@ -199,4 +200,55 @@ describe("navigation owner", () => {
       expect(navigationOwner(pages, selected)).toBe(selected);
     },
   );
+});
+
+import { setLanguage } from "../../shared/i18n";
+afterEach(() => setLanguage("en"));
+
+test("projects frozen built-in titles in the live language without mutating registry identity or English navigation order", () => {
+  const official = Object.freeze(page("buzz.inbox/inbox", "Activity"));
+  const custom = Object.freeze(page("buzz.inbox/inbox", "My activity"));
+  const foreign = Object.freeze(page("example.inbox/inbox", "Activity"));
+  const changedMessages = Object.freeze(
+    page("buzz.channels/channels", "My team"),
+  );
+  const input = Object.freeze([official, foreign, custom, changedMessages]);
+  const originalOrder = orderPages(input);
+  setLanguage("ko");
+  expect(pagePresentation(official).label).toBe("활동");
+  expect(pagePresentation(messages).label).toBe("메시지");
+  expect(pagePresentation(custom).label).toBe("My activity");
+  expect(pagePresentation(foreign).label).toBe("Activity");
+  expect(pagePresentation(changedMessages).label).toBe("My team");
+  expect(orderPages(input)).toEqual(originalOrder);
+  expect(input[0]).toBe(official);
+  expect(official.title).toBe("Activity");
+  setLanguage("en");
+  expect(pagePresentation(official).label).toBe("Activity");
+  expect(pagePresentation(messages).label).toBe("Messages");
+});
+
+test.each([
+  ["buzz.channels/channels", "Channels", "메시지"],
+  ["buzz.inbox/inbox", "Activity", "활동"],
+  ["buzz.drafts-and-sent/drafts-sent", "Drafts & sent", "초안 및 보낸 메시지"],
+  ["buzz.reminders/reminders", "Reminders", "알림 예약"],
+  ["buzz.agents/agents", "Agents", "에이전트"],
+  ["buzz.workflows/workflows", "Workflows", "워크플로"],
+  ["buzz.relay-notes/notes", "Shared notes", "공유 노트"],
+  ["buzz.repos/repos", "Repository", "저장소"],
+])("translates only the original title for %s", (key, title, korean) => {
+  const entry = Object.freeze(page(key, title));
+  const custom = Object.freeze(page(key, `Custom ${title}`));
+  setLanguage("ko");
+  expect(pagePresentation(entry).label).toBe(korean);
+  expect(pagePresentation(custom).label).toBe(`Custom ${title}`);
+  expect(pagePresentation(page(`example/${entry.id}`, title)).label).toBe(
+    title,
+  );
+  setLanguage("en");
+  expect(pagePresentation(entry).label).toBe(
+    key === "buzz.channels/channels" ? "Messages" : title,
+  );
+  expect(entry.title).toBe(title);
 });

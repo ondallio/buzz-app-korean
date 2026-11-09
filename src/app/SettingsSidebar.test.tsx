@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { SettingsSidebar } from "./SettingsSidebar";
@@ -14,7 +14,11 @@ import {
 
 import { CpuIcon, ChatCircleIcon } from "../shared/design-system/icons";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 // The shared sidebar's resize handle measures its panel.
 vi.stubGlobal(
@@ -269,3 +273,68 @@ it.each([
     expect(screen.getByRole("button", { name: "Appearance" })).toBeVisible();
   },
 );
+
+import { setLanguage } from "../shared/i18n";
+it("changes the mounted settings navigation without re-registering frozen cards or replacing focused selection", async () => {
+  setLanguage("en");
+  const client = { selected: null, memberships: [] };
+  const connection = {};
+  const entry = Object.freeze({
+    id: "settings",
+    key: "example/settings",
+    pluginId: "example",
+    revision: "one",
+    title: "Profile",
+    group: "Plugins",
+    component: () => null,
+  });
+  const entries = Object.freeze([entry]);
+  const register = vi.fn();
+  const snapshot = vi.fn(() => entries);
+  const onSection = vi.fn();
+  render(
+    <SettingsSidebar
+      communities={
+        {
+          subscribe: () => () => {},
+          snapshot: () => client,
+          relay: { subscribe: () => () => {}, snapshot: () => connection },
+        } as unknown as Communities
+      }
+      cards={
+        {
+          subscribe: () => () => {},
+          snapshot,
+          register,
+        } as unknown as SettingsCards
+      }
+      selected="profile"
+      onSection={onSection}
+    />,
+  );
+  const profile = screen.getByRole("button", {
+    name: "Profile",
+    current: "page",
+  });
+  profile.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "프로필", current: "page" })).toBe(
+    profile,
+  );
+  expect(profile).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Profile" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "개인 공간" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "플러그인 관리" })).toBeVisible();
+  await userEvent.setup().click(profile);
+  expect(onSection.mock.calls).toEqual([["profile"]]);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Profile", current: "page" })).toBe(
+    profile,
+  );
+  expect(profile).toHaveFocus();
+  expect(register).not.toHaveBeenCalled();
+  expect(
+    snapshot.mock.results.every((result) => result.value === entries),
+  ).toBe(true);
+  expect(entries[0]).toBe(entry);
+});

@@ -1,4 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { useLanguage } from "../../shared/i18n/language";
 import { useConversationPresentation } from "./ConversationPresentation";
 import {
   useContext,
@@ -112,6 +113,7 @@ export function MessageLink({
   interactive?: boolean;
   channelPrivate?: boolean;
 }) {
+  useLanguage();
   const active = useConversationPresentation();
   const renderers = useSyncExternalStore(
     registry?.subscribe ?? subscribe,

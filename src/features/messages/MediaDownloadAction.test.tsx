@@ -7,11 +7,12 @@ import {
   render,
   screen,
 } from "@testing-library/react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ToastProvider } from "../../shared/design-system/ui/Toast";
+import { setLanguage } from "../../shared/i18n";
 import { MediaMenuDownloadNotice } from "./MediaDownloadAction";
 import { VideoPlayer } from "./VideoPlayer";
 import { AudioAttachment } from "./AudioAttachment";
@@ -80,6 +81,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  setLanguage("en");
+  localStorage.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -263,4 +266,93 @@ it("does not listen for menu downloads outside the desktop host", () => {
     </ToastProvider>,
   );
   expect(listen).not.toHaveBeenCalled();
+});
+
+it("keeps the same pending/retry download control and raw native request across locale changes", async () => {
+  setLanguage("en");
+  const first = held(),
+    second = held();
+  let saving = first.promise;
+  vi.mocked(invoke).mockImplementation(async (command) =>
+    command === "media_download" ? saving : "http://127.0.0.1:4321/token/",
+  );
+  render(<Surface kind="voice note" />);
+  const button = await screen.findByRole("button", {
+    name: "Download voice note",
+  });
+  button.focus();
+  fireEvent.click(button);
+  const status = screen.getByRole("status");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "음성 메모 다운로드" })).toBe(
+    button,
+  );
+  expect(button).toHaveFocus();
+  expect(button).toHaveAttribute("aria-busy", "true");
+  expect(status).toHaveTextContent("다운로드 중…");
+  expect(
+    vi
+      .mocked(invoke)
+      .mock.calls.filter(([command]) => command === "media_download"),
+  ).toEqual([["media_download", { source, name }]]);
+  await act(async () => first.reject(new Error("raw native error")));
+  expect(
+    screen.getByRole("button", { name: "음성 메모 다운로드 다시 시도" }),
+  ).toBe(button);
+  expect(screen.getByRole("alert")).toHaveTextContent("다운로드 실패");
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("button", { name: "Retry download voice note" }),
+  ).toBe(button);
+  saving = second.promise;
+  fireEvent.click(button);
+  await act(async () => second.resolve());
+  act(() => setLanguage("ko"));
+  expect(screen.getByText("다운로드 완료")).toBeVisible();
+  expect(
+    vi
+      .mocked(invoke)
+      .mock.calls.filter(([command]) => command === "media_download"),
+  ).toEqual([
+    ["media_download", { source, name }],
+    ["media_download", { source, name }],
+  ]);
+});
+
+it("keeps completed native-menu feedback live after its listener unmounts", async () => {
+  setLanguage("en");
+  vi.mocked(isTauri).mockReturnValue(true);
+  let publish!: (event: { payload: string | null }) => void;
+  const unlisten = vi.fn();
+  vi.mocked(listen).mockImplementation(async (_event, handler) => {
+    publish = handler as typeof publish;
+    return unlisten;
+  });
+  function Host() {
+    const [open, setOpen] = useState(true);
+    return (
+      <ToastProvider>
+        {open && <MediaMenuDownloadNotice />}
+        <button type="button" onClick={() => setOpen(false)}>
+          Retire listener
+        </button>
+      </ToastProvider>
+    );
+  }
+  render(<Host />);
+  await act(async () => {});
+  act(() => publish({ payload: "原文 {name}.mp4" }));
+  const toast = await screen.findByRole("dialog", {
+    name: "Saved to Downloads",
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Retire listener" }));
+  expect(unlisten).toHaveBeenCalledOnce();
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("dialog", { name: "다운로드 폴더에 저장했습니다" }),
+  ).toBe(toast);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("dialog", { name: "Saved to Downloads" })).toBe(
+    toast,
+  );
 });

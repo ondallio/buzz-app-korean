@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { WindowControls } from "./WindowControls";
+import { setLanguage } from "../../shared/i18n";
 
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: vi.fn() }));
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: vi.fn() }));
@@ -13,6 +14,8 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  setLanguage("en");
+  localStorage.clear();
 });
 
 it.each([
@@ -28,6 +31,39 @@ it.each([
     expect(getCurrentWindow).not.toHaveBeenCalled();
   },
 );
+
+it("keeps a focused native action and its failure live across language changes and retries the same command", async () => {
+  setLanguage("en");
+  vi.mocked(isTauri).mockReturnValue(true);
+  vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+  const minimize = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("native detail"))
+    .mockResolvedValue(undefined);
+  vi.mocked(getCurrentWindow).mockReturnValue({
+    minimize,
+  } as unknown as ReturnType<typeof getCurrentWindow>);
+  const user = userEvent.setup();
+  render(<WindowControls />);
+  const button = screen.getByRole("button", { name: "Minimize window" });
+  await user.click(button);
+  const failure = await screen.findByRole("alert");
+  expect(failure).toHaveTextContent("Window action failed. Try again.");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "창 최소화" })).toBe(button);
+  expect(button).toHaveFocus();
+  expect(screen.getByRole("group", { name: "창 제어" })).toContainElement(
+    button,
+  );
+  expect(screen.getByRole("alert")).toBe(failure);
+  expect(failure).toHaveTextContent("창 작업에 실패했습니다. 다시 시도하세요.");
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Minimize window" })).toBe(button);
+  expect(failure).toHaveTextContent("Window action failed. Try again.");
+  await user.keyboard("{Enter}");
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(minimize.mock.calls).toEqual([[], []]);
+});
 
 it.each(["Linux x86_64"])(
   "supports keyboard window actions and retry on %s",

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { setLanguage } from "../../shared/i18n";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
@@ -15,7 +16,11 @@ import {
 } from "../../shared/design-system/ui/Menu";
 import { ChannelReadMenuItem } from "./ChannelReadMenuItem";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 function setup() {
   const listeners = new Map<string, Set<() => void>>();
   const snapshots = new Map<string, UnreadSnapshot>();
@@ -138,4 +143,24 @@ it("updates an open menu from the domain snapshot, disables pending work and rel
   view.rerender(h.menu("other", false, false));
   await waitFor(() => expect(h.listeners.get("other")?.size).toBe(0));
   view.unmount();
+});
+
+it("keeps its focused read option and raw unread target through EN→KO→EN", async () => {
+  const h = setup();
+  render(h.menu());
+  const item = await screen.findByRole("menuitem", { name: "Mark as unread" });
+  item.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("menuitem", { name: "읽지 않음으로 표시" })).toBe(
+    item,
+  );
+  expect(item).toHaveAttribute("title", "이 기기에서만 읽지 않음으로 표시");
+  expect(item).toHaveFocus();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("menuitem", { name: "Mark as unread" })).toBe(item);
+  await userEvent.setup().keyboard("{Enter}");
+  expect(h.unread.markUnreadLocal).toHaveBeenCalledExactlyOnceWith({
+    kind: "channel",
+    channelId: "room",
+  });
 });

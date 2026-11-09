@@ -1,3 +1,10 @@
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  localMessage,
+  errorMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import {
   statusDurations,
   statusDeadline,
@@ -34,6 +41,21 @@ const choices = [
   ["🏖️", "Vacationing"],
   ["🏠", "Working remotely"],
 ] as const;
+const durationKeys = {
+  "3600": "statusFocus.hour1",
+  "28800": "statusFocus.hours8",
+  today: "statusFocus.today",
+  week: "statusFocus.week",
+  custom: "statusFocus.custom",
+  never: "statusFocus.never",
+} as const;
+const choiceKeys = {
+  "In a meeting": "statusFocus.meeting",
+  Commuting: "statusFocus.commuting",
+  "Out sick": "statusFocus.sick",
+  Vacationing: "statusFocus.vacation",
+  "Working remotely": "statusFocus.remote",
+} as const;
 function draftFrom(status: UserStatus | undefined) {
   return {
     text: status?.text ?? "",
@@ -63,6 +85,7 @@ export function StatusEditor({
   close(): void;
   finalFocus: RefObject<HTMLButtonElement | null>;
 }) {
+  useLanguage();
   const [current, setCurrent] = useState(initialCurrent);
   const edited = useRef(false);
   const submitted = useRef(false);
@@ -79,7 +102,7 @@ export function StatusEditor({
   const emojiName = useEmojiName(effectiveEmoji);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const message = useRef<HTMLInputElement>(null);
   const emojiTrigger = useRef<HTMLButtonElement>(null);
   const pickerId = `status-emoji-${useId()}`;
@@ -132,10 +155,13 @@ export function StatusEditor({
     setChecking(false);
     setCheckError(false);
   }
+  const durationLabels = new Map<string, string>(
+    statusDurations.map(([value]) => [value, t(durationKeys[value])]),
+  );
   const durationLabel =
     duration === "custom"
-      ? "Custom date and time"
-      : statusDurations.find(([value]) => value === duration)?.[1];
+      ? t("statusFocus.customDate")
+      : durationLabels.get(duration);
   async function submit(clear = false) {
     if (working.current) return;
     const expiresAt =
@@ -154,7 +180,7 @@ export function StatusEditor({
       expiresAt !== undefined &&
       (!Number.isFinite(expiresAt) || expiresAt <= Date.now() / 1000)
     ) {
-      setError("Choose a date and time in the future.");
+      setError(localMessage("statusFocus.futureStatus"));
       return;
     }
     markEdited();
@@ -170,8 +196,7 @@ export function StatusEditor({
       });
       if (mounted.current) close();
     } catch (reason) {
-      if (mounted.current)
-        setError(reason instanceof Error ? reason.message : String(reason));
+      if (mounted.current) setError(errorMessage(reason));
     } finally {
       working.current = false;
       if (mounted.current) setBusy(false);
@@ -181,9 +206,9 @@ export function StatusEditor({
     <Dialog
       size="compact"
       open
-      title="Set a status"
+      title={t("statusFocus.statusTitle")}
       dismissOnOutsideClick={false}
-      closeLabel="Close status editor"
+      closeLabel={t("statusFocus.closeStatus")}
       onOpenChange={(open) => {
         if (!open) close();
       }}
@@ -198,7 +223,9 @@ export function StatusEditor({
               disabled={busy}
               onClick={() => void submit(true)}
             >
-              <span className="text-danger">Clear status</span>
+              <span className="text-danger">
+                {t("statusFocus.clearStatus")}
+              </span>
             </Button>
           ) : (
             <span />
@@ -210,7 +237,7 @@ export function StatusEditor({
             loading={busy}
             disabled={busy || (!text.trim() && !emoji)}
           >
-            Save status
+            {t("statusFocus.saveStatus")}
           </Button>
         </div>
       }
@@ -236,7 +263,7 @@ export function StatusEditor({
                 <IconButton
                   ref={emojiTrigger}
                   size="sm"
-                  aria-label="Choose a status emoji"
+                  aria-label={t("statusFocus.chooseEmoji")}
                   aria-expanded={pickerOpen}
                   aria-haspopup="dialog"
                   aria-controls={pickerOpen ? pickerId : undefined}
@@ -266,10 +293,10 @@ export function StatusEditor({
           >
             <Input
               ref={message}
-              aria-label="Status message"
+              aria-label={t("statusFocus.statusMessage")}
               autoComplete="off"
               maxLength={STATUS_TEXT_LIMIT}
-              placeholder="What's your status?"
+              placeholder={t("statusFocus.placeholder")}
               value={text}
               onChange={(event) => {
                 markEdited();
@@ -278,11 +305,15 @@ export function StatusEditor({
             />
           </InputGroup>
           <div className={styles.section}>
-            <span className="text-label-sm text-subtle">Duration</span>
+            <span className="text-label-sm text-subtle">
+              {t("statusFocus.duration")}
+            </span>
             <MenuRoot>
               <MenuTrigger
                 disabled={busy}
-                aria-label={`Duration: ${durationLabel}`}
+                aria-label={t("statusFocus.durationName", {
+                  duration: durationLabel ?? "",
+                })}
                 render={<FieldButton />}
               >
                 {durationLabel}
@@ -295,7 +326,7 @@ export function StatusEditor({
                     setDuration(value);
                     setDurationChanged(true);
                   }}
-                  aria-label="Duration"
+                  aria-label={t("statusFocus.duration")}
                 >
                   {statusDurations
                     .filter(
@@ -303,9 +334,9 @@ export function StatusEditor({
                         value !== "never" ||
                         (current && current.expiresAt === undefined),
                     )
-                    .map(([value, label]) => (
+                    .map(([value]) => (
                       <MenuRadioItem key={value} value={value} closeOnClick>
-                        {label}
+                        {durationLabels.get(value)}
                       </MenuRadioItem>
                     ))}
                 </MenuRadioGroup>
@@ -326,7 +357,9 @@ export function StatusEditor({
           </div>
           {!current && (
             <div className={styles.section}>
-              <span className="text-label-sm text-subtle">Quick statuses</span>
+              <span className="text-label-sm text-subtle">
+                {t("statusFocus.quick")}
+              </span>
               <div className={styles.choices}>
                 {choices.map(([icon, label]) => (
                   <NavigationItem
@@ -344,7 +377,7 @@ export function StatusEditor({
                         {icon}
                       </span>
                     }
-                    label={label}
+                    label={t(choiceKeys[label])}
                   />
                 ))}
               </div>
@@ -371,12 +404,12 @@ export function StatusEditor({
         )}
         {checking && (
           <p role="status" className="text-body-sm text-muted">
-            Checking your current status…
+            {t("statusFocus.checking")}
           </p>
         )}
         {checkError && (
           <div role="alert" className="text-body-sm text-muted">
-            Couldn’t check your latest status. Your draft is unchanged.
+            {t("statusFocus.checkFailed")}
             <Button
               variant="link"
               size="sm"
@@ -385,13 +418,13 @@ export function StatusEditor({
                 setCheckAttempt((value) => value + 1);
               }}
             >
-              Retry
+              {t("statusFocus.retry")}
             </Button>
           </div>
         )}
         {error && (
           <p className={styles.error} role="alert">
-            {error}
+            {resolveMessage(error)}
           </p>
         )}
       </form>

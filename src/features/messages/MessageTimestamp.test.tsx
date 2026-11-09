@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { memo } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../../shared/i18n/language";
 import {
   DayDivider,
   MessageTimestamp,
@@ -26,6 +27,7 @@ function timestamp(createdAt: number, hint = false) {
 }
 
 beforeEach(() => {
+  setLanguage("en");
   vi.useFakeTimers();
   vi.setSystemTime(new Date(2026, 8, 24, 12));
 });
@@ -33,6 +35,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.restoreAllMocks();
+  setLanguage("en");
 });
 // The label ladder itself belongs to formatItemTimestamp in datetime.test.ts.
 it("names the day outside today while retaining the full accessible date", () => {
@@ -65,13 +68,13 @@ it.each([false, true])(
   "refreshes cached styles after yielding when locale or timezone changes (hint=%s)",
   async (hint) => {
     const NativeFormat = Intl.DateTimeFormat;
-    let locale = "en-GB";
+    let hostLocale = "en-GB";
     let timeZone = "Europe/London";
     function dateTimeFormat(
       requestedLocale?: Intl.LocalesArgument,
       options?: Intl.DateTimeFormatOptions,
     ) {
-      return new NativeFormat(requestedLocale ?? locale, {
+      return new NativeFormat(requestedLocale ?? hostLocale, {
         timeZone,
         ...options,
       });
@@ -81,15 +84,19 @@ it.each([false, true])(
     const { container, rerender } = render(
       timestamp(date.getTime() / 1000, hint),
     );
-    const assertDate = () => {
+    const time = container.querySelector("time");
+    if (!time) throw new Error("Expected the production timestamp element");
+    const assertDate = (selectedLocale: "en-US" | "ko-KR") => {
+      expect(container.querySelector("time")).toBe(time);
+      expect(time).toHaveAttribute("datetime", "2026-09-24T09:05:00.000Z");
       expect(container.querySelector(".sr-only")).toHaveTextContent(
-        new NativeFormat(locale, {
+        new NativeFormat(selectedLocale, {
           timeZone,
           dateStyle: "full",
           timeStyle: "long",
         }).format(date),
       );
-      const clock = new NativeFormat(locale, {
+      const clock = new NativeFormat(selectedLocale, {
         timeZone,
         hour: "numeric",
         minute: "2-digit",
@@ -100,15 +107,21 @@ it.each([false, true])(
           container.querySelector('[aria-hidden="true"]'),
         ).toHaveTextContent(clock.format(date));
     };
-    assertDate();
+    assertDate("en-US");
     await Promise.resolve();
     timeZone = "America/Los_Angeles";
     rerender(timestamp(date.getTime() / 1000, hint));
-    assertDate();
+    assertDate("en-US");
     await Promise.resolve();
-    locale = "de-DE";
+    hostLocale = "de-DE";
     rerender(timestamp(date.getTime() / 1000, hint));
-    assertDate();
+    assertDate("en-US");
+    await Promise.resolve();
+    act(() => setLanguage("ko"));
+    assertDate("ko-KR");
+    await Promise.resolve();
+    act(() => setLanguage("en"));
+    assertDate("en-US");
   },
 );
 it("updates the visible clock, accessible date and datetime when a mounted row changes", () => {

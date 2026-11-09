@@ -1,3 +1,11 @@
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  errorMessage,
+  localError,
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import {
   createContext,
   useCallback,
@@ -113,6 +121,7 @@ export function ForwardMessageProvider({
   renderDialog?: boolean;
   children: ReactNode;
 }) {
+  useLanguage();
   const active = useConversationPresentation();
   // Hosted conversations nest beneath the dialog's owner. Delegate to it so
   // one provider holds the source, the pending guard and the retry notice.
@@ -238,7 +247,7 @@ export function ForwardMessageProvider({
         )}
         {blocked && !delegate && (
           <ToastNotice
-            title="Retry the pending forward before forwarding another message."
+            title={t("messageActions.forward.blocked")}
             tone="info"
             timeout={pending ? 0 : 4000}
             onDismiss={() => setBlocked(false)}
@@ -250,7 +259,7 @@ export function ForwardMessageProvider({
                   open(pending.source.channelId, pending.source.forward);
                 }}
               >
-                Review pending forward
+                {t("messageActions.forward.review")}
               </Button>
             )}
           </ToastNotice>
@@ -281,6 +290,7 @@ function ForwardMessageDialog({
   finalFocus: React.RefObject<HTMLElement | null>;
   lock(value: boolean): void;
 }) {
+  useLanguage();
   const [people, setPeople] = useState<Recipient[]>(() =>
     recovered ? [recovered.person] : [],
   );
@@ -294,11 +304,11 @@ function ForwardMessageDialog({
   }
   const [typed, setTyped] = useState(false);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const [notice, setNotice] = useState<{
-    text: string;
+    text: DisplayMessage;
     error: boolean;
-    navigation?: { label: string; open(): void };
+    navigation?: { label: DisplayMessage; open(): void };
   }>();
   const fields = useRef<HTMLDivElement>(null);
   const noteField = useRef<HTMLTextAreaElement>(null);
@@ -352,9 +362,7 @@ function ForwardMessageDialog({
                   choice.pubkey === person.pubkey && canMessageAgent(choice),
               )
           )
-            throw new Error(
-              "This agent is no longer available for direct messages. Choose another person.",
-            );
+            throw localError("messageActions.forward.personUnavailable");
         };
         validateRecipient();
         const channelId = await session.directMessages.open(
@@ -369,9 +377,7 @@ function ForwardMessageDialog({
           session.viewer,
         );
         if (saved && !isPendingSource(saved, source))
-          throw new Error(
-            "Retry the pending forward before forwarding another message.",
-          );
+          throw localError("messageActions.forward.blocked");
         validateRecipient();
         const link = `buzz://message?${new URLSearchParams({ channel: source.channelId, id: source.forward })}`;
         const literalNote = note
@@ -419,10 +425,10 @@ function ForwardMessageDialog({
       const { id, channelId, person: to } = sent;
       // You stay where you forwarded from; the notice opens what you sent.
       setNotice({
-        text: `Message forwarded to ${to.name}`,
+        text: localMessage("messageActions.forward.success", { name: to.name }),
         error: false,
         navigation: {
-          label: `Open your DM with ${to.name}`,
+          label: localMessage("messageActions.forward.open", { name: to.name }),
           open: () => {
             setNotice(undefined);
             void navigation.open({
@@ -441,8 +447,8 @@ function ForwardMessageDialog({
         lock(false);
         const text =
           reason instanceof Error
-            ? reason.message
-            : "Couldn’t forward the message. Try again.";
+            ? errorMessage(reason)
+            : localMessage("messageActions.forward.failed");
         setError(text);
         setNotice({ text, error: true });
       }
@@ -457,8 +463,8 @@ function ForwardMessageDialog({
     <>
       <Dialog
         open={open}
-        title="Forward message"
-        description="Send this message to a person, with an optional note."
+        title={t("messageActions.forward.title")}
+        description={t("messageActions.forward.description")}
         headerGap="compact"
         footerGap="compact"
         preventClose={pending}
@@ -477,7 +483,7 @@ function ForwardMessageDialog({
         actions={
           <>
             <Button disabled={pending} onClick={close}>
-              Cancel
+              {t("messageActions.cancel")}
             </Button>
             <Button
               variant="prominent"
@@ -485,7 +491,11 @@ function ForwardMessageDialog({
               disabled={pending || !person || typed}
               onClick={() => void submit()}
             >
-              {recovered ? "Retry forward" : "Forward"}
+              {t(
+                recovered
+                  ? "messageActions.forward.retry"
+                  : "messageActions.forward.confirm",
+              )}
             </Button>
           </>
         }
@@ -504,7 +514,7 @@ function ForwardMessageDialog({
             onTyped={setTyped}
             onComplete={() => noteField.current?.focus()}
           />
-          <Field label="Note (optional)">
+          <Field label={t("messageActions.forward.note")}>
             <Textarea
               ref={noteField}
               rows={3}
@@ -515,7 +525,10 @@ function ForwardMessageDialog({
             />
           </Field>
           {open && (
-            <section className={styles.preview} aria-label="Message to forward">
+            <section
+              className={styles.preview}
+              aria-label={t("messageActions.forward.preview")}
+            >
               <BuzzLinkPreview
                 session={session}
                 channelId={source.channelId}
@@ -524,23 +537,27 @@ function ForwardMessageDialog({
             </section>
           )}
           <p className="text-body-sm text-subtle">
-            The recipient can open the original only if they have access to its
-            conversation.
+            {t("messageActions.forward.access")}
           </p>
           {error && (
             <p role="alert" className="text-body-sm text-subtle">
-              {error}
+              {resolveMessage(error)}
             </p>
           )}
         </div>
       </Dialog>
       {notice && (
         <ToastNotice
-          title={notice.text}
+          title={resolveMessage(notice.text)}
           tone={notice.error ? "error" : "success"}
           timeout={notice.error ? 0 : 4000}
           onDismiss={() => setNotice(undefined)}
-          navigation={notice.navigation}
+          navigation={
+            notice.navigation && {
+              ...notice.navigation,
+              label: resolveMessage(notice.navigation.label),
+            }
+          }
         />
       )}
     </>

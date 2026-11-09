@@ -1,3 +1,9 @@
+import { useLanguage } from "../../shared/i18n";
+import {
+  errorMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 // An agent's sections, wherever they are shown (its Build view and its
 // profile panel): the type's tabs, settings, and Memory.
 // Memory is relay-backed for both local and hosted agents. Agents classified
@@ -203,9 +209,10 @@ function shows(when: (agent: Agent) => boolean, agent: Agent, key: string) {
 }
 
 function HostSettings({ host }: { host: AgentSettingsHost }) {
+  useLanguage();
   const form = useId();
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const save = async () => {
     if (!host.pendingSave) return;
     setSaving(true);
@@ -213,7 +220,7 @@ function HostSettings({ host }: { host: AgentSettingsHost }) {
     try {
       await host.pendingSave();
     } catch (reason) {
-      setError(String(reason instanceof Error ? reason.message : reason));
+      setError(errorMessage(reason));
     } finally {
       setSaving(false);
     }
@@ -230,7 +237,7 @@ function HostSettings({ host }: { host: AgentSettingsHost }) {
       {host.typeControl?.(false)}
       {error && (
         <p role="alert" className="buzz-field-error">
-          {error}
+          {resolveMessage(error)}
         </p>
       )}
       <AgentSaveButton

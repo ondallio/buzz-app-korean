@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { useState } from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../../shared/i18n/language";
 import { CronExpressionInput } from "./CronExpressionInput";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 
 function Harness({
   initial,
@@ -149,4 +153,66 @@ it("disables every box", () => {
   for (const name of ["Minute", "Hour", "Day", "Month", "Weekday"]) {
     expect(box(name)).toBeDisabled();
   }
+});
+
+it("keeps all cron boxes, aliases, ids and keyboard gestures when display language changes", async () => {
+  const change = vi.fn();
+  render(<Harness initial="30 14 1,15 JAN,JUL MON-FRI" onChange={change} />);
+  const minute = box("Minute"),
+    hour = box("Hour"),
+    month = box("Month");
+  const id = month.id;
+  if (!(month instanceof HTMLInputElement))
+    throw new Error("Expected real cron input");
+  month.focus();
+  month.setSelectionRange(1, 4);
+  act(() => setLanguage("ko"));
+  expect(box("월")).toBe(month);
+  expect(month.id).toBe(id);
+  expect(month).toHaveValue("JAN,JUL");
+  expect(month).toHaveFocus();
+  expect([month.selectionStart, month.selectionEnd]).toEqual([1, 4]);
+  expect(box("분")).toBe(minute);
+  expect(box("시")).toBe(hour);
+  expect(change).not.toHaveBeenCalled();
+  const user = userEvent.setup();
+  await user.click(minute);
+  await user.keyboard(" ");
+  expect(hour).toHaveFocus();
+  act(() => setLanguage("en"));
+  expect(box("Hour")).toBe(hour);
+  expect(hour).toHaveFocus();
+  expect(screen.getByTestId("value")).toHaveTextContent(
+    "30 14 1,15 JAN,JUL MON-FRI",
+  );
+  expect(change).not.toHaveBeenCalled();
+});
+
+it("retains the mixed canonical cron diagnostic and authored atom as literal text", async () => {
+  const change = vi.fn();
+  render(<Harness initial="60 9 * * *" onChange={change} />);
+  const minute = box("Minute"),
+    alert = screen.getByRole("alert");
+  expect(alert).toHaveTextContent("Minute must be between 0 and 59.");
+  minute.focus();
+  act(() => setLanguage("ko"));
+  expect(box("분")).toBe(minute);
+  expect(minute).toHaveFocus();
+  expect(screen.getByRole("alert")).toBe(alert);
+  expect(alert).toHaveTextContent("Minute must be between 0 and 59.");
+  expect(change).not.toHaveBeenCalled();
+  const user = userEvent.setup();
+  await user.clear(minute);
+  await user.type(minute, "raw_atom");
+  expect(change).toHaveBeenLastCalledWith("raw_atom 9 * * *");
+  expect(alert).toHaveTextContent(
+    "Minute contains “raw_atom”, which is not a supported value.",
+  );
+  act(() => setLanguage("en"));
+  expect(box("Minute")).toBe(minute);
+  expect(minute).toHaveValue("raw_atom");
+  expect(minute).toHaveFocus();
+  expect(alert).toHaveTextContent(
+    "Minute contains “raw_atom”, which is not a supported value.",
+  );
 });

@@ -14,7 +14,13 @@ import {
 } from "../relay/channel-lifecycle";
 import { ChannelJoinNotice } from "./ChannelJoinNotice";
 
-afterEach(cleanup);
+import { setLanguage } from "../../shared/i18n";
+
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 it.each([
   { guest: false, place: "channel" as const },
@@ -170,4 +176,73 @@ it("waits for content once per channel and stays visible during refresh", () => 
   expect(screen.getByRole("button", { name: "Join" })).toBeInTheDocument();
   rerender(<ChannelJoinNotice {...props} channelId="other" ready={false} />);
   expect(screen.queryByRole("button", { name: "Join" })).toBeNull();
+});
+
+it("keeps one raw lifecycle run and the same pending/error controls while changing language", async () => {
+  setLanguage("en");
+  let reject!: (reason: unknown) => void;
+  const run = vi.fn<ChannelLifecycleCapability["run"]>(
+    () =>
+      new Promise<void>((_, no) => {
+        reject = no;
+      }),
+  );
+  const started = vi.fn();
+  render(
+    <ChannelJoinNotice
+      channelId="raw-channel-{name}"
+      lifecycle={lifecycle(run)}
+      joinable
+      onJoin={started}
+    />,
+  );
+  const button = screen.getByRole("button", { name: "Join" });
+  fireEvent.click(button);
+  const signal = run.mock.calls[0]?.[2];
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "참여" })).toBe(button);
+  expect(button).toHaveAttribute("aria-disabled", "true");
+  expect(run).toHaveBeenCalledExactlyOnceWith(
+    "join",
+    "raw-channel-{name}",
+    signal,
+  );
+  expect(started).toHaveBeenCalledOnce();
+  await act(async () =>
+    reject(new ChannelLifecycleUnconfirmed(new Error("raw timeout"))),
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "참여가 적용되었을 수 있지만 아직 확인되지 않았습니다. 다시 시도하여 확인하세요.",
+  );
+  const alert = screen.getByRole("alert");
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("alert")).toBe(alert);
+  expect(alert).toHaveTextContent(
+    "Join may have taken effect, but it is not confirmed yet. Try again to check.",
+  );
+  expect(screen.getByRole("button", { name: "Join" })).toBe(button);
+  expect(run).toHaveBeenCalledTimes(1);
+});
+
+it("preserves an external error even when it matches an app-owned English template", async () => {
+  setLanguage("ko");
+  const raw =
+    "Join may have taken effect, but it is not confirmed yet. Try again to check.";
+  const run = vi
+    .fn<ChannelLifecycleCapability["run"]>()
+    .mockRejectedValue(new Error(raw));
+  render(
+    <ChannelJoinNotice
+      channelId="raw-id"
+      lifecycle={lifecycle(run)}
+      joinable
+      onJoin={() => {}}
+    />,
+  );
+  await act(async () =>
+    fireEvent.click(screen.getByRole("button", { name: "참여" })),
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent(raw);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("alert")).toHaveTextContent(raw);
 });

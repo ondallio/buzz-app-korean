@@ -6,6 +6,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import type { Communities } from "../../features/communities/service";
 import type { Shortcut } from "../../features/shortcuts/service";
 import { ToastProvider } from "../../shared/design-system/ui/Toast";
+import { setLanguage } from "../../shared/i18n";
 import { MarkAllReadShortcut } from "./MarkAllReadShortcut";
 
 afterEach(cleanup);
@@ -106,6 +107,24 @@ it("asks first, focusing Mark all as read, and marks nothing when cancelled", as
     expect(
       screen.getByRole("button", { name: "Mark all as read" }),
     ).toHaveFocus(),
+  );
+  const confirm = screen.getByRole("button", { name: "Mark all as read" });
+  const registration = shortcut();
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("alertdialog", { name: "모두 읽음으로 표시할까요?" }),
+  ).toBe(dialog);
+  expect(screen.getByRole("button", { name: "모두 읽음으로 표시" })).toBe(
+    confirm,
+  );
+  expect(confirm).toHaveFocus();
+  expect(dialog).toHaveTextContent(
+    "Acme Relay의 모든 대화를 읽음으로 표시합니다.",
+  );
+  expect(shortcut()).toBe(registration);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Mark all as read" })).toBe(
+    confirm,
   );
   await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
   await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());

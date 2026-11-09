@@ -1,5 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { useSyncExternalStore } from "react";
+import { useLanguage } from "./i18n/language";
 
 export type HourCycle = "h12" | "h23";
 export type ClockPreference = {
@@ -98,6 +99,7 @@ const pending = () => unsaved;
  * changes, so times from `shared/datetime` stay current; the system setting is
  * re-read when the window regains focus. */
 export function useClockFormat(): void {
+  useLanguage();
   useSyncExternalStore(subscribe, key, key);
 }
 

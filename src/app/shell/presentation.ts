@@ -1,3 +1,5 @@
+import { t } from "../../shared/i18n";
+import { ownedPageLabel } from "../../shared/i18n/owned-labels";
 import {
   AlarmIcon,
   BellIcon,
@@ -14,8 +16,20 @@ import type { RegisteredPage } from "../../features/pages/service";
 // Shell-owned presentation keeps plugin content independent of navigation chrome.
 // Add page identities here; unknown plugins inherit a consistent layout default.
 export const shellPresentation = {
-  settings: { label: "Settings", icon: GearIcon, tone: "lavender" },
-  channels: { label: "Messages", icon: ChatsCircleIcon, tone: "lime" },
+  settings: {
+    get label() {
+      return t("navigation.settings");
+    },
+    icon: GearIcon,
+    tone: "lavender",
+  },
+  channels: {
+    get label() {
+      return t("navigation.messages");
+    },
+    icon: ChatsCircleIcon,
+    tone: "lime",
+  },
 } as const;
 
 // Navigation order is host policy, never plugin activation timing. Match full
@@ -45,8 +59,8 @@ export function orderPages(
   return [...pages].sort(
     (a, b) =>
       rank(a) - rank(b) ||
-      pagePresentation(a).label.localeCompare(
-        pagePresentation(b).label,
+      ownedPageLabel(a.key, a.title, "en").localeCompare(
+        ownedPageLabel(b.key, b.title, "en"),
         "en",
       ) ||
       a.key.localeCompare(b.key, "en"),
@@ -105,12 +119,21 @@ type PagePresentation = Readonly<{
   image?: string;
 }>;
 export function pagePresentation(page: RegisteredPage): PagePresentation {
-  if (page.key === "buzz.channels/channels") return shellPresentation.channels;
+  if (page.key === "buzz.channels/channels")
+    return {
+      ...shellPresentation.channels,
+      label: ownedPageLabel(page.key, page.title),
+    };
   const tone = page.layout === "workspace" ? "lime" : "sky";
   const bundledIcon = bundledIcons.get(page.key);
-  if (bundledIcon) return { label: page.title, icon: bundledIcon, tone };
+  if (bundledIcon)
+    return {
+      label: ownedPageLabel(page.key, page.title),
+      icon: bundledIcon,
+      tone,
+    };
   return {
-    label: page.title,
+    label: ownedPageLabel(page.key, page.title),
     icon: BrowserIcon,
     tone,
     ...(page.icon === undefined ? {} : { image: page.icon }),

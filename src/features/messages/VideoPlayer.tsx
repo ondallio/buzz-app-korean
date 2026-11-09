@@ -1,3 +1,9 @@
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { useMediaReadRecovery } from "./use-media-read-recovery";
 import { useVideoGestures } from "./use-video-gestures";
 import { useMediaControls } from "./use-media-controls";
@@ -73,6 +79,7 @@ export function VideoControls({
   markers?: readonly VideoMarker[];
   onMarker?(id: string, seconds: number): void;
 }) {
+  useLanguage();
   const corners = useMediaCorners();
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
@@ -83,7 +90,7 @@ export function VideoControls({
   const audibleVolume = muted ? 0 : volume;
   const [rate, setRate] = useState(savedSpeed);
   const [hover, setHover] = useState<number>();
-  const [notice, setNotice] = useState<string>();
+  const [notice, setNotice] = useState<DisplayMessage>();
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -159,7 +166,7 @@ export function VideoControls({
     else
       void video
         .play()
-        .catch(() => setNotice("Playback paused. Press play to try again."));
+        .catch(() => setNotice(localMessage("mediaViewing.video.paused")));
   };
   const seek = (seconds: number) => {
     if (!videoRef.current || !duration) return;
@@ -174,7 +181,9 @@ export function VideoControls({
       <IconButton
         size={inline ? "md" : "sm"}
         variant={inline ? "media" : "ghost"}
-        aria-label={playing ? "Pause video" : "Play video"}
+        aria-label={t(
+          playing ? "mediaViewing.video.pause" : "mediaViewing.video.play",
+        )}
         onClick={toggle}
         icon={playing ? <PauseFilledIcon /> : <PlayFilledIcon />}
       />
@@ -185,7 +194,7 @@ export function VideoControls({
       {inline && playButton}
       {notice && (
         <p className={styles.notice} role="status">
-          {notice}
+          {resolveMessage(notice)}
         </p>
       )}
       <div
@@ -203,7 +212,7 @@ export function VideoControls({
             render={
               <IconButton
                 size="sm"
-                aria-label="Video volume"
+                aria-label={t("mediaViewing.video.volume")}
                 icon={
                   muted || volume === 0 ? (
                     <SpeakerSlashIcon />
@@ -215,7 +224,7 @@ export function VideoControls({
             }
           />
           <PopoverPopup
-            aria-label="Video volume controls"
+            aria-label={t("mediaViewing.video.volumeControls")}
             collisionAvoidance={{ side: "none", align: "shift" }}
             side="top"
             align="center"
@@ -243,7 +252,7 @@ export function VideoControls({
               <input
                 type="range"
                 tabIndex={0}
-                aria-label="Video volume"
+                aria-label={t("mediaViewing.video.volume")}
                 aria-orientation="vertical"
                 min={0}
                 max={1}
@@ -262,7 +271,11 @@ export function VideoControls({
             </div>
             <IconButton
               size="sm"
-              aria-label={muted || volume === 0 ? "Unmute video" : "Mute video"}
+              aria-label={t(
+                muted || volume === 0
+                  ? "mediaViewing.video.unmute"
+                  : "mediaViewing.video.mute",
+              )}
               onClick={(event) => {
                 const video = videoRef.current;
                 if (!video) return;
@@ -302,7 +315,11 @@ export function VideoControls({
           <input
             type="range"
             tabIndex={0}
-            aria-label={inline ? "Video progress" : "Video timeline"}
+            aria-label={t(
+              inline
+                ? "mediaViewing.video.progress"
+                : "mediaViewing.video.timeline",
+            )}
             aria-valuetext={`${videoTime(time)} / ${videoTime(duration)}`}
             min={0}
             max={duration || 1}
@@ -340,7 +357,10 @@ export function VideoControls({
                   <IconButton
                     size="sm"
                     variant="avatar"
-                    aria-label={`Seek to ${marker.label}, ${marker.author}`}
+                    aria-label={t("mediaViewing.video.marker", {
+                      label: marker.label,
+                      author: marker.author,
+                    })}
                     title={`${marker.label} · ${marker.author}: ${marker.text}`}
                     onClick={() => {
                       seek(marker.seconds);
@@ -370,7 +390,7 @@ export function VideoControls({
                   {rate}x
                 </Button>
               }
-              aria-label={`Playback speed: ${rate}x`}
+              aria-label={t("mediaViewing.video.speed", { rate: String(rate) })}
             >
               {rate}x
             </MenuTrigger>

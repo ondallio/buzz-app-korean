@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
-import { act, cleanup, renderHook } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import {
+  act,
+  cleanup,
+  render,
+  renderHook,
+  screen,
+} from "@testing-library/react";
+import { setLanguage } from "../../shared/i18n";
 import { createNavigationController } from "../../features/navigation/controller";
 import { createMemoryHistory } from "../../features/navigation/history";
 import { afterEach, expect, it, vi } from "vitest";
@@ -9,7 +17,11 @@ import type { Panels } from "../../features/panels/service";
 import type { PageNavigation } from "../../features/navigation/service";
 import { ChannelsPage, mediaReviewForDestination } from "./ChannelsPage";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 // Run the page's hooks in React, then inspect its returned workspace element.
 // Browser journeys exercise the workspace subtree and navigation interactions.
 // Inspect the actual element returned at the workspace boundary, not a parallel
@@ -322,4 +334,72 @@ it("animates Connecting only while a connection is actually under way", async ()
   } finally {
     vi.useRealTimers();
   }
+});
+
+it.each(["sign-in", "no-access"] as const)(
+  "projects the canonical %s refusal only in the page display",
+  (refusal) => {
+    const retry = vi.fn();
+    const snapshot = {
+      status: "error",
+      denied: true,
+      refusal,
+      scope: "public-fixture",
+      generation: 0,
+    } as RelaySnapshot;
+    render(
+      <ChannelsPage
+        relay={{ snapshot: () => snapshot, retry } as unknown as RelayData}
+        panels={{} as Panels}
+        navigator={createNavigationController(createMemoryHistory()).navigation}
+      />,
+    );
+    const english =
+      refusal === "sign-in"
+        ? "Sign in to open this community"
+        : "You don’t have access to this community";
+    const heading = screen.getByRole("heading", { name: english });
+    act(() => setLanguage("ko"));
+    expect(
+      screen.getByRole("heading", {
+        name:
+          refusal === "sign-in"
+            ? "로그인하여 커뮤니티 열기"
+            : "이 커뮤니티에 접근할 수 없습니다",
+      }),
+    ).toBe(heading);
+    expect(snapshot.refusal).toBe(refusal);
+    expect(retry).not.toHaveBeenCalled();
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("heading", { name: english })).toBe(heading);
+  },
+);
+
+it("keeps the same failed-connection recovery action through language changes", () => {
+  const retry = vi.fn();
+  const snapshot = {
+    status: "error",
+    scope: "public-fixture",
+    generation: 0,
+  } as RelaySnapshot;
+  render(
+    <ChannelsPage
+      relay={{ snapshot: () => snapshot, retry } as unknown as RelayData}
+      panels={{} as Panels}
+      navigator={createNavigationController(createMemoryHistory()).navigation}
+    />,
+  );
+  const action = screen.getByRole("button", { name: "Try again" });
+  action.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "다시 시도" })).toBe(action);
+  expect(action).toHaveFocus();
+  expect(
+    screen.getByText("연결 상태를 확인한 뒤 다시 시도해 주세요."),
+  ).toBeVisible();
+  expect(retry).not.toHaveBeenCalled();
+  action.click();
+  expect(retry).toHaveBeenCalledOnce();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Try again" })).toBe(action);
 });

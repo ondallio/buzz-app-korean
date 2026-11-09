@@ -47,3 +47,22 @@ steps:
     });
   });
 });
+
+it("projects only a whole semantic description while retaining icon, raw emoji and step identity", () => {
+  const yaml =
+    'trigger: {on: reaction_added, emoji: "custom:raw"}\nsteps: [{id: "raw-step", action: send_dm}, {action: delay}]';
+  const canonical = workflowCardPresentation(yaml);
+  const received: unknown[] = [];
+  const projected = workflowCardPresentation(yaml, (input) => {
+    received.push(input);
+    return "전체 문장";
+  });
+  expect(projected).toEqual({ ...canonical, description: "전체 문장" });
+  expect(received).toEqual([
+    { trigger: "reaction", actions: ["message", "delay"], malformed: false },
+  ]);
+  expect(workflowCardPresentation("trigger: [", () => "잘못된 구성")).toEqual({
+    ...workflowCardPresentation("trigger: ["),
+    description: "잘못된 구성",
+  });
+});

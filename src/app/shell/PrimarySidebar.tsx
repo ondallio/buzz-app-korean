@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { soloNavigationFor } from "../../features/channel-navigation/solo-navigation";
 import {
   useEffect,
@@ -99,6 +100,7 @@ function ScopedSidebar({
   scope: string;
   connection: ReturnType<typeof useRelayConnection>;
 }) {
+  useLanguage();
   const attempt = useSyncExternalStore(
     props.navigator.subscribe,
     () => props.navigator.snapshot().attempt.id,
@@ -139,12 +141,18 @@ function ScopedSidebar({
   );
   const soloNavigation = soloNavigationFor(connection.session);
   // Select the title, not the snapshot: Solo regions are rebuilt on every message.
-  const soloTitle = useSyncExternalStore(
+  const contributedSoloTitle = useSyncExternalStore(
     soloNavigation?.subscribe ?? noSubscription,
     () =>
-      soloNavigation?.snapshot().regions.find((region) => region.source)
-        ?.title ?? "Solo",
+      soloNavigation?.snapshot().regions.find((region) => region.source)?.title,
   );
+  const soloTitle = contributedSoloTitle ?? "Solo";
+  const soloLabel = contributedSoloTitle ?? t("shell.sidebar.solo");
+  const filterLabels = {
+    all: t("shell.sidebar.all"),
+    solo: soloLabel,
+    team: t("shell.sidebar.team"),
+  };
   const target = props.target;
   const local =
     "scope" in target &&
@@ -222,19 +230,14 @@ function ScopedSidebar({
             />
           ) : (
             <Tabs
-              label="Navigation scope"
+              label={t("shell.sidebar.scope")}
               variant="segmented"
               size="sm"
               value={filter}
-              items={
-                soloTitle === "Solo"
-                  ? filters
-                  : [
-                      filters[0],
-                      filters[2],
-                      { ...filters[1], label: soloTitle },
-                    ]
-              }
+              items={(soloTitle === "Solo"
+                ? filters
+                : [filters[0], filters[2], filters[1]]
+              ).map((item) => ({ ...item, label: filterLabels[item.value] }))}
               onValueChange={setFilter}
             />
           )}
@@ -278,7 +281,7 @@ function ScopedSidebar({
           }) => (
             <ResizableSidebar scope={scope} className="shell-sidebar">
               <SidebarFrame
-                label="Sidebar"
+                label={t("shell.sidebar.label")}
                 header={header}
                 panelId={panelId}
                 {...frame}
@@ -300,7 +303,7 @@ function ScopedSidebar({
                 {before}
                 <SidebarUnread listRef={sidebar.list} dmPreviews={dmPreviews}>
                   <section
-                    aria-label={soloTitle}
+                    aria-label={soloLabel}
                     className={styles.sidebarGroup}
                     hidden={filter === "team"}
                   >
@@ -326,7 +329,7 @@ function ScopedSidebar({
                             filter === "all"
                               ? {
                                   sectionKey: "scope:solo",
-                                  title: soloTitle,
+                                  title: soloLabel,
                                   open:
                                     !sidebar.collapsed.includes("scope:solo"),
                                   onToggle: (open) =>
@@ -353,7 +356,7 @@ function ScopedSidebar({
                       <InventoryGroup
                         sidebar={sidebar}
                         sectionKey="scope:team"
-                        title="Team"
+                        title={t("shell.sidebar.team")}
                         ownsCurrent={destination === "team"}
                         location={sidebarLocation}
                       >
@@ -373,7 +376,7 @@ function ScopedSidebar({
       ) : (
         <div className="shell-sidebar-default">
           <SidebarFrame
-            label="Sidebar"
+            label={t("shell.sidebar.label")}
             header={header}
             panelId={panelId}
             launchPending={
@@ -399,10 +402,10 @@ function ScopedSidebar({
                 <div className={styles.connectionStatus}>
                   <p>
                     {connection.status === "connecting" || connection.retrying
-                      ? "Connecting…"
+                      ? t("shell.sidebar.connecting")
                       : connection.status === "error"
-                        ? "Couldn’t load channels."
-                        : "Choose a community to see channels."}
+                        ? t("shell.sidebar.loadFailed")
+                        : t("shell.sidebar.chooseCommunity")}
                   </p>
                   {connection.status === "error" && !connection.retrying && (
                     <>
@@ -416,7 +419,9 @@ function ScopedSidebar({
                         relay={connection.origin}
                         memberships={props.memberships}
                       />
-                      <Button onClick={props.relay.retry}>Try again</Button>
+                      <Button onClick={props.relay.retry}>
+                        {t("shell.sidebar.retry")}
+                      </Button>
                     </>
                   )}
                 </div>

@@ -9,6 +9,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { setLanguage } from "../../shared/i18n";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
 import { localAgentsFixture } from "../../features/agents/local-testing";
@@ -66,6 +67,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.useRealTimers();
   Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
 });
@@ -4663,5 +4665,137 @@ it("asks again for a member's name after the cache evicted it, but not for a kno
     ).toHaveLength(1);
   } finally {
     h.dispose();
+  }
+});
+
+it("keeps the same mention popup, pending raw query and focus across language changes", async () => {
+  const fixture = setup();
+  const name = "Raw {name} 한글";
+  fixture.profiles.set(fixture.member, { name });
+  let release: () => void = () => {
+    throw new Error("Missing directory gate");
+  };
+  const people = vi.mocked(fixture.session.directMessages.people);
+  people.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        release = () => resolve({ people: [], hasMore: false });
+      }),
+  );
+  const select = vi.fn(() => true);
+  render(
+    <MentionPicker
+      session={fixture.session}
+      scope="test"
+      channelId="parent"
+      disabled={false}
+      select={select}
+    />,
+  );
+  const user = userEvent.setup();
+  const trigger = screen.getByRole("button", { name: "Mention a member" });
+  await user.click(trigger);
+  const popup = screen.getByLabelText("Mention a member or agent");
+  const input = screen.getByRole("searchbox", {
+    name: "Search community people and agents",
+  });
+  const row = screen.getByRole("button", { name: rowName(name) });
+  if (!(input instanceof HTMLInputElement))
+    throw new Error("Missing search input");
+  await user.type(input, "Raw");
+  await waitFor(() => expect(people).toHaveBeenCalledTimes(1));
+  await screen.findByText("Searching community…");
+  const clear = screen.getByRole("button", {
+    name: "Clear search community people and agents",
+  });
+  input.setSelectionRange(1, 2);
+  try {
+    act(() => setLanguage("ko"));
+    expect(screen.getByLabelText("멤버 또는 에이전트 멘션하기")).toBe(popup);
+    expect(
+      screen.getByRole("searchbox", {
+        name: "커뮤니티의 사람과 에이전트 검색",
+      }),
+    ).toBe(input);
+    expect(input).toHaveValue("Raw");
+    expect(input).toHaveFocus();
+    expect(input.selectionStart).toBe(1);
+    expect(input.selectionEnd).toBe(2);
+    expect(
+      screen.getByRole("button", {
+        name: "커뮤니티의 사람과 에이전트 검색어 지우기",
+      }),
+    ).toBe(clear);
+    expect(screen.getByRole("button", { name: rowName(name) })).toBe(row);
+    expect(screen.getByText("커뮤니티를 검색하는 중…")).toBeVisible();
+    expect(people).toHaveBeenCalledTimes(1);
+    expect(select).not.toHaveBeenCalled();
+    act(() => setLanguage("en"));
+    expect(screen.getByLabelText("Mention a member or agent")).toBe(popup);
+    expect(input).toHaveFocus();
+    expect(input.selectionStart).toBe(1);
+    expect(input.selectionEnd).toBe(2);
+    await act(async () => release());
+    await user.click(clear);
+    expect(input).toHaveValue("");
+    expect(input).toHaveFocus();
+    act(() => setLanguage("ko"));
+    await user.click(screen.getByRole("button", { name: rowName(name) }));
+    expect(select).toHaveBeenCalledExactlyOnceWith({
+      pubkey: fixture.member,
+      name,
+    });
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "멤버 멘션하기" })).toBe(trigger);
+  } finally {
+    await act(async () => release());
+    fixture.library.dispose();
+  }
+});
+
+it("retains the picker-owned name failure in the current language without repeating profile reads", async () => {
+  const h = setup();
+  let fail: (reason: Error) => void = () => {
+    throw new Error("Missing profile gate");
+  };
+  const ensure = vi.spyOn(h.session.profiles, "ensure").mockImplementation(
+    () =>
+      new Promise((_, reject) => {
+        fail = reject;
+      }),
+  );
+  const view = render(
+    <MentionPicker
+      session={h.session}
+      scope="test"
+      channelId="parent"
+      disabled={false}
+      select={() => true}
+    />,
+  );
+  const user = userEvent.setup();
+  try {
+    await user.click(screen.getByRole("button", { name: "Mention a member" }));
+    const input = screen.getByRole("searchbox");
+    await waitFor(() => expect(input).toHaveFocus());
+    expect(ensure).toHaveBeenCalledTimes(1);
+    act(() => setLanguage("ko"));
+    await act(async () => fail(new Error("Provider raw {diagnostic}")));
+    const text =
+      "이름을 불러올 수 없습니다. 정확한 공개 키로 받는 사람을 확인할 수 있습니다.";
+    const status = await screen.findByText(text);
+    expect(input).toHaveFocus();
+    expect(ensure).toHaveBeenCalledTimes(1);
+    act(() => setLanguage("en"));
+    expect(
+      screen.getByText(
+        "Names unavailable. Exact public keys still identify recipients.",
+      ),
+    ).toBe(status);
+    expect(input).toHaveFocus();
+    expect(ensure).toHaveBeenCalledTimes(1);
+  } finally {
+    view.unmount();
+    h.library.dispose();
   }
 });

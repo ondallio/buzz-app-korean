@@ -1,3 +1,6 @@
+import { t, useLanguage } from "../shared/i18n";
+import { en as notificationEnglish } from "../shared/i18n/catalogs/notifications";
+import { notificationCategoryLabel } from "../features/notifications/content";
 import { SettingsGroup } from "../shared/design-system/ui/SettingsGroup";
 import { Header, InlineHeader } from "../shared/design-system/ui/Header";
 import { ToastNotice } from "../shared/design-system/ui/Toast";
@@ -38,6 +41,10 @@ function AlertSoundRow({
   onChange: (next: SoundName) => void;
 }) {
   const recommended = RECOMMENDED_SOUND_BY_CATEGORY[category];
+  const label =
+    category === "mention"
+      ? t("notifications.sound.mention")
+      : notificationCategoryLabel(category, CATEGORY_SOUND_LABELS[category]);
 
   const names = [
     "silent",
@@ -46,15 +53,17 @@ function AlertSoundRow({
   ];
   return (
     <PreferenceRow
-      title={CATEGORY_SOUND_LABELS[category]}
+      title={label}
       disabled={disabled}
       trailing={
         <Select
-          label={CATEGORY_SOUND_LABELS[category]}
+          label={label}
           variant="compact"
           disabled={disabled}
           value={value}
-          valueLabel={value === "silent" ? "Silent" : value}
+          valueLabel={
+            value === "silent" ? t("notifications.settings.silent") : value
+          }
           groups={[
             {
               label: "",
@@ -62,9 +71,9 @@ function AlertSoundRow({
                 value: name,
                 label:
                   name === "silent"
-                    ? "Silent"
+                    ? t("notifications.settings.silent")
                     : name === recommended
-                      ? `${name} rec.`
+                      ? t("notifications.settings.recommended", { sound: name })
                       : name,
               })),
             },
@@ -83,6 +92,7 @@ export function NotificationSettings({
   notifications: NotificationsService;
   active?: boolean;
 }) {
+  useLanguage();
   const state = useSyncExternalStore(
     notifications.subscribe,
     notifications.snapshot,
@@ -152,34 +162,45 @@ export function NotificationSettings({
       stopPreview();
   }, [active, preferences, stopPreview]);
   const desktopAlertsEnabled = !state.developmentPaused && preferences.enabled;
+  const preferenceError =
+    state.preferencesError ===
+    notificationEnglish["notifications.error.restoreDetails"]
+      ? t("notifications.error.restoreDetails")
+      : state.preferencesError ===
+          notificationEnglish["notifications.error.saveDetails"]
+        ? t("notifications.error.saveDetails")
+        : state.preferencesError;
   const permissionStatus = state.developmentPaused
-    ? "Notifications are paused by your local development setting. Remove BUZZ_DEV_NOTIFICATIONS=0 from .env.local and restart the dev server to resume normal behavior. Your saved alert choices are unchanged."
+    ? t("notifications.permission.development")
     : state.requesting
-      ? "Waiting for system permission…"
+      ? t("notifications.permission.waiting")
       : permission === "denied"
-        ? "Notifications are off. Turn them on in your browser or system settings."
+        ? t("notifications.permission.denied")
         : permission === "unsupported"
-          ? "This build can’t show system notifications."
+          ? t("notifications.permission.unsupported")
           : permission === "default"
-            ? "Allow notifications to receive alerts."
+            ? t("notifications.permission.default")
             : null;
   return (
     <section
       className={styles.root}
       aria-labelledby="notification-settings-title"
     >
-      <Header id="notification-settings-title" title="Notifications" />
+      <Header
+        id="notification-settings-title"
+        title={t("notifications.settings.title")}
+      />
       <div className="grid grid-cols-1 gap-section-gap">
         <section aria-labelledby="notification-categories-title">
           <InlineHeader
             id="notification-categories-title"
-            title="Notify me about"
+            title={t("notifications.settings.about")}
           />
           <SettingsGroup>
             {state.categories.map(({ key, label }) => (
               <SwitchPreferenceRow
                 key={key}
-                label={label}
+                label={notificationCategoryLabel(key, label)}
                 checked={preferences.categories[key] !== false}
                 onCheckedChange={(enabled) =>
                   notifications.updatePreferences({
@@ -190,11 +211,14 @@ export function NotificationSettings({
             ))}
           </SettingsGroup>
         </section>
-        <section id="setting-delivery" aria-label="Desktop delivery">
-          <InlineHeader title="Delivery" />
+        <section
+          id="setting-delivery"
+          aria-label={t("notifications.settings.deliveryRegion")}
+        >
+          <InlineHeader title={t("notifications.settings.delivery")} />
           <SettingsGroup>
             <SwitchPreferenceRow
-              label="Desktop alerts"
+              label={t("notifications.settings.alerts")}
               checked={desktopAlertsEnabled}
               disabled={state.developmentPaused}
               onCheckedChange={(enabled) =>
@@ -229,7 +253,7 @@ export function NotificationSettings({
                           disabled={state.requesting}
                           onClick={() => void notifications.requestPermission()}
                         >
-                          Allow notifications
+                          {t("notifications.permission.allow")}
                         </Button>
                       )}
                       <Button
@@ -240,7 +264,7 @@ export function NotificationSettings({
                         loading={checking}
                         onClick={checkPermission}
                       >
-                        Check permission
+                        {t("notifications.permission.check")}
                       </Button>
                     </div>
                   )}
@@ -250,8 +274,8 @@ export function NotificationSettings({
               <div className={styles.nestedPreferences}>
                 <SwitchPreferenceRow
                   id="setting-viewing"
-                  label="Notify while viewing"
-                  description="Include direct messages in the conversation you’re viewing."
+                  label={t("notifications.settings.viewing")}
+                  description={t("notifications.settings.viewingDescription")}
                   checked={preferences.notifyWhileViewing}
                   onCheckedChange={(notifyWhileViewing) =>
                     notifications.updatePreferences({ notifyWhileViewing })
@@ -259,8 +283,8 @@ export function NotificationSettings({
                 />
                 <SwitchPreferenceRow
                   id="setting-sound"
-                  label="Sound"
-                  description="Choose a sound to preview it."
+                  label={t("notifications.settings.sound")}
+                  description={t("notifications.settings.soundDescription")}
                   checked={preferences.sound}
                   onCheckedChange={(sound) =>
                     notifications.updatePreferences({ sound })
@@ -298,28 +322,28 @@ export function NotificationSettings({
         />
         {active && state.preferencesError && (
           <ToastNotice
-            title="Notification choices weren’t saved"
-            description={state.preferencesError}
+            title={t("notifications.error.preferences")}
+            description={preferenceError ?? state.preferencesError}
           >
             <Button
               type="button"
               size="sm"
               onClick={() => notifications.updatePreferences({})}
             >
-              Retry saving choices
+              {t("notifications.error.retry")}
             </Button>{" "}
             <Button
               type="button"
               size="sm"
               onClick={() => notifications.reloadPreferences()}
             >
-              Reload saved choices
+              {t("notifications.error.reload")}
             </Button>
           </ToastNotice>
         )}
         {active && state.error && (
           <ToastNotice
-            title="Buzz couldn’t send the notification"
+            title={t("notifications.error.send")}
             description={state.error}
           />
         )}

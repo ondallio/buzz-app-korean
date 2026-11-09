@@ -1,3 +1,4 @@
+import { t, useLanguage, formattingLocale } from "../shared/i18n";
 import { useCallback, useEffect, useState } from "react";
 import { Header, InlineHeader } from "../shared/design-system/ui/Header";
 import { SettingsGroup } from "../shared/design-system/ui/SettingsGroup";
@@ -14,7 +15,7 @@ import {
 } from "../features/credential-pairing/service";
 
 const date = (seconds: number) =>
-  new Date(seconds * 1000).toLocaleDateString(undefined, {
+  new Date(seconds * 1000).toLocaleDateString(formattingLocale(), {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -27,6 +28,7 @@ export function SecuritySettings({
   /** Available only when the host has a native identity. */
   viewer?: string | undefined;
 }) {
+  useLanguage();
   const [tools, setTools] = useState<PairedTool[] | null>(null);
   const [error, setError] = useState("");
   const [revoking, setRevoking] = useState<string | null>(null);
@@ -59,10 +61,10 @@ export function SecuritySettings({
     <section aria-labelledby="security-settings-title">
       <Header
         id="security-settings-title"
-        title="Security"
-        subtitle="Tools paired on this device, and applications you authorize to act as you."
+        title={t("settings.security")}
+        subtitle={t("settings.securityDescription")}
       />
-      <InlineHeader id="paired-tools-title" title="Paired command-line tools" />
+      <InlineHeader id="paired-tools-title" title={t("settings.pairedTools")} />
       {error && (
         <p role="alert" className="text-body-sm text-danger">
           {error}
@@ -71,8 +73,8 @@ export function SecuritySettings({
       {tools?.length === 0 ? (
         <EmptyState
           icon={<LockIcon />}
-          title="No paired tools"
-          description="Run buzz auth desktop pair in a terminal to let a command-line tool use Buzz as you."
+          title={t("settings.noPairedTools")}
+          description={t("settings.pairInstructions")}
         />
       ) : (
         tools && (
@@ -81,14 +83,19 @@ export function SecuritySettings({
               <PreferenceRow
                 key={tool.id}
                 title={tool.client}
-                subtitle={`${tool.relay} · Paired ${date(tool.created)} · Last used ${date(tool.lastUsed)} · Expires ${date(tool.expires)} unless used`}
+                subtitle={t("settings.pairedDetails", {
+                  relay: tool.relay,
+                  paired: date(tool.created),
+                  used: date(tool.lastUsed),
+                  expires: date(tool.expires),
+                })}
                 trailing={
                   <Button
                     loading={revoking === tool.id}
                     disabled={revoking !== null}
                     onClick={() => void revoke(tool.id)}
                   >
-                    Revoke
+                    {t("settings.revoke")}
                   </Button>
                 }
               />

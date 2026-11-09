@@ -1,3 +1,8 @@
+import { useLanguage } from "../../shared/i18n";
+import {
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { FadingLabel } from "./FadingLabel";
 import { prepareSoloMove } from "../../features/channel-navigation/solo-navigation";
 import { useChatConversions } from "../../features/solo/conversion";
@@ -166,7 +171,11 @@ export function SoloWorkspaces({
     setRenaming(undefined);
   const [deleting, setDeleting] = useState<string>();
   const [projectError, setProjectError] = useState("");
-  const [readError, setReadError] = useState<{ id: string; message: string }>();
+  useLanguage();
+  const [readError, setReadError] = useState<{
+    id: string;
+    message: DisplayMessage;
+  }>();
   const [animate, setAnimate] = useState(false);
   const [rowFocus, setRowFocus] = useState<string>();
   useLayoutEffect(() => {
@@ -439,7 +448,7 @@ export function SoloWorkspaces({
       )}
       {readError && (
         <p role="alert" className={styles.listMessage}>
-          {readError.message}
+          {resolveMessage(readError.message)}
         </p>
       )}
       <ChannelSidebarDnd
@@ -791,7 +800,7 @@ type ChatEntryActions = {
   settings(id: string): void;
   rename(id: string): boolean;
   lifecycle(channel: ChannelSummary, action: ChannelLifecycleAction): void;
-  readResult(id: string, error?: string): void;
+  readResult(id: string, error?: DisplayMessage): void;
 };
 
 /** One listed chat. The roster changes often; a row renders again only when

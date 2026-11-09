@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { channelHasUnread } from "../../bundled/channels/useSidebarFilters";
 import { inTerminal } from "../../bundled/channels/conversation-rows";
@@ -26,6 +27,7 @@ export function MarkAllReadShortcut({
   communities: Communities;
   shortcuts: SearchServices["shortcuts"];
 }) {
+  useLanguage();
   const client = useSyncExternalStore(
     communities.subscribe,
     communities.snapshot,
@@ -74,15 +76,15 @@ export function MarkAllReadShortcut({
   const close = () => setAsking(undefined);
   return (
     <AlertDialog
-      title="Mark everything as read?"
-      description={`Every conversation in ${asking.name} will show as read. You can still mark a conversation unread afterward.`}
+      title={t("search.markAllTitle")}
+      description={t("search.markAllDescription", { name: asking.name })}
       pending={pending}
       initialFocus={proceed}
       onClose={close}
       actions={
         <>
           <Button disabled={pending} onClick={close}>
-            Cancel
+            {t("identity.cancel")}
           </Button>
           <Button
             ref={proceed}
@@ -96,7 +98,7 @@ export function MarkAllReadShortcut({
               });
             }}
           >
-            Mark all as read
+            {t("search.markAll")}
           </Button>
         </>
       }

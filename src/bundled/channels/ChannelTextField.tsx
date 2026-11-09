@@ -1,3 +1,6 @@
+import type { detailsDraftErrors } from "../../features/relay/channel-details-protocol";
+import { en as formEnglish } from "../../shared/i18n/catalogs/channel-forms";
+import { t, useLanguage, formattingLocale } from "../../shared/i18n";
 import { useId, type Ref } from "react";
 import { Field } from "../../shared/design-system/ui/Field";
 import { Input } from "../../shared/design-system/ui/Input";
@@ -16,13 +19,14 @@ type Props = {
 
 /** Shared presentation/input policy, not draft or persistence ownership. */
 export function ChannelTextField(props: Props) {
+  useLanguage();
   const countId = useId();
   const isName = props.field === "name";
   const limit = isName ? 120 : 1000;
   const count = [...props.value].length;
   const showCount = count >= limit * 0.9 && !props.error;
-  const countLabel = count.toLocaleString("en-US");
-  const limitLabel = limit.toLocaleString("en-US");
+  const countLabel = count.toLocaleString(formattingLocale());
+  const limitLabel = limit.toLocaleString(formattingLocale());
   const control = {
     value: props.value,
     disabled: props.disabled,
@@ -35,7 +39,11 @@ export function ChannelTextField(props: Props) {
     <Field
       label={
         <span className={styles.label}>
-          <span>{isName ? "Name" : "Description"}</span>
+          <span>
+            {isName
+              ? t("channelForms.field.name")
+              : t("channelForms.field.description")}
+          </span>
           {showCount && (
             <span
               aria-hidden="true"
@@ -57,19 +65,19 @@ export function ChannelTextField(props: Props) {
           autoComplete={props.creation ? "off" : undefined}
           autoCapitalize="none"
           spellCheck={false}
-          placeholder="release-notes"
+          placeholder={t("channelForms.field.namePlaceholder")}
         />
       ) : (
         <Textarea
           {...control}
           ref={props.inputRef}
           rows={3}
-          placeholder="What this channel is for"
+          placeholder={t("channelForms.field.descriptionPlaceholder")}
         />
       )}
       {showCount && (
         <span id={countId} className="sr-only">
-          {countLabel} of {limitLabel} characters
+          {t("channelForms.field.characters", { count, limit })}
         </span>
       )}
     </Field>
@@ -95,4 +103,26 @@ function boundedInput(
   input.value = value;
   input.setSelectionRange(prefix.length, prefix.length);
   return value;
+}
+
+/** Display projection only for the local detailsDraftErrors producer; never pass API diagnostics. */
+export function localizedDetailsErrors(
+  errors: ReturnType<typeof detailsDraftErrors>,
+) {
+  const known = [
+    "channelForms.validation.name",
+    "channelForms.validation.description",
+    "channelForms.validation.huddle",
+    "channelForms.validation.duration",
+  ] as const;
+  const display = (message: string | undefined) => {
+    const key = known.find((key) => formEnglish[key] === message);
+    return key ? t(key) : message;
+  };
+  return {
+    ...errors,
+    name: display(errors.name),
+    description: display(errors.description),
+    lifetime: display(errors.lifetime),
+  };
 }

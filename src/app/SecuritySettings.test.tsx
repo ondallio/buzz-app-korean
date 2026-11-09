@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../shared/i18n";
 import { SecuritySettings } from "./SecuritySettings";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), isTauri: vi.fn() }));
@@ -21,7 +22,10 @@ const tool = {
 beforeEach(() => {
   vi.mocked(listen).mockResolvedValue(() => {});
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 
 it("lists paired tools and revokes one", async () => {
   vi.mocked(invoke).mockImplementation(async (command) =>
@@ -65,4 +69,29 @@ it("shows an empty state, and a read failure", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "could not be read",
   );
+});
+
+it("updates paired dates and labels without reloading tools or changing native revoke IDs", async () => {
+  setLanguage("en");
+  vi.mocked(invoke).mockClear();
+  vi.mocked(invoke).mockImplementation(async (command) =>
+    command === "credential_pairings_list" ? [tool] : undefined,
+  );
+  render(<SecuritySettings />);
+  const revoke = await screen.findByRole("button", { name: "Revoke" });
+  revoke.focus();
+  const calls = vi.mocked(invoke).mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "접근 취소" })).toBe(revoke);
+  expect(revoke).toHaveFocus();
+  expect(
+    screen.getByText(/wss:\/\/relay\.example\/ · 연결일/),
+  ).toHaveTextContent(/\d{4}년/);
+  expect(invoke).toHaveBeenCalledTimes(calls);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Revoke" })).toBe(revoke);
+  await userEvent.click(revoke);
+  expect(invoke).toHaveBeenLastCalledWith("credential_pairing_revoke", {
+    id: "p1",
+  });
 });

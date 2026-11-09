@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { setLanguage } from "../../shared/i18n";
 import "@testing-library/jest-dom/vitest";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -20,6 +21,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  setLanguage("en");
+  localStorage.clear();
   vi.unstubAllGlobals();
 });
 function fixture() {
@@ -222,4 +225,52 @@ it("does not steal external focus when a previously focused preview releases", a
   screen.getByRole("button", { name: "Elsewhere" }).focus();
   await act(async () => h.finish());
   expect(screen.getByRole("button", { name: "Elsewhere" })).toHaveFocus();
+});
+
+it("retains raw queued text/IDs and focused pending controls while changing language", async () => {
+  setLanguage("en");
+  const h = fixture();
+  const publish = h.add("Attachment");
+  let compacting = true;
+  const listeners = new Set<() => void>();
+  const types: readonly never[] = [];
+  const agents = {
+    types: () => types,
+    find: (pubkey: string) => ({ key: pubkey }),
+    sessionState: () => (compacting ? "compacting" : "idle"),
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  } as unknown as Agents;
+  h.mount(agents);
+  const snapshot = h.queue.snapshot();
+  const send = screen.getByRole("button", { name: "Send" });
+  const remove = screen.getByRole("button", { name: "Remove queued message" });
+  send.focus();
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("region", { name: "대기 중인 후속 메시지" }),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: "전송" })).toBe(send);
+  expect(send).toHaveFocus();
+  expect(send).toHaveAttribute("aria-disabled", "true");
+  expect(screen.getByRole("button", { name: "대기 메시지 제거" })).toBe(remove);
+  expect(screen.getByRole("button", { name: "Attachment" })).toHaveTextContent(
+    "Attachment",
+  );
+  expect(h.queue.snapshot()).toBe(snapshot);
+  await userEvent.setup().keyboard("{Enter}");
+  expect(publish).not.toHaveBeenCalled();
+  act(() => {
+    compacting = false;
+    for (const listener of listeners) listener();
+  });
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Send" })).toBe(send);
+  expect(send).toHaveFocus();
+  await userEvent.setup().keyboard("{Enter}");
+  expect(publish).toHaveBeenCalledOnce();
 });

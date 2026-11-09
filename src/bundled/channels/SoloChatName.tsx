@@ -1,3 +1,6 @@
+import { t, useLanguage } from "../../shared/i18n";
+import { en as pageEnglish } from "../../shared/i18n/catalogs/channel-pages";
+import { en as formEnglish } from "../../shared/i18n/catalogs/channel-forms";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import type { RelaySession } from "../../features/relay/session";
 import { useLifetime } from "../../features/solo/Lifetime";
@@ -20,7 +23,14 @@ export function SoloChatName({
   title: string;
   close(focus: boolean): void;
 }) {
+  useLanguage();
   const name = useLifetime({ session, id, enabled: true });
+  const invalid =
+    name.invalid === pageEnglish["channelPages.solo.invalidName"]
+      ? t("channelPages.solo.invalidName")
+      : name.invalid === formEnglish["channelForms.validation.duration"]
+        ? t("channelForms.validation.duration")
+        : name.invalid;
   const input = useRef<HTMLInputElement>(null);
   const form = useRef<HTMLFormElement>(null);
   const active = useRef(true);
@@ -76,7 +86,7 @@ export function SoloChatName({
     <form
       ref={form}
       className={styles.nameEditor}
-      aria-label={`Rename ${title}`}
+      aria-label={t("channelPages.solo.rename", { name: title })}
       aria-busy={(!name.base && !name.error) || name.busy}
       onSubmit={(event) => {
         event.preventDefault();
@@ -111,15 +121,15 @@ export function SoloChatName({
         </span>
         <div className={styles.nameEditorField}>
           <Field
-            label="Chat name"
+            label={t("channelPages.solo.name")}
             labelVisibility="hidden"
             error={
-              name.invalid ||
+              invalid ||
               name.error ||
               (name.base && !name.eligible
-                ? "This chat can’t be renamed."
+                ? t("channelPages.solo.cannotRename")
                 : name.unrelatedAttempt
-                  ? "Finish the pending change in Chat settings first."
+                  ? t("channelPages.solo.finishPending")
                   : undefined)
             }
           >
@@ -139,7 +149,7 @@ export function SoloChatName({
           {!name.busy &&
             (name.checkOnly ? (
               <Button type="submit" size="sm">
-                Check save status
+                {t("channelPages.solo.check")}
               </Button>
             ) : (
               name.error && (
@@ -151,14 +161,14 @@ export function SoloChatName({
                     void name.run("reload").catch(() => {});
                   }}
                 >
-                  Reload chat details
+                  {t("channelPages.solo.reload")}
                 </Button>
               )
             ))}
         </div>
         <IconButton
           type="button"
-          aria-label="Cancel rename"
+          aria-label={t("channelPages.solo.cancel")}
           icon={<XIcon size={16} />}
           disabled={name.busy}
           onClick={() => finish(true)}

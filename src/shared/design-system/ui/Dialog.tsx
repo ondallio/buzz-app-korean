@@ -11,6 +11,7 @@ import { useModalWindowDrag } from "./ModalWindowDrag";
 import { IconButton } from "./IconButton";
 import { ScrollEdgeMaterial } from "./ScrollEdgeMaterial";
 import { useFinalFocusUnlessMoved } from "./finalFocus";
+import { useDialogCloseLabel } from "./DialogLabels";
 
 type PopupProps = ComponentProps<typeof BaseDialog.Popup>;
 export type DialogProps = {
@@ -86,7 +87,7 @@ export function Dialog({
   onEscape,
   placement = "center",
   dismissOnOutsideClick = true,
-  closeLabel = "Close",
+  closeLabel,
   size = "default",
   visit = false,
   preventClose = false,
@@ -96,6 +97,7 @@ export function Dialog({
   initialFocus,
   finalFocus,
 }: DialogProps) {
+  const closeName = useDialogCloseLabel(closeLabel);
   const [instantClose, setInstantClose] = useState(false);
   const windowDrag = useModalWindowDrag();
   const detail = useRef<HTMLDivElement>(null);
@@ -152,7 +154,7 @@ export function Dialog({
               disabled={preventClose}
               render={
                 <IconButton
-                  aria-label={closeLabel}
+                  aria-label={closeName}
                   variant="subtle"
                   disabled={preventClose}
                   size="compact"

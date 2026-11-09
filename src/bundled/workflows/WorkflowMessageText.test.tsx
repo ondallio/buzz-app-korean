@@ -1,7 +1,14 @@
+import { setLanguage } from "../../shared/i18n/language";
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { useState } from "react";
-import { cleanup, render, renderHook, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  renderHook,
+  screen,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { WorkflowForm, type WorkflowSelection } from "./WorkflowForm";
@@ -24,7 +31,10 @@ vi.stubGlobal(
     disconnect() {}
   },
 );
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 
 const members: WorkflowMentionMember[] = [
   { pubkey: "a".repeat(64), name: "Alice Smith", label: "Alice Smith" },
@@ -146,4 +156,35 @@ it("reserves profile room for the channel's roster while mounted", () => {
   expect(ensure.mock.calls.flatMap(([batch]) => batch)).toEqual(ids);
   view.unmount();
   expect(release).toHaveBeenCalledOnce();
+});
+
+it("keeps the open mention popup, raw names, caret and selected member across languages", async () => {
+  const user = userEvent.setup();
+  render(<Example />);
+  const input = screen.getByRole("textbox", { name: "Message text" });
+  await user.type(input, "@bo");
+  const popup = await screen.findByRole("dialog", {
+    name: "Mention suggestions",
+  });
+  const list = screen.getByRole("listbox", { name: "Mention suggestions" });
+  const option = screen.getByRole("option", { name: /^Bob \(bbbb\)/ });
+  if (!(input instanceof HTMLTextAreaElement))
+    throw new Error("Expected real message editor");
+  const caret = input.selectionStart;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("dialog", { name: "멘션 추천" })).toBe(popup);
+  expect(screen.getByRole("listbox", { name: "멘션 추천" })).toBe(list);
+  expect(screen.getByRole("option", { name: /^Bob \(bbbb\)/ })).toBe(option);
+  expect(option).toHaveAttribute("aria-selected", "true");
+  expect(input).toHaveValue("@bo");
+  expect(input).toHaveFocus();
+  expect(input.selectionStart).toBe(caret);
+  expect(input.selectionEnd).toBe(caret);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("dialog", { name: "Mention suggestions" })).toBe(
+    popup,
+  );
+  await user.keyboard("{Enter}");
+  expect(input).toHaveValue("@Bob ");
+  expect(input).toHaveFocus();
 });

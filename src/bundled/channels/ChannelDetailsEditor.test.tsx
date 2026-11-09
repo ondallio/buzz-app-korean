@@ -1,3 +1,4 @@
+import { setLanguage } from "../../shared/i18n";
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import {
@@ -22,6 +23,7 @@ import { createRelaySession } from "../../features/relay/session";
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.restoreAllMocks();
   localStorage.clear();
 });
@@ -1504,4 +1506,56 @@ it("keeps invited-only Read access intact when editing details", async () => {
     { ...current, description: `${current.description} updated` },
     expect.any(AbortSignal),
   );
+});
+
+it("keeps its edited draft and single save pending while changing only display language", async () => {
+  const h = harness();
+  const held = deferred<void>();
+  h.save.mockReturnValueOnce(held.promise);
+  render(
+    <ChannelDetailsEditor
+      scope="locale-fixture"
+      capability={h.capability}
+      channel={channel}
+    />,
+  );
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: "Edit details" }));
+  const name = screen.getByRole("textbox", { name: "Name" });
+  fireEvent.change(name, { target: { value: "Raw {name} 한글" } });
+  if (!(name instanceof HTMLInputElement))
+    throw new Error("Expected name field");
+  name.focus();
+  name.setSelectionRange(1, 4);
+  const save = screen.getByRole("button", { name: "Save changes" });
+  const reads = h.load.mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("dialog", { name: "채널 세부 정보 편집" }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "이름" })).toBe(name);
+  expect(name).toHaveValue("Raw {name} 한글");
+  expect(name).toHaveFocus();
+  expect([name.selectionStart, name.selectionEnd]).toEqual([1, 4]);
+  expect(h.load).toHaveBeenCalledTimes(reads);
+  await userEvent
+    .setup()
+    .click(screen.getByRole("button", { name: "변경 사항 저장" }));
+  try {
+    expect(h.save).toHaveBeenCalledExactlyOnceWith(
+      base,
+      expect.objectContaining({
+        name: "Raw {name} 한글",
+        description: "Existing description",
+        visibility: "public",
+      }),
+      expect.any(AbortSignal),
+    );
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("button", { name: "Save changes" })).toBe(save);
+    expect(h.save).toHaveBeenCalledTimes(1);
+  } finally {
+    await act(async () => held.resolve());
+  }
 });

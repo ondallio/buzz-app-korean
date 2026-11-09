@@ -1,3 +1,11 @@
+import { t, useLanguage } from "../shared/i18n";
+import {
+  localMessage,
+  localError,
+  errorMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../shared/i18n/deferred-message";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import {
   useCallback,
@@ -27,6 +35,7 @@ export function CommunityRepositoriesSettings({
   community: string;
   viewer: string | undefined;
 }) {
+  useLanguage();
   const read = useCallback(() => {
     try {
       return {
@@ -36,14 +45,13 @@ export function CommunityRepositoriesSettings({
     } catch {
       return {
         value: "",
-        error:
-          "Couldn’t read the repositories folder on this device. Try again.",
+        error: localMessage("settingsHost.repositoriesReadFailed"),
       };
     }
   }, [community, viewer]);
   const [stored, setStored] = useState(read);
   const [draft, setDraft] = useState<string | null>(null);
-  const [error, setError] = useState(stored.error);
+  const [error, setError] = useState<DisplayMessage>(stored.error);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const alive = useRef(true);
@@ -88,9 +96,7 @@ export function CommunityRepositoriesSettings({
       snapshot.viewer !== viewer ||
       !snapshot.memberships.some((entry) => entry.id === community)
     )
-      throw new Error(
-        "This account or community changed. Open Local settings again.",
-      );
+      throw localError("settingsHost.repositoriesAccountChanged");
     return viewer;
   };
   const save = async (path: string) => {
@@ -100,10 +106,7 @@ export function CommunityRepositoriesSettings({
     setError("");
     try {
       current();
-      if (!desktop)
-        throw new Error(
-          "Repositories folders are configured in the desktop app.",
-        );
+      if (!desktop) throw localError("settingsHost.repositoriesDesktopOnly");
       const validated = path.trim()
         ? await invoke<string>("repositories_folder_validate", { path })
         : "";
@@ -113,8 +116,7 @@ export function CommunityRepositoriesSettings({
       setDraft(null);
       setSaved(true);
     } catch (reason) {
-      if (alive.current)
-        setError(reason instanceof Error ? reason.message : String(reason));
+      if (alive.current) setError(errorMessage(reason));
     } finally {
       if (alive.current) {
         // Hand off before settlement can natively disable the focused action.
@@ -134,14 +136,13 @@ export function CommunityRepositoriesSettings({
     try {
       current();
       const path = await invoke<string | null>("workspace_pick_folder", {
-        title: "Choose repositories folder",
+        title: t("settingsHost.chooseFolderTitle"),
         start: (draft ?? stored.value) || DEFAULT_REPOSITORIES_FOLDER,
       });
       current();
       if (path) setDraft(path);
     } catch (reason) {
-      if (alive.current)
-        setError(reason instanceof Error ? reason.message : String(reason));
+      if (alive.current) setError(errorMessage(reason));
     } finally {
       if (alive.current) {
         restoreFocus.current = { from: focused, to: browse.current };
@@ -160,19 +161,19 @@ export function CommunityRepositoriesSettings({
       >
         <SettingsGroup layout="form">
           <Field
-            label="Repositories folder"
-            error={error || undefined}
+            label={t("settingsHost.repositoriesFolder")}
+            error={resolveMessage(error) || undefined}
             description={
               desktop
-                ? "Allows your agents to work in existing code checkouts instead of cloning separate copies. Leave blank to use the default location."
-                : "Open the desktop app to choose a folder on this device."
+                ? t("settingsHost.repositoriesDescription")
+                : t("settingsHost.repositoriesBrowserDescription")
             }
           >
             <Input
               ref={input}
               value={value}
               readOnly={!desktop || busy}
-              placeholder="Default REPOS folder in each agent’s workspace"
+              placeholder={t("settingsHost.repositoriesPlaceholder")}
               maxLength={2048}
               autoCorrect="off"
               autoCapitalize="none"
@@ -193,7 +194,7 @@ export function CommunityRepositoriesSettings({
                 focusableWhenDisabled={busy}
                 onClick={() => void pick()}
               >
-                Choose folder…
+                {t("settingsHost.chooseFolder")}
               </Button>
               <Button
                 type="button"
@@ -202,7 +203,7 @@ export function CommunityRepositoriesSettings({
                 disabled={busy || (!stored.value && !draft)}
                 onClick={() => void save("")}
               >
-                Restore default
+                {t("settingsHost.restoreDefault")}
               </Button>
               <Button
                 type="button"
@@ -215,7 +216,7 @@ export function CommunityRepositoriesSettings({
                   input.current?.focus();
                 }}
               >
-                Cancel
+                {t("settingsHost.cancel")}
               </Button>
               <Button
                 type="submit"
@@ -224,14 +225,13 @@ export function CommunityRepositoriesSettings({
                 focusableWhenDisabled={busy}
                 disabled={busy || value.trim() === stored.value}
               >
-                Save folder
+                {t("settingsHost.saveFolder")}
               </Button>
             </div>
           )}
           {saved && (
             <p role="status" className="m-0 text-body-sm text-muted">
-              Repositories folder saved on this device. Claude and Goose use it
-              in new sessions; Codex uses it on future turns.
+              {t("settingsHost.repositoriesSaved")}
             </p>
           )}
         </SettingsGroup>

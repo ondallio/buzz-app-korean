@@ -2,6 +2,9 @@
 //! Password encoding matches keyring's native Windows UTF-16 / Linux UTF-8 format.
 //! Create-only writes, copies and deletes are serialized across cooperating app processes, not profiles.
 //! Locks contain no secrets; missing/locked/broken secure storage never falls back.
+/// Build-time distributor ownership shared by every native credential owner.
+pub mod distribution;
+
 use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
 use std::path::Path;
@@ -21,33 +24,27 @@ pub fn dev_item(
     account: &str,
     value: &[u8],
 ) -> Option<Result<Zeroizing<Vec<u8>>>> {
+    if distribution::ISOLATED {
+        return None;
+    }
     std::env::var_os("BUZZ_DEV_CREDENTIAL_HELPER")
         .map(|helper| dev_helper::item(&helper, operation, service, account, value))
 }
 
 pub const HUMAN_ACCOUNT: &str = "human";
 pub const HUMAN_SERVICE: &str = human_service(cfg!(debug_assertions));
-/// The human key's service before 1.0, which reads copy from.
+/// The official pre-1.0 service, or the custom profile's own service only.
 pub const PREVIOUS_HUMAN_SERVICE: &str = human_store(cfg!(debug_assertions));
 /// Names the files kept for the human key store: sign-out records and locks,
-/// backups. It stays the service from before 1.0, so files older builds wrote
-/// are still found.
+/// backups. Official builds retain pre-1.0 names; distributors use only their own.
 pub const HUMAN_STORE: &str = human_store(cfg!(debug_assertions));
 
 pub const fn human_service(debug: bool) -> &'static str {
-    if debug {
-        "xyz.block.buzz.desktop.identity.debug"
-    } else {
-        "xyz.block.buzz.desktop.identity"
-    }
+    distribution::human_service(debug)
 }
 
 pub const fn human_store(debug: bool) -> &'static str {
-    if debug {
-        "dev.local.buzz.foundation.identity.debug"
-    } else {
-        "dev.local.buzz.foundation.identity"
-    }
+    distribution::human_store(debug)
 }
 
 /// Sanitized outcomes. Only `Absent` permits creation of a new credential.
@@ -115,7 +112,7 @@ fn lock_root() -> Result<std::path::PathBuf> {
     #[cfg(windows)]
     let home = dirs::home_dir(); // Windows Known Folder API, not environment.
     home.filter(|path| path.is_absolute())
-        .map(|path| path.join(".buzz-foundation/credential-locks"))
+        .map(|path| path.join(distribution::CREDENTIAL_LOCKS))
         .ok_or(Error::Unavailable)
 }
 
@@ -234,11 +231,15 @@ fn acquire(root: &Path, service: &str, account: &str) -> Result<Lock> {
 /// Read an item under its current service or, absent there, copy the one
 /// saved under its service from before 1.0 to it (see [`copy`]), keeping the
 /// old item for older builds. A key saved under the current service wins, even
-/// if it differs: it may be newer. Every failure is returned, never absence.
+/// if it differs: it may be newer. Custom profiles never call the copy callback.
+/// Every failure is returned, never absence.
 pub fn read_or_copy<T, E>(
     current: impl Fn() -> std::result::Result<Option<T>, E>,
     copy: impl FnOnce() -> std::result::Result<(), E>,
 ) -> std::result::Result<Option<T>, E> {
+    if distribution::ISOLATED {
+        return current();
+    }
     if let Some(value) = current()? {
         return Ok(Some(value));
     }
@@ -300,7 +301,8 @@ fn optional(result: Result<Zeroizing<Vec<u8>>>) -> Result<Option<Zeroizing<Vec<u
 /// Whether this is a debug build `just desktop me` started, which signs in with
 /// the release build's human key. Only that launcher sets the variable.
 pub fn reads_release_human() -> bool {
-    cfg!(debug_assertions)
+    !distribution::ISOLATED
+        && cfg!(debug_assertions)
         && std::env::var_os("BUZZ_DEV_RELEASE_KEY").as_deref() == Some(std::ffi::OsStr::new("1"))
 }
 
@@ -325,7 +327,7 @@ fn release_or_own(
     read: impl Fn(&str) -> Result<Zeroizing<Vec<u8>>>,
     own: impl FnOnce() -> Result<Zeroizing<Vec<u8>>>,
 ) -> Result<Zeroizing<Vec<u8>>> {
-    if release {
+    if release && !distribution::ISOLATED {
         for service in [human_service(false), human_store(false)] {
             match read(service) {
                 Err(Error::Absent) => {}
@@ -337,7 +339,7 @@ fn release_or_own(
 }
 
 /// Read only this build's own human identity; never create or select another
-/// key. One saved before 1.0 is copied to the current service first.
+/// key. Official builds copy pre-1.0 entries; distributors never consult them.
 #[cfg(not(test))]
 pub fn read_own_human() -> Result<Zeroizing<Vec<u8>>> {
     read_or_copy(
@@ -470,7 +472,7 @@ mod tests;
 /// Erase an indexed session without reading its contents or knowing its schema.
 #[cfg(not(test))]
 pub fn delete_session(service: &str, account: &str) -> Result<()> {
-    if !service.starts_with("xyz.block.buzz.desktop.federated-session") {
+    if !distribution::session_service_allowed(service) {
         return Err(Error::Denied);
     }
     let _lock = acquire(&lock_root()?, service, account)?;
@@ -496,7 +498,7 @@ pub fn compare_session(
     expected: Option<&[u8]>,
     replacement: Option<&[u8]>,
 ) -> Result<()> {
-    if !service.starts_with("xyz.block.buzz.desktop.federated-session") {
+    if !distribution::session_service_allowed(service) {
         return Err(Error::Denied);
     }
     let _lock = acquire(&lock_root()?, service, account)?;

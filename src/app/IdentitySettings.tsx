@@ -1,4 +1,10 @@
 import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../shared/i18n/deferred-message";
+import { t, useLanguage, formattingLocale } from "../shared/i18n";
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -8,7 +14,6 @@ import {
 } from "react";
 import { npubEncode } from "nostr-tools/nip19";
 import type { BackupStatus } from "../features/identity/backup";
-import { BACKUP_FAILURES } from "../features/identity/backup-failure";
 import { BackupPrompt } from "../features/identity/BackupConsent";
 import {
   backupOfferedFor,
@@ -25,7 +30,7 @@ import {
   coveredCommunities,
   serverName,
 } from "../features/federated-identity/community-servers";
-import { recoveryMessage } from "../features/federated-identity/CommunitySignIn";
+
 import { PrivateKey } from "../features/identity/PrivateKey";
 import { SignOutDialog } from "../features/identity/SignOut";
 import { Header, InlineHeader } from "../shared/design-system/ui/Header";
@@ -33,7 +38,7 @@ import { SettingsGroup } from "../shared/design-system/ui/SettingsGroup";
 import { PreferenceRow } from "../shared/design-system/ui/PreferenceRow";
 import { IconButton } from "../shared/design-system/ui/IconButton";
 import { Button } from "../shared/design-system/ui/Button";
-import { relativeTimestamp } from "../shared/relative-timestamp";
+
 import { CHANNEL_ACTIVITY_KINDS } from "../features/relay/channel-activity";
 import type { RelaySession } from "../features/relay/session";
 import { Tooltip } from "../shared/design-system/ui/Tooltip";
@@ -42,43 +47,73 @@ import { CopyIcon } from "../shared/design-system/icons";
 import styles from "./IdentitySettings.module.css";
 import { writeClipboardText } from "../shared/clipboard";
 
-const WAITING = {
-  no_consent: undefined,
-  no_session: "Sign in to Builderlab to sync your identity.",
-  not_linked: BACKUP_FAILURES.not_linked.message,
-} as const;
+const backupMessages = {
+  busy: "settings.backup.busy",
+  signed_out: "settings.backup.signed_out",
+  not_offered: "settings.backup.not_offered",
+  other_key_linked: "settings.backup.other_key_linked",
+  invalid_service: "settings.backup.invalid_service",
+  refused: "settings.backup.refused",
+  unreachable: "settings.backup.unreachable",
+  unconfirmed: "settings.backup.unconfirmed",
+  storage: "settings.backup.storage",
+} as const satisfies Record<
+  Extract<BackupStatus, { status: "failed" }>["kind"],
+  string
+>;
 
-/** Running and complete show beside the row instead. */
-const INDICATOR = {
-  running: "Syncing…",
-  complete: "Synced with Builderlab",
-} as const;
-
-/**
- * Loading, sign-in and failure feedback below the row's fixed description;
- * failures read as first run's copy. Waiting for consent shows the action.
- */
+/** Resolves only structured backup outcomes, never arbitrary service text. */
 function backupFeedback(status: BackupStatus) {
   switch (status.status) {
     case "idle":
-      // Nothing has run this launch; a copy may still exist from an earlier one.
-      return "Buzz hasn’t checked whether your identity is synced since it opened.";
+      return t("settings.backupUnchecked");
     case "running":
     case "complete":
       return undefined;
     case "waiting":
-      return WAITING[status.reason];
-    case "failed": {
-      // Settings has no Try again; a new Builderlab sign-in hands the
-      // uploader a session, which starts another pass, so a kind it clears
-      // (every retryable one, and a lapsed sign-in) says so.
-      const failure: { cause?: string; message: string } =
-        BACKUP_FAILURES[status.kind];
-      return failure.cause
-        ? `${failure.cause} Buzz tries again when you next sign in to Builderlab.`
-        : failure.message;
-    }
+      return status.reason === "no_consent"
+        ? undefined
+        : status.reason === "no_session"
+          ? t("settings.backupSignIn")
+          : t("settings.backup.not_linked");
+    case "failed":
+      return t(backupMessages[status.kind]);
   }
+}
+
+function signInRecovery(code: string) {
+  if (code === "sign-in-timed-out") return t("settings.recoveryTimeout");
+  if (code === "storage-busy") return t("settings.recoveryBusy");
+  if (code.startsWith("storage-")) return t("settings.recoveryStorage");
+  if (code === "sign-in-canceled") return t("settings.recoveryCanceled");
+  if (code === "reauthentication-required")
+    return t("settings.recoveryExpired");
+  return t("settings.recoveryOther");
+}
+
+function activityTimestamp(seconds: number) {
+  const age = Math.max(0, Date.now() / 1000 - seconds);
+  if (age < 60) return t("settings.justNow");
+  if (age < 3600) {
+    const count = Math.floor(age / 60);
+    return t(count === 1 ? "settings.minuteAgo" : "settings.minutesAgo", {
+      count,
+    });
+  }
+  if (age < 86400) {
+    const count = Math.floor(age / 3600);
+    return t(count === 1 ? "settings.hourAgo" : "settings.hoursAgo", { count });
+  }
+  if (age < 604800) {
+    const count = Math.floor(age / 86400);
+    return t(count === 1 ? "settings.dayAgo" : "settings.daysAgo", { count });
+  }
+  return t("settings.onDate", {
+    date: new Date(seconds * 1000).toLocaleDateString(formattingLocale(), {
+      month: "short",
+      day: "numeric",
+    }),
+  });
 }
 
 /**
@@ -96,6 +131,7 @@ function BackupRow({
   identity: Identity;
   viewer: string;
 }) {
+  useLanguage();
   const { backup } = identity;
   const status = useSyncExternalStore(backup.subscribe, backup.snapshot);
   const [offered, setOffered] = useState(false);
@@ -118,16 +154,15 @@ function BackupRow({
   const feedback = backupFeedback(status);
   const indicator =
     status.status === "running" || status.status === "complete"
-      ? INDICATOR[status.status]
+      ? t(status.status === "running" ? "settings.syncing" : "settings.synced")
       : undefined;
   return (
     <>
       <PreferenceRow
-        title="Identity sync"
+        title={t("settings.identitySync")}
         subtitle={
           <span ref={sentence} tabIndex={-1}>
-            Save your identity key with your Builderlab account so you can log
-            in more easily on another device.
+            {t("settings.identitySyncDescription")}
             {/* Mounted empty so a later sentence is announced. */}
             <span role="status" className="block">
               {feedback}
@@ -142,7 +177,7 @@ function BackupRow({
                 type="button"
                 onClick={() => setAsking(true)}
               >
-                Sync with Builderlab
+                {t("settings.syncBuilderlab")}
               </Button>
             )}
             {/* Mounted empty so a later indicator is announced. */}
@@ -208,6 +243,7 @@ function BackedUpKey({
   federated: FederatedIdentity;
   lastActive?: ((pubkey: string) => Promise<number | undefined>) | undefined;
 }) {
+  useLanguage();
   const session = useSyncExternalStore(
     federated.subscribe,
     federated.snapshot,
@@ -276,32 +312,36 @@ function BackedUpKey({
   if (!revision)
     return (
       <PreferenceRow
-        title="Backed-up key"
-        subtitle="Sign in to your organization to see your backed-up key."
+        title={t("settings.backedUpKey")}
+        subtitle={t("settings.backupSignInOrganization")}
       />
     );
   if (!shown)
     return (
       <PreferenceRow
-        title="Backed-up key"
-        subtitle={<span role="status">Checking your backup…</span>}
+        title={t("settings.backedUpKey")}
+        subtitle={<span role="status">{t("settings.checkingBackup")}</span>}
       />
     );
   if ("failed" in shown)
     return (
       <PreferenceRow
-        title="Backed-up key"
+        title={t("settings.backedUpKey")}
         subtitle={
-          <span role="alert">Couldn’t check your backup. {shown.failed}</span>
+          <span role="alert">
+            {t("settings.backupCheckFailed", { error: shown.failed })}
+          </span>
         }
       />
     );
   if (!shown.key) return null;
   return (
     <PreferenceRow
-      title={["Backed-up key", shown.key === viewer && "This device", "Linked"]
-        .filter(Boolean)
-        .join(" · ")}
+      title={t(
+        shown.key === viewer
+          ? "settings.backedUpThisDevice"
+          : "settings.backedUpLinked",
+      )}
       subtitle={
         <>
           <code className={`text-mono ${styles.identityValue}`}>
@@ -309,12 +349,14 @@ function BackedUpKey({
           </code>
           {lastActive &&
             (active === undefined
-              ? "Checking activity…"
+              ? t("settings.checkingActivity")
               : active === null
-                ? "No activity here"
+                ? t("settings.noActivity")
                 : active === false
-                  ? "Couldn’t check activity"
-                  : `Last active ${relativeTimestamp(active)}`)}
+                  ? t("settings.activityFailed")
+                  : t("settings.lastActive", {
+                      time: activityTimestamp(active),
+                    }))}
         </>
       }
     />
@@ -345,28 +387,40 @@ export function IdentitySettings({
   /** When `pubkey` was last active in a channel on the current community's relay. */
   lastActive?: ((pubkey: string) => Promise<number | undefined>) | undefined;
 }) {
+  useLanguage();
   const [signingOut, setSigningOut] = useState(false);
   const [offered, setOffered] = useState(false);
   useEffect(() => {
     if (identity) void backupOfferedFor(identity.backup).then(setOffered);
   }, [identity]);
   const [copyStatus, setCopyStatus] = useState<{
-    message: string;
+    message: DisplayMessage;
     failed: boolean;
   } | null>(null);
   const copyAttempt = useRef(0);
   const npub = viewer ? npubEncode(viewer) : "";
-  async function copyIdentity(value: string, label: string) {
+  async function copyIdentity(value: string, kind: "hex" | "npub") {
     const attempt = ++copyAttempt.current;
     setCopyStatus(null);
     try {
       await writeClipboardText(value);
       if (attempt === copyAttempt.current)
-        setCopyStatus({ message: `${label} copied.`, failed: false });
+        setCopyStatus({
+          message: localMessage(
+            kind === "hex"
+              ? "settings.publicKeyCopied"
+              : "settings.nostrAddressCopied",
+          ),
+          failed: false,
+        });
     } catch {
       if (attempt === copyAttempt.current)
         setCopyStatus({
-          message: `Couldn’t copy ${label.toLowerCase()}. Select it and copy manually.`,
+          message: localMessage(
+            kind === "hex"
+              ? "settings.publicKeyCopyFailed"
+              : "settings.nostrCopyFailed",
+          ),
           failed: true,
         });
     }
@@ -375,23 +429,31 @@ export function IdentitySettings({
     <section aria-labelledby="identity-settings-title">
       <Header
         id="identity-settings-title"
-        title="Identity"
-        subtitle="Your identity is shared across communities. Public keys are safe to share."
+        title={t("settings.identity")}
+        subtitle={t("settings.identityDescription")}
       />
-      {!viewer && (
-        <p>Your identity is unavailable. Connect your identity to manage it.</p>
-      )}
+      {!viewer && <p>{t("settings.identityUnavailable")}</p>}
       {viewer && (
         <>
           <SettingsGroup>
             {(
               [
-                ["Public key (hex)", "Public key", viewer],
-                ["Nostr address (npub)", "Nostr address", npub],
+                [
+                  "hex",
+                  t("settings.publicKeyHex"),
+                  t("settings.copyPublicKey"),
+                  viewer,
+                ],
+                [
+                  "npub",
+                  t("settings.nostrAddressNpub"),
+                  t("settings.copyNostrAddress"),
+                  npub,
+                ],
               ] as const
-            ).map(([label, copyLabel, value]) => (
+            ).map(([kind, label, copyLabel, value]) => (
               <PreferenceRow
-                key={label}
+                key={kind}
                 title={label}
                 subtitle={
                   <code className={`text-mono ${styles.identityValue}`}>
@@ -399,16 +461,13 @@ export function IdentitySettings({
                   </code>
                 }
                 trailing={
-                  <Tooltip
-                    content={`Copy ${copyLabel.toLowerCase()}`}
-                    hint="familiar"
-                  >
+                  <Tooltip content={copyLabel} hint="familiar">
                     <IconButton
                       size="sm"
                       variant="ghost"
-                      aria-label={`Copy ${copyLabel.toLowerCase()}`}
+                      aria-label={copyLabel}
                       icon={<CopyIcon aria-hidden="true" />}
-                      onClick={() => void copyIdentity(value, copyLabel)}
+                      onClick={() => void copyIdentity(value, kind)}
                     />
                   </Tooltip>
                 }
@@ -432,11 +491,11 @@ export function IdentitySettings({
                   />
                 )}
                 <PreferenceRow
-                  title="Sign out of Buzz"
-                  subtitle="Remove your private key from this device. Also signs you out of your organization and ends Builderlab and hosted community logins."
+                  title={t("settings.signOutBuzz")}
+                  subtitle={t("settings.signOutDescription")}
                   trailing={
                     <Button type="button" onClick={() => setSigningOut(true)}>
-                      Sign out of Buzz
+                      {t("settings.signOutBuzz")}
                     </Button>
                   }
                 />
@@ -460,11 +519,11 @@ export function IdentitySettings({
             <ToastNotice
               title={
                 copyStatus.failed
-                  ? "Identity wasn’t copied"
-                  : copyStatus.message
+                  ? t("settings.identityCopyFailed")
+                  : resolveMessage(copyStatus.message)
               }
               {...(copyStatus.failed
-                ? { description: copyStatus.message }
+                ? { description: resolveMessage(copyStatus.message) }
                 : {})}
               tone={copyStatus.failed ? "error" : "success"}
               timeout={copyStatus.failed ? 0 : 5000}
@@ -513,6 +572,7 @@ function OrganizationSignIns({
   memberships: readonly Membership[];
   servers: () => Promise<readonly SessionSnapshot[]>;
 }) {
+  useLanguage();
   const [ids, setIds] = useState<readonly string[]>([]);
   useEffect(() => {
     let active = true;
@@ -575,10 +635,13 @@ function OrganizationSignIns({
   const problems = [...unfinished].map(([session, { authority, failure }]) => (
     <div key={authority.id}>
       <p role="alert" className="text-body-sm text-danger">
-        {`Couldn’t sign out of ${serverName(authority)}. ${recoveryMessage(failure)}`}
+        {t("settings.signOutServerFailed", {
+          server: serverName(authority),
+          error: signInRecovery(failure),
+        })}
       </p>
       <Button type="button" onClick={() => signOut(session)}>
-        Try again
+        {t("settings.tryAgain")}
       </Button>
     </div>
   ));
@@ -601,7 +664,7 @@ function OrganizationSignIns({
     <section className="mt-6" aria-labelledby="organization-sign-in-title">
       <InlineHeader
         id="organization-sign-in-title"
-        title="Organization sign-in"
+        title={t("settings.organizationSignIn")}
       />
       <SettingsGroup>
         {!firstSignedIn && !firstFailed && (
@@ -635,6 +698,7 @@ function ServerSession({
   memberships: readonly Membership[];
   onSignOut: () => void;
 }) {
+  useLanguage();
   const state = useSyncExternalStore(
     session.subscribe,
     session.snapshot,
@@ -647,7 +711,7 @@ function ServerSession({
     memberships,
   );
   const expires = state.expiresAt
-    ? new Date(state.expiresAt).toLocaleString(undefined, {
+    ? new Date(state.expiresAt).toLocaleString(formattingLocale(), {
         dateStyle: "medium",
         timeStyle: "short",
       })
@@ -657,12 +721,14 @@ function ServerSession({
       title={serverTitle(state.authority)}
       subtitle={
         <>
-          {`Signed in as ${state.email ?? "your organization account"}`}
-          {expires && ` · Expires at ${expires}`}
+          {state.email
+            ? t("settings.signedInAs", { account: state.email })
+            : t("settings.signedInOrganization")}
+          {expires && t("settings.expiresSuffix", { time: expires })}
           {usedBy.length > 0 && (
             <>
               <br />
-              {`Used by: ${usedBy.join(", ")}`}
+              {t("settings.usedBy", { communities: usedBy.join(", ") })}
             </>
           )}
         </>
@@ -670,10 +736,10 @@ function ServerSession({
       trailing={
         <Button
           type="button"
-          aria-label={`Sign out of ${host}`}
+          aria-label={t("settings.signOutServer", { host })}
           onClick={onSignOut}
         >
-          Sign out
+          {t("settings.signOut")}
         </Button>
       }
     />
@@ -696,12 +762,13 @@ function OrganizationSignIn({
   identity: FederatedIdentity;
   listed?: boolean;
 }) {
+  useLanguage();
   const state = useSyncExternalStore(
     identity.subscribe,
     identity.snapshot,
     identity.snapshot,
   );
-  const [failure, setFailure] = useState("");
+  const [failure, setFailure] = useState<DisplayMessage>("");
   const problem = failure || state.failure;
   if (!state.authority || state.status === "unconfigured") return null;
   const unavailable = state.status === "unavailable";
@@ -709,18 +776,22 @@ function OrganizationSignIn({
   if (unavailable && !listed)
     return problem ? (
       <p role="alert" className="mt-6 text-body-sm text-danger">
-        {recoveryMessage(problem)}
+        {typeof problem === "string"
+          ? signInRecovery(problem)
+          : resolveMessage(problem)}
       </p>
     ) : null;
   const organization = new URL(state.authority.identityOrigin).host;
   const signedIn = state.status === "signed-in";
   const signingIn = state.status === "signing-in";
   const status = signedIn
-    ? `Signed in as ${state.email ?? "your organization account"}`
-    : "Not signed in";
+    ? state.email
+      ? t("settings.signedInAs", { account: state.email })
+      : t("settings.signedInOrganization")
+    : t("settings.notSignedIn");
   const expires =
     signedIn && state.expiresAt
-      ? new Date(state.expiresAt).toLocaleString(undefined, {
+      ? new Date(state.expiresAt).toLocaleString(formattingLocale(), {
           dateStyle: "medium",
           timeStyle: "short",
         })
@@ -731,7 +802,9 @@ function OrganizationSignIn({
       .then(operation)
       .catch((error: unknown) =>
         setFailure(
-          error instanceof Error ? error.message : "Sign-in unavailable",
+          error instanceof Error
+            ? error.message
+            : localMessage("settings.signInUnavailable"),
         ),
       );
   }
@@ -749,11 +822,11 @@ function OrganizationSignIn({
             )}
             {expires && (
               <>
-                Expires at {expires}
+                {t("settings.expiresAt", { time: expires })}
                 <br />
               </>
             )}
-            {`Lets you and your agents into communities that require your ${organization} login. Signing out keeps your Buzz key on this device, but you and your agents can’t connect to those communities again until you sign back in.`}
+            {t("settings.organizationDescription", { organization })}
           </>
         }
         trailing={
@@ -772,17 +845,19 @@ function OrganizationSignIn({
               }
             >
               {signedIn
-                ? "Sign out of organization"
+                ? t("settings.signOutOrganization")
                 : signingIn
-                  ? "Cancel sign-in"
-                  : "Sign in"}
+                  ? t("settings.cancelSignIn")
+                  : t("settings.signIn")}
             </Button>
           )
         }
       />
       {problem && (
         <p role="alert" className="text-body-sm text-danger">
-          {recoveryMessage(problem)}
+          {typeof problem === "string"
+            ? signInRecovery(problem)
+            : resolveMessage(problem)}
         </p>
       )}
     </>
@@ -792,7 +867,7 @@ function OrganizationSignIn({
     <section className="mt-6" aria-labelledby="organization-sign-in-title">
       <InlineHeader
         id="organization-sign-in-title"
-        title="Organization sign-in"
+        title={t("settings.organizationSignIn")}
       />
       <SettingsGroup>{row}</SettingsGroup>
     </section>

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { setLanguage } from "../../shared/i18n";
 import "../../../tests/sonner-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -31,6 +32,8 @@ const release = vi.fn(() => {
 const keepMounted = vi.fn((_id: string) => release);
 afterEach(async () => {
   cleanup();
+  setLanguage("en");
+  localStorage.clear();
   vi.unstubAllGlobals();
   for (const owner of owners.splice(0)) owner.dispose();
   await waitFor(() =>
@@ -328,3 +331,42 @@ it.each([
     }
   },
 );
+
+it("keeps the real MessageRow report workflow and signed raw payload across language changes", async () => {
+  setLanguage("en");
+  const publish = vi.fn(async (_event: RelayEvent) => {});
+  const user = userEvent.setup();
+  mount(publish);
+  const trigger = screen.getByRole("button", { name: "More message actions" });
+  await user.click(trigger);
+  const item = await screen.findByRole("menuitem", { name: "Report" });
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("menuitem", { name: "신고" })).toBe(item);
+  await user.click(item);
+  const dialog = await screen.findByRole("dialog", { name: "메시지 신고" });
+  await user.click(screen.getByRole("radio", { name: "스팸" }));
+  const note = screen.getByRole("textbox", { name: "추가 설명 (선택사항)" });
+  await user.type(note, "원문 메모");
+  await user.click(screen.getByRole("button", { name: "신고 제출" }));
+  await waitFor(() => expect(publish).toHaveBeenCalledOnce());
+  expect(publish.mock.calls[0]?.[0]).toMatchObject({
+    kind: 1984,
+    content: "원문 메모",
+    pubkey: viewer.pubkey,
+    tags: [
+      ["p", other.pubkey],
+      ["e", root.id, "spam"],
+    ],
+  });
+  const success = await screen.findByRole("dialog", {
+    name: "커뮤니티 운영자에게 신고를 제출했습니다",
+  });
+  expect(dialog.isConnected).toBe(false);
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("dialog", {
+      name: "Report submitted to community moderators",
+    }),
+  ).toBe(success);
+  expect(publish).toHaveBeenCalledOnce();
+});

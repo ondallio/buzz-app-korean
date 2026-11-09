@@ -1,13 +1,20 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { Agent, Agents } from "./service";
+import type { Agent, Agents, RegisteredAgentType } from "./service";
 import { agentSections } from "./tabs";
 
-afterEach(cleanup);
+import { setLanguage } from "../../shared/i18n";
+import { localError } from "../../shared/i18n/deferred-message";
+import { useAgentSettingsHost } from "../../bundled/agents/AgentSettingsHost";
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 
 const agent: Agent = {
   key: "a".repeat(64),
@@ -389,4 +396,97 @@ it("retains opening revisions for ordinary tabs and forwards explicitly reconcil
     config: { model: "merged" },
     base: { settings: "reconciled" },
   });
+});
+
+it("keeps the staged type and pending HostSettings save while only owned failures follow locale", async () => {
+  let fail!: (reason: unknown) => void;
+  const gate = new Promise<void>((_resolve, reject) => {
+    fail = reject;
+  });
+  const retype = vi.fn(
+    async (_key: string, _type: string, _change: { config: unknown }) => gate,
+  );
+  const preview = vi.fn(() => ({
+    config: { raw: "{config} 한글" },
+    moved: [],
+    dropped: [],
+    settings: [],
+  }));
+  const agents = {
+    subscribe: () => () => {},
+    configHistory: () => undefined,
+    addedTabs: () => [],
+    retype,
+    previewRetype: preview,
+  } as unknown as Agents;
+  const echo = {
+    key: agent.type,
+    pluginId: "test",
+    revision: "one",
+    id: "echo",
+    title: "Echo",
+    defaults: () => ({ config: {} }),
+  } satisfies RegisteredAgentType;
+  const next = { ...echo, key: "test/next", id: "next", title: "Next" };
+  function Host() {
+    const host = useAgentSettingsHost({
+      agents,
+      agent,
+      type: echo,
+      types: [echo, next],
+    });
+    const sections = agentSections({
+      agents,
+      agent: host.agent,
+      type: host.type,
+      settingsHost: host.settingsHost,
+      memories: undefined,
+    });
+    return sections
+      .find((section) => section.value === "agent:settings")
+      ?.render();
+  }
+  render(<Host />);
+  const user = userEvent.setup();
+  await user.click(
+    screen.getByRole("button", { name: "Change harness from Echo" }),
+  );
+  await user.click(await screen.findByRole("menuitemradio", { name: "Next" }));
+  await user.click(await screen.findByRole("button", { name: "Continue" }));
+  const save = screen.getByRole("button", { name: "Save" });
+  const form = save.closest("form");
+  await user.click(save);
+  act(() => setLanguage("ko"));
+  expect(save).toHaveAttribute("aria-disabled", "true");
+  expect(save).toHaveAttribute("aria-busy", "true");
+  await user.click(save);
+  expect(save.closest("form")).toBe(form);
+  expect(retype).toHaveBeenCalledExactlyOnceWith(agent.key, "test/next", {
+    config: { raw: "{config} 한글" },
+  });
+  await act(async () =>
+    fail(localError("agentsErrors.providerChanging", { name: "Ada" })),
+  );
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("Ada의 제공자를 변경하는 중입니다.");
+  save.focus();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("alert")).toBe(alert);
+  expect(alert).toHaveTextContent("Ada's provider is already changing");
+  expect(save).toHaveFocus();
+  expect(preview).toHaveBeenCalledExactlyOnceWith(agent.key, "test/next");
+  retype.mockRejectedValueOnce(new Error("Ada's provider is already changing"));
+  act(() => setLanguage("ko"));
+  await user.click(save);
+  await waitFor(() =>
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Ada's provider is already changing",
+    ),
+  );
+  expect(retype).toHaveBeenCalledTimes(2);
+  expect(retype.mock.calls[1]).toEqual([
+    agent.key,
+    "test/next",
+    { config: { raw: "{config} 한글" } },
+  ]);
 });

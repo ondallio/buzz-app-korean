@@ -1,3 +1,12 @@
+import { TranslatedMessage } from "../../shared/i18n/Message";
+import {
+  localMessage,
+  localError,
+  errorMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
+import { t, useLanguage } from "../../shared/i18n";
 import {
   soloModelPicksKey,
   parseSoloModelPicks,
@@ -226,11 +235,7 @@ function notifyRecovered(
     listener(recovered);
 }
 function errorForRecovery(reason: unknown) {
-  return reason instanceof Error
-    ? reason.message
-    : reason !== undefined
-      ? String(reason)
-      : undefined;
+  return reason !== undefined ? errorMessage(reason) : undefined;
 }
 /** What `MentionRecipient` promises, checked where one arrives from a
  * contribution: a 64-hex pubkey and a non-empty name. */
@@ -248,10 +253,10 @@ function wellFormedRecipient(
 }
 /** Why a pending mention returned to prose, as the send it held tells it. */
 const pendingRefusals = {
-  unresolved: "could not be confirmed as one person or agent",
-  unavailable: "could not be tagged here",
-  limit: "could not be tagged: a message can tag at most 32 recipients",
-  length: "could not be tagged: the message would be too long",
+  unresolved: "messages.composer.mentionUnresolved",
+  unavailable: "messages.composer.mentionUnavailable",
+  limit: "messages.composer.mentionLimit",
+  length: "messages.composer.mentionLength",
 } as const;
 type PendingRefusal = { name: string; reason: keyof typeof pendingRefusals };
 function subscribeRecovery(
@@ -524,6 +529,7 @@ function Composer({
   inviteAgents = false,
   trailingTool,
 }: MessageComposerProps) {
+  const language = useLanguage();
   const active = useConversationPresentation();
   // Previews replace the list on every message; subscribe to this channel's facts.
   const listed =
@@ -1103,13 +1109,18 @@ function Composer({
     setStorageFailed(result === "failed");
     return result;
   }
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<DisplayMessage | DisplayMessage[]>();
   const [pasteTooLong, setPasteTooLong] = useState(false);
   const [attachmentError, setAttachmentError] =
-    useState<Readonly<{ title: string; description: string }>>();
+    useState<
+      Readonly<{ title: DisplayMessage; description: DisplayMessage }>
+    >();
   /** Nothing was attached, for this one reason. */
-  const refuseAttachment = (description: string) =>
-    setAttachmentError({ title: "Could not attach file", description });
+  const refuseAttachment = (description: DisplayMessage) =>
+    setAttachmentError({
+      title: localMessage("messages.composer.attachFailed"),
+      description,
+    });
   const focusRestoredDraft = useRef(false);
   const beforeEdit = useRef<
     { value: MentionDraft; restore(): void } | undefined
@@ -1252,10 +1263,12 @@ function Composer({
   const iconPlaceholder =
     channelLabel && placeholder === undefined && ChannelIcon !== ChatCircleIcon;
   const label = channelLabel
-    ? `Message ${ChannelIcon === LockIcon ? "" : "#"}${channelName}`
+    ? t("messages.composer.message", {
+        channel: `${ChannelIcon === LockIcon ? "" : "#"}${channelName}`,
+      })
     : editing.target
-      ? "Edit message"
-      : (customLabel ?? "Reply to thread");
+      ? t("messages.composer.edit")
+      : (customLabel ?? t("messages.composer.reply"));
   const gifPreview = useGifDraftPreview(extensions?.tools);
   const attachments = useAttachmentDraft(
     session,
@@ -1279,20 +1292,46 @@ function Composer({
     const copy = async () => {
       try {
         await writeClipboardText(text);
-        notify("Text copied", "success");
+        notify(
+          <TranslatedMessage
+            value={localMessage("messages.composer.textCopied")}
+          />,
+          "success",
+        );
       } catch {
-        notify("Couldn’t copy text", "error", {
-          label: "Try again",
-          onClick: () => void copy(),
-          timeout: Infinity,
-        });
+        notify(
+          <TranslatedMessage
+            value={localMessage("messages.composer.textCopyFailed")}
+          />,
+          "error",
+          {
+            label: <TranslatedMessage value={localMessage("messages.retry")} />,
+            onClick: () => void copy(),
+            timeout: Infinity,
+          },
+        );
       }
     };
-    notify(`${solo ? "Chat" : "Channel"} archived: ${channelName}`, "info", {
-      label: "Copy text",
-      onClick: () => void copy(),
-      timeout: Infinity,
-    });
+    notify(
+      <TranslatedMessage
+        value={localMessage(
+          solo
+            ? "messages.composer.chatArchived"
+            : "messages.composer.channelArchived",
+          { name: channelName },
+        )}
+      />,
+      "info",
+      {
+        label: (
+          <TranslatedMessage
+            value={localMessage("messages.composer.copyText")}
+          />
+        ),
+        onClick: () => void copy(),
+        timeout: Infinity,
+      },
+    );
   });
   useLayoutEffect(() => () => handOffFocus(), []);
   const canAttach = submission
@@ -1353,14 +1392,14 @@ function Composer({
     )
       return;
     if (editing.target) {
-      refuseAttachment("Finish editing before attaching new files.");
+      refuseAttachment(localMessage("messages.composer.finishEditAttach"));
       return;
     }
     if (!canAttach) {
       refuseAttachment(
         submission
-          ? "Create this conversation before attaching files."
-          : "Uploads are unavailable on this connection.",
+          ? localMessage("messages.composer.createBeforeAttach")
+          : localMessage("messages.composer.uploadUnavailable"),
       );
       return;
     }
@@ -1376,8 +1415,13 @@ function Composer({
         left.length
           ? {
               title: added.length
-                ? `Could not attach ${refused} of ${files.length} files`
-                : `Could not attach ${refused} files`,
+                ? localMessage("messages.composer.attachSomeFailed", {
+                    refused,
+                    count: files.length,
+                  })
+                : localMessage("messages.composer.attachCountFailed", {
+                    count: refused,
+                  }),
               description: left.join(" "),
             }
           : undefined,
@@ -1385,7 +1429,9 @@ function Composer({
       return added;
     } catch (reason) {
       refuseAttachment(
-        reason instanceof Error ? reason.message : "Could not attach files.",
+        reason instanceof Error
+          ? errorMessage(reason)
+          : localMessage("messages.composer.attachFilesFailed"),
       );
     }
   }
@@ -1580,11 +1626,11 @@ function Composer({
       return;
     const current = editableRows().find((item) => item.id === row.id);
     if (!current || !lastEditableMessage(session, [current])) {
-      setError("This message is no longer available to edit.");
+      setError(localMessage("messages.composer.editUnavailable"));
       return;
     }
     if (editing.target) {
-      setError("Finish or cancel your current edit first.");
+      setError(localMessage("messages.composer.finishEdit"));
       input.current.focus();
       return;
     }
@@ -1618,7 +1664,7 @@ function Composer({
     )
       return;
     if (editing.target) {
-      setError("Finish or cancel your current edit first.");
+      setError(localMessage("messages.composer.finishEdit"));
       input.current.focus();
       return;
     }
@@ -1628,7 +1674,7 @@ function Composer({
         .snapshot()
         .find((entry) => entry.id === id && entry.channelId === channelId);
       if (!entry?.message)
-        throw new Error("This queued message is no longer available to edit.");
+        throw localError("messages.composer.queuedEditUnavailable");
       const lease = queue.edit(id);
       completion.invalidate();
       beforeEdit.current = {
@@ -1649,7 +1695,7 @@ function Composer({
       caret.current = next.text.length;
       setError(undefined);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      setError(errorMessage(reason));
     }
   };
   useEffect(() => {
@@ -1691,18 +1737,16 @@ function Composer({
       terminator = undefined;
     }
     if (recipient && !admits()(recipient.pubkey)) {
-      setError(
-        "This recipient is no longer available. Remove it or refresh choices.",
-      );
+      setError(localMessage("messages.composer.recipientUnavailable"));
       return false;
     }
     if (recipient && valueRef.current.recipients.length >= 32) {
-      setError("Choose at most 32 recipients");
+      setError(localMessage("messages.composer.recipientLimit"));
       return false;
     }
     completion.invalidate();
     if (!field.insertText(text, recipient, range, terminator, focus)) {
-      setError("Message is too long to insert text");
+      setError(localMessage("messages.composer.insertTooLong"));
       return false;
     }
     if (recipient) rememberMention(session, channelId, recipient.pubkey);
@@ -1724,12 +1768,14 @@ function Composer({
     const current = valueRef.current.gifs ?? [];
     if (!current.includes(text)) {
       if (current.length >= MAX_DRAFT_GIFS) {
-        setError(`Attach at most ${MAX_DRAFT_GIFS} GIFs per message.`);
+        setError(
+          localMessage("messages.composer.gifLimit", { count: MAX_DRAFT_GIFS }),
+        );
         return false;
       }
       const next = { ...valueRef.current, gifs: [...current, text] };
       if (composerMarkdown(next).length > 16000) {
-        setError("Message is too long to attach this GIF");
+        setError(localMessage("messages.composer.gifTooLong"));
         return false;
       }
       saveDraft(next);
@@ -1982,7 +2028,7 @@ function Composer({
       ...new Map(recipients.map((person) => [person.pubkey, person])).values(),
     ];
     if (unique.length > 32) {
-      setError("Choose at most 32 recipients");
+      setError(localMessage("messages.composer.recipientLimit"));
       return false;
     }
     if (
@@ -2003,9 +2049,7 @@ function Composer({
       );
     const admitted = admits();
     if (unique.some((person) => !admitted(person.pubkey))) {
-      setError(
-        "A team member is no longer available. Refresh choices before trying again.",
-      );
+      setError(localMessage("messages.composer.teamUnavailable"));
       return false;
     }
     const text = unique.map((person) => `@${person.name} `).join("");
@@ -2017,9 +2061,7 @@ function Composer({
           )
         : input.current.insertText(text, unique, range))
     ) {
-      setError(
-        "The team would exceed the message length or 32-recipient limit. Nothing was added.",
-      );
+      setError(localMessage("messages.composer.teamLimit"));
       return false;
     }
     completion.invalidate();
@@ -2076,7 +2118,7 @@ function Composer({
       !outbox?.supports(9) ||
       !input.current?.isConnected
     )
-      return "The message can't be edited right now";
+      return t("messages.composer.editNotReady");
     completion.invalidate();
     return input.current.insertResource(resource);
   }
@@ -2382,10 +2424,10 @@ function Composer({
   // Alone in a Solo chat, a send addresses agents; with people it is a conversation.
   const needsRecipient = (requireMention || solo) && !withPeople;
   const recipientHint = routing
-    ? "Choose an agent to send"
+    ? "messages.composer.chooseAgent"
     : submission
-      ? "Tag an agent to send"
-      : "Tag a person or agent to send";
+      ? "messages.composer.tagAgent"
+      : "messages.composer.tagRecipient";
   // A pending mention may yet become the recipient; sending waits for it.
   const untagged =
     needsRecipient &&
@@ -2398,7 +2440,7 @@ function Composer({
   ) {
     const channel = await session.channelWrites.refreshMembership(channelId);
     if (!currentAdmission())
-      throw new Error("The session changed. Review its channel and retry.");
+      throw localError("messages.composer.sessionChanged");
     // The pill stands in only while the chat is the viewer and agents; a
     // person who joined since needs the agents tagged by name.
     if (
@@ -2412,14 +2454,14 @@ function Composer({
         ),
       )
     )
-      throw new Error("Someone joined this chat. Tag an agent to send.");
+      throw localError("messages.composer.personJoined");
     const recipients = [...explicit];
     if (!recipients.length) {
       // An untagged send relies on a person being present; confirm it against
       // the fresh roster and agent inventory, not the rendered snapshot.
       await session.agentChoices.refresh();
       if (!currentAdmission())
-        throw new Error("The session changed. Review its channel and retry.");
+        throw localError("messages.composer.sessionChanged");
       const profiles = session.profiles.snapshot();
       if (
         !soloHasPeople(
@@ -2429,14 +2471,14 @@ function Composer({
           knownAgentPubkeys(profiles, session.agentChoices.snapshot()),
         )
       )
-        throw new Error("Tag an agent to send.");
+        throw localError("messages.composer.tagAgentSentence");
     }
     const missing = recipients.filter((key) => !channel.members?.includes(key));
     if (missing.length) {
       // Classification no longer depends on inventory; refresh before admission.
       await session.agentChoices.refresh();
       if (!currentAdmission())
-        throw new Error("The session changed. Review its channel and retry.");
+        throw localError("messages.composer.sessionChanged");
       if (
         missing.some(
           (key) =>
@@ -2445,16 +2487,14 @@ function Composer({
               .selectable.some((agent) => agent.pubkey === key),
         )
       )
-        throw new Error(
-          "Tag a person already in this chat or one of your available agents.",
-        );
+        throw localError("messages.composer.tagAvailable");
       await session.channelWrites.addAgents(
         channelId,
         missing,
         currentAdmission,
       );
       if (!currentAdmission())
-        throw new Error("The session changed. Review its channel and retry.");
+        throw localError("messages.composer.sessionChanged");
     }
     return recipients;
   }
@@ -2471,9 +2511,7 @@ function Composer({
         !valueRef.current.chatCards?.length
       ) {
         if (editing.target.attachments.length) {
-          setError(
-            "Keep attachment links unchanged. To remove this message, use Delete message.",
-          );
+          setError(localMessage("messages.composer.keepAttachmentLinks"));
           return;
         }
         if (requestDeletion && session.outbox?.supports(5)) {
@@ -2556,23 +2594,33 @@ function Composer({
             const names = prose
               .filter((chip) => chip.reason === reason)
               .map((chip) => `@${chip.name}`);
-            return names.length ? [`${names.join(", ")} ${says}.`] : [];
+            return names.length
+              ? [localMessage(says, { names: names.join(", ") })]
+              : [];
           },
         );
-        setError(
-          [
-            ...why,
-            needsRecipient && !sendRecipients().length
-              ? `${recipientHint}.`
-              : `Send again to send ${prose.length > 1 ? "them" : "it"} as text.`,
-          ].join(" "),
-        );
+        setError([
+          ...why,
+          needsRecipient && !sendRecipients().length
+            ? localMessage(
+                routing
+                  ? "messages.composer.chooseAgentSentence"
+                  : submission
+                    ? "messages.composer.tagAgentSentence"
+                    : "messages.composer.tagRecipientSentence",
+              )
+            : localMessage(
+                prose.length > 1
+                  ? "messages.composer.resendMany"
+                  : "messages.composer.resendOne",
+              ),
+        ]);
         return;
       }
     }
     const recipientsNow = sendRecipients();
     if (needsRecipient && !recipientsNow.length) {
-      setError(recipientHint);
+      setError(localMessage(recipientHint));
       return;
     }
     // Named conversations require text unless their owner explicitly permits files alone.
@@ -2599,9 +2647,7 @@ function Composer({
     const picksNow = choicesNow?.source ?? committedPicks.current;
     if (pickReadFailed) return;
     if (pendingPickSaves.current || awaitingPickCommit.current) {
-      setError(
-        "Model and effort choices are still saving. Try sending again shortly.",
-      );
+      setError(localMessage("messages.composer.choicesSaving"));
       return;
     }
     // A failed save acknowledgement revokes Send before its error render commits.
@@ -2620,8 +2666,7 @@ function Composer({
         ))
     ) {
       setError(
-        choicesNow?.error ??
-          "Saved model and effort choices are still loading. Try sending again shortly.",
+        choicesNow?.error ?? localMessage("messages.composer.choicesLoading"),
       );
       return;
     }
@@ -2702,10 +2747,10 @@ function Composer({
           (p) => archivedMention(session, p.pubkey) && !bringable.has(p.pubkey),
         )
       )
-        throw new Error(
+        throw localError(
           routing && !captured.recipients.length
-            ? "An agent you're sending to is archived. Choose another agent to send."
-            : "A selected recipient is archived. Remove it before sending.",
+            ? "messages.composer.agentArchived"
+            : "messages.composer.recipientArchived",
         );
       if (
         ownSoloConversation &&
@@ -2717,9 +2762,7 @@ function Composer({
               .selectable.some((agent) => agent.pubkey === person.pubkey),
         )
       )
-        throw new Error(
-          "Only your available agents can be mentioned in Solo chats. Remove the unavailable recipient and retry.",
-        );
+        throw localError("messages.composer.soloAvailableOnly");
       if (submission) {
         // SoloDraft filters the captured choices against its final recipient set.
         submission.submit(
@@ -2893,7 +2936,7 @@ function Composer({
         sender: ComposerSession,
       ) {
         if (compactingNow(recipients))
-          throw new Error("Wait for compaction to finish, or interrupt it.");
+          throw localError("messages.composer.waitCompaction");
         return threadRootId
           ? sender.messages.reply(
               channelId,
@@ -2927,7 +2970,7 @@ function Composer({
         validated = false,
       ) => {
         if (compactingNow(recipients))
-          throw new Error("Wait for compaction to finish, or interrupt it.");
+          throw localError("messages.composer.waitCompaction");
         if (!queueFollowUp || !host) return publishNow(uploaded, session);
         const message = {
           channelId,
@@ -2946,9 +2989,7 @@ function Composer({
             ready: send.ready,
             publish: (recovery) => {
               if (compactingNow(recipients))
-                throw new Error(
-                  "Wait for compaction to finish, or interrupt it.",
-                );
+                throw localError("messages.composer.waitCompaction");
               return send.publish(recovery);
             },
             onSend: (id) => {
@@ -2975,7 +3016,8 @@ function Composer({
           recoveryKey,
           channelId,
           {
-            name: threadRootId ? `thread in ${name}` : name,
+            name,
+            ...(threadRootId ? { thread: true as const } : {}),
             // A huddle opens from its entry point, never by its room's link.
             ...(listed?.huddle
               ? {}
@@ -3111,7 +3153,7 @@ function Composer({
       finishDraft(pending);
     } catch (reason) {
       if (live.current && !attempt.signal.aborted)
-        setError(reason instanceof Error ? reason.message : String(reason));
+        setError(errorMessage(reason));
     } finally {
       admission.current = false;
       if (sendAttempt.current === attempt) {
@@ -3202,7 +3244,7 @@ function Composer({
             type="file"
             multiple
             hidden
-            aria-label="Choose attachments"
+            aria-label={t("messages.composer.chooseAttachments")}
             onChange={(event) => {
               const ids = attachFiles(
                 Array.from(event.currentTarget.files ?? []),
@@ -3216,8 +3258,8 @@ function Composer({
             hint="familiar"
             size="sm"
             type="button"
-            aria-label="Attach files"
-            title="Attach files"
+            aria-label={t("messages.composer.attach")}
+            title={t("messages.composer.attach")}
             disabled={editingDisabled || !!editing.target}
             onClick={() => picker.current?.click()}
             icon={<PaperclipIcon size={16} />}
@@ -3231,7 +3273,7 @@ function Composer({
       <>
         {context}
         <footer className={styles.composer} data-composer-surface="">
-          This relay connection supports reading only.
+          {t("messages.composer.readOnly")}
         </footer>
       </>
     );
@@ -3291,10 +3333,10 @@ function Composer({
         }}
         aria-label={
           editing.target
-            ? "Edit message"
+            ? t("messages.composer.edit")
             : threadRootId
-              ? "Reply to thread"
-              : `Send a message to ${channelName}`
+              ? t("messages.composer.reply")
+              : t("messages.composer.sendTo", { channel: channelName })
         }
         onSubmit={(event) => {
           event.preventDefault();
@@ -3329,8 +3371,8 @@ function Composer({
         {dragging && <FileDropOverlay composer={form} />}
         {attachmentError && (
           <ToastNotice
-            title={attachmentError.title}
-            description={attachmentError.description}
+            title={resolveMessage(attachmentError.title)}
+            description={resolveMessage(attachmentError.description)}
             onDismiss={() => setAttachmentError(undefined)}
           />
         )}
@@ -3338,11 +3380,15 @@ function Composer({
           {editing.target ? (
             <div className={styles.replyContext}>
               <PencilSimpleIcon size={18} aria-hidden="true" />
-              <div>Editing message</div>
+              <div>{t("messages.composer.editing")}</div>
               <IconButton
                 type="button"
                 size="sm"
-                aria-label={editing.locked ? "Close edit" : "Cancel edit"}
+                aria-label={
+                  editing.locked
+                    ? t("messages.composer.closeEdit")
+                    : t("messages.composer.cancelEdit")
+                }
                 disabled={editing.busy}
                 onClick={editing.close}
                 icon={<XIcon size={16} aria-hidden="true" />}
@@ -3593,8 +3639,14 @@ function Composer({
               <span
                 className={styles.channelPlaceholder}
                 aria-hidden="true"
-                data-lead="Message"
-                data-name={channelName}
+                data-lead={
+                  language === "en" ? t("messages.composer.messageLead") : ""
+                }
+                data-name={
+                  language === "en"
+                    ? channelName
+                    : t("messages.composer.message", { channel: channelName })
+                }
               >
                 <ChannelIcon className={channelIconClass(ChannelIcon)} />
               </span>
@@ -3606,12 +3658,16 @@ function Composer({
           mediaTimeSeconds !== undefined &&
           !hideMediaTimeIndicator && (
             <div className={styles.mediaComposerAnchor}>
-              <span>Commenting at {formatMediaTime(mediaTimeSeconds)}</span>
+              <span>
+                {t("messages.composer.commentAt", {
+                  time: formatMediaTime(mediaTimeSeconds),
+                })}
+              </span>
               <IconButton
                 size="compact"
                 type="button"
                 onClick={clearMediaTime}
-                aria-label="Remove video time"
+                aria-label={t("messages.composer.removeVideoTime")}
                 icon={<XIcon size={13} />}
               />
             </div>
@@ -3701,15 +3757,19 @@ function Composer({
               size="toolbar"
               type="submit"
               style={editing.target ? undefined : accentButtonStyle}
-              aria-label={editing.target ? "Save changes" : "Send message"}
+              aria-label={
+                editing.target
+                  ? t("messages.composer.saveChanges")
+                  : t("messages.composer.send")
+              }
               title={
                 editing.target
-                  ? "Save changes"
+                  ? t("messages.composer.saveChanges")
                   : compacting
-                    ? "Wait for compaction to finish, or interrupt it."
+                    ? t("messages.composer.waitCompaction")
                     : untagged
-                      ? recipientHint
-                      : "Send message"
+                      ? t(recipientHint)
+                      : t("messages.composer.send")
               }
               focusableWhenDisabled={
                 untagged || (!editing.target && compacting) || undefined
@@ -3743,39 +3803,43 @@ function Composer({
         </div>
         {!editing.target && compacting && (
           <p className={styles.composerStatus} role="status">
-            Compacting session…
+            {t("messages.composer.compacting")}
           </p>
         )}
         {pasteTooLong && (
           <p id={`${inputId}-paste-error`} role="alert">
-            This paste would make your message too long.{" "}
-            {canAttach && !editing.target
-              ? "Shorten it or attach the text as a file."
-              : "Shorten the text and try again."}
+            {t(
+              canAttach && !editing.target
+                ? "messages.composer.pasteTooLongAttach"
+                : "messages.composer.pasteTooLong",
+            )}
           </p>
         )}
         {(error || editing.error) && (
-          <p role="alert">{error ?? editing.error}</p>
+          <p role="alert">
+            {Array.isArray(error)
+              ? error.map((message) => resolveMessage(message)).join(" ")
+              : (resolveMessage(error) ?? editing.error)}
+          </p>
         )}
         {stickyPicks && (pickReadPending || pickReadFailed) && (
           <div className={pickReadFailed ? undefined : "sr-only"}>
             <LoadingRegion
               pending={pickReadPending}
-              label="Loading saved model and effort…"
+              label={t("messages.composer.loadingChoices")}
               statusVisibility="screen-reader"
               feedback={
                 pickReadFailed ? (
                   <div>
                     <p role="alert">
-                      Could not read saved model and effort for this chat on
-                      this device. Retry before sending.
+                      {t("messages.composer.readChoicesFailed")}
                     </p>
                     <Button
                       type="button"
                       disabled={pickReadPending}
                       onClick={() => void refreshPicks()}
                     >
-                      Retry saved choices
+                      {t("messages.composer.retryChoices")}
                     </Button>
                   </div>
                 ) : undefined
@@ -3786,10 +3850,7 @@ function Composer({
           </div>
         )}
         {pickStorageFailed && (
-          <p role="alert">
-            Could not save model and effort for this chat on this device. The
-            current choices remain until this composer closes.
-          </p>
+          <p role="alert">{t("messages.composer.saveChoicesFailed")}</p>
         )}
         {!editing.target &&
           !submission &&
@@ -3797,40 +3858,40 @@ function Composer({
             <div>
               <p role="alert">
                 {accepted
-                  ? "Message accepted. Could not update the saved draft. Retry cleanup before sending again."
+                  ? t("messages.composer.acceptedDraftFailed")
                   : conflict
-                    ? "This draft changed elsewhere. Your edits are kept here; choose which draft to keep."
-                    : "Could not save this draft on this device. Your edits are kept here."}
+                    ? t("messages.composer.draftConflict")
+                    : t("messages.composer.draftSaveFailed")}
               </p>
               {accepted ? (
                 <Button type="button" onClick={() => finishDraft(accepted)}>
-                  Retry draft cleanup
+                  {t("messages.composer.retryCleanup")}
                 </Button>
               ) : conflict ? (
                 <>
                   <Button type="button" onClick={() => resolveDraft(false)}>
-                    Load saved draft
+                    {t("messages.composer.loadDraft")}
                   </Button>
                   <Button type="button" onClick={() => resolveDraft(true)}>
-                    Keep my draft
+                    {t("messages.composer.keepDraft")}
                   </Button>
                 </>
               ) : (
                 <Button type="button" onClick={() => persist(valueRef.current)}>
-                  Retry draft save
+                  {t("messages.composer.retryDraft")}
                 </Button>
               )}
             </div>
           )}
         {editing.retryable && (
           <>
-            <p role="status">Your edit is still in the outbox.</p>
+            <p role="status">{t("messages.composer.editOutbox")}</p>
             <Button
               type="button"
               disabled={editDisabled}
               onClick={editing.retry}
             >
-              Retry edit
+              {t("messages.composer.retryEdit")}
             </Button>
           </>
         )}
@@ -3850,7 +3911,7 @@ function Composer({
               });
             }}
           >
-            Retry message preparation
+            {t("messages.composer.retryPreparation")}
           </Button>
         )}
       </form>
@@ -3903,6 +3964,7 @@ function RecipientAvatars({
   disabled: boolean;
   remove(pubkey: string): void;
 }) {
+  useLanguage();
   const reduceMotion = useReducedMotion();
   const enter = useCallback(
     (node: HTMLButtonElement | null) => {
@@ -3933,7 +3995,11 @@ function RecipientAvatars({
   return (
     <section
       className={styles.mentionRecipients}
-      aria-label={mentions ? "Explicit mentions" : "Sending to"}
+      aria-label={
+        mentions
+          ? t("messages.composer.explicitMentions")
+          : t("messages.composer.sendingTo")
+      }
     >
       {unique.map((recipient) => {
         const profile = profiles.get(recipient.pubkey);
@@ -3947,8 +4013,18 @@ function RecipientAvatars({
             data-avatar-shape={
               agentPubkeys.has(recipient.pubkey) ? "squircle" : "circle"
             }
-            title={`Remove ${mentions ? "explicit mention of " : ""}${recipient.name} (${recipient.pubkey.slice(0, 8)})`}
-            aria-label={`Remove ${mentions ? "mention" : "agent"} ${recipient.name} ${recipient.pubkey}`}
+            title={t(
+              mentions
+                ? "messages.composer.removeMentionTitle"
+                : "messages.composer.removeAgentTitle",
+              { name: recipient.name, key: recipient.pubkey.slice(0, 8) },
+            )}
+            aria-label={t(
+              mentions
+                ? "messages.composer.removeMention"
+                : "messages.composer.removeAgent",
+              { name: recipient.name, key: recipient.pubkey },
+            )}
             disabled={disabled}
             onClick={() => remove(recipient.pubkey)}
             icon={

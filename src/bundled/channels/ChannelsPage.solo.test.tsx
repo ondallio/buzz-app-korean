@@ -11,6 +11,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../../shared/i18n";
 import { createRelaySession } from "../../features/relay/session";
 import { ChatNotStarted } from "../../features/relay/channel-writes";
 import { keypair, signed } from "../../features/relay/testing";
@@ -49,6 +50,7 @@ composerDOMFixture();
 const owners: ReturnType<typeof createRelaySession>[] = [];
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   localStorage.clear();
   for (const owner of owners.splice(0)) owner.dispose();
   vi.unstubAllGlobals();
@@ -256,7 +258,7 @@ function fixture({
     channelLifecycle: {
       ...owner.session.channelLifecycle,
       available: true,
-      load: vi.fn(async () => ({
+      load: vi.fn<RelaySession["channelLifecycle"]["load"]>(async () => ({
         channelId: id,
         channelType: "stream" as const,
         canArchive: !viewOnly,
@@ -696,6 +698,12 @@ it("keeps refused-start restoration visibly retryable when window ownership fail
     const retry = () =>
       screen.findByRole("button", { name: "Retry restoring message" });
     const firstRetry = await retry();
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("button", { name: "메시지 복원 다시 시도" })).toBe(
+      firstRetry,
+    );
+    act(() => setLanguage("en"));
+    expect(await retry()).toBe(firstRetry);
     fireEvent.click(firstRetry);
     // The toast consumes its action before invoking it; a second failure must
     // offer a new action retaining the same refused prompt.
@@ -1563,3 +1571,63 @@ it("leaves Escape to a text field outside the composer", async () => {
   expect(f.read.current?.available()).toBe(false);
   field.remove();
 });
+
+it("retranslates a retained mark-read failure without replacing the shortcut or repeating its raw request", async () => {
+  const h = fixture({ unread: 1 });
+  h.markRead.mockRejectedValueOnce(new Error("offline"));
+  h.mountWithToasts();
+  await waitFor(() => expect(h.read.current?.available()).toBe(true));
+  const shortcut = h.read.current;
+  await act(async () => shortcut?.run());
+  const message = await screen.findByText("Couldn’t mark as read.");
+  act(() => setLanguage("ko"));
+  expect(screen.getByText("읽음으로 표시하지 못했습니다.")).toBe(message);
+  expect(h.read.current).toBe(shortcut);
+  expect(h.markRead).toHaveBeenCalledExactlyOnceWith(id);
+  expect(h.open).not.toHaveBeenCalled();
+  act(() => setLanguage("en"));
+  expect(screen.getByText("Couldn’t mark as read.")).toBe(message);
+  expect(h.markRead).toHaveBeenCalledOnce();
+});
+
+it.each([false, true])(
+  "localizes only the app-owned leave refusal, retaining a supplied identical diagnostic (%s)",
+  async (external) => {
+    const h = fixture({ type: "stream", canLeave: false });
+    const raw = "You can’t leave this channel with your current permissions.";
+    if (external)
+      h.session.channelLifecycle.load.mockResolvedValueOnce({
+        channelId: id,
+        channelType: "stream",
+        canArchive: true,
+        canUnarchive: false,
+        canDelete: true,
+        canLeave: false,
+        canHide: false,
+        leaveReason: raw,
+      });
+    h.mount();
+    const editor = await screen.findByRole("textbox", {
+      name: "Message Planning",
+    });
+    await userEvent.setup().type(editor, "/leave{Enter}");
+    const error = await screen.findByText(raw);
+    act(() => setLanguage("ko"));
+    expect(
+      screen.getByText(
+        external ? raw : "현재 권한으로는 이 채널에서 나갈 수 없습니다.",
+      ),
+    ).toBe(error);
+    expect(editor).toHaveValue("/leave");
+    expect(editor).toHaveFocus();
+    expect(h.session.channelLifecycle.load).toHaveBeenCalledExactlyOnceWith(
+      id,
+      expect.any(AbortSignal),
+    );
+    expect(h.run).not.toHaveBeenCalled();
+    expect(h.send).not.toHaveBeenCalled();
+    expect(h.open).not.toHaveBeenCalled();
+    act(() => setLanguage("en"));
+    expect(screen.getByText(raw)).toBe(error);
+  },
+);

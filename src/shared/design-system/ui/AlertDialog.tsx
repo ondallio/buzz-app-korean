@@ -3,6 +3,7 @@ import { XIcon } from "../icons";
 import { IconButton } from "./IconButton";
 import { useModalWindowDrag } from "./ModalWindowDrag";
 import { useState, type ComponentProps, type ReactNode } from "react";
+import { useDialogCloseLabel } from "./DialogLabels";
 
 /** Confirmations keep alert-dialog semantics and focus behavior owned by Base UI. */
 export function AlertDialog({
@@ -14,6 +15,7 @@ export function AlertDialog({
   pending = false,
   finalFocus,
   initialFocus,
+  closeLabel,
 }: {
   title: ReactNode;
   description: ReactNode;
@@ -21,9 +23,11 @@ export function AlertDialog({
   actions: ReactNode;
   onClose(): void;
   pending?: boolean;
+  closeLabel?: string;
   initialFocus?: ComponentProps<typeof BaseAlertDialog.Popup>["initialFocus"];
   finalFocus?: ComponentProps<typeof BaseAlertDialog.Popup>["finalFocus"];
 }) {
+  const closeName = useDialogCloseLabel(closeLabel);
   const windowDrag = useModalWindowDrag();
   // Preserve Base UI’s body/action default; Close joins the tab order afterward.
   const [focusEntered, setFocusEntered] = useState(false);
@@ -71,7 +75,7 @@ export function AlertDialog({
             <BaseAlertDialog.Close
               render={
                 <IconButton
-                  aria-label="Close"
+                  aria-label={closeName}
                   tabIndex={
                     initialFocus === undefined && !focusEntered ? -1 : 0
                   }

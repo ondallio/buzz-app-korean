@@ -5,6 +5,7 @@ import { Context } from "@deepseek-ai/cordis";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../shared/i18n";
 import { CommunityLocalSettings } from "./CommunityLocalSettings";
 import { createCommunities } from "../features/communities/service";
 import { localCommunityNameKey } from "../features/communities/names";
@@ -53,6 +54,7 @@ async function setup() {
 }
 afterEach(async () => {
   cleanup();
+  setLanguage("en");
   for (const root of roots.splice(0)) await root.fiber.dispose();
   localStorage.clear();
   vi.restoreAllMocks();
@@ -154,4 +156,36 @@ it("copies the exact community URL, keeps it selectable on clipboard failure, an
   expect(await screen.findByText("Community URL copied.")).toBeVisible();
   expect(screen.queryByRole("alert")).toBeNull();
   expect(communities.snapshot().selected).toBe(origin);
+});
+
+it("keeps the same local-name draft and clipboard failure while switching language, then saves its raw value", async () => {
+  setLanguage("en");
+  const { user, communities } = await setup();
+  const input = screen.getByLabelText("Display name");
+  await user.type(input, "Profile updated");
+  const write = vi.fn().mockRejectedValueOnce(new Error("denied"));
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: write },
+  });
+  await user.click(screen.getByRole("button", { name: "Copy URL" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Select it and copy manually.",
+  );
+  await user.click(input);
+  act(() => setLanguage("ko"));
+  expect(screen.getByLabelText("표시 이름")).toBe(input);
+  expect(input).toHaveFocus();
+  expect(input).toHaveValue("Profile updated");
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "URL을 복사하지 못했습니다. 직접 선택하여 복사해 주세요.",
+  );
+  expect(screen.getByLabelText("커뮤니티 주소")).toHaveValue(origin);
+  act(() => setLanguage("en"));
+  expect(screen.getByLabelText("Display name")).toBe(input);
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(communities.snapshot().memberships[0]?.localName).toBe(
+    "Profile updated",
+  );
+  expect(write).toHaveBeenCalledExactlyOnceWith(origin);
 });

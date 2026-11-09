@@ -98,6 +98,8 @@
     "allow-media-stream-base",
     "allow-get-os-idle-seconds",
     "allow-system-hour-cycle",
+    "allow-system-language",
+    "allow-set-desktop-language",
     "allow-workspace-pick-folder",
     "allow-repositories-folder-validate",
     "allow-legacy-communities",

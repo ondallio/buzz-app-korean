@@ -1,3 +1,4 @@
+import { errorMessage } from "../../shared/i18n/deferred-message";
 import { followUpQueue } from "../messages/follow-up-queue";
 import { registerAttention } from "./attention-command";
 import { canMessageAgent, createAgentChoices } from "./choices";
@@ -17226,4 +17227,177 @@ it("tells a transcript only of an agent's new or changed steps", async () => {
   stop();
   two.step("Read", "c.txt");
   expect(listener).toHaveBeenCalledTimes(3);
+});
+
+it("keeps preview guard diagnostics canonical while carrying owned display provenance", async () => {
+  const { service, plugin, native } = await setup();
+  const failure = (action: () => unknown) => {
+    try {
+      action();
+    } catch (reason) {
+      return reason;
+    }
+    throw new Error("Expected preview rejection");
+  };
+  const absent = failure(() => service.previewRetype(bot, "example/echo"));
+  await service.create({ type: "example/echo", name: "Raw {name} 이름" });
+  plugin.agents.register(cloud().type);
+  const missingType = failure(() =>
+    service.previewRetype(bot, "external/missing"),
+  );
+  const hosted = failure(() => service.previewRetype(bot, "example/cloud"));
+  for (const [reason, message, key] of [
+    [absent, "No such agent on this device", "agentsErrors.noAgent"],
+    [
+      missingType,
+      "That agent type is not available",
+      "agentsErrors.missingType",
+    ],
+    [
+      hosted,
+      "A hosted provider cannot take over a local agent key",
+      "agentsErrors.hostedKey",
+    ],
+  ] as const) {
+    expect(reason).toBeInstanceOf(Error);
+    if (!(reason instanceof Error)) throw new Error("Expected actual Error");
+    expect(reason.message).toBe(message);
+    expect(String(reason)).toBe(`Error: ${message}`);
+    expect(JSON.stringify(reason)).toBe("{}");
+    expect(errorMessage(reason)).toMatchObject({
+      kind: "localized-message",
+      key,
+    });
+    expect(errorMessage(new Error(message))).toBe(message);
+  }
+  expect(native.setType).not.toHaveBeenCalled();
+  expect(service.find(bot)).toMatchObject({
+    name: "Raw {name} 이름",
+    type: "example/echo",
+  });
+});
+
+it("carries rename guard provenance without changing native or hosted rename diagnostics and requests", async () => {
+  const { service, plugin, native } = await setup();
+  const rejected = async (action: Promise<unknown>) => {
+    try {
+      await action;
+    } catch (reason) {
+      return reason;
+    }
+    throw new Error("Expected rename rejection");
+  };
+  await service.create({ type: "example/echo", name: "Raw {name} 이름" });
+  const missing = await rejected(
+    service.save("f".repeat(64), { name: "Next" }),
+  );
+  const unnamed = await rejected(service.save(bot, { name: " " }));
+  const opaque = new Error("Name the agent");
+  native.rename.mockRejectedValueOnce(opaque);
+  expect(await rejected(service.save(bot, { name: "Raw next 이름" }))).toBe(
+    opaque,
+  );
+  expect(errorMessage(opaque)).toBe("Name the agent");
+  expect(native.rename).toHaveBeenCalledExactlyOnceWith(bot, "Raw next 이름");
+  const hosted = cloud();
+  plugin.agents.register(hosted.type);
+  await service.create({ type: "example/cloud", name: "Hosted {name}" });
+  let finish!: () => void;
+  hosted.remote.profile.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const saving = service.save(hostedKey, { name: "Hosted raw 이름" });
+  await vi.waitFor(() => expect(hosted.remote.profile).toHaveBeenCalledOnce());
+  const busy = await rejected(service.save(hostedKey, { name: "Another" }));
+  finish();
+  await saving;
+  expect(hosted.remote.profile.mock.calls[0]?.[0]).toMatchObject({
+    name: "Hosted raw 이름",
+    pubkey: hostedKey,
+    community: "wss://relay.example.test",
+  });
+  const next = await setup();
+  const unfinished = cloud();
+  unfinished.remote.activate.mockRejectedValueOnce(
+    new Error("opaque activation"),
+  );
+  next.plugin.agents.register(unfinished.type);
+  await expect(
+    next.service.create({ type: "example/cloud", name: "Unfinished" }),
+  ).rejects.toThrow("opaque activation");
+  const setupError = await rejected(
+    next.service.save(hostedKey, { name: "Next" }),
+  );
+  for (const [reason, message, key] of [
+    [missing, "No such agent on this device", "agentsErrors.noAgent"],
+    [unnamed, "Name the agent", "agentsErrors.nameRequired"],
+    [
+      busy,
+      "Wait for the agent's last change to finish",
+      "agentsErrors.waitForChange",
+    ],
+    [
+      setupError,
+      "Finish the agent's setup first",
+      "agentsErrors.setupRequired",
+    ],
+  ] as const) {
+    expect(reason).toBeInstanceOf(Error);
+    if (!(reason instanceof Error)) throw new Error("Expected actual Error");
+    expect(reason.message).toBe(message);
+    expect(String(reason)).toBe(`Error: ${message}`);
+    expect(JSON.stringify(reason)).toBe("{}");
+    expect(errorMessage(reason)).toMatchObject({
+      kind: "localized-message",
+      key,
+    });
+  }
+  expect(native.setType).not.toHaveBeenCalled();
+});
+
+it("carries retype guard provenance and preserves the saved type before any native mutation", async () => {
+  const { service, plugin, native } = await setup();
+  await service.create({ type: "example/echo", name: "Raw {name} 이름" });
+  plugin.agents.register(cloud().type);
+  for (const [key, type, message, code] of [
+    [
+      "f".repeat(64),
+      "example/echo",
+      "No such agent on this device",
+      "agentsErrors.noAgent",
+    ],
+    [
+      bot,
+      "external/missing",
+      "That agent type is not available",
+      "agentsErrors.missingType",
+    ],
+    [
+      bot,
+      "example/cloud",
+      "A hosted provider cannot take over a local agent key",
+      "agentsErrors.hostedKey",
+    ],
+  ] as const) {
+    const reason = await service
+      .retype(key, type)
+      .catch((error: unknown) => error);
+    expect(reason).toBeInstanceOf(Error);
+    if (!(reason instanceof Error))
+      throw new Error("Expected retype rejection");
+    expect(reason.message).toBe(message);
+    expect(JSON.stringify(reason)).toBe("{}");
+    expect(errorMessage(reason)).toMatchObject({
+      kind: "localized-message",
+      key: code,
+    });
+  }
+  expect(native.setType).not.toHaveBeenCalled();
+  expect(service.find(bot)).toMatchObject({
+    type: "example/echo",
+    name: "Raw {name} 이름",
+  });
 });

@@ -1,3 +1,13 @@
+import { t, useLanguage } from "../shared/i18n";
+import { rich } from "../shared/i18n/rich";
+import { en as pluginEnglish } from "../shared/i18n/catalogs/plugin-management";
+import {
+  localMessage,
+  localError,
+  errorMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../shared/i18n/deferred-message";
 import { SettingsGroup } from "../shared/design-system/ui/SettingsGroup";
 import { Field } from "../shared/design-system/ui/Field";
 import { Input } from "../shared/design-system/ui/Input";
@@ -38,6 +48,23 @@ import type {
   PluginInstallRequest,
 } from "../plugins/installer";
 
+type ImportFeedback =
+  | DisplayMessage
+  | Readonly<{ kind: "import-error"; message: DisplayMessage }>;
+function importFeedback(reason: unknown): ImportFeedback {
+  if (!(reason instanceof Error)) return String(reason);
+  const message = errorMessage(reason);
+  return typeof message === "string"
+    ? String(reason)
+    : Object.freeze({ kind: "import-error", message });
+}
+function importFeedbackText(value: ImportFeedback | null): string | null {
+  return value && typeof value === "object" && value.kind === "import-error"
+    ? t("pluginManagement.import.errorPrefix", {
+        message: resolveMessage(value.message),
+      })
+    : resolveMessage(value);
+}
 const shortCommit = (commit: string) => commit.slice(0, 12);
 const sourceLabel = (repository: string, path: string) =>
   path === "." ? repository : `${repository} · ${path}`;
@@ -126,6 +153,7 @@ export function PluginImport({
     repository: string,
   ) => Promise<{ repository: string; token: string } | null>;
 }) {
+  useLanguage();
   const imports = plugins.imports;
   const [open, setOpen] = useState(!!initialGit);
   const [dragging, setDragging] = useState(false);
@@ -183,7 +211,7 @@ export function PluginImport({
     (showUnchanged ? unchangedBack.current : unchangedTrigger.current)?.focus();
   }, [showUnchanged]);
   const previewRegion = useRef<HTMLElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ImportFeedback | null>(null);
   const browse = useRef<HTMLButtonElement>(null);
   const errorBack = useRef<HTMLButtonElement>(null);
   const previewBack = useRef<HTMLButtonElement>(null);
@@ -225,12 +253,16 @@ export function PluginImport({
   }, [error, busy, loading, discarding]);
   // Pending operations disable their control, so callers capture the return
   // target before starting rather than reading focus when the failure arrives.
-  function showError(reason: unknown, returnTo: Element | null) {
+  function showError(
+    reason: unknown,
+    returnTo: Element | null,
+    display?: DisplayMessage,
+  ) {
     if (!error) {
       errorTrigger.current = returnTo as HTMLElement | null;
       errorReturnsToBack.current = returnTo === previewBack.current;
     }
-    setError(String(reason));
+    setError(display ?? importFeedback(reason));
   }
   const [enableOnInstall, setEnableOnInstall] = useState(true);
   const lifetime = useRef({ active: true, token: "", installing: false });
@@ -298,7 +330,7 @@ export function PluginImport({
         setError(null);
       }
     } catch (reason) {
-      if (current.active) setError(String(reason));
+      if (current.active) setError(importFeedback(reason));
     } finally {
       checkPending.current = false;
       if (current.active) setChecking(false);
@@ -358,15 +390,21 @@ export function PluginImport({
       trimSlash(installedSource.repository) === trimSlash(preview.source) &&
       installedSource.path === candidate.path
     )
-      ? `${existing.manifest.name} is already installed from ${
-          installedSource && "repository" in installedSource
-            ? sourceLabel(installedSource.repository, installedSource.path)
-            : installedSource && "url" in installedSource
-              ? installedSource.url
-              : installedSource
-                ? sourceLabel(installedSource.root, installedSource.path)
-                : "an unknown source"
-        }; remove it first to install it from ${sourceLabel(preview.source, candidate.path)}.`
+      ? installedSource
+        ? t("pluginManagement.conflictKnown", {
+            name: existing.manifest.name,
+            source:
+              "repository" in installedSource
+                ? sourceLabel(installedSource.repository, installedSource.path)
+                : "url" in installedSource
+                  ? installedSource.url
+                  : sourceLabel(installedSource.root, installedSource.path),
+            destination: sourceLabel(preview.source, candidate.path),
+          })
+        : t("pluginManagement.conflictUnknown", {
+            name: existing.manifest.name,
+            destination: sourceLabel(preview.source, candidate.path),
+          })
       : null;
   const constraint =
     updateAction?.source ?? (bound ? bound.source : initialGit);
@@ -378,7 +416,7 @@ export function PluginImport({
     : constraint?.commit;
   const pinError =
     pinned && preview && preview.commit?.toLowerCase() !== pinned
-      ? "This repository is not at the commit that was requested. Nothing was installed."
+      ? t("pluginManagement.import.pinMismatch")
       : null;
   const duplicate = updating && !updateId && (!requested || !!conflict);
   const upToDate =
@@ -510,7 +548,7 @@ export function PluginImport({
     try {
       const result = await acquisition;
       if (!result && updateId && savedSource)
-        throw new Error("No update source found. Try again.");
+        throw localError("pluginManagement.import.noUpdateSourceTry");
       const next =
         result && updateId
           ? {
@@ -538,12 +576,13 @@ export function PluginImport({
           const warning = next.warnings.find((warning) =>
             warning.startsWith(prefix),
           );
-          throw new Error(
-            warning ??
-              (savedSource
-                ? "The saved folder or repository no longer contains this plugin at its installed path."
-                : "This source does not contain the installed plugin. Choose a source with the same plugin ID."),
-          );
+          throw warning === undefined
+            ? localError(
+                savedSource
+                  ? "pluginManagement.import.savedMissing"
+                  : "pluginManagement.import.installedMissing",
+              )
+            : new Error(warning);
         }
       }
       setError(null);
@@ -600,9 +639,7 @@ export function PluginImport({
     const candidates = result.candidates.filter((item) => item.path === path);
     if (candidates.length) return { ...result, candidates };
     await imports?.discard(result.token).catch(() => {});
-    throw new Error(
-      `This repository has no plugin at ${path}. Nothing was installed.`,
-    );
+    throw localError("pluginManagement.import.missingPath", { path });
   }
   async function dismiss() {
     if (blocked || pending.current || !preview) return;
@@ -691,19 +728,20 @@ export function PluginImport({
     }
     void checkSource(async () => {
       const result = await acquire();
-      if (!result) throw new Error("No update source found");
+      if (!result) throw localError("pluginManagement.import.noUpdateSource");
       const candidate = result.candidates.find(
         (item) => item.manifest.id === updateId && item.path === source.path,
       );
-      if (!candidate)
-        throw new Error(
-          result.warnings.find((warning) =>
-            warning.startsWith(
-              `${source.path === "." ? "Selected folder" : source.path}:`,
-            ),
-          ) ??
-            "The saved repository no longer contains this plugin at its installed path.",
+      if (!candidate) {
+        const warning = result.warnings.find((warning) =>
+          warning.startsWith(
+            `${source.path === "." ? "Selected folder" : source.path}:`,
+          ),
         );
+        throw warning === undefined
+          ? localError("pluginManagement.import.savedRepositoryMissing")
+          : new Error(warning);
+      }
       return candidate.revision;
     });
   }
@@ -725,8 +763,9 @@ export function PluginImport({
         updateSourceKey(source) !== updateSourceKey(updateAction.source)
       ) {
         showError(
-          "The plugin source changed. Close this review and check again.",
+          pluginEnglish["pluginManagement.import.sourceChanged"],
           installButton.current,
+          localMessage("pluginManagement.import.sourceChanged"),
         );
         return;
       }
@@ -751,10 +790,13 @@ export function PluginImport({
       );
       if (!success) {
         if (!current.active) return;
+        const failure = plugins.snapshot().error;
         showError(
-          plugins.snapshot().error ??
-            "Plugin installation wasn’t confirmed. Check the preview and try again.",
+          failure ?? pluginEnglish["pluginManagement.installUnconfirmed"],
           installButton.current,
+          failure == null
+            ? localMessage("pluginManagement.installUnconfirmed")
+            : undefined,
         );
         return;
       }
@@ -846,7 +888,11 @@ export function PluginImport({
       size="sm"
       aria-label={
         updateId
-          ? `Update ${catalog.plugins.find((item) => item.manifest.id === updateId)?.manifest.name ?? "plugin"}`
+          ? t("pluginManagement.updateNamed", {
+              name:
+                catalog.plugins.find((item) => item.manifest.id === updateId)
+                  ?.manifest.name ?? t("pluginManagement.plugin"),
+            })
           : undefined
       }
       disabled={blocked}
@@ -866,7 +912,7 @@ export function PluginImport({
         }
       }}
     >
-      {updateId ? "Update" : "Add"}
+      {updateId ? t("pluginManagement.update") : t("pluginManagement.add")}
     </Button>
   );
   const updateActions = (
@@ -880,7 +926,7 @@ export function PluginImport({
           disabled={blocked || checking}
           onClick={() => checkSavedGit()}
         >
-          Check for updates
+          {t("pluginManagement.import.checkUpdates")}
         </Button>
       )}
       {updateAvailable && (
@@ -893,7 +939,7 @@ export function PluginImport({
             prepareReview();
           }}
         >
-          Update
+          {t("pluginManagement.update")}
         </Button>
       )}
     </>
@@ -903,11 +949,14 @@ export function PluginImport({
       {!updateId &&
         (actionTarget ? createPortal(addButton, actionTarget) : addButton)}
       {updateId && !updateAction && (
-        <section aria-label="Plugin updates" className="text-body-sm">
+        <section
+          aria-label={t("pluginManagement.import.updates")}
+          className="text-body-sm"
+        >
           <h3 className={`${styles.sourceHeading} text-caption`}>
             {savedSource && "repository" in savedSource
-              ? "Source repository"
-              : "Source folder"}
+              ? t("pluginManagement.sourceRepository")
+              : t("pluginManagement.sourceFolder")}
           </h3>
           {savedSource ? (
             <code className={styles.sourcePath}>
@@ -916,27 +965,27 @@ export function PluginImport({
                     { source: savedSource.root, commit: null },
                     savedSource.path,
                   )
-                : `${savedSource.repository} · ${savedSource.reference || "Repository default"} · ${savedSource.path}`}
+                : `${savedSource.repository} · ${savedSource.reference || t("pluginManagement.repositoryDefault")} · ${savedSource.path}`}
             </code>
           ) : (
             <p className="m-0 text-muted">
-              No saved source. Choose a folder or repository to update this
-              plugin.
+              {t("pluginManagement.import.noSavedSource")}
             </p>
           )}
           <LoadingRegion
             pending={checking || (loading && !open)}
-            label="Checking for updates…"
+            label={t("pluginManagement.import.checking")}
           >
             {null}
           </LoadingRegion>
           {error && !open ? (
             <p role="alert">
-              Source{" "}
-              {savedSource && "repository" in savedSource
-                ? "repository"
-                : "folder"}{" "}
-              unavailable. {error}
+              {t(
+                savedSource && "repository" in savedSource
+                  ? "pluginManagement.import.sourceRepositoryUnavailable"
+                  : "pluginManagement.import.sourceFolderUnavailable",
+                { error: importFeedbackText(error) ?? "" },
+              )}
             </p>
           ) : null}
           {(preview || checkedRevision !== undefined) &&
@@ -944,9 +993,12 @@ export function PluginImport({
           !error &&
           !updateAvailable ? (
             statusTarget ? (
-              createPortal(<span role="status">Up to date</span>, statusTarget)
+              createPortal(
+                <span role="status">{t("pluginManagement.upToDate")}</span>,
+                statusTarget,
+              )
             ) : (
-              <p role="status">Up to date</p>
+              <p role="status">{t("pluginManagement.upToDate")}</p>
             )
           ) : null}
           {actionTarget
@@ -960,48 +1012,53 @@ export function PluginImport({
           if (!next) void close();
         }}
         title={
-          automaticUpdate ? (
-            `Updating ${currentPlugin?.manifest.name ?? "plugin"}`
-          ) : showUnchanged ? (
-            "Unchanged declarations"
-          ) : error || !preview ? (
-            updateId ? (
-              "Update plugin"
-            ) : (
-              "Add a plugin"
-            )
-          ) : reviewing ? (
-            duplicate ? (
-              "Already installed"
-            ) : existing ? (
-              `Update ${existing.manifest.name}`
-            ) : (
-              <>
-                Review{" "}
-                <strong>{candidate?.manifest.name ?? "Unknown"} Plugin</strong>{" "}
-                access
-              </>
-            )
-          ) : preview.candidates.length ? (
-            "Choose a plugin"
-          ) : (
-            "No plugins found"
-          )
+          automaticUpdate
+            ? t("pluginManagement.updatingNamed", {
+                name:
+                  currentPlugin?.manifest.name ?? t("pluginManagement.plugin"),
+              })
+            : showUnchanged
+              ? t("pluginManagement.import.unchangedTitle")
+              : error || !preview
+                ? updateId
+                  ? t("pluginManagement.import.updateTitle")
+                  : t("pluginManagement.import.addTitle")
+                : reviewing
+                  ? duplicate
+                    ? t("pluginManagement.import.alreadyInstalled")
+                    : existing
+                      ? t("pluginManagement.updateNamed", {
+                          name: existing.manifest.name,
+                        })
+                      : rich("pluginManagement.reviewAccess", {
+                          plugin: (
+                            <strong>
+                              {t("pluginManagement.pluginName", {
+                                name:
+                                  candidate?.manifest.name ??
+                                  t("pluginManagement.unknown"),
+                              })}
+                            </strong>
+                          ),
+                        })
+                  : preview.candidates.length
+                    ? t("pluginManagement.import.choose")
+                    : t("pluginManagement.import.none")
         }
         description={
           updateAction
-            ? "Save unfinished forms and stop active plugin workers before you update. Updating an enabled plugin reloads it immediately."
+            ? t("pluginManagement.import.updateWarning")
             : error || showUnchanged
               ? undefined
               : preview
                 ? reviewing
                   ? updating
                     ? undefined
-                    : "Only install code you trust."
+                    : t("pluginManagement.import.trust")
                   : preview.candidates.length
-                    ? "Select a plugin to review before installing."
-                    : "Try another folder or repository."
-                : "Load built plugins containing manifest.json and plugin.js. Buzz doesn’t build source code or run install scripts."
+                    ? t("pluginManagement.import.chooseHelp")
+                    : t("pluginManagement.import.tryAnother")
+                : t("pluginManagement.import.builtHelp")
         }
         size={
           automaticUpdate || error || (reviewing && updating)
@@ -1019,7 +1076,7 @@ export function PluginImport({
           currentPlugin?.source === "external" &&
           !currentPlugin.enabled ? (
             <p className="m-0 text-body-sm text-muted">
-              This plugin will stay disabled.
+              {t("pluginManagement.stayDisabled")}
             </p>
           ) : reviewing &&
             candidate &&
@@ -1027,7 +1084,7 @@ export function PluginImport({
             (!existing || loading) &&
             !error ? (
             <Switch
-              label="Enable plugin"
+              label={t("pluginManagement.enable")}
               checked={enableOnInstall}
               disabled={blocked}
               onCheckedChange={setEnableOnInstall}
@@ -1046,11 +1103,13 @@ export function PluginImport({
                 else setError(null);
               }}
             >
-              {!preview && savedSource ? "Try again" : "Back"}
+              {!preview && savedSource
+                ? t("pluginManagement.tryAgain")
+                : t("pluginManagement.back")}
             </Button>
           ) : showUnchanged ? (
             <Button ref={unchangedBack} onClick={() => setShowUnchanged(false)}>
-              Back
+              {t("pluginManagement.back")}
             </Button>
           ) : preview ? (
             <>
@@ -1069,7 +1128,7 @@ export function PluginImport({
                     } else void dismiss();
                   }}
                 >
-                  Back
+                  {t("pluginManagement.back")}
                 </Button>
               )}
               {reviewing && duplicate && onOpenInstalled && (
@@ -1081,12 +1140,12 @@ export function PluginImport({
                     if (await close()) onOpenInstalled(id);
                   }}
                 >
-                  Open in Buzz
+                  {t("pluginManagement.openBuzz")}
                 </Button>
               )}
               {reviewing && (duplicate ? !onOpenInstalled : upToDate) && (
                 <Button disabled={blocked} onClick={() => void close()}>
-                  Done
+                  {t("pluginManagement.done")}
                 </Button>
               )}
               {!reviewing && preview.candidates.length > 1 && (
@@ -1103,7 +1162,7 @@ export function PluginImport({
                     setReviewing(true);
                   }}
                 >
-                  Continue
+                  {t("pluginManagement.continue")}
                 </Button>
               )}
               {reviewing &&
@@ -1121,7 +1180,9 @@ export function PluginImport({
                     }
                     onClick={() => void installCandidate()}
                   >
-                    {updating ? "Update" : "Install plugin"}
+                    {updating
+                      ? t("pluginManagement.update")
+                      : t("pluginManagement.install")}
                   </Button>
                 )}
             </>
@@ -1140,7 +1201,7 @@ export function PluginImport({
       >
         {error && (
           <p role="alert" className="error break-words">
-            {error}
+            {importFeedbackText(error)}
           </p>
         )}
         {showUnchanged && candidate && (
@@ -1150,14 +1211,16 @@ export function PluginImport({
             unchangedOnly
           />
         )}
-        {automaticUpdate && <p role="status">Updating plugin…</p>}
+        {automaticUpdate && (
+          <p role="status">{t("pluginManagement.updating")}</p>
+        )}
         <div hidden={automaticUpdate || !!error || showUnchanged}>
           <div hidden={!!preview || (!!updateId && !!savedSource)}>
             {(!updateId || !savedSource) && (
               <div className={styles.columns}>
                 {!bound && (
                   <section
-                    aria-label="Add from folder"
+                    aria-label={t("pluginManagement.import.fromFolder")}
                     className={styles.folder}
                     data-dragging={dragging || undefined}
                     onDragOver={(event) => {
@@ -1180,7 +1243,7 @@ export function PluginImport({
                       const current = lifetime.current;
                       void load(async () => {
                         if (!entry?.isDirectory)
-                          throw new Error("Drop one folder, or choose Browse.");
+                          throw localError("pluginManagement.import.dropOne");
                         const upload = await readPluginFolder(entry);
                         if (!current.active) return null;
                         const next = await imports.files(
@@ -1198,21 +1261,21 @@ export function PluginImport({
                   >
                     <FolderOpenIcon size={32} aria-hidden="true" />
                     <p className="m-0 text-body-sm">
-                      Drop a plugin folder here
+                      {t("pluginManagement.import.dropHint")}
                     </p>
                     <Button
                       size="sm"
                       ref={browse}
-                      aria-label="Browse plugin folder"
+                      aria-label={t("pluginManagement.import.browseAria")}
                       disabled={blocked}
                       onClick={() => void load(() => imports.folder())}
                     >
-                      Browse
+                      {t("pluginManagement.import.browse")}
                     </Button>
                   </section>
                 )}
                 <form
-                  aria-label="Add from Git"
+                  aria-label={t("pluginManagement.import.fromGit")}
                   className={styles.git}
                   onSubmit={(event) => {
                     event.preventDefault();
@@ -1220,7 +1283,7 @@ export function PluginImport({
                   }}
                 >
                   <SettingsGroup layout="form">
-                    <Field label="Git or GitHub repository">
+                    <Field label={t("pluginManagement.import.repository")}>
                       <Input
                         required
                         value={repository}
@@ -1230,45 +1293,54 @@ export function PluginImport({
                         onChange={(event) => setRepository(event.target.value)}
                       />
                     </Field>
-                    <Field label="Branch or tag (optional)">
+                    <Field label={t("pluginManagement.import.reference")}>
                       <Input
                         value={reference}
                         disabled={blocked}
                         readOnly={!!bound || linkConstrained}
-                        placeholder="Repository default"
+                        placeholder={t("pluginManagement.repositoryDefault")}
                         onChange={(event) => setReference(event.target.value)}
                       />
                     </Field>
                     {(bound || linkConstrained) && (
                       <p className="m-0 break-all text-caption text-muted">
-                        {bound
-                          ? `Opened from ${requester(bound.origin)}. `
-                          : "Opened from a link. "}
-                        {constraint?.commit
-                          ? `Pinned to commit ${shortCommit(constraint.commit)}. Nothing is installed unless the fetched repository matches it. `
-                          : ""}
-                        {constraint?.path
-                          ? `Plugin folder: ${constraint.path}. `
-                          : ""}
-                        {bound
-                          ? "Review the source, then choose Find to read it. Nothing is installed until you confirm."
-                          : "Nothing is installed until you confirm."}
+                        {[
+                          bound
+                            ? t("pluginManagement.import.openedFrom", {
+                                requester: requester(bound.origin),
+                              })
+                            : t("pluginManagement.import.openedLink"),
+                          ...(constraint?.commit
+                            ? [
+                                t("pluginManagement.import.pinnedHelp", {
+                                  commit: shortCommit(constraint.commit),
+                                }),
+                              ]
+                            : []),
+                          ...(constraint?.path
+                            ? [
+                                t("pluginManagement.import.folderHint", {
+                                  path: constraint.path,
+                                }),
+                              ]
+                            : []),
+                          bound
+                            ? t("pluginManagement.import.reviewFind")
+                            : t("pluginManagement.import.confirmOnly"),
+                        ].join(" ")}
                       </p>
                     )}
                     <p className="m-0 text-caption text-muted">
-                      HTTPS or SSH; GitHub owner/repository also works. SSH uses
-                      your agent and known hosts. Password prompts and
-                      credential helpers are not used. Buzz git repositories in
-                      this community sign in with your account.
+                      {t("pluginManagement.import.gitHelp")}
                     </p>
                     <div className="justify-self-start">
                       <Button
                         type="submit"
                         size="sm"
-                        aria-label="Find plugins"
+                        aria-label={t("pluginManagement.import.findAria")}
                         disabled={blocked || !repository.trim()}
                       >
-                        Find
+                        {t("pluginManagement.import.find")}
                       </Button>
                     </div>
                   </SettingsGroup>
@@ -1277,47 +1349,54 @@ export function PluginImport({
             )}
           </div>
           {loading && !preview && (
-            <p role="status">
-              Reading plugin folders… Git imports may take up to a minute.
-            </p>
+            <p role="status">{t("pluginManagement.import.reading")}</p>
           )}
           {loading && preview && (
             <p role="status">
-              {updating ? "Updating plugin…" : "Installing plugin…"}
+              {updating
+                ? t("pluginManagement.updating")
+                : t("pluginManagement.installing")}
             </p>
           )}
           {preview && (
-            <section ref={previewRegion} aria-label="Plugin import preview">
+            <section
+              ref={previewRegion}
+              aria-label={t("pluginManagement.import.preview")}
+            >
               <div className="flex flex-col gap-4">
                 {!reviewing &&
                   (preview.candidates.length === 0 || preview.commit) && (
                     <div className="min-w-0 text-body-sm">
                       {preview.candidates.length === 0 && (
                         <p className="m-0 break-all text-caption text-muted">
-                          Source:{" "}
-                          <code className={styles.sourcePath}>
-                            {preview.source}
-                          </code>
+                          {rich("pluginManagement.sourceDetail", {
+                            source: (
+                              <code className={styles.sourcePath}>
+                                {preview.source}
+                              </code>
+                            ),
+                          })}
                         </p>
                       )}
                       {preview.commit && (
                         <p className="m-0 break-all text-caption text-muted">
-                          Commit: {preview.commit}
+                          {t("pluginManagement.commitDetail", {
+                            commit: preview.commit,
+                          })}
                         </p>
                       )}
                     </div>
                   )}
                 {preview.candidates.length === 0 ? (
-                  <p className="m-0">
-                    No built plugins found. Build the plugin first, then choose
-                    its output folder, or use a repository that includes built
-                    artifacts.
-                  </p>
+                  <p className="m-0">{t("pluginManagement.import.noBuilt")}</p>
                 ) : !reviewing && preview.candidates.length > 1 ? (
-                  <Field label="Choose a plugin" labelVisibility="hidden">
+                  <Field
+                    label={t("pluginManagement.import.choose")}
+                    labelVisibility="hidden"
+                  >
                     <RadioGroup
                       name="plugin-folder"
-                      aria-label="Choose a plugin"
+                      aria-label={t("pluginManagement.import.choose")}
                       value={selected}
                       disabled={busy}
                       onValueChange={(value) => {
@@ -1346,15 +1425,16 @@ export function PluginImport({
                 {preview.warnings.length > 0 &&
                   (!reviewing || preview.candidates.length === 1) && (
                     <section
-                      aria-label="Skipped folders"
+                      aria-label={t("pluginManagement.import.skipped")}
                       className="text-body-sm"
                     >
                       <p className="m-0 text-label">
-                        Folders skipped ({preview.warnings.length})
+                        {t("pluginManagement.import.skippedCount", {
+                          count: preview.warnings.length,
+                        })}
                       </p>
                       <p className="mb-0 mt-1 text-muted">
-                        These folders couldn’t be loaded as plugins. Other
-                        listed plugins can still be installed.
+                        {t("pluginManagement.import.skippedHelp")}
                       </p>
                       <ul className="mb-0 mt-2 list-disc space-y-1 break-words pl-4">
                         {preview.warnings.map((warning) => (
@@ -1369,15 +1449,24 @@ export function PluginImport({
                   (candidate.publisher ?? null) !==
                     (existing.publisher ?? null) && (
                     <p className="m-0 break-all text-body-sm">
-                      Publisher: {candidate.publisher ?? "Unsigned"}. Previous
-                      publisher: {existing.publisher ?? "Unsigned"}.
+                      {t("pluginManagement.import.publisher", {
+                        current:
+                          candidate.publisher ?? t("pluginManagement.unsigned"),
+                        previous:
+                          existing.publisher ?? t("pluginManagement.unsigned"),
+                      })}
                     </p>
                   )}
                 {reviewing && updating && (
-                  <section aria-label="Update source" className="text-body-sm">
+                  <section
+                    aria-label={t("pluginManagement.import.updateSource")}
+                    className="text-body-sm"
+                  >
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-muted">
-                        {preview.commit ? "Source" : "Source folder"}
+                        {preview.commit
+                          ? t("pluginManagement.source")
+                          : t("pluginManagement.sourceFolder")}
                       </span>
                     </div>
                     <code className={styles.sourcePath}>
@@ -1387,24 +1476,25 @@ export function PluginImport({
                 )}
                 {reviewing && bound && (
                   <p className="m-0 text-caption text-muted">
-                    Opened from {requester(bound.origin)}.
+                    {t("pluginManagement.import.openedFrom", {
+                      requester: requester(bound.origin),
+                    })}
                   </p>
                 )}
                 {reviewing && pinError && <p className="m-0">{pinError}</p>}
                 {reviewing && (requested || pinned) && preview.commit && (
                   <p className="m-0 break-all text-caption text-muted">
-                    Commit {shortCommit(preview.commit)}
-                    {pinned && !pinError
-                      ? " (matches the requested commit)"
-                      : ""}
+                    {t(
+                      pinned && !pinError
+                        ? "pluginManagement.import.commitMatches"
+                        : "pluginManagement.import.commit",
+                      { commit: shortCommit(preview.commit) },
+                    )}
                   </p>
                 )}
                 {reviewing && conflict && <p className="m-0">{conflict}</p>}
                 {reviewing && updating && !updateId && !requested && (
-                  <p>
-                    This plugin is already installed. Open its details to manage
-                    it.
-                  </p>
+                  <p>{t("pluginManagement.import.installedHelp")}</p>
                 )}
                 {reviewing &&
                   candidate &&
@@ -1420,8 +1510,7 @@ export function PluginImport({
                   )}
                 {reviewing && existing?.source === "bundled" && !loading && (
                   <p className="m-0 text-body-sm">
-                    This plugin is included with Buzz. Update Buzz to get its
-                    latest version.
+                    {t("pluginManagement.bundledHelp")}
                   </p>
                 )}
                 {reviewing &&
@@ -1429,7 +1518,11 @@ export function PluginImport({
                   candidate &&
                   existing?.source === "external" &&
                   rollbackWarning && (
-                    <p className="m-0 text-body-sm">{rollbackWarning}</p>
+                    <p className="m-0 text-body-sm">
+                      {candidate.publisher && existing && !existing.hasSignature
+                        ? t("pluginManagement.rollbackWarning")
+                        : rollbackWarning}
+                    </p>
                   )}
               </div>
             </section>

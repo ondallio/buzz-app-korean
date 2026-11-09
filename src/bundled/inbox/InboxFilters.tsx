@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import type { ReactNode, Ref } from "react";
 import styles from "./Inbox.module.css";
 import { Button } from "../../shared/design-system/ui/Button";
@@ -20,16 +21,16 @@ export type ActivityFilter =
   | "reactions";
 export type SenderFilter = "everyone" | "humans" | "agents";
 const views = [
-  { value: "all", label: "All" },
-  { value: "threads", label: "Threads" },
-  { value: "mentions", label: "Mentions" },
-  { value: "dms", label: "DMs" },
-  { value: "reactions", label: "Reactions" },
+  { value: "all", label: "inbox.all" },
+  { value: "threads", label: "inbox.threads" },
+  { value: "mentions", label: "inbox.mentions" },
+  { value: "dms", label: "inbox.dms" },
+  { value: "reactions", label: "inbox.reactions" },
 ] as const;
 const senders = [
-  { value: "everyone", label: "Anyone" },
-  { value: "humans", label: "People" },
-  { value: "agents", label: "Agents" },
+  { value: "everyone", label: "inbox.anyone" },
+  { value: "humans", label: "inbox.people" },
+  { value: "agents", label: "inbox.agents" },
 ] as const satisfies readonly { value: SenderFilter; label: string }[];
 
 /**
@@ -58,17 +59,23 @@ export function InboxFilters({
   /** Refresh status, sharing the last line with Unread so it never adds one. */
   status?: ReactNode;
 }) {
+  useLanguage();
   const from = senders.find((entry) => entry.value === sender) ?? senders[0];
-  const fromLabel = `From ${from.label.toLowerCase()}`;
+  const fromKeys = {
+    everyone: "inbox.fromAnyone",
+    humans: "inbox.fromPeople",
+    agents: "inbox.fromAgents",
+  } as const;
+  const fromLabel = t(fromKeys[from.value]);
   return (
     <div className={styles.filters}>
       <div className={styles.typeTabs}>
         <Tabs
-          label="Activity type"
+          label={t("inbox.activityType")}
           variant="panel"
           size="sm"
           value={view}
-          items={views}
+          items={views.map((item) => ({ ...item, label: t(item.label) }))}
           onValueChange={onViewChange}
         />
       </div>
@@ -82,13 +89,13 @@ export function InboxFilters({
               aria-label={fromLabel}
               title={fromLabel}
             >
-              From
+              {t("inbox.from")}
               <CaretDownIcon size="1rem" />
             </Button>
           }
         />
         <MenuPopup
-          aria-label="From"
+          aria-label={t("inbox.from")}
           style={{ maxHeight: "var(--available-height)" }}
         >
           <MenuRadioGroup
@@ -97,14 +104,14 @@ export function InboxFilters({
           >
             {senders.map(({ value, label }) => (
               <MenuRadioItem key={value} value={value} closeOnClick>
-                {label}
+                {t(label)}
               </MenuRadioItem>
             ))}
           </MenuRadioGroup>
         </MenuPopup>
       </MenuRoot>
       <Switch
-        label="Unread"
+        label={t("inbox.unread")}
         checked={unreadOnly}
         onCheckedChange={onUnreadChange}
       />

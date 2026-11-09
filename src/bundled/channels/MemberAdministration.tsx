@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useEffect,
   useRef,
@@ -38,6 +39,11 @@ export function memberAccessLabel(role: MemberChange["expectedRole"]) {
     none: "No access",
     absent: "No access",
   }[role];
+}
+
+/** Maps canonical roles only at member UI sinks; the English producer stays unchanged. */
+function displayedMemberAccess(role: MemberChange["expectedRole"]) {
+  return t(`channelForms.members.role.${role}`);
 }
 
 export function useMemberAdministration(
@@ -110,6 +116,7 @@ export function MemberRow({
     | undefined;
   children: ReactNode;
 }) {
+  useLanguage();
   const capability = session.memberAdministration;
   const state = useSyncExternalStore(
     capability.subscribe,
@@ -151,7 +158,7 @@ export function MemberRow({
   const roleCaption =
     role === "unknown" || role === "member" || role === "bot"
       ? undefined
-      : memberAccessLabel(role);
+      : displayedMemberAccess(role);
   const locked =
     state.operation?.status === "pending" ||
     state.operation?.status === "uncertain";
@@ -173,7 +180,7 @@ export function MemberRow({
           openingProfile.current = onViewProfile?.() ?? false;
         }}
       >
-        View profile
+        {t("channelPages.members.viewProfile")}
       </MenuItem>
       {onViewOwnerProfile && (
         <MenuItem
@@ -181,12 +188,12 @@ export function MemberRow({
             openingProfile.current = onViewOwnerProfile();
           }}
         >
-          View owner profile
+          {t("channelPages.members.viewOwnerProfile")}
         </MenuItem>
       )}
       {onSendMessage && (
         <MenuItem disabled={messagePending} onClick={onSendMessage}>
-          Send message
+          {t("channelPages.members.sendMessage")}
         </MenuItem>
       )}
       {(canEdit || canRemove) && !locked && (
@@ -204,7 +211,7 @@ export function MemberRow({
             >
               {editableMemberRoles.map((next) => (
                 <MenuRadioItem key={next} value={next}>
-                  {memberAccessLabel(next)}
+                  {displayedMemberAccess(next)}
                 </MenuRadioItem>
               ))}
             </MenuRadioGroup>
@@ -212,7 +219,11 @@ export function MemberRow({
           {canEdit && <MenuSeparator />}
           {canRemove && (
             <MenuItem tone="danger" onClick={() => choose("remove")}>
-              Remove from {place}
+              {t(
+                place === "chat"
+                  ? "channelPages.members.removeChat"
+                  : "channelPages.members.removeChannel",
+              )}
             </MenuItem>
           )}
         </>
@@ -294,13 +305,13 @@ export function MemberRow({
                     variant="bare"
                     size="sm"
                     shape="row-end"
-                    aria-label={`Actions for ${name}`}
+                    aria-label={t("channelPages.members.actions", { name })}
                     icon={<DotsThreeIcon size={18} aria-hidden="true" />}
                   />
                 }
               />
               <MenuPopup
-                aria-label={`Actions for ${name}`}
+                aria-label={t("channelPages.members.actions", { name })}
                 align="end"
                 finalFocus={finalFocus}
               >
@@ -311,7 +322,7 @@ export function MemberRow({
         )}
       </ContextMenuTrigger>
       <MenuPopup
-        aria-label={`Actions for ${name}`}
+        aria-label={t("channelPages.members.actions", { name })}
         anchor={menuAnchor}
         align={menuAnchor ? "end" : "start"}
         finalFocus={finalFocus}

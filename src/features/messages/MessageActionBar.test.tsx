@@ -29,6 +29,7 @@ import { MessageLink } from "../conversation/MessageLink";
 import { LinkThreadTabContext } from "../conversation/LinkLabelContext";
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -771,4 +772,48 @@ it("retires the native top-layer bar and its open menu with the source", async (
     Reflect.deleteProperty(HTMLElement.prototype, "hidePopover");
     vi.unstubAllGlobals();
   }
+});
+
+import "@testing-library/jest-dom/vitest";
+import { setLanguage } from "../../shared/i18n";
+it("keeps a clipboard failure live across languages and retries the unchanged user message through the same menu", async () => {
+  setLanguage("en");
+  const user = userEvent.setup();
+  const write = vi
+    .spyOn(navigator.clipboard, "writeText")
+    .mockRejectedValueOnce(new Error("provider diagnostic"))
+    .mockResolvedValueOnce();
+  render(<MessageActionBar copyText={() => "사용자 raw message\ncode()"} />);
+  const trigger = screen.getByRole("button", { name: "More message actions" });
+  await user.click(trigger);
+  await user.click(
+    await screen.findByRole("menuitem", { name: "Copy message" }),
+  );
+  const error = await screen.findByText(
+    "Couldn’t copy. Try again from the message menu.",
+  );
+  trigger.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "메시지 작업 더 보기" })).toBe(
+    trigger,
+  );
+  expect(
+    screen.getByText(
+      "복사하지 못했습니다. 메시지 메뉴에서 다시 시도해 주세요.",
+    ),
+  ).toBe(error);
+  expect(trigger).toHaveFocus();
+  await user.click(trigger);
+  await user.click(
+    await screen.findByRole("menuitem", { name: "메시지 복사" }),
+  );
+  await screen.findByText("메시지를 복사했습니다");
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "More message actions" })).toBe(
+    trigger,
+  );
+  expect(write.mock.calls).toEqual([
+    ["사용자 raw message\ncode()"],
+    ["사용자 raw message\ncode()"],
+  ]);
 });

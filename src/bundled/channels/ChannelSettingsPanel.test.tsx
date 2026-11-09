@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
+import { setLanguage } from "../../shared/i18n";
 import {
   act,
   cleanup,
@@ -23,6 +24,8 @@ import type { CommunityMembership } from "../moderation/membership";
 
 afterEach(() => {
   cleanup();
+  setLanguage("en");
+  localStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -607,4 +610,64 @@ it("drops an unconfirmed prompt once the signed flag shows the change landed", a
 it("disables the switch when channel actions are unavailable on this connection", () => {
   render(autoJoinPanel(publicStream, "owner", lifecycle(false)));
   expect(autoJoinSwitch()).toHaveAttribute("aria-disabled", "true");
+});
+
+it("keeps the settings tab, raw channel ID and copied feedback on the same controls across language switches", async () => {
+  const user = userEvent.setup();
+  const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+  render(idPanel("Raw {id} 한글"));
+  const tab = screen.getByRole("tab", { name: "Channel settings" });
+  const close = screen.getByRole("button", {
+    name: "Close Channel settings tab",
+  });
+  const copy = screen.getByRole("button", { name: "Copy channel id" });
+  await user.click(copy);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent(
+    "Channel ID copied",
+  );
+  const feedback = screen.getByRole("status");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("tab", { name: "채널 설정" })).toBe(tab);
+  expect(screen.getByRole("button", { name: "채널 설정 탭 닫기" })).toBe(close);
+  expect(screen.getByRole("button", { name: "채널 ID 복사" })).toBe(copy);
+  expect(screen.getByRole("status")).toBe(feedback);
+  expect(feedback).toHaveTextContent("채널 ID를 복사했습니다");
+  expect(write).toHaveBeenCalledExactlyOnceWith("Raw {id} 한글");
+  expect(screen.getByText("Raw {id} 한글")).toBeInTheDocument();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Copy channel id" })).toBe(copy);
+});
+
+it("keeps the starter permission, raw action and retained unconfirmed feedback across locale changes", async () => {
+  const capability = lifecycle();
+  capability.run.mockRejectedValueOnce(
+    new ChannelLifecycleUnconfirmed(new Error("raw timeout")),
+  );
+  render(autoJoinPanel(publicStream, "owner", capability));
+  const control = autoJoinSwitch();
+  await userEvent.setup().click(control);
+  const error = await screen.findByRole("alert");
+  expect(error).toHaveTextContent(
+    "Saved, but not confirmed yet. Try again to check.",
+  );
+  control.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("switch", { name: "새 멤버용 시작 채널" })).toBe(
+    control,
+  );
+  expect(control).toHaveFocus();
+  expect(screen.getByRole("alert")).toBe(error);
+  expect(error).toHaveTextContent(
+    "저장되었지만 아직 확인되지 않았습니다. 다시 시도하여 확인하세요.",
+  );
+  expect(capability.run).toHaveBeenCalledExactlyOnceWith(
+    "auto-join-on",
+    publicStream.id,
+    expect.any(AbortSignal),
+  );
+  expect(control).not.toBeChecked();
+  act(() => setLanguage("en"));
+  expect(error).toHaveTextContent(
+    "Saved, but not confirmed yet. Try again to check.",
+  );
 });

@@ -49,6 +49,22 @@ do not infer approval from an existing inconsistent screen.
 
 ## Compose the whole surface
 
+Hosts can supply the generic dialog close name through `DialogLabelsProvider`.
+Explicit `closeLabel` props still take precedence. The provider changes text only;
+Base UI continues to own dismissal, focus restoration and keyboard behavior.
+Toast hosts similarly supply region/dismiss labels on `ToastProvider`; completed
+toast titles and actions can contain live React text without recreating a toast.
+
+`ChipLabelsProvider` supplies complete accessible names and kind labels for inline
+chips. The host owns translated phrases; scoped faces, authored names, addresses,
+loading state and preview actions keep their existing owners. Outside the provider,
+shared specimens and consumers retain the English labels.
+
+`TabsLabelsProvider` supplies complete tab close, menu and rename phrases. A tab's
+explicit `closeLabel` overrides the shared phrase. Use the close control's stable
+`data-tab-close` value for a focus handoff; translated accessible names are not
+control identifiers.
+
 Use these recipes before the detailed visual reference below. They describe
 structure and ownership, not new plugin APIs. Examples demonstrate the named
 pattern only; the [adoption review](../../../docs/design-system-adoption.md#composition-review)
