@@ -29,10 +29,12 @@ temporary locks. Real-account integration targets were excluded. These results
 do not establish native IME, real key storage, OS permissions, packaging or
 updating.
 
-Dependency policy fails on this lockfile's libsqlite3-sys 0.38.2 and rmcp 3.8.0
-advisories. No ignore was added. The targeted rmcp candidate and coordinated
-SQLite/SDK repair are separate from this checkpoint. An installer cannot be
-called validated while those gates remain unresolved.
+Dependency policy still fails on libsqlite3-sys 0.38.2. No ignore was added.
+The two-block rmcp/macro update to 3.9.0 is included here. Its separate candidate
+passed locked metadata and Clippy; 52 upstream HTTP response-limit cases passed
+in a disposable library fixture. That is distinct from testing the complete
+SDK integration or shipping app. The coordinated SQLite/SDK repair is still
+unresolved, so this source is not a validated installer.
 
 No installer/feed, Apple signing/notarization, user installation or maintainer
 acceptance is attested. Hosted CI and platform requirements remain authoritative;
