@@ -1,4 +1,12 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { t, useLanguage, formattingLocale } from "../../shared/i18n";
+import {
+  localMessage,
+  localError,
+  errorMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { communityFromScope } from "../../features/relay/gifs";
 import {
   useProfileGeneration,
@@ -63,9 +71,15 @@ const USES = [
     label: uses === 1 ? "1 use" : `${uses} uses`,
   })),
 ];
-const message = (reason: unknown) =>
-  reason instanceof Error ? reason.message : String(reason);
-const STALE = "The member list is out of date. Retry before making changes.";
+const ROLE_LABELS = {
+  owner: "communityAdmin.owner",
+  admin: "communityAdmin.admin",
+  member: "communityAdmin.member",
+} as const;
+const roleLabel = (role: Member["role"]) => t(ROLE_LABELS[role]);
+
+const message = errorMessage;
+const STALE = localMessage("communityAdmin.stale");
 
 export function CommunityAdmin({
   relay,
@@ -78,6 +92,7 @@ export function CommunityAdmin({
   communityName?: string;
   active(): boolean;
 }) {
+  useLanguage();
   const [fallbackMembership] = useState(() =>
     suppliedMembership ? null : createCommunityMembership(relay),
   );
@@ -93,12 +108,12 @@ export function CommunityAdmin({
   return (
     <section aria-labelledby="community-admin-title">
       <h2 id="community-admin-title" className="mt-0 mb-2 text-label">
-        Membership
+        {t("communityAdmin.membership")}
       </h2>
       <p className="text-body-sm text-muted">
         {communityName
-          ? `Manage members and access to ${communityName}.`
-          : "Manage members and community access."}
+          ? t("communityAdmin.manageNamed", { community: communityName })
+          : t("communityAdmin.manage")}
       </p>
       {community && connection.viewer ? (
         <Members
@@ -110,7 +125,7 @@ export function CommunityAdmin({
           active={active}
         />
       ) : (
-        <p role="status">Choose a connected community to manage members.</p>
+        <p role="status">{t("communityAdmin.chooseCommunity")}</p>
       )}
     </section>
   );
@@ -131,14 +146,15 @@ function Members({
   membership: CommunityMembership;
   active(): boolean;
 }) {
+  useLanguage();
   const membershipState = useSyncExternalStore(
     membership.subscribe,
     membership.snapshot,
   );
   const members = membershipState.members;
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const readError = membershipState.error ?? "";
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<DisplayMessage>("");
   const refreshing = membershipState.refreshing;
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<Pending | null>(null);
@@ -178,7 +194,7 @@ function Members({
     if (!active()) return;
     if (locked) {
       setError(STALE);
-      throw new Error(STALE);
+      throw localError("communityAdmin.stale");
     }
     setBusy(true);
     setError("");
@@ -190,7 +206,7 @@ function Members({
         setError(message(reason));
         throw reason;
       }
-      setNotice("Change accepted by the relay.");
+      setNotice(localMessage("communityAdmin.accepted"));
       // Stay busy until the shared roster reflects the write, so no stale row acts.
       await refresh();
     } finally {
@@ -203,26 +219,27 @@ function Members({
       disabled={refreshing || busy}
       onClick={() => void refresh()}
     >
-      {readError ? "Retry" : "Refresh"}
+      {readError ? t("communityAdmin.retry") : t("communityAdmin.refresh")}
     </Button>
   );
   const status = (
     <>
       {notice && (
         <p role="status" className="m-0 text-body-sm">
-          {notice}
+          {resolveMessage(notice)}
         </p>
       )}
       {readError && (
         <p role="alert" className="m-0 text-body-sm">
-          {readError}
-          {members ? " The list below may be out of date." : ""}
+          {members
+            ? t("communityAdmin.staleRead", { error: readError })
+            : readError}
         </p>
       )}
     </>
   );
   if (membershipState.status === "idle" || membershipState.status === "loading")
-    return <p role="status">Loading members…</p>;
+    return <p role="status">{t("communityAdmin.loading")}</p>;
   if (members === null || (role !== "owner" && role !== "admin"))
     return (
       <div className="mt-4 flex flex-col items-start gap-3">
@@ -230,8 +247,8 @@ function Members({
         {!readError && (
           <p role="status" className="m-0">
             {members === null
-              ? "This community does not publish a member list, so it has no member administration."
-              : "Only community owners and admins can invite people or manage members."}
+              ? t("communityAdmin.noRoster")
+              : t("communityAdmin.restricted")}
           </p>
         )}
         {refreshButton}
@@ -263,9 +280,9 @@ function Members({
       pending.action,
     );
   const verb = {
-    promote: "Make admin",
-    demote: "Make member",
-    remove: "Remove",
+    promote: "communityAdmin.promote",
+    demote: "communityAdmin.demote",
+    remove: "communityAdmin.remove",
   } as const;
   return (
     <>
@@ -274,27 +291,34 @@ function Members({
         {/* A stale roster cannot prove the viewer still manages this community. */}
         {!stale && (
           <Button variant="primary" onClick={() => setInviting(true)}>
-            Invite members
+            {t("communityAdmin.inviteMembers")}
           </Button>
         )}
       </div>
       {status}
       {error && (
         <p role="alert" className="text-body-sm">
-          {error}
+          {resolveMessage(error)}
         </p>
       )}
       <h3 className="mt-6 text-label">
-        Members <span className="text-muted">{members.length}</span>
+        {t("communityAdmin.members")}{" "}
+        <span className="text-muted">
+          {new Intl.NumberFormat(formattingLocale()).format(members.length)}
+        </span>
       </h3>
       <div className="rounded-xl border border-default p-4">
         <SearchField
-          label="Search members"
-          placeholder="Search members"
+          label={t("communityAdmin.search")}
+          placeholder={t("communityAdmin.search")}
+          clearLabel={t("communityAdmin.clearSearch")}
           value={query}
           onValueChange={setQuery}
         />
-        <ul className="m-0 mt-3 list-none p-0" aria-label="Members">
+        <ul
+          className="m-0 mt-3 list-none p-0"
+          aria-label={t("communityAdmin.members")}
+        >
           {shown.map((member) => {
             // A stale list must not offer another destructive command.
             const actions = stale
@@ -320,8 +344,11 @@ function Members({
                     )}
                   </p>
                   <p className="m-0 text-body-sm text-muted">
-                    {member.role[0]?.toUpperCase() + member.role.slice(1)}
-                    {member.pubkey === viewer ? " · You" : ""}
+                    {member.pubkey === viewer
+                      ? t("communityAdmin.selfRole", {
+                          role: roleLabel(member.role),
+                        })
+                      : roleLabel(member.role)}
                   </p>
                 </div>
                 {actions.length > 0 && (
@@ -329,7 +356,9 @@ function Members({
                     <MenuTrigger
                       render={
                         <IconButton
-                          aria-label={`Actions for ${label}`}
+                          aria-label={t("communityAdmin.actionsFor", {
+                            name: label,
+                          })}
                           icon={<DotsThreeIcon />}
                           disabled={busy || refreshing}
                         />
@@ -350,7 +379,7 @@ function Members({
                               <MinusIcon size={14} />
                             )}
                           </MenuIcon>
-                          {verb[action]}
+                          {t(verb[action])}
                         </MenuItem>
                       ))}
                     </MenuPopup>
@@ -362,21 +391,23 @@ function Members({
         </ul>
         {!shown.length && (
           <p role="status" className="text-body-sm text-muted">
-            No members match.
+            {t("communityAdmin.noMatch")}
           </p>
         )}
       </div>
       {pending && (
         <AlertDialog
-          title={`${verb[pending.action]}: ${name(pending.member.pubkey)}?`}
+          title={t(`communityAdmin.confirm.${pending.action}`, {
+            name: name(pending.member.pubkey),
+          })}
           description={
             stale
-              ? STALE
+              ? resolveMessage(STALE)
               : pending.action === "remove"
-                ? "They lose access to this community until they are invited again."
+                ? t("communityAdmin.removeHelp")
                 : pending.action === "promote"
-                  ? "Admins can invite people and remove members."
-                  : "They will no longer be able to invite people or manage members."
+                  ? t("communityAdmin.promoteHelp")
+                  : t("communityAdmin.demoteHelp")
           }
           pending={busy}
           initialFocus={pending.action === "remove" ? undefined : proceed}
@@ -384,7 +415,7 @@ function Members({
           actions={
             <>
               <Button disabled={busy} onClick={() => setPending(null)}>
-                Cancel
+                {t("communityAdmin.cancel")}
               </Button>
               <Button
                 ref={proceed}
@@ -408,7 +439,7 @@ function Members({
                     .catch(() => setPending(null))
                 }
               >
-                {verb[pending.action]}
+                {t(verb[pending.action])}
               </Button>
             </>
           }
@@ -433,7 +464,7 @@ function Members({
 function publicKey(input: string) {
   const key = typedPublicKey(input);
   if (key) return key;
-  throw new Error("Enter an npub or 64-character hex public key.");
+  throw localError("communityAdmin.invalidPublicKey");
 }
 
 /** Label-left, value-right choice row control, as in the Buzz desktop dialog. */
@@ -509,13 +540,42 @@ function InviteDialog({
   retry(): void;
   add(pubkey: string, role: "admin" | "member"): Promise<void>;
 }) {
+  useLanguage();
+  const expiryOptions = EXPIRY.map((option) => ({
+    ...option,
+    label: t(
+      Number(option.value) === DAY
+        ? "communityAdmin.oneDay"
+        : "communityAdmin.days",
+      { days: Number(option.value) / DAY },
+    ),
+  }));
+  const useOptions = USES.map((option) => ({
+    ...option,
+    label: option.value
+      ? t(
+          option.value === "1"
+            ? "communityAdmin.oneUse"
+            : "communityAdmin.uses",
+          { uses: Number(option.value) },
+        )
+      : t("communityAdmin.unlimited"),
+  }));
+  const roleOptions = ROLES_OFFERED.map((option) => ({
+    ...option,
+    label: t(
+      option.value === "admin"
+        ? "communityAdmin.admin"
+        : "communityAdmin.member",
+    ),
+  }));
   const [ttl, setTtl] = useState(String(3 * DAY));
   const [uses, setUses] = useState("");
   const [identity, setIdentity] = useState("");
   const [role, setRole] = useState<"admin" | "member">("member");
   const [adding, setAdding] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
+  const [notice, setNotice] = useState<DisplayMessage>("");
   const [copied, setCopied] = useState(false);
   // One minted link per settings; a missing entry for these settings mints.
   const settings = `${ttl}:${uses}`;
@@ -558,12 +618,12 @@ function InviteDialog({
   const url = current?.url;
   const pending = !!current && !url && !current.failed;
   let directKey: string | null = null;
-  let identityError = "";
+  let identityError: DisplayMessage = "";
   if (identity.trim()) {
     try {
       directKey = publicKey(identity);
       if (members.some((member) => member.pubkey === directKey))
-        identityError = "This person is already a community member.";
+        identityError = localMessage("communityAdmin.alreadyMember");
     } catch (reason) {
       identityError = message(reason);
     }
@@ -577,7 +637,7 @@ function InviteDialog({
       await add(directKey, owner ? role : "member");
       setIdentity("");
       setRole("member");
-      setNotice("Member added directly.");
+      setNotice(localMessage("communityAdmin.added"));
     } catch (reason) {
       setError(message(reason));
     } finally {
@@ -601,16 +661,17 @@ function InviteDialog({
         close();
       }}
       preventClose={adding}
-      title="Add or invite people"
-      description="Add someone by their exact identity, or share a link they can use to join."
+      title={t("communityAdmin.inviteTitle")}
+      description={t("communityAdmin.inviteDescription")}
+      closeLabel={t("communityAdmin.close")}
     >
       <div className="flex flex-col gap-6">
         <section aria-labelledby="add-member-directly">
           <h3 id="add-member-directly" className="m-0 text-label">
-            Add directly
+            {t("communityAdmin.addDirectly")}
           </h3>
           <p className="mt-1 mb-3 text-body-sm text-muted">
-            Paste the person’s npub or 64-character public key.
+            {t("communityAdmin.identityHelp")}
           </p>
           <form
             className="flex gap-2"
@@ -622,8 +683,8 @@ function InviteDialog({
             <div className="min-w-0 flex-1">
               <InputGroup>
                 <Input
-                  aria-label="Public identity"
-                  placeholder="npub1… or public key"
+                  aria-label={t("communityAdmin.publicIdentity")}
+                  placeholder={t("communityAdmin.identityPlaceholder")}
                   value={identity}
                   onChange={(event) => setIdentity(event.currentTarget.value)}
                   autoComplete="off"
@@ -632,9 +693,9 @@ function InviteDialog({
                 />
                 {owner && (
                   <Choice
-                    label="Choose member role"
+                    label={t("communityAdmin.chooseRole")}
                     value={role}
-                    options={ROLES_OFFERED}
+                    options={roleOptions}
                     onChange={(value) => setRole(value as "admin" | "member")}
                     disabled={adding}
                   />
@@ -642,7 +703,7 @@ function InviteDialog({
               </InputGroup>
               {identityError && (
                 <p role="alert" className="mt-2 mb-0 text-body-sm">
-                  {identityError}
+                  {resolveMessage(identityError)}
                 </p>
               )}
             </div>
@@ -652,28 +713,28 @@ function InviteDialog({
               loading={adding}
               disabled={adding || locked || !directKey || !!identityError}
             >
-              Add member
+              {t("communityAdmin.addMember")}
             </Button>
           </form>
         </section>
         <section aria-labelledby="invite-with-link">
           <h3 id="invite-with-link" className="m-0 text-label">
-            Invite with a link
+            {t("communityAdmin.inviteLink")}
           </h3>
           <p className="mt-1 mb-3 text-body-sm text-muted">
-            Anyone with this link can use it to join until it expires.
+            {t("communityAdmin.inviteLinkHelp")}
           </p>
           <InputGroup>
             <Input
-              aria-label="Community invite link"
+              aria-label={t("communityAdmin.inviteLinkLabel")}
               readOnly
               value={url ?? ""}
               placeholder={
                 current?.failed
-                  ? "Couldn’t create invite link"
+                  ? t("communityAdmin.createFailed")
                   : locked && !current
-                    ? "Retry the member list to create a link"
-                    : "Creating invite link…"
+                    ? t("communityAdmin.retryRoster")
+                    : t("communityAdmin.creating")
               }
             />
             <Button
@@ -689,31 +750,41 @@ function InviteDialog({
                 writeClipboardText(url)
                   .then(() => {
                     setCopied(true);
-                    setNotice("Invite link copied.");
+                    setNotice(localMessage("communityAdmin.linkCopied"));
                   })
-                  .catch(() => setError("Could not copy the invite link."));
+                  .catch(() =>
+                    setError(localMessage("communityAdmin.copyFailed")),
+                  );
               }}
             >
-              {current?.failed ? "Retry" : copied ? "Copied" : "Copy link"}
+              {current?.failed
+                ? t("communityAdmin.retry")
+                : copied
+                  ? t("communityAdmin.copied")
+                  : t("communityAdmin.copyLink")}
             </Button>
           </InputGroup>
           <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between gap-4">
-              <span className="text-label-sm">Expires after</span>
+              <span className="text-label-sm">
+                {t("communityAdmin.expiresAfter")}
+              </span>
               <Choice
-                label="Choose invite expiry"
+                label={t("communityAdmin.chooseExpiry")}
                 value={ttl}
-                options={EXPIRY}
+                options={expiryOptions}
                 onChange={setTtl}
                 disabled={pending || locked}
               />
             </div>
             <div className="flex items-center justify-between gap-4">
-              <span className="text-label-sm">Limit number of uses</span>
+              <span className="text-label-sm">
+                {t("communityAdmin.maxUses")}
+              </span>
               <Choice
-                label="Choose maximum invite uses"
+                label={t("communityAdmin.chooseMaxUses")}
                 value={uses}
-                options={USES}
+                options={useOptions}
                 onChange={setUses}
                 disabled={pending || locked}
               />
@@ -721,13 +792,13 @@ function InviteDialog({
           </div>
           {error && (
             <p role="alert" className="m-0 text-body-sm">
-              {error}
+              {resolveMessage(error)}
             </p>
           )}
           {stale && !adding && (
             <div className="flex items-center justify-between gap-3">
               <p role="alert" className="m-0 text-body-sm">
-                {STALE}
+                {resolveMessage(STALE)}
               </p>
               <Button
                 size="sm"
@@ -735,13 +806,13 @@ function InviteDialog({
                 disabled={refreshing}
                 onClick={retry}
               >
-                Retry
+                {t("communityAdmin.retry")}
               </Button>
             </div>
           )}
           {notice && (
             <p role="status" className="m-0 text-body-sm">
-              {notice}
+              {resolveMessage(notice)}
             </p>
           )}
         </section>

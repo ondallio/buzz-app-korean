@@ -393,7 +393,7 @@ test("relay-backed GIF tab searches KLIPY and inserts URL-only media", async ({
   await expect.poll(() => requests.length).toBe(reopenRequests + 1);
   expect(requests.at(-1)).toMatchObject({ query: "hello" });
   const clear = picker.getByRole("button", {
-    name: "Clear search gifs",
+    name: "Clear GIF search",
     exact: true,
   });
   await expect(clear).toHaveCSS("width", "32px");

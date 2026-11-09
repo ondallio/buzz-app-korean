@@ -10,8 +10,10 @@ mobile/server localization is outside this change.
 Use whole templates and named arguments. Persist the device language preference,
 preserve mounted drafts/focus during switching, and format dates/numbers for
 the selected language with the user's timezone and clock settings. Preserve
-user content, API fields, events, saved values, permissions, authentication and
-destructive-action guards.
+user content, API fields, events, saved values, permissions, authentication,
+canonical commands and destructive-action guards. Mixed producer errors need
+explicit ownership; English-string matching must not reinterpret arbitrary
+user/provider diagnostics.
 
 The maintainer explicitly authorized translation wiring/display-only changes in
 FOUNDATION files src/main.tsx, src/app/App.tsx, src/app/RecoveryScreen.tsx,
@@ -19,17 +21,28 @@ src/features/communities/service.ts and src/features/relay/session.ts. Other
 marked contracts need separate guidance. In particular,
 src/features/conversation/contracts.ts is unchanged.
 
+The earlier reviewed shell/message/settings/agent/workflow/repository/staff/
+status-focus work is retained. This source adds reviewed agent memory and
+community scope, direct-message composition, community administration, mention
+errors, GitHub settings and Huddle main/call/discussion/companion display.
+Huddle language initialization, focus return and retained error/close behavior
+have targeted regressions. These are completed bounded implementation units,
+not a declaration that every screen or producer is translated. Agent/provider
+setup, remaining producer-owned fallbacks and other bundled surfaces still
+need their own audits and acceptance.
+
 Implementation owners work in disjoint files and catalogs. The coordinator owns
 common registration/integration. Independent reviewers check actual source,
-retained behavior and current evidence. Screen audits and remaining producer
-errors are separate from registered catalog keys.
+retained behavior and current evidence. Registered keys, screen audits, mixed
+producer errors and native acceptance remain distinct. The catalog inventory
+must not be presented as a completion percentage.
 
-This checkpoint includes reviewed shell, message, settings, agent, workflow,
-repository, relay-staff and status/focus batches. Deeper agent memory,
-provider/model setup, community administration, huddle and other bundled
-features remain incomplete. It is not a fully translated app.
+The keyless packaging entry point reuses the existing build/helper owners and
+records candidate bytes. It does not add signing, release activation or an
+installer acceptance claim. The dependency repair for rmcp is included; the
+broader SQLite/SDK security issue is still unresolved.
 
 Native IME composition/Enter/Shift+Enter, real native controls, restart
-persistence, signed A-to-B updating and the maintainer's own acceptance test
-remain outstanding. Keep PRs draft. Agent checks cannot attest human testing,
-merge approval or release approval.
+persistence, permissions, signed A-to-B updating and the maintainer's own
+acceptance test remain outstanding. Keep PRs draft. Agent checks cannot attest
+human testing, merge approval or release approval.

@@ -1,3 +1,11 @@
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  errorMessage,
+  localError,
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { AvatarStack } from "../../shared/design-system/ui/AvatarStack";
 import { canMessageAgent } from "../agents/choices";
 import { avatarMedia } from "../../shared/avatar-source";
@@ -120,7 +128,7 @@ function recovered(operations: readonly OutgoingEvent[], viewer?: string) {
   const people = validRecipients(value.people, viewer);
   const channelId = item.event.tags.find(([name]) => name === "h")?.[1];
   if (item.event.kind !== 9 || !channelId || !people.length)
-    throw new Error("The saved new message could not be restored.");
+    throw localError("directMessage.savedInvalid");
   return {
     id: item.event.id,
     channelId,
@@ -159,6 +167,7 @@ export function NewMessage({
   ): void;
   onStarted(channelId: string, messageId: string): void;
 }) {
+  useLanguage();
   // A message held for delivery or retry stays a Back stop even when its
   // draft view is gone or it carries only attachments.
   const held = useRef(false);
@@ -213,7 +222,7 @@ export function NewMessage({
   }, []);
   const retiring = useRef<string | undefined>(undefined);
   const [busy, setBusy] = useState<"uploading" | "sending" | undefined>();
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const [uploadFailed, setUploadFailed] = useState(false);
   const [draftChannel] = useState(() => crypto.randomUUID());
   const attempt = useRef<AbortController | null>(null);
@@ -288,8 +297,8 @@ export function NewMessage({
         if (active)
           setError(
             reason instanceof Error
-              ? reason.message
-              : "Could not restore the message.",
+              ? errorMessage(reason)
+              : localMessage("directMessage.restoreFailed"),
           );
       }
     })();
@@ -313,9 +322,7 @@ export function NewMessage({
           !controlled.has(person.pubkey),
       )
     )
-      throw new Error(
-        "A selected agent is no longer available. Remove it or refresh its details and try again.",
-      );
+      throw localError("directMessage.agentUnavailable");
   }
   function change(people: Recipient[]) {
     if (locked || attempt.current) return;
@@ -374,9 +381,7 @@ export function NewMessage({
               JSON.stringify(attachments)))
       ) {
         if (session.directMessages.delivery(current.id) !== "failed")
-          throw new Error(
-            "Retry the earlier message to confirm its delivery before editing.",
-          );
+          throw localError("directMessage.confirmEarlier");
         validateAgents();
         await outbox?.dismiss(current.id);
         controller.signal.throwIfAborted();
@@ -444,8 +449,8 @@ export function NewMessage({
       else if (!controller.signal.aborted)
         setError(
           reason instanceof Error
-            ? reason.message
-            : "Could not send your message. Try again.",
+            ? errorMessage(reason)
+            : localMessage("directMessage.sendFailed"),
         );
     } finally {
       if (!controller.signal.aborted) setBusy(undefined);
@@ -485,7 +490,7 @@ export function NewMessage({
   return (
     <section
       className={styles.page}
-      aria-label="New message"
+      aria-label={t("directMessage.new")}
       data-attachment-drop-zone
     >
       <RecipientPicker
@@ -531,37 +536,35 @@ export function NewMessage({
       <div className={styles.feedback}>
         {busy && (
           <p role="status">
-            {busy === "uploading" ? "Uploading files…" : "Sending message…"}
+            {t(
+              busy === "uploading"
+                ? "directMessage.uploading"
+                : "directMessage.sending",
+            )}
           </p>
         )}
-        {uploadFailed && (
-          <p role="status">
-            A file couldn’t upload. Retry or remove it, then send again.
-          </p>
-        )}
+        {uploadFailed && <p role="status">{t("directMessage.uploadFailed")}</p>}
         {!session.directMessages.available && (
-          <p role="status">
-            Starting direct messages is unavailable on this connection.
-          </p>
+          <p role="status">{t("directMessage.unavailable")}</p>
         )}
         {pending && !failed && !busy && !error && (
           <Button
             type="button"
             onClick={() => pending && void send(pending.draft)}
           >
-            Retry send
+            {t("directMessage.retrySend")}
           </Button>
         )}
         {error && (
           <div role="alert">
-            <p>{error}</p>
+            <p>{resolveMessage(error)}</p>
             {pending && !failed && (
               <Button
                 type="button"
                 disabled={!!busy}
                 onClick={() => pending && void send(pending.draft)}
               >
-                Retry send
+                {t("directMessage.retrySend")}
               </Button>
             )}
           </div>
@@ -575,8 +578,12 @@ export function NewMessage({
           extensions={extensions}
           channelId={draftChannel}
           focusRequest={composerFocus}
-          channelName={recipientNames || "new message"}
-          label={recipientNames ? `Message ${recipientNames}` : "New message"}
+          channelName={recipientNames || t("directMessage.channelName")}
+          label={
+            recipientNames
+              ? t("directMessage.messageTo", { names: recipientNames })
+              : t("directMessage.new")
+          }
           placeholder={recipientNames ? undefined : ""}
           disabled={!recipients.length}
           submission={{
@@ -621,6 +628,7 @@ function ExistingDiscussion({
   onOpen(messageId: string, threadRootId: string, intent?: "reply"): void;
   onRecovered(): void;
 }) {
+  useLanguage();
   const window = useChannelWindow(session.channels, channel.id);
   const retry = useRef<HTMLButtonElement>(null);
   const [recovering, setRecovering] = useState(false);
@@ -637,7 +645,11 @@ function ExistingDiscussion({
         className={styles.feedback}
         role={window.status === "error" ? "alert" : "status"}
       >
-        <p>{window.status === "error" ? window.error : "Loading messages…"}</p>
+        <p>
+          {window.status === "error"
+            ? window.error
+            : t("directMessage.loadingHistory")}
+        </p>
         {(window.status === "error" || recovering) && (
           <Button
             ref={retry}
@@ -648,7 +660,7 @@ function ExistingDiscussion({
               session.channels.ensure(channel.id);
             }}
           >
-            Retry messages
+            {t("directMessage.retryHistory")}
           </Button>
         )}
       </div>

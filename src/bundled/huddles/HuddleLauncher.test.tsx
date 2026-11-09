@@ -1,6 +1,7 @@
+import { setLanguage } from "../../shared/i18n";
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { createRelaySession } from "../../features/relay/session";
@@ -10,7 +11,11 @@ import { MenuRoot, MenuPopup } from "../../shared/design-system/ui/Menu";
 import { HuddleCapsule } from "./HuddleCapsule";
 import { HuddleLauncher, SoloHuddleMenu } from "./HuddleLauncher";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  vi.restoreAllMocks();
+});
 
 it("moves idle Solo huddles to the menu while preserving Team's header action", async () => {
   const store = createRelaySession(null);
@@ -285,5 +290,283 @@ it("offers voice for a capable agent DM, explains automatic joining, and keeps o
   } finally {
     await huddles.dispose();
     store.dispose();
+  }
+});
+
+function localizedLauncherFixture(
+  phase: "idle" | "connected" | "connecting" = "idle",
+) {
+  const store = createRelaySession(null);
+  const parent = "00000000-0000-4000-8000-000000000001";
+  const room = "00000000-0000-4000-8000-000000000002";
+  const list = {
+    status: "ready" as const,
+    channels: [
+      { id: parent, name: "Raw parent 한글", channelType: "stream" as const },
+      {
+        id: room,
+        name: "Raw room 한글",
+        huddle: true as const,
+        parentChannelId: parent,
+        members: [],
+      },
+    ],
+  };
+  const resolve = vi.fn(async () => {});
+  const session = {
+    ...store.session,
+    channels: { ...store.session.channels, list: () => list, resolve },
+  };
+  const snapshot = {
+    status: "ready" as const,
+    generation: 1,
+    scope: "https://example.com:viewer",
+    viewer: "viewer",
+    session,
+  };
+  const relay: RelayData = {
+    snapshot: () => snapshot,
+    subscribe: () => () => {},
+    retry() {},
+    disconnect() {},
+    async clearCache() {},
+  };
+  const bridge = {
+    available: false,
+    open: vi.fn(async () => {}),
+    close: vi.fn(async () => {}),
+    touch: vi.fn(async () => {}),
+    send: vi.fn(async () => {}),
+  };
+  const audio = vi.fn(async () => {
+    throw new Error("No audio may open");
+  });
+  const huddles = createHuddles(relay, bridge, audio);
+  const context = {
+    scope: snapshot.scope,
+    viewer: "viewer",
+    channelId: parent,
+    channelName: "Raw parent 한글",
+    relayUrl: "wss://example.com",
+  };
+  const call = {
+    phase,
+    id: "fixture-call",
+    destination: context,
+    room,
+    muted: false,
+    participants: [],
+  };
+  vi.spyOn(huddles, "snapshot").mockReturnValue(call);
+  const start = vi.spyOn(huddles, "start").mockResolvedValue();
+  const join = vi.spyOn(huddles, "join").mockResolvedValue();
+  const leave = vi.spyOn(huddles, "leave").mockResolvedValue();
+  const showWindow = vi.fn(async () => {});
+  return {
+    store,
+    session,
+    huddles,
+    context,
+    bridge,
+    audio,
+    start,
+    join,
+    leave,
+    resolve,
+    props: { context, relay, huddles, showWindow, available: () => true },
+    async dispose() {
+      await huddles.dispose();
+      store.dispose();
+    },
+  };
+}
+
+it("keeps the same Huddle confirmation and keyboard target across languages", async () => {
+  const f = localizedLauncherFixture();
+  const user = userEvent.setup();
+  const view = render(<HuddleLauncher {...f.props} />);
+  try {
+    const trigger = screen.getByRole("button", {
+      name: "Start or join a huddle",
+    });
+    await user.click(trigger);
+    const dialog = screen.getByRole("alertdialog", { name: "Start a huddle?" });
+    const start = screen.getByRole("button", { name: "Start huddle" });
+    await waitFor(() => expect(start).toHaveFocus());
+    act(() => setLanguage("ko"));
+    expect(
+      screen.getByRole("alertdialog", { name: "허들을 시작할까요?" }),
+    ).toBe(dialog);
+    expect(screen.getByRole("button", { name: "허들 시작" })).toBe(start);
+    expect(start).toHaveFocus();
+    expect(
+      screen.getByText(
+        "마이크가 켜지며 이 대화의 다른 사람들도 참여할 수 있습니다.",
+      ),
+    ).toBeInTheDocument();
+    expect(f.start).not.toHaveBeenCalled();
+    expect(f.join).not.toHaveBeenCalled();
+    expect(f.leave).not.toHaveBeenCalled();
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("alertdialog", { name: "Start a huddle?" })).toBe(
+      dialog,
+    );
+    expect(start).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(f.start).toHaveBeenCalledExactlyOnceWith(f.context);
+    expect(f.audio).not.toHaveBeenCalled();
+    expect(f.bridge.open).not.toHaveBeenCalled();
+  } finally {
+    view.unmount();
+    await f.dispose();
+  }
+});
+
+it("keeps active options, raw clipboard feedback and room invitation through languages", async () => {
+  const f = localizedLauncherFixture("connected");
+  const user = userEvent.setup();
+  const write = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+  const view = render(<HuddleLauncher {...f.props} />);
+  const link = `buzz://channel/${encodeURIComponent(f.context.channelId)}`;
+  try {
+    const options = screen.getByRole("button", { name: "Huddle options" });
+    await user.click(options);
+    const menu = await screen.findByRole("menu");
+    const copy = screen.getByRole("menuitem", { name: "Copy link" });
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("button", { name: "허들 옵션" })).toBe(options);
+    expect(screen.getByRole("menu")).toBe(menu);
+    expect(screen.getByRole("menuitem", { name: "링크 복사" })).toBe(copy);
+    await user.click(copy);
+    expect(write).toHaveBeenCalledExactlyOnceWith(link);
+    expect(screen.getByRole("menuitem", { name: "링크 복사됨" })).toBe(copy);
+    write.mockRejectedValueOnce(new Error("opaque clipboard diagnostic"));
+    await user.click(copy);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      `복사하지 못했습니다. 이 링크를 직접 복사하세요: ${link}`,
+    );
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("alert")).toBe(alert);
+    expect(alert).toHaveTextContent(
+      `Couldn’t copy. You can copy this link manually: ${link}`,
+    );
+    await user.click(screen.getByRole("menuitem", { name: "Add someone" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Huddle members",
+    });
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("dialog", { name: "허들 참여자" })).toBe(dialog);
+    expect(dialog).toHaveAccessibleDescription(
+      "여기서 추가한 사람은 이 허들과 스레드에 참여할 수 있습니다. 기존 채팅은 비공개로 유지됩니다.",
+    );
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(options).toHaveFocus();
+    expect(f.join).not.toHaveBeenCalled();
+    expect(f.start).not.toHaveBeenCalled();
+    expect(f.leave).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "허들 나가기" }));
+    expect(f.leave).toHaveBeenCalledOnce();
+    expect(f.audio).not.toHaveBeenCalled();
+    expect(f.bridge.open).not.toHaveBeenCalled();
+  } finally {
+    view.unmount();
+    await f.dispose();
+  }
+});
+
+it.each([1, 2, 1000])(
+  "uses a whole incoming join phrase without repeating discovery (%s)",
+  async (count) => {
+    const f = localizedLauncherFixture();
+    const authority = "ab".repeat(32),
+      creator = "cd".repeat(32);
+    const start = {
+      id: "fixture-start",
+      pubkey: creator,
+      kind: 48100,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [["h", f.context.channelId]],
+      content: JSON.stringify({
+        ephemeral_channel_id: "00000000-0000-4000-8000-000000000002",
+      }),
+    };
+    const events = [
+      start,
+      ...Array.from({ length: count }, (_, i) => ({
+        ...start,
+        id: `fixture-join-${i}`,
+        pubkey: authority,
+        kind: 48101,
+        tags: [...start.tags, ["p", (i + 1).toString(16).padStart(64, "0")]],
+      })),
+    ];
+    const observe = vi.fn(() => ({
+      snapshot: () => ({ status: "ready" as const, events }),
+      subscribe: () => () => {},
+      refresh: async () => {},
+      dispose: vi.fn(),
+    }));
+    Object.assign(f.session, { relayAuthor: authority, observe });
+    vi.spyOn(f.huddles, "canJoin").mockReturnValue(true);
+    const view = render(<HuddleLauncher {...f.props} />);
+    const user = userEvent.setup();
+    try {
+      const button = await screen.findByRole("button", {
+        name: `Join active huddle (${count.toLocaleString("en-US")} ${count === 1 ? "participant" : "participants"})`,
+      });
+      button.focus();
+      const reads = observe.mock.calls.length;
+      act(() => setLanguage("ko"));
+      expect(
+        screen.getByRole("button", {
+          name: `진행 중인 허들 참여 (참여자 ${count.toLocaleString("ko-KR")}명)`,
+        }),
+      ).toBe(button);
+      expect(button).toHaveFocus();
+      expect(observe).toHaveBeenCalledTimes(reads);
+      expect(f.join).not.toHaveBeenCalled();
+      act(() => setLanguage("en"));
+      await user.keyboard("{Enter}");
+      expect(f.join).toHaveBeenCalledExactlyOnceWith(
+        f.context,
+        "00000000-0000-4000-8000-000000000002",
+      );
+      expect(f.start).not.toHaveBeenCalled();
+      expect(f.audio).not.toHaveBeenCalled();
+    } finally {
+      view.unmount();
+      await f.dispose();
+    }
+  },
+);
+
+it("keeps the pending connection cancellable without another call on locale changes", async () => {
+  const f = localizedLauncherFixture("connecting");
+  const user = userEvent.setup();
+  const view = render(<HuddleLauncher {...f.props} />);
+  try {
+    const cancel = screen.getByRole("button", {
+      name: "Cancel Huddle connection",
+    });
+    cancel.focus();
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("button", { name: "허들 연결 취소" })).toBe(cancel);
+    expect(cancel).toHaveFocus();
+    act(() => setLanguage("en"));
+    expect(
+      screen.getByRole("button", { name: "Cancel Huddle connection" }),
+    ).toBe(cancel);
+    expect(f.leave).not.toHaveBeenCalled();
+    await user.click(cancel);
+    expect(f.leave).toHaveBeenCalledOnce();
+    expect(f.join).not.toHaveBeenCalled();
+    expect(f.start).not.toHaveBeenCalled();
+    expect(f.audio).not.toHaveBeenCalled();
+    expect(f.bridge.open).not.toHaveBeenCalled();
+  } finally {
+    view.unmount();
+    await f.dispose();
   }
 });

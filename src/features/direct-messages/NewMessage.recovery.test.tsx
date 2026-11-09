@@ -47,6 +47,7 @@ import { OutboxStatus } from "../../bundled/channels/OutboxStatus";
 import { useHiddenDms } from "../../bundled/channels/useHiddenDms";
 import { createRelayProfiler } from "../relay/profiling";
 import { readView, writeView } from "../../shared/view-state";
+import { setLanguage } from "../../shared/i18n";
 
 composerDOMFixture();
 
@@ -106,6 +107,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   for (const owner of owners.splice(0)) owner.dispose();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -1393,4 +1395,131 @@ it("drops files on the recipient header into the new DM composer", async () => {
   fireEvent.drop(header, { dataTransfer });
   await waitFor(() => expect(f.files.snapshot()[0]?.status).toBe("ready"));
   expect(t.openDirectMessage).not.toHaveBeenCalled();
+});
+
+it("keeps the existing-discussion load and retry focus across languages without another read", async () => {
+  const t = setup();
+  t.events.unshift(
+    message(other, channel, "Raw retained history 한글", 1_700_000_001),
+  );
+  const read = t.query.getMockImplementation();
+  assert.exists(read);
+  let release = () => {};
+  let held: Promise<void> | undefined = new Promise((resolve) => {
+    release = resolve;
+  });
+  let broken = true;
+  let started = false;
+  const historyReads = () =>
+    t.query.mock.calls.filter(([filters]) =>
+      filters.some((filter) => filter.kinds?.includes(9)),
+    ).length;
+  t.query.mockImplementation(async (filters) => {
+    const history = filters.some((filter) => filter.kinds?.includes(9));
+    if (history) {
+      started = true;
+      await held;
+    }
+    const result = await read(filters);
+    return broken && history
+      ? result.filter((event) => event.kind === 9)
+      : result;
+  });
+  const owner = t.create();
+  t.mount(owner);
+  await t.user.click(await screen.findByRole("option", { name: "Avery" }));
+  try {
+    await waitFor(() => expect(started).toBe(true));
+    const loading = screen.getByText("Loading messages…");
+    const calls = historyReads();
+    act(() => setLanguage("ko"));
+    expect(screen.getByText("메시지를 불러오는 중…")).toBe(loading);
+    expect(historyReads()).toBe(calls);
+  } finally {
+    release();
+  }
+  await waitFor(() =>
+    expect(owner.session.channels.window(channel).status).toBe("error"),
+  );
+  const rawError = owner.session.channels.window(channel).error;
+  assert(rawError);
+  const editor = screen.getByRole("textbox", { name: "Avery에게 메시지" });
+  await t.user.type(editor, "Keep existing draft");
+  const retry = screen.getByRole("button", { name: "메시지 다시 불러오기" });
+  retry.focus();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("button", { name: "Retry messages" })).toBe(retry);
+  expect(retry).toHaveFocus();
+  expect(screen.getByRole("alert")).toHaveTextContent(rawError);
+  broken = false;
+  started = false;
+  held = new Promise((resolve) => {
+    release = resolve;
+  });
+  try {
+    await t.user.keyboard("{Enter}");
+    await waitFor(() => expect(started).toBe(true));
+    const calls = historyReads();
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("button", { name: "메시지 다시 불러오기" })).toBe(
+      retry,
+    );
+    expect(retry).toHaveFocus();
+    expect(retry).toHaveAttribute("aria-busy", "true");
+    expect(editor).toHaveTextContent("Keep existing draft");
+    expect(historyReads()).toBe(calls);
+  } finally {
+    release();
+  }
+  await waitFor(() =>
+    expect(owner.session.channels.window(channel).status).toBe("ready"),
+  );
+  await waitFor(() => expect(editor).toHaveFocus());
+  expect(screen.getByRole("textbox", { name: "Avery에게 메시지" })).toBe(
+    editor,
+  );
+  expect(editor).toHaveTextContent("Keep existing draft");
+  await showsHistory(owner, channel, "Raw retained history 한글");
+  expect(t.openDirectMessage).not.toHaveBeenCalled();
+  expect(t.publish).not.toHaveBeenCalled();
+});
+
+it("keeps the pending upload and its raw file through localized parent feedback", async () => {
+  const t = setup();
+  const f = attachable(t);
+  let rejectUpload = (_error: Error) => {};
+  f.uploadForNewChat.mockImplementationOnce(
+    () =>
+      new Promise((_resolve, reject) => {
+        rejectUpload = reject;
+      }),
+  );
+  await t.user.click(await screen.findByRole("option", { name: "Avery" }));
+  await f.attach();
+  await waitFor(() => expect(f.uploadForNewChat).toHaveBeenCalledOnce());
+  try {
+    await t.user.click(send());
+    const status = await screen.findByText("Uploading files…");
+    act(() => setLanguage("ko"));
+    expect(screen.getByText("파일을 업로드하는 중…")).toBe(status);
+    expect(f.files.snapshot()[0]?.file.name).toBe("photo.png");
+    expect(f.uploadForNewChat).toHaveBeenCalledOnce();
+    expect(t.openDirectMessage).not.toHaveBeenCalled();
+    expect(t.publish).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => rejectUpload(new Error("Raw upload failure")));
+  }
+  const failed = await screen.findByText(
+    "파일을 업로드하지 못했습니다. 다시 시도하거나 파일을 제거한 뒤 다시 보내세요.",
+  );
+  expect(failed).toHaveAttribute("role", "status");
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByText(
+      "A file couldn’t upload. Retry or remove it, then send again.",
+    ),
+  ).toBe(failed);
+  expect(f.files.snapshot()[0]?.file.name).toBe("photo.png");
+  expect(f.uploadForNewChat).toHaveBeenCalledOnce();
+  expect(t.publish).not.toHaveBeenCalled();
 });

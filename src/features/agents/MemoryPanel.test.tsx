@@ -23,11 +23,301 @@ import type { Agent } from "./service";
 import type { AgentScopeReader } from "./AgentCommunityScope";
 import type { CommunityReader } from "../communities/service";
 import { PanelWorkspace } from "../panels/PanelWorkspace";
+import { setLanguage } from "../../shared/i18n";
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  setLanguage("en");
 });
+
+it("keeps open raw memory content and focus across languages without rereading", async () => {
+  setLanguage("en");
+  const read = vi.fn(async () => ({
+    entries: [
+      entry("core", "No memories yet"),
+      entry(
+        "mem/memory",
+        "Raw **Markdown** {body} 한글 [link](https://example.org/notes)",
+      ),
+    ],
+    partial: false,
+  }));
+  const h = setup(read);
+  const user = userEvent.setup();
+  try {
+    const core = await screen.findByRole("region", { name: "Core memories" });
+    const details = screen.getByRole("region", { name: "Memories" });
+    const coreTrigger = within(core).getByRole("button", { name: "core" });
+    await user.click(coreTrigger);
+    const body = within(core).getByText("No memories yet");
+    const trigger = within(details).getByRole("button", { name: "mem/memory" });
+    await user.click(trigger);
+    const markdown = within(details).getByRole("link", { name: "link" });
+    trigger.focus();
+    expect(read).toHaveBeenCalledOnce();
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("region", { name: "핵심 기억" })).toBe(core);
+    expect(screen.getByRole("region", { name: "기억" })).toBe(details);
+    expect(within(core).getByRole("button", { name: "core" })).toBe(
+      coreTrigger,
+    );
+    expect(coreTrigger).toHaveAttribute("aria-expanded", "true");
+    expect(within(core).getByText("No memories yet")).toBe(body);
+    expect(within(details).getByRole("button", { name: "mem/memory" })).toBe(
+      trigger,
+    );
+    expect(trigger).toHaveFocus();
+    expect(markdown).toHaveAttribute("href", "https://example.org/notes");
+    expect(within(details).getByText("Markdown")).toHaveProperty(
+      "tagName",
+      "STRONG",
+    );
+    expect(read).toHaveBeenCalledOnce();
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("region", { name: "Core memories" })).toBe(core);
+    expect(trigger).toHaveFocus();
+    expect(read).toHaveBeenCalledOnce();
+  } finally {
+    h.unmount();
+    h.owner.dispose();
+  }
+});
+
+it("keeps retry state and partial entries live across language changes", async () => {
+  const user = userEvent.setup();
+  let finish: (value: MemoryListing) => void = () => {};
+  const pending = new Promise<MemoryListing>((resolve) => {
+    finish = resolve;
+  });
+  const read = vi
+    .fn<() => Promise<MemoryListing>>()
+    .mockResolvedValueOnce({
+      entries: [entry("core", "Some memories couldn't be shown.")],
+      partial: true,
+    })
+    .mockReturnValueOnce(pending);
+  const h = setup(read);
+  try {
+    await screen.findByRole("region", { name: "Core memories" });
+    await openCore();
+    const body = within(
+      screen.getByRole("region", { name: "Core memories" }),
+    ).getByText("Some memories couldn't be shown.");
+    const retry = screen.getByRole("button", {
+      name: "Retry loading memories",
+    });
+    retry.focus();
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("button", { name: "기억 다시 불러오기" })).toBe(
+      retry,
+    );
+    expect(retry).toHaveFocus();
+    expect(screen.getByText("일부 기억을 표시하지 못했습니다.")).toBeVisible();
+    expect(body).toHaveTextContent("Some memories couldn't be shown.");
+    await user.click(retry);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "기억을 더 불러오는 중…",
+    );
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Loading more memories…",
+    );
+    expect(body).toBeInTheDocument();
+    expect(read).toHaveBeenCalledTimes(2);
+    await act(async () => finish({ entries: [], partial: false }));
+    act(() => setLanguage("ko"));
+    expect(screen.getAllByText("아직 기억이 없습니다")).toHaveLength(2);
+    expect(read).toHaveBeenCalledTimes(2);
+  } finally {
+    h.unmount();
+    h.owner.dispose();
+  }
+});
+
+it.each([
+  ["loading", "Loading memories", "기억 불러오는 중"],
+  [
+    "blocked",
+    "Memory can be read once Buzz is connected.",
+    "Buzz에 연결되면 기억을 읽을 수 있습니다.",
+  ],
+  [
+    "denied",
+    "This community doesn't let you read this agent's memory.",
+    "이 커뮤니티에서는 이 에이전트의 기억을 읽을 수 없습니다.",
+  ],
+  ["error", "Memory couldn't be read.", "기억을 읽지 못했습니다."],
+  [
+    "unavailable",
+    "Memory isn't available here.",
+    "여기서는 기억을 사용할 수 없습니다.",
+  ],
+] as const)(
+  "renders the finite %s read state without restarting its view",
+  async (state, english, korean) => {
+    const read = vi.fn(async (): Promise<MemoryListing> => {
+      if (state === "loading") return new Promise(() => {});
+      const error = new Error("Some memories couldn't be shown.");
+      if (state === "denied") error.name = "MemoryDenied";
+      throw error;
+    });
+    const owner = createAgentMemories(
+      state === "unavailable" ? undefined : read,
+      "c".repeat(64),
+      () => state !== "blocked",
+    );
+    const view = render(
+      <MemoryPanel
+        agents={scopeAgents}
+        agent={agent}
+        memories={owner.capability}
+      />,
+    );
+    try {
+      const message =
+        state === "loading"
+          ? await screen.findByRole("status", { name: english })
+          : await screen.findByText(english);
+      const calls = state === "blocked" || state === "unavailable" ? 0 : 1;
+      expect(read).toHaveBeenCalledTimes(calls);
+      act(() => setLanguage("ko"));
+      expect(
+        state === "loading"
+          ? screen.getByRole("status", { name: korean })
+          : screen.getByText(korean),
+      ).toBe(message);
+      expect(screen.queryByText("Some memories couldn't be shown.")).toBeNull();
+      act(() => setLanguage("en"));
+      expect(
+        state === "loading"
+          ? screen.getByRole("status", { name: english })
+          : screen.getByText(english),
+      ).toBe(message);
+      expect(read).toHaveBeenCalledTimes(calls);
+    } finally {
+      view.unmount();
+      owner.dispose();
+    }
+  },
+);
+
+it.each([false, true])(
+  "keeps copied-body feedback live after its panel closes (failure=%s)",
+  async (fails) => {
+    const user = userEvent.setup();
+    let settle: () => void = () => {};
+    const pending = new Promise<void>((resolve, reject) => {
+      settle = () =>
+        fails ? reject(new Error("Memory body copied.")) : resolve();
+    });
+    const write = vi
+      .spyOn(navigator.clipboard, "writeText")
+      .mockReturnValue(pending);
+    const raw = "Memory body copied. **raw** {count} 한글";
+    const owner = createAgentMemories(
+      async () => ({ entries: [entry("core", raw)], partial: false }),
+      "c".repeat(64),
+      () => true,
+    );
+    const view = render(
+      <ToastProvider>
+        <MemoryPanel
+          agents={scopeAgents}
+          agent={agent}
+          memories={owner.capability}
+        />
+      </ToastProvider>,
+    );
+    try {
+      fireEvent.contextMenu(
+        await screen.findByRole("button", { name: "core" }),
+      );
+      const item = await screen.findByRole("menuitem", {
+        name: "Copy full body",
+      });
+      act(() => setLanguage("ko"));
+      expect(
+        await screen.findByRole("menuitem", { name: "전체 내용 복사" }),
+      ).toBe(item);
+      await user.click(item);
+      expect(write).toHaveBeenCalledExactlyOnceWith(raw);
+      view.rerender(<ToastProvider>{null}</ToastProvider>);
+      await act(async () => settle());
+      const notice = await screen.findByText(
+        fails
+          ? "기억 내용을 복사하지 못했습니다."
+          : "기억 내용을 복사했습니다.",
+      );
+      act(() => setLanguage("en"));
+      expect(
+        screen.getByText(
+          fails ? "Couldn’t copy the memory body." : "Memory body copied.",
+        ),
+      ).toBe(notice);
+      expect(write).toHaveBeenCalledExactlyOnceWith(raw);
+    } finally {
+      view.unmount();
+      owner.dispose();
+    }
+  },
+);
+
+it.each([
+  [-60, "just now", "방금"],
+  [59, "just now", "방금"],
+  [60, "1 minute ago", "1분 전"],
+  [120, "2 minutes ago", "2분 전"],
+  [3600, "1 hour ago", "1시간 전"],
+  [7200, "2 hours ago", "2시간 전"],
+  [86400, "1 day ago", "1일 전"],
+  [172800, "2 days ago", "2일 전"],
+  [604800, "1 week ago", "1주 전"],
+  [1209600, "2 weeks ago", "2주 전"],
+  [2592000, "1 month ago", "1개월 전"],
+  [5097600, "1 month ago", "1개월 전"],
+  [5184000, undefined, undefined],
+] as const)(
+  "preserves the memory recency ladder at age %s seconds in the OS zone",
+  async (age, english, korean) => {
+    const now = Date.UTC(2026, 2, 8, 6, 30) / 1000;
+    vi.spyOn(Date, "now").mockReturnValue(now * 1000);
+    const timestamp = now - age;
+    const read = vi.fn(async () => ({
+      entries: [entry("core", "Raw", timestamp)],
+      partial: false,
+    }));
+    const h = setup(read);
+    try {
+      const region = await screen.findByRole("region", {
+        name: "Core memories",
+      });
+      const label = within(region).getByTitle(formatFullTimestamp(timestamp));
+      const englishDate = new Date(timestamp * 1000).toLocaleDateString(
+        "en-US",
+        { month: "short", day: "numeric" },
+      );
+      expect(label).toHaveTextContent(english ?? englishDate);
+      act(() => setLanguage("ko"));
+      expect(within(region).getByTitle(formatFullTimestamp(timestamp))).toBe(
+        label,
+      );
+      expect(label).toHaveTextContent(
+        korean ??
+          new Date(timestamp * 1000).toLocaleDateString("ko-KR", {
+            month: "short",
+            day: "numeric",
+          }),
+      );
+      act(() => setLanguage("en"));
+      expect(label).toHaveTextContent(english ?? englishDate);
+      expect(read).toHaveBeenCalledOnce();
+    } finally {
+      h.unmount();
+      h.owner.dispose();
+    }
+  },
+);
 
 const pubkey = "a".repeat(64);
 const agent = {

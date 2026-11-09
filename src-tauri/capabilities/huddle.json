@@ -6,6 +6,7 @@
   "permissions": [
     "allow-huddle-window-watch",
     "allow-huddle-window-action",
+    "allow-system-language",
     "allow-media-download",
     "allow-clipboard-write-text",
     {

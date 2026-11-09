@@ -296,6 +296,8 @@ export type MessageComposerProps = {
   channelId: string;
   channelName: string;
   label?: string | undefined;
+  /** Names the new-message form without changing canonical channel metadata. */
+  formLabel?: string | undefined;
   placeholder?: string | undefined;
   soloConversation?: boolean | undefined;
   ownSoloConversation?: boolean | undefined;
@@ -500,6 +502,7 @@ function Composer({
   channelId,
   channelName,
   label: customLabel,
+  formLabel,
   placeholder,
   onSend,
   onCommand,
@@ -3336,7 +3339,8 @@ function Composer({
             ? t("messages.composer.edit")
             : threadRootId
               ? t("messages.composer.reply")
-              : t("messages.composer.sendTo", { channel: channelName })
+              : formLabel ||
+                t("messages.composer.sendTo", { channel: channelName })
         }
         onSubmit={(event) => {
           event.preventDefault();

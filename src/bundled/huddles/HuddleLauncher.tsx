@@ -1,3 +1,4 @@
+import { formattingLocale, t, useLanguage } from "../../shared/i18n";
 import type { Agents } from "../../features/agents/service";
 import { useAgentsSnapshot } from "../../features/agents/react";
 import { useAgentChoices } from "../../features/agents/use-choices";
@@ -90,6 +91,7 @@ export function SoloHuddleMenu({
 }
 
 export function HuddleLauncher(props: Props) {
+  useLanguage();
   const { context, available, huddles } = props;
   useAgentsSnapshot(props.agents);
   const call = useSyncExternalStore(huddles.subscribe, huddles.snapshot);
@@ -130,18 +132,27 @@ export function HuddleLauncher(props: Props) {
     !active && incoming && huddles.canJoin(context.scope, incoming.id);
   const label =
     call.phase === "connecting"
-      ? "Cancel Huddle connection"
+      ? t("huddleMain.cancelConnection")
       : active
-        ? "Show active Huddle"
+        ? t("huddleMain.showActive")
         : joinable
           ? parent?.channelType === "solo"
-            ? "Join huddle"
-            : `Join active huddle (${incoming.participants} ${incoming.participants === 1 ? "participant" : "participants"})`
+            ? t("huddleMain.joinHuddle")
+            : t(
+                incoming.participants === 1
+                  ? "huddleMain.joinActiveOne"
+                  : "huddleMain.joinActiveMany",
+                {
+                  count: new Intl.NumberFormat(formattingLocale()).format(
+                    incoming.participants,
+                  ),
+                },
+              )
           : voiceAgent
-            ? `Talk with ${voiceAgent.name}`
+            ? t("huddleMain.talkWith", { name: voiceAgent.name })
             : parent?.channelType === "solo"
-              ? "Start a huddle"
-              : "Start or join a huddle";
+              ? t("huddleMain.startSolo")
+              : t("huddleMain.startOrJoin");
   const activate = () => {
     if (!available()) return;
     if (call.phase === "connecting") void huddles.leave();
@@ -177,17 +188,17 @@ export function HuddleLauncher(props: Props) {
       />
       {confirming === target && (
         <AlertDialog
-          title="Start a huddle?"
+          title={t("huddleMain.confirmTitle")}
           description={
             voiceAgent
-              ? `Your microphone will turn on and ${voiceAgent.name} will join automatically.`
-              : "Your microphone will turn on, and others in this conversation can join."
+              ? t("huddleMain.confirmAgent", { name: voiceAgent.name })
+              : t("huddleMain.confirmPeople")
           }
           initialFocus={proceed}
           onClose={close}
           actions={
             <>
-              <Button onClick={close}>Cancel</Button>
+              <Button onClick={close}>{t("huddleMain.cancel")}</Button>
               <Button
                 ref={proceed}
                 variant="primary"
@@ -196,7 +207,7 @@ export function HuddleLauncher(props: Props) {
                   activate();
                 }}
               >
-                Start huddle
+                {t("huddleMain.startAction")}
               </Button>
             </>
           }
@@ -213,6 +224,7 @@ function ActiveHuddle({
   huddles,
   callId,
 }: Props & { callId: string }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const call = useSyncExternalStore(huddles.subscribe, huddles.snapshot);
   const [membersOpen, setMembersOpen] = useState(false);
@@ -246,15 +258,15 @@ function ActiveHuddle({
     <>
       <fieldset
         className={styles.activeLauncher}
-        aria-label="Active Huddle in this chat"
+        aria-label={t("huddleMain.activeGroup")}
       >
         <IconButton
           size="toolbar"
           variant="ghost"
           style={{ color: "var(--status-online)" }}
           data-huddle-leave=""
-          aria-label="Leave huddle"
-          title="Leave huddle"
+          aria-label={t("huddleMain.leave")}
+          title={t("huddleMain.leave")}
           icon={
             <span className={styles.leaveGlyph} aria-hidden="true">
               <HeadphonesIcon size={16} className={styles.headphonesGlyph} />
@@ -284,7 +296,7 @@ function ActiveHuddle({
                 variant="ghost"
                 style={{ color: "var(--status-online)" }}
                 ref={trigger}
-                aria-label="Huddle options"
+                aria-label={t("huddleMain.options")}
                 icon={<CaretDownIcon size={16} aria-hidden="true" />}
               />
             }
@@ -299,7 +311,7 @@ function ActiveHuddle({
               <MenuIcon>
                 <UsersIcon size={16} />
               </MenuIcon>
-              Add someone
+              {t("huddleMain.add")}
             </MenuItem>
             <MenuItem
               closeOnClick={false}
@@ -317,11 +329,11 @@ function ActiveHuddle({
               <MenuIcon>
                 <LinkIcon size={16} />
               </MenuIcon>
-              {copied ? "Link copied" : "Copy link"}
+              {t(copied ? "huddleMain.linkCopied" : "huddleMain.copyLink")}
             </MenuItem>
             {error && (
               <MenuNote role="alert">
-                Couldn’t copy. You can copy this link manually: {link}
+                {t("huddleMain.copyFailed", { link })}
               </MenuNote>
             )}
           </MenuPopup>
@@ -331,8 +343,8 @@ function ActiveHuddle({
         <ChannelMembersDialog
           session={connection.session}
           channelId={call.room}
-          title="Huddle members"
-          description="People added here can join this Huddle and its thread. The original chat stays private."
+          title={t("huddleMain.members")}
+          description={t("huddleMain.membersHelp")}
           close={() => setMembersOpen(false)}
           trigger={trigger}
         />

@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import {
+  act,
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -9,7 +11,8 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { npubEncode } from "nostr-tools/nip19";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../../shared/i18n";
 import type { RelayData } from "../../features/relay/service";
 import { mediaUrl } from "../../features/relay/transport";
 import { publicKeyLabels } from "../../shared/identity/public-key";
@@ -36,8 +39,10 @@ const roster = [
   ["member", member, "member"],
 ];
 
+beforeEach(() => setLanguage("en"));
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.unstubAllGlobals();
 });
 
@@ -118,7 +123,9 @@ function relay(
   };
 }
 
-function broker(routes: Record<string, (body: unknown) => Response>) {
+function broker(
+  routes: Record<string, (body: unknown) => Response | Promise<Response>>,
+) {
   const calls: { route: string; body: unknown }[] = [];
   vi.stubGlobal(
     "fetch",
@@ -583,4 +590,399 @@ it("adds a member by a nostr: npub and refuses an npub that is not a 32-byte key
       role: "member",
     }),
   );
+});
+
+it("membership localization retains its same search, raw names and clear action across languages", async () => {
+  const calls = broker({});
+  const rawName = "Raw {member} 한글";
+  const { relay: data, read } = relay(
+    owner,
+    [snapshot(roster)],
+    new Map([[member, { name: rawName }]]),
+  );
+  render(
+    <CommunityAdmin
+      relay={data}
+      communityName="Raw {community} 한글"
+      active={() => true}
+    />,
+  );
+  const search = await screen.findByRole("searchbox", {
+    name: "Search members",
+  });
+  if (!(search instanceof HTMLInputElement))
+    throw new Error("Expected real member search");
+  fireEvent.change(search, { target: { value: "Raw {member}" } });
+  search.focus();
+  search.setSelectionRange(2, 5);
+  const reads = read.mock.calls.length,
+    writes = [...calls];
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("searchbox", { name: "멤버 검색" })).toBe(search);
+  expect(search).toHaveValue("Raw {member}");
+  expect(search).toHaveFocus();
+  expect([search.selectionStart, search.selectionEnd]).toEqual([2, 5]);
+  expect(
+    screen.getByRole("heading", { name: "멤버 관리", level: 2 }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText("Raw {community} 한글의 멤버와 접근 권한을 관리합니다."),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText((text) => text.startsWith(rawName), {
+      selector: "span.truncate",
+    }),
+  ).toBeVisible();
+  const clear = screen.getByRole("button", { name: "멤버 검색 지우기" });
+  await userEvent.setup().click(clear);
+  expect(search).toHaveValue("");
+  expect(search).toHaveFocus();
+  expect(
+    within(screen.getByRole("list", { name: "멤버" })).getAllByRole("listitem"),
+  ).toHaveLength(3);
+  expect(screen.getByText("소유자 · 나")).toBeInTheDocument();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("searchbox", { name: "Search members" })).toBe(
+    search,
+  );
+  expect(search).toHaveFocus();
+  expect(read).toHaveBeenCalledTimes(reads);
+  expect(calls).toEqual(writes);
+});
+
+it.each([owner, admin, member])(
+  "membership localization preserves permissions for fixture viewer %s",
+  async (viewer) => {
+    const calls = broker({});
+    render(<CommunityAdmin relay={relay(viewer).relay} active={() => true} />);
+    if (viewer === member) {
+      await screen.findByText(
+        "Only community owners and admins can invite people or manage members.",
+      );
+      act(() => setLanguage("ko"));
+      expect(
+        screen.getByText(
+          "커뮤니티 소유자와 관리자만 사람들을 초대하거나 멤버를 관리할 수 있습니다.",
+        ),
+      ).toBeVisible();
+      expect(
+        screen.queryByRole("button", { name: "멤버 초대" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /작업$/ }),
+      ).not.toBeInTheDocument();
+    } else {
+      const actions = await screen.findAllByRole("button", {
+        name: /^Actions for /,
+      });
+      expect(actions).toHaveLength(viewer === owner ? 2 : 1);
+      act(() => setLanguage("ko"));
+      expect(screen.getByRole("button", { name: "멤버 초대" })).toBeVisible();
+      expect(screen.getAllByRole("button", { name: /작업$/ })).toHaveLength(
+        viewer === owner ? 2 : 1,
+      );
+      const action = actions.at(-1);
+      if (!action) throw new Error("Expected permitted member action");
+      await userEvent.setup().click(action);
+      expect(
+        await screen.findByRole("menuitem", { name: "제거" }),
+      ).toBeVisible();
+      expect(
+        screen.queryByRole("menuitem", { name: "관리자로 변경" }) !== null,
+      ).toBe(viewer === owner);
+    }
+    expect(calls.filter((call) => call.route === "member")).toHaveLength(0);
+  },
+);
+
+it("membership localization retains an exact removal target and accepted result through a stale refresh", async () => {
+  const write = deferred<Response>();
+  const calls = broker({ member: () => write.promise });
+  const rawName = "Bob {target} 한글";
+  const { relay: data, read } = relay(
+    owner,
+    [snapshot(roster)],
+    new Map([[member, { name: rawName }]]),
+  );
+  render(<CommunityAdmin relay={data} active={() => true} />);
+  const labels = publicKeyLabels([owner, admin, member]);
+  const label = `${rawName} · ${labels.get(member)}`;
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: `Actions for ${label}` }),
+  );
+  const menu = await screen.findByRole("menu");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("menu")).toBe(menu);
+  await user.click(screen.getByRole("menuitem", { name: "제거" }));
+  const dialog = screen.getByRole("alertdialog", {
+    name: `${label}님을 제거할까요?`,
+  });
+  const confirm = within(dialog).getByRole("button", { name: "제거" });
+  confirm.focus();
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("alertdialog", { name: `Remove: ${label}?` })).toBe(
+    dialog,
+  );
+  expect(within(dialog).getByRole("button", { name: "Remove" })).toBe(confirm);
+  expect(confirm).toHaveFocus();
+  try {
+    await user.click(confirm);
+    await waitFor(() =>
+      expect(calls.filter((call) => call.route === "member")).toEqual([
+        { route: "member", body: { action: "remove", pubkey: member } },
+      ]),
+    );
+    act(() => setLanguage("ko"));
+    expect(confirm).toBeDisabled();
+  } finally {
+    read.mockRejectedValueOnce(new Error("Change accepted by the relay."));
+    write.resolve(Response.json({ accepted: true, message: "" }));
+  }
+  await screen.findByText("릴레이가 변경을 수락했습니다.");
+  const rawRead = "Could not load members: Change accepted by the relay.";
+  expect(screen.getByRole("alert").textContent).toBe(
+    `${rawRead} 아래 목록이 최신 상태가 아닐 수 있습니다.`,
+  );
+  expect(
+    screen.queryByRole("button", { name: /작업$/ }),
+  ).not.toBeInTheDocument();
+  const retry = screen.getByRole("button", { name: "다시 시도" });
+  const held = deferred<ReturnType<typeof snapshot>[]>();
+  read.mockReturnValueOnce(held.promise);
+  await user.click(retry);
+  try {
+    expect(screen.getByRole("button", { name: "새로고침" })).toBe(retry);
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("button", { name: "Refresh" })).toBe(retry);
+    expect(retry).toBeDisabled();
+  } finally {
+    held.resolve([snapshot(roster)]);
+  }
+  await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  expect(calls.filter((call) => call.route === "member")).toHaveLength(1);
+});
+
+const rawInviteUrl =
+  "https://primary.example/invite/fixture?raw={token}&name=한글";
+const inviteReply = () =>
+  Response.json({
+    code: "fixture",
+    url: rawInviteUrl,
+    expires_at: 1700003600,
+    max_uses: null,
+    uses_remaining: null,
+  });
+
+it("membership localization retains a held invite, raw identity, settings choices and canonical numbers", async () => {
+  const held = deferred<Response>();
+  let first = true;
+  const calls = broker({
+    invite: () => {
+      if (first) {
+        first = false;
+        return held.promise;
+      }
+      return inviteReply();
+    },
+  });
+  render(<CommunityAdmin relay={relay(owner).relay} active={() => true} />);
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: "Invite members" }),
+  );
+  const dialog = screen.getByRole("dialog", { name: "Add or invite people" });
+  const identity = within(dialog).getByRole("textbox", {
+    name: "Public identity",
+  });
+  if (!(identity instanceof HTMLInputElement))
+    throw new Error("Expected identity input");
+  const rawIdentity = `nostr:${npubEncode("3".repeat(64))}`;
+  fireEvent.change(identity, { target: { value: rawIdentity } });
+  identity.focus();
+  identity.setSelectionRange(3, 9);
+  try {
+    await waitFor(() =>
+      expect(calls.filter((call) => call.route === "invite")).toHaveLength(1),
+    );
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("dialog", { name: "사람 추가 또는 초대" })).toBe(
+      dialog,
+    );
+    expect(within(dialog).getByRole("textbox", { name: "공개 신원" })).toBe(
+      identity,
+    );
+    expect(identity).toHaveValue(rawIdentity);
+    expect(identity).toHaveFocus();
+    expect([identity.selectionStart, identity.selectionEnd]).toEqual([3, 9]);
+    expect(
+      within(dialog).getByRole("button", { name: "초대 만료 기간 선택" }),
+    ).toBeDisabled();
+    expect(within(dialog).getByLabelText("커뮤니티 초대 링크")).toHaveAttribute(
+      "placeholder",
+      "초대 링크를 만드는 중…",
+    );
+  } finally {
+    held.resolve(inviteReply());
+  }
+  const link = await within(dialog).findByDisplayValue(rawInviteUrl);
+  expect(calls.filter((call) => call.route === "invite")).toEqual([
+    { route: "invite", body: { ttl_secs: 259200, max_uses: null } },
+  ]);
+  await user.click(
+    within(dialog).getByRole("button", { name: "초대 만료 기간 선택" }),
+  );
+  const expiry = await screen.findByRole("menuitemradio", { name: "30일" });
+  const menu = await screen.findByRole("menu");
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("menu")).toBe(menu);
+  expect(screen.getByRole("menuitemradio", { name: "30 days" })).toBe(expiry);
+  await user.click(expiry);
+  await waitFor(() =>
+    expect(calls.filter((call) => call.route === "invite")).toHaveLength(2),
+  );
+  await waitFor(() =>
+    expect(
+      within(dialog).getByRole("button", {
+        name: "Choose maximum invite uses",
+      }),
+    ).toBeEnabled(),
+  );
+  await user.click(
+    within(dialog).getByRole("button", { name: "Choose maximum invite uses" }),
+  );
+  await user.click(
+    await screen.findByRole("menuitemradio", { name: "5 uses" }),
+  );
+  await waitFor(() =>
+    expect(calls.filter((call) => call.route === "invite")).toHaveLength(3),
+  );
+  expect(
+    calls.filter((call) => call.route === "invite").map((call) => call.body),
+  ).toEqual([
+    { ttl_secs: 259200, max_uses: null },
+    { ttl_secs: 2592000, max_uses: null },
+    { ttl_secs: 2592000, max_uses: 5 },
+  ]);
+  act(() => setLanguage("ko"));
+  expect(within(dialog).getByDisplayValue(rawInviteUrl)).toBe(link);
+  expect(identity).toHaveValue(rawIdentity);
+  expect(calls.filter((call) => call.route === "invite")).toHaveLength(3);
+});
+
+it("membership localization distinguishes local identity validation from identical server text", async () => {
+  const raw = "Enter an npub or 64-character hex public key.";
+  const calls = broker({
+    invite: () => Response.json({ error: raw }, { status: 400 }),
+  });
+  render(<CommunityAdmin relay={relay(owner).relay} active={() => true} />);
+  await userEvent
+    .setup()
+    .click(await screen.findByRole("button", { name: "Invite members" }));
+  const dialog = screen.getByRole("dialog");
+  await within(dialog).findByText(raw);
+  const identity = within(dialog).getByRole("textbox", {
+    name: "Public identity",
+  });
+  fireEvent.change(identity, { target: { value: "Carol {raw} 한글" } });
+  act(() => setLanguage("ko"));
+  expect(within(dialog).getByText(raw)).toBeVisible();
+  expect(
+    within(dialog).getByText("npub 또는 64자리 16진수 공개 키를 입력하세요."),
+  ).toBeVisible();
+  expect(identity).toHaveValue("Carol {raw} 한글");
+  expect(
+    within(dialog).getByRole("button", { name: "멤버 추가" }),
+  ).toBeDisabled();
+  expect(calls.filter((call) => call.route === "member")).toHaveLength(0);
+  fireEvent.change(identity, { target: { value: member } });
+  expect(
+    within(dialog).getByText("이미 커뮤니티 멤버인 사람입니다."),
+  ).toBeVisible();
+});
+
+it("membership localization keeps the copied timer and raw clipboard value across locales", async () => {
+  const user = userEvent.setup();
+  broker({ invite: inviteReply });
+  render(<CommunityAdmin relay={relay(owner).relay} active={() => true} />);
+  await user.click(
+    await screen.findByRole("button", { name: "Invite members" }),
+  );
+  const dialog = screen.getByRole("dialog");
+  await within(dialog).findByDisplayValue(rawInviteUrl);
+  const copied = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
+  vi.useFakeTimers();
+  try {
+    const copy = within(dialog).getByRole("button", { name: "Copy link" });
+    fireEvent.click(copy);
+    await act(async () => Promise.resolve());
+    expect(copied).toHaveBeenCalledExactlyOnceWith(rawInviteUrl);
+    expect(within(dialog).getByRole("button", { name: "Copied" })).toBe(copy);
+    act(() => setLanguage("ko"));
+    expect(within(dialog).getByRole("button", { name: "복사됨" })).toBe(copy);
+    expect(within(dialog).getByText("초대 링크를 복사했습니다.")).toBeVisible();
+    act(() => vi.advanceTimersByTime(1999));
+    expect(within(dialog).getByRole("button", { name: "복사됨" })).toBe(copy);
+    act(() => setLanguage("en"));
+    act(() => vi.advanceTimersByTime(1));
+    expect(within(dialog).getByRole("button", { name: "Copy link" })).toBe(
+      copy,
+    );
+    copied.mockRejectedValueOnce(new Error("opaque clipboard failure"));
+    fireEvent.click(copy);
+    await act(async () => Promise.resolve());
+    const alert = within(dialog).getByRole("alert");
+    expect(alert).toHaveTextContent("Could not copy the invite link.");
+    act(() => setLanguage("ko"));
+    expect(within(dialog).getByRole("alert")).toBe(alert);
+    expect(alert).toHaveTextContent("초대 링크를 복사하지 못했습니다.");
+  } finally {
+    copied.mockRestore();
+    vi.useRealTimers();
+  }
+});
+
+it("membership localization keeps a direct-add write, role and identity while pending", async () => {
+  const held = deferred<Response>();
+  const calls = broker({ invite: inviteReply, member: () => held.promise });
+  render(<CommunityAdmin relay={relay(owner).relay} active={() => true} />);
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: "Invite members" }),
+  );
+  const dialog = screen.getByRole("dialog");
+  await within(dialog).findByDisplayValue(rawInviteUrl);
+  const identity = within(dialog).getByRole("textbox", {
+    name: "Public identity",
+  });
+  fireEvent.change(identity, { target: { value: "3".repeat(64) } });
+  await user.click(
+    within(dialog).getByRole("button", { name: "Choose member role" }),
+  );
+  await user.click(await screen.findByRole("menuitemradio", { name: "Admin" }));
+  const add = within(dialog).getByRole("button", { name: "Add member" });
+  await user.click(add);
+  try {
+    await waitFor(() =>
+      expect(calls.filter((call) => call.route === "member")).toHaveLength(1),
+    );
+    act(() => setLanguage("ko"));
+    expect(within(dialog).getByRole("button", { name: "멤버 추가" })).toBe(add);
+    expect(add).toBeDisabled();
+    expect(identity).toBeDisabled();
+    expect(identity).toHaveValue("3".repeat(64));
+    expect(calls.filter((call) => call.route === "member")).toEqual([
+      {
+        route: "member",
+        body: { action: "add", pubkey: "3".repeat(64), role: "admin" },
+      },
+    ]);
+  } finally {
+    held.resolve(Response.json({ accepted: true, message: "" }));
+  }
+  await within(dialog).findByText("멤버를 직접 추가했습니다.");
+  expect(identity).toHaveValue("");
+  act(() => setLanguage("en"));
+  expect(within(dialog).getByText("Member added directly.")).toBeVisible();
+  expect(calls.filter((call) => call.route === "member")).toHaveLength(1);
 });

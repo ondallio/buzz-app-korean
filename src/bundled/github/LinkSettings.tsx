@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useState } from "react";
 import { InlineHeader } from "../../shared/design-system/ui/Header";
 import { SettingsGroup } from "../../shared/design-system/ui/SettingsGroup";
@@ -8,15 +9,16 @@ import {
 } from "./link-preference";
 
 export function LinkSettings({ active }: { active(): boolean }) {
+  useLanguage();
   const enabled = useOpenGitHubLinksInBuzz();
   const [error, setError] = useState(false);
   return (
-    <section aria-label="GitHub link settings">
-      <InlineHeader title="Links" />
+    <section aria-label={t("githubSettings.linksSettings")}>
+      <InlineHeader title={t("githubSettings.links")} />
       <SettingsGroup>
         <SwitchPreferenceRow
-          label="Open GitHub links in Buzz"
-          description="Open supported GitHub links in a side panel. Turn off to use your browser. This applies to all communities on this device."
+          label={t("githubSettings.openLinks")}
+          description={t("githubSettings.openLinksHelp")}
           checked={enabled}
           onCheckedChange={(next) => {
             if (!active()) return;
@@ -31,7 +33,7 @@ export function LinkSettings({ active }: { active(): boolean }) {
       </SettingsGroup>
       {error && (
         <p role="alert" className="text-body-sm text-danger">
-          Your choice could not be saved. Try changing it again.
+          {t("githubSettings.choiceFailed")}
         </p>
       )}
     </section>

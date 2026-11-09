@@ -42,12 +42,16 @@ import type {
 import { agentDirectory } from "../../features/identity-names/testing";
 import type { LiveCallbacks } from "../../features/relay/live";
 import { keypair, profile, signed } from "../../features/relay/testing";
+import { setLanguage } from "../../shared/i18n";
 
 const key = "a".repeat(64),
   viewer = "b".repeat(64),
   threadRoot = "c".repeat(64);
 const personLink = profileTarget("d".repeat(64)) ?? "";
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 
 function deferred() {
   let resolve!: () => void;
@@ -58,6 +62,49 @@ function deferred() {
   });
   return { promise, resolve, reject };
 }
+it("keeps the same open memory tab and body when the profile host changes language", async () => {
+  const dispose = renderAgentActivity(
+    [{ title: "Activity", role: "activity" }],
+    undefined,
+    false,
+    undefined,
+    undefined,
+    false,
+    {
+      body: "Memory **raw** {count}",
+      context: undefined,
+      dirty: false,
+      saving: false,
+    },
+  );
+  const user = userEvent.setup();
+  try {
+    const tab = screen.getByRole("tab", { name: "Memory" });
+    await user.click(tab);
+    const region = await screen.findByRole("region", { name: "Core memories" });
+    const trigger = within(region).getByRole("button", { name: "core" });
+    await user.click(trigger);
+    const body = within(region).getByText("raw");
+    trigger.focus();
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("tab", { name: "기억" })).toBe(tab);
+    expect(tab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("region", { name: "핵심 기억" })).toBe(region);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(trigger).toHaveFocus();
+    expect(within(region).getByText("raw")).toBe(body);
+    expect(body).toHaveProperty("tagName", "STRONG");
+    // This fixture's external plugin owns its Activity title.
+    expect(screen.getByRole("tab", { name: "Activity" })).toBeInTheDocument();
+    act(() => setLanguage("en"));
+    expect(screen.getByRole("tab", { name: "Memory" })).toBe(tab);
+    expect(trigger).toHaveFocus();
+    expect(within(region).getByText("raw")).toBe(body);
+  } finally {
+    dispose();
+  }
+});
+
 it("updates a mounted profile from the shared name view without replacing its identity", async () => {
   let name = "Local name";
   let notify = () => {};

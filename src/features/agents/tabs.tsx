@@ -1,4 +1,4 @@
-import { useLanguage } from "../../shared/i18n";
+import { t, useLanguage } from "../../shared/i18n";
 import {
   errorMessage,
   resolveMessage,
@@ -98,7 +98,20 @@ export function agentSections({
   const tabs = orderedTabs.map(
     ({ id, title, role, reconcilesConfig, component: Component }) => ({
       value: (role ? `agent:${role}` : `agent:type:${id}`) as `agent:${string}`,
-      label: title,
+      label:
+        type &&
+        [
+          "buzz.claude-code/claude-code",
+          "buzz.codex/codex",
+          "buzz.goose/goose",
+          "buzz.pi/pi",
+          "block.builderlab/builderlab",
+        ].includes(type.key) &&
+        id === "activity" &&
+        role === "activity" &&
+        title === "Activity"
+          ? t("agentMemory.activity")
+          : title,
       render: () => (
         <EditorBase
           key={
@@ -159,7 +172,7 @@ export function agentSections({
   )
     tabs.unshift({
       value: "agent:settings",
-      label: "Settings",
+      label: t("agentsBrowse.settings"),
       render: () => (
         <div className="grid gap-4">
           {execution === "remote" && (
@@ -175,7 +188,10 @@ export function agentSections({
     if (!when || shows(when, agent, key))
       tabs.push({
         value: `agent:added:${key}`,
-        label: title,
+        label:
+          key === "buzz.watching/watching" && title === "Attention"
+            ? t("agentMemory.attention")
+            : title,
         render: () => (
           <Component agent={agent} open={openLink} canOpen={canOpenLink} />
         ),
@@ -184,7 +200,7 @@ export function agentSections({
     ...tabs,
     {
       value: "agent:memory",
-      label: "Memory",
+      label: t("agentsBrowse.memory"),
       render: () => (
         <MemoryPanel
           agents={agents}

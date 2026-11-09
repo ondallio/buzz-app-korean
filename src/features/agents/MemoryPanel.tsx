@@ -1,6 +1,9 @@
 import { Accordion } from "../../shared/design-system/ui/Accordion";
 import { SettingsGroup } from "../../shared/design-system/ui/SettingsGroup";
 import { Header } from "../../shared/design-system/ui/Header";
+import { formattingLocale, t, useLanguage } from "../../shared/i18n";
+import { localMessage } from "../../shared/i18n/deferred-message";
+import { TranslatedMessage } from "../../shared/i18n/Message";
 // The app's read-only view of an agent's memory. Every agent type keeps its
 // memory the same way, encrypted to the owner, so the app shows it once: `core`
 // (what each run is given) first, then the slugs the agent reads on demand.
@@ -18,7 +21,6 @@ import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { formatFullTimestamp } from "../../shared/datetime";
 import { useClockFormat } from "../../shared/clock-preference";
-import { relativeTimestamp } from "../../shared/relative-timestamp";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
 import type { CommunityReader } from "../communities/service";
 import {
@@ -59,15 +61,15 @@ export type MemoryLinks = {
 };
 type View = ReturnType<AgentMemories["open"]>;
 
-const MESSAGES: Record<MemorySnapshot["status"], string> = {
-  idle: "Memory isn't loaded.",
-  loading: "Loading memory…",
-  blocked: "Memory can be read once Buzz is connected.",
-  error: "Memory couldn't be read.",
-  denied: "This community doesn't let you read this agent's memory.",
-  unavailable: "Memory isn't available here.",
-  ready: "Memory isn't available here.",
-};
+const MESSAGES = {
+  idle: "agentMemory.idle",
+  loading: "agentMemory.loading",
+  blocked: "agentMemory.blocked",
+  error: "agentMemory.error",
+  denied: "agentMemory.denied",
+  unavailable: "agentMemory.unavailable",
+  ready: "agentMemory.unavailable",
+} as const satisfies Record<MemorySnapshot["status"], string>;
 
 const REMARK = [remarkGfm, remarkBreaks, remarkMemoryLinks];
 const WEEK_SECONDS = 7 * 24 * 60 * 60;
@@ -177,6 +179,7 @@ export function MemoryPanel({
   agents: AgentScopeReader;
   links?: MemoryLinks | undefined;
 }) {
+  useLanguage();
   const community = useAgentScopeCommunity(agent, agents, communities);
   const { snapshot, refreshing, refresh } = useMemory(memories, agent.pubkey);
   const reducedMotion = useReducedMotion();
@@ -190,7 +193,9 @@ export function MemoryPanel({
     status !== "denied";
   const refreshButton = canRefresh ? (
     <IconButton
-      aria-label={listing?.partial ? "Retry loading memories" : "Refresh"}
+      aria-label={t(
+        listing?.partial ? "agentMemory.retry" : "agentMemory.refresh",
+      )}
       disabled={refreshing}
       focusableWhenDisabled
       icon={
@@ -209,9 +214,9 @@ export function MemoryPanel({
       listing ? (
         <>
           <MemorySection
-            title="Core memories"
+            title={t("agentMemory.core")}
             links={links}
-            description="Included in this agent’s context for every session."
+            description={t("agentMemory.coreHelp")}
             community={
               <AgentCommunityScope community={community} scope="Memory" />
             }
@@ -220,9 +225,9 @@ export function MemoryPanel({
             refreshing={refreshing}
           />
           <MemorySection
-            title="Memories"
+            title={t("agentMemory.memories")}
             links={links}
-            description="Details the agent can look up as needed."
+            description={t("agentMemory.help")}
             community={
               <AgentCommunityScope community={community} scope="Memory" />
             }
@@ -239,12 +244,12 @@ export function MemoryPanel({
                 className="motion-safe:animate-spin"
                 aria-hidden="true"
               />
-              Loading more memories…
+              {t("agentMemory.more")}
             </div>
           ) : status === "error" ? (
             <div className="flex items-center justify-between gap-2">
               <p role="alert" className="m-0 text-body-sm text-danger">
-                {MESSAGES.error}
+                {t(MESSAGES.error)}
               </p>
               {refreshButton}
             </div>
@@ -252,7 +257,7 @@ export function MemoryPanel({
             listing.partial && (
               <div className="flex items-center justify-between gap-2">
                 <p className="m-0 text-body-sm text-secondary">
-                  Some memories couldn't be shown.
+                  {t("agentMemory.partial")}
                 </p>
                 {refreshButton}
               </div>
@@ -262,7 +267,7 @@ export function MemoryPanel({
       ) : status === "loading" ? (
         <div
           role="status"
-          aria-label="Loading memories"
+          aria-label={t("agentMemory.loadingLabel")}
           className="flex min-h-12 items-center justify-center text-secondary"
         >
           <CircleNotchIcon
@@ -276,7 +281,7 @@ export function MemoryPanel({
             role={status === "error" ? "alert" : undefined}
             className={`m-0 text-body-sm ${status === "error" ? "text-danger" : "text-secondary"}`}
           >
-            {MESSAGES[status]}
+            {t(MESSAGES[status])}
           </p>
           {refreshButton}
         </div>
@@ -334,7 +339,7 @@ function MemorySection({
             <SettingsGroup>
               <div className="flex flex-col items-center justify-center gap-3 py-8 text-secondary">
                 {emptyIcon}
-                <p className="m-0 text-body-sm">No memories yet</p>
+                <p className="m-0 text-body-sm">{t("agentMemory.empty")}</p>
               </div>
             </SettingsGroup>
           </div>
@@ -407,17 +412,40 @@ function MemoryAccordion({
 }
 
 function MemoryCopyMenu({ entry }: { entry: MemoryEntry }) {
+  useLanguage();
   const notify = useToastNotification();
   const copy = (value: string, label: "name" | "body") =>
     writeClipboardText(value).then(
-      () => notify(`Memory ${label} copied.`, "success"),
-      () => notify(`Couldn’t copy the memory ${label}.`, "error"),
+      () =>
+        notify(
+          <TranslatedMessage
+            value={localMessage(
+              label === "name"
+                ? "agentMemory.copiedName"
+                : "agentMemory.copiedBody",
+            )}
+          />,
+          "success",
+        ),
+      () =>
+        notify(
+          <TranslatedMessage
+            value={localMessage(
+              label === "name"
+                ? "agentMemory.copyNameFailed"
+                : "agentMemory.copyBodyFailed",
+            )}
+          />,
+          "error",
+        ),
     );
   return (
     <>
-      <MenuItem onClick={() => copy(entry.slug, "name")}>Copy name</MenuItem>
+      <MenuItem onClick={() => copy(entry.slug, "name")}>
+        {t("agentMemory.copyName")}
+      </MenuItem>
       <MenuItem onClick={() => copy(entry.body, "body")}>
-        Copy full body
+        {t("agentMemory.copyBody")}
       </MenuItem>
     </>
   );
@@ -425,12 +453,38 @@ function MemoryCopyMenu({ entry }: { entry: MemoryEntry }) {
 
 function memoryTimestamp(createdAt: number, nowSeconds = Date.now() / 1_000) {
   const age = Math.max(0, nowSeconds - createdAt);
-  if (age >= WEEK_SECONDS && age < MONTH_SECONDS) {
-    const weeks = Math.floor(age / WEEK_SECONDS);
-    return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+  if (age < 60) return t("agentMemory.now");
+  const count = (value: number) => value.toLocaleString(formattingLocale());
+  if (age < 3_600) {
+    const minutes = Math.floor(age / 60);
+    return t(
+      minutes === 1 ? "agentMemory.minuteOne" : "agentMemory.minuteMany",
+      { count: count(minutes) },
+    );
   }
-  if (age >= MONTH_SECONDS && age < TWO_MONTHS_SECONDS) return "1 month ago";
-  return relativeTimestamp(createdAt, nowSeconds).replace(/^on /, "");
+  if (age < 86_400) {
+    const hours = Math.floor(age / 3_600);
+    return t(hours === 1 ? "agentMemory.hourOne" : "agentMemory.hourMany", {
+      count: count(hours),
+    });
+  }
+  if (age < WEEK_SECONDS) {
+    const days = Math.floor(age / 86_400);
+    return t(days === 1 ? "agentMemory.dayOne" : "agentMemory.dayMany", {
+      count: count(days),
+    });
+  }
+  if (age < MONTH_SECONDS) {
+    const weeks = Math.floor(age / WEEK_SECONDS);
+    return t(weeks === 1 ? "agentMemory.weekOne" : "agentMemory.weekMany", {
+      count: count(weeks),
+    });
+  }
+  if (age < TWO_MONTHS_SECONDS) return t("agentMemory.month");
+  return new Date(createdAt * 1_000).toLocaleDateString(formattingLocale(), {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function MemoryBody({

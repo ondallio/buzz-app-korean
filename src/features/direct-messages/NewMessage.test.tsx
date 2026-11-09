@@ -2156,3 +2156,296 @@ it("keeps the recipient input, memoized agent option and keyboard choice across 
   );
   expect(t.messages.send.mock.calls[0]?.[1]).toBe("Raw payload 한글");
 });
+
+it("keeps the new-message parent, current recipient query and authored draft across languages", async () => {
+  const t = setup();
+  t.mount();
+  const page = screen.getByRole("region", { name: "New message" });
+  await t.user.click(await screen.findByRole("option", { name: "Person 1" }));
+  const chip = screen.getByRole("button", { name: "Remove Person 1" });
+  const editor = screen.getByRole("textbox", { name: "Message Person 1" });
+  await t.user.type(editor, "New message 한글");
+  const input = recipient();
+  assert(input instanceof HTMLInputElement);
+  await t.user.type(input, "Person");
+  input.setSelectionRange(1, 4);
+  const selected = input.getAttribute("aria-activedescendant");
+  const reads = t.directMessages.people.mock.calls.length;
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("region", { name: "새 메시지" })).toBe(page);
+  expect(screen.getByRole("textbox", { name: "Person 1에게 메시지" })).toBe(
+    editor,
+  );
+  expect(editor).toHaveTextContent("New message 한글");
+  expect(screen.getByRole("button", { name: "Person 1 제거" })).toBe(chip);
+  expect(screen.getByRole("combobox", { name: "메시지를 받을 사람" })).toBe(
+    input,
+  );
+  expect(input).toHaveValue("Person");
+  expect(input).toHaveFocus();
+  expect([input.selectionStart, input.selectionEnd]).toEqual([1, 4]);
+  expect(input).toHaveAttribute("aria-activedescendant", selected);
+  act(() => setLanguage("en"));
+  expect(screen.getByRole("region", { name: "New message" })).toBe(page);
+  expect(screen.getByRole("textbox", { name: "Message Person 1" })).toBe(
+    editor,
+  );
+  expect(screen.getByRole("button", { name: "Remove Person 1" })).toBe(chip);
+  expect(input).toHaveFocus();
+  expect(input).toHaveValue("Person");
+  expect([input.selectionStart, input.selectionEnd]).toEqual([1, 4]);
+  expect(t.directMessages.people).toHaveBeenCalledTimes(reads);
+  expect(t.directMessages.open).not.toHaveBeenCalled();
+  expect(t.messages.send).not.toHaveBeenCalled();
+});
+
+it("keeps one pending new-chat request and the exact draft through a language change", async () => {
+  const t = setup();
+  let release: (id: string) => void = () => {};
+  t.directMessages.open.mockReturnValueOnce(
+    new Promise((resolve) => {
+      release = resolve;
+    }),
+  );
+  t.mount();
+  await t.user.click(await screen.findByRole("option", { name: "Person 1" }));
+  const editor = screen.getByRole("textbox", { name: "Message Person 1" });
+  await t.user.type(editor, "Sending message… 한글");
+  await t.user.click(send());
+  try {
+    await waitFor(() => expect(t.directMessages.open).toHaveBeenCalledOnce());
+    const status = screen.getByText("Sending message…", { selector: "p" });
+    const chip = screen.getByRole("button", { name: "Remove Person 1" });
+    const calls = t.directMessages.people.mock.calls.length;
+    act(() => setLanguage("ko"));
+    expect(screen.getByText("메시지를 보내는 중…", { selector: "p" })).toBe(
+      status,
+    );
+    expect(screen.getByRole("textbox", { name: "Person 1에게 메시지" })).toBe(
+      editor,
+    );
+    expect(editor).toHaveTextContent("Sending message… 한글");
+    expect(screen.getByRole("button", { name: "Person 1 제거" })).toBe(chip);
+    expect(chip).toBeDisabled();
+    expect(
+      screen.getByRole("combobox", { name: "메시지를 받을 사람" }),
+    ).toBeDisabled();
+    expect(t.messages.send).not.toHaveBeenCalled();
+    expect(t.directMessages.open).toHaveBeenCalledExactlyOnceWith(
+      [people[0]?.pubkey],
+      expect.any(AbortSignal),
+    );
+    expect(t.directMessages.people).toHaveBeenCalledTimes(calls);
+    act(() => setLanguage("en"));
+    expect(screen.getByText("Sending message…", { selector: "p" })).toBe(
+      status,
+    );
+  } finally {
+    await act(async () => release(channel));
+  }
+  await waitFor(() =>
+    expect(t.onStarted).toHaveBeenCalledExactlyOnceWith(
+      channel,
+      "d".repeat(64),
+    ),
+  );
+  expect(t.messages.send).toHaveBeenCalledOnce();
+  expect(t.messages.send.mock.calls[0]?.slice(0, 4)).toEqual([
+    channel,
+    "Sending message… 한글",
+    [],
+    [],
+  ]);
+  expect(t.directMessages.open).toHaveBeenCalledOnce();
+  expect(t.outbox.acknowledge).toHaveBeenCalledExactlyOnceWith("d".repeat(64));
+});
+
+it.each([
+  "local-agent",
+  "external-agent-text",
+  "local-send-fallback",
+  "external-send-text",
+] as const)(
+  "retains %s error provenance and draft without a locale-only retry",
+  async (kind) => {
+    const t = setup();
+    const agentRaw =
+      "A selected agent is no longer available. Remove it or refresh its details and try again.";
+    const sendRaw = "Could not send your message. Try again.";
+    const localAgent = kind === "local-agent";
+    const raw = kind.includes("agent") ? agentRaw : sendRaw;
+    if (!localAgent)
+      t.directMessages.open.mockRejectedValueOnce(
+        kind === "local-send-fallback" ? null : new Error(raw),
+      );
+    t.mount();
+    await t.user.click(
+      await screen.findByRole("option", {
+        name: localAgent ? "Person 2, Agent" : "Person 1",
+      }),
+    );
+    const editor = screen.getByRole("textbox");
+    await t.user.type(editor, "New message preserved");
+    const control = t.control.snapshot();
+    if (localAgent) t.updateControl({ ...control, status: "error" });
+    await t.user.click(send());
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(raw);
+    const opens = t.directMessages.open.mock.calls.length;
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("alert")).toBe(alert);
+    expect(alert.textContent).toBe(
+      localAgent
+        ? "선택한 에이전트를 더 이상 사용할 수 없습니다. 제거하거나 세부 정보를 새로 고친 뒤 다시 시도하세요."
+        : kind === "local-send-fallback"
+          ? "메시지를 보내지 못했습니다. 다시 시도하세요."
+          : raw,
+    );
+    expect(editor).toHaveTextContent("New message preserved");
+    expect(t.directMessages.open).toHaveBeenCalledTimes(opens);
+    expect(t.messages.send).not.toHaveBeenCalled();
+    act(() => setLanguage("en"));
+    expect(alert.textContent).toBe(raw);
+    if (localAgent) t.updateControl(control);
+    await t.user.click(send());
+    await waitFor(() => expect(t.onStarted).toHaveBeenCalledOnce());
+    expect(t.messages.send).toHaveBeenCalledOnce();
+    expect(t.messages.send.mock.calls[0]?.[1]).toBe("New message preserved");
+  },
+);
+
+it.each(["invalid-journal", "fallback", "external"] as const)(
+  "preserves the %s restore boundary across languages",
+  async (kind) => {
+    const t = setup();
+    const invalid: readonly OutgoingEvent[] = [
+      {
+        event: {
+          id: "d".repeat(64),
+          pubkey: "f".repeat(64),
+          kind: 9,
+          content: "Raw",
+          created_at: 1,
+          tags: [],
+        },
+        delivery: "failed",
+        recovery: { key: "direct-message:new", value: "{}" },
+      },
+    ];
+    if (kind === "invalid-journal") t.outbox.snapshot = () => invalid;
+    const ready = vi.fn(async () => {
+      if (kind !== "invalid-journal")
+        throw kind === "external"
+          ? new Error("Could not restore the message.")
+          : null;
+    });
+    t.outbox.ready = ready;
+    t.mount();
+    const alert = await screen.findByRole("alert");
+    const raw =
+      kind === "invalid-journal"
+        ? "The saved new message could not be restored."
+        : "Could not restore the message.";
+    expect(alert).toHaveTextContent(raw);
+    act(() => setLanguage("ko"));
+    expect(screen.getByRole("alert")).toBe(alert);
+    expect(alert.textContent).toBe(
+      kind === "invalid-journal"
+        ? "저장된 새 메시지를 복원하지 못했습니다."
+        : kind === "fallback"
+          ? "메시지를 복원하지 못했습니다."
+          : raw,
+    );
+    act(() => setLanguage("en"));
+    expect(alert.textContent).toBe(raw);
+    expect(ready).toHaveBeenCalledOnce();
+    expect(t.directMessages.open).not.toHaveBeenCalled();
+    expect(t.messages.send).not.toHaveBeenCalled();
+  },
+);
+
+it("keeps confirmation-only retry on the original durable target across languages", async () => {
+  const t = setup();
+  const person = people[0];
+  assert(person);
+  const storageKey = (key: string) =>
+    `buzz-view.v1:${JSON.stringify([scope, key])}`;
+  localStorage.setItem(
+    storageKey("direct-message:recipients"),
+    JSON.stringify([person]),
+  );
+  localStorage.setItem(
+    storageKey("direct-message:pending"),
+    JSON.stringify({
+      id: "d".repeat(64),
+      channelId: channel,
+      recipients: person.pubkey,
+      draft: { text: "Retry send raw draft", recipients: [] },
+    }),
+  );
+  t.directMessages.delivery.mockReturnValue(undefined);
+  let release = () => {};
+  t.directMessages.delivered.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      release = resolve;
+    }),
+  );
+  t.mount();
+  const retry = await screen.findByRole("button", { name: "Retry send" });
+  retry.focus();
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("button", { name: "전송 다시 시도" })).toBe(retry);
+  expect(retry).toHaveFocus();
+  expect(screen.getByRole("textbox")).toHaveTextContent("Retry send raw draft");
+  try {
+    await t.user.keyboard("{Enter}");
+    await waitFor(() =>
+      expect(t.directMessages.delivered).toHaveBeenCalledExactlyOnceWith(
+        "d".repeat(64),
+        channel,
+        expect.any(AbortSignal),
+      ),
+    );
+    const status = screen.getByText("메시지를 보내는 중…", { selector: "p" });
+    act(() => setLanguage("en"));
+    expect(screen.getByText("Sending message…", { selector: "p" })).toBe(
+      status,
+    );
+    expect(t.messages.send).not.toHaveBeenCalled();
+    expect(t.directMessages.open).not.toHaveBeenCalled();
+    expect(t.directMessages.delivered).toHaveBeenCalledOnce();
+  } finally {
+    await act(async () => release());
+  }
+  await waitFor(() =>
+    expect(t.onStarted).toHaveBeenCalledExactlyOnceWith(
+      channel,
+      "d".repeat(64),
+    ),
+  );
+  expect(t.messages.send).not.toHaveBeenCalled();
+  expect(t.directMessages.open).not.toHaveBeenCalled();
+  expect(localStorage.getItem(storageKey("direct-message:pending"))).toBeNull();
+});
+
+it("shows the connection's unavailable state live without creating a chat", async () => {
+  const t = setup();
+  t.directMessages.available = false;
+  t.mount();
+  const status = screen.getByText(
+    "Starting direct messages is unavailable on this connection.",
+  );
+  act(() => setLanguage("ko"));
+  expect(screen.getByText("이 연결에서는 새 DM을 시작할 수 없습니다.")).toBe(
+    status,
+  );
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByText(
+      "Starting direct messages is unavailable on this connection.",
+    ),
+  ).toBe(status);
+  expect(send()).toBeDisabled();
+  expect(t.directMessages.open).not.toHaveBeenCalled();
+  expect(t.messages.send).not.toHaveBeenCalled();
+});

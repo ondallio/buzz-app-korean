@@ -3,6 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
+import { setLanguage } from "../../shared/i18n";
 import { LinkSettings } from "./LinkSettings";
 import type { GitHubCli } from "./gh";
 import { GitHubSettings } from "./GitHubSettings";
@@ -14,6 +15,7 @@ import {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  setLanguage("en");
   localStorage.clear();
 });
 
@@ -124,4 +126,55 @@ it("shows the signed-in account alongside the link setting", async () => {
   expect(
     await screen.findByText("Signed in to GitHub as octocat through gh."),
   ).toBeInTheDocument();
+});
+
+it("keeps a failed link choice and focused switch while the recovery caption translates, then retries the original storage value", async () => {
+  const active = vi.fn(() => true),
+    key = "buzz.github.open-links-in-buzz.v1";
+  render(<LinkSettings active={active} />);
+  const toggle = screen.getByRole("switch", {
+    name: "Open GitHub links in Buzz",
+  });
+  toggle.focus();
+  const original = Storage.prototype.setItem;
+  const write = vi
+    .spyOn(Storage.prototype, "setItem")
+    .mockImplementation(function (this: Storage, name: string, value: string) {
+      if (name === key) throw new Error("Opaque storage failure");
+      original.call(this, name, value);
+    });
+  await userEvent.click(toggle);
+  const alert = screen.getByRole("alert");
+  expect(toggle).toBeChecked();
+  expect(active).toHaveBeenCalledOnce();
+  for (const language of ["ko", "en"] as const) {
+    act(() => setLanguage(language));
+    expect(
+      screen.getByRole("switch", {
+        name:
+          language === "ko"
+            ? "Buzz에서 GitHub 링크 열기"
+            : "Open GitHub links in Buzz",
+      }),
+    ).toBe(toggle);
+    expect(screen.getByRole("alert")).toBe(alert);
+    expect(alert).toHaveTextContent(
+      language === "ko"
+        ? "선택을 저장하지 못했습니다. 다시 변경해 주세요."
+        : "Your choice could not be saved. Try changing it again.",
+    );
+    expect(toggle).toHaveFocus();
+    expect(toggle).toBeChecked();
+    expect(active).toHaveBeenCalledOnce();
+  }
+  expect(write.mock.calls.filter(([name]) => name === key)).toEqual([
+    [key, "off"],
+  ]);
+  write.mockRestore();
+  act(() => setLanguage("ko"));
+  await userEvent.click(toggle);
+  expect(active).toHaveBeenCalledTimes(2);
+  expect(toggle).not.toBeChecked();
+  expect(localStorage.getItem(key)).toBe("off");
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });

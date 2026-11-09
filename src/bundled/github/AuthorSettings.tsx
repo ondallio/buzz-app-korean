@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useState } from "react";
 import { Accordion } from "../../shared/design-system/ui/Accordion";
 import { Button } from "../../shared/design-system/ui/Button";
@@ -17,6 +18,7 @@ export function AuthorSettings({
   active(): boolean;
   gh?: GitHubCli | undefined;
 }) {
+  useLanguage();
   const [saved, setSaved] = useState(loadPolicy);
   const [draft, setDraft] = useState(saved.text);
   const [fallback, setFallback] = useState(saved.fallback);
@@ -30,13 +32,13 @@ export function AuthorSettings({
     parsed.text !== saved.text ||
     fallback !== saved.fallback;
   return (
-    <section aria-label="GitHub comment authors settings">
+    <section aria-label={t("githubSettings.authorsSettings")}>
       <InlineHeader
-        title="Comment authors"
-        subtitle="Agents watching a pull request are woken by CI, and by the comments and reviews these rules allow."
+        title={t("githubSettings.authors")}
+        subtitle={t("githubSettings.authorsHelp")}
       />
       <form
-        aria-label="GitHub comment author rules"
+        aria-label={t("githubSettings.rulesForm")}
         onSubmit={(event) => {
           event.preventDefault();
           if (!active() || !dirty) return;
@@ -57,19 +59,18 @@ export function AuthorSettings({
           <Account gh={gh} />
           {saved.error !== undefined && (
             <p role="status" className="m-0 text-body-sm text-subtle">
-              Your saved rules no longer parse, so no comment or review wakes
-              your agents until you fix them.
+              {t("githubSettings.invalidSaved")}
             </p>
           )}
           {open(saved) && (
             <p role="status" className="m-0 text-body-sm text-subtle">
-              Comments from anyone no rule denies can wake your agents.
+              {t("githubSettings.openPolicy")}
             </p>
           )}
           <Field
-            label="Rules"
+            label={t("githubSettings.rules")}
             error={checked && typeof parsed === "string" ? parsed : undefined}
-            description="One rule per line. The first rule that matches decides."
+            description={t("githubSettings.rulesHelp")}
           >
             <Textarea
               rows={6}
@@ -88,46 +89,28 @@ export function AuthorSettings({
             items={[
               {
                 value: "syntax",
-                title: "Rule syntax",
+                title: t("githubSettings.syntax"),
                 content: (
                   <ul className="m-0 flex flex-col gap-1 pl-5 text-body-sm text-subtle">
-                    <li>
-                      allow or deny, then any of author:login, author:/pattern/,
-                      org:organization, body:/pattern/ and prefix:text, which
-                      runs to the end of the line. A bare allow or deny matches
-                      everyone.
-                    </li>
-                    <li>
-                      author:@me is your GitHub account, a bot’s login ends in
-                      [bot], and logins match case aside.
-                    </li>
-                    <li>
-                      body: sees a comment’s first 1,000 characters, the most a
-                      wake quotes.
-                    </li>
-                    <li>
-                      Patterns are JavaScript regular expressions without
-                      backreferences, lookaround or escapes JavaScript reads as
-                      plain letters, such as \q.
-                    </li>
-                    <li>
-                      Membership your GitHub account cannot see, or of a
-                      misspelled organization, counts as none.
-                    </li>
+                    <li>{t("githubSettings.syntaxConditions")}</li>
+                    <li>{t("githubSettings.syntaxAccount")}</li>
+                    <li>{t("githubSettings.syntaxBody")}</li>
+                    <li>{t("githubSettings.syntaxPattern")}</li>
+                    <li>{t("githubSettings.syntaxMembership")}</li>
                   </ul>
                 ),
               },
             ]}
           />
           <Select
-            label="When no rule matches"
+            label={t("githubSettings.fallback")}
             value={fallback}
             groups={[
               {
                 label: "",
                 options: [
-                  { value: "allow", label: "Wake the agent" },
-                  { value: "deny", label: "Don’t wake it" },
+                  { value: "allow", label: t("githubSettings.allow") },
+                  { value: "deny", label: t("githubSettings.deny") },
                 ],
               },
             ]}
@@ -140,7 +123,7 @@ export function AuthorSettings({
           )}
           <div className="flex flex-wrap items-center justify-end gap-3">
             <Button type="submit" variant="primary" disabled={!dirty}>
-              Save
+              {t("githubSettings.save")}
             </Button>
           </div>
         </SettingsGroup>
@@ -150,6 +133,7 @@ export function AuthorSettings({
 }
 /** Who author:@me is: the account the person's `gh` is signed in to. */
 function Account({ gh }: { gh: GitHubCli | undefined }) {
+  useLanguage();
   /** The login, or why `gh` could not say. */
   const [answer, setAnswer] = useState<{ login: string } | Error>();
   useEffect(() => {
@@ -171,12 +155,12 @@ function Account({ gh }: { gh: GitHubCli | undefined }) {
   return (
     <p className="m-0 text-body-sm text-subtle">
       {!gh
-        ? "Your GitHub account is the one gh is signed in to in the desktop app."
+        ? t("githubSettings.accountDesktop")
         : !answer
-          ? "Checking which GitHub account gh is signed in to…"
+          ? t("githubSettings.accountChecking")
           : answer instanceof Error
-            ? `gh couldn’t read your GitHub account: ${answer.message}`
-            : `Signed in to GitHub as ${answer.login} through gh.`}
+            ? t("githubSettings.accountFailed", { reason: answer.message })
+            : t("githubSettings.accountSignedIn", { login: answer.login })}
     </p>
   );
 }

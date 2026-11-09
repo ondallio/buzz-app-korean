@@ -1,3 +1,4 @@
+import { useLanguage } from "../../shared/i18n";
 import { historyPresentation } from "../../features/agents/history-presentation";
 import {
   profileHistoryActive,
@@ -378,6 +379,7 @@ function ProfileDetails({
   openConversation: AgentViewProps["openConversation"];
   close(): void;
 }) {
+  useLanguage();
   const selection = useMemo(
     () => selectProfiles(session.profiles, [pubkey]),
     [session.profiles, pubkey],

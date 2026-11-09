@@ -1,6 +1,14 @@
 // @vitest-environment jsdom
+import "@testing-library/jest-dom/vitest";
+import { setLanguage } from "../../shared/i18n";
 import { afterEach, beforeAll, expect, it, vi, assert } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { stubAvatarBrowserApis } from "../../features/agents/avatar-testing";
 stubAvatarBrowserApis();
 import { invoke } from "@tauri-apps/api/core";
@@ -14,7 +22,10 @@ import type { HuddleDiscussion } from "../../features/huddle/discussion";
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+});
 
 function discussion(delivery: "failed" | "unknown"): HuddleDiscussion {
   return {
@@ -247,4 +258,149 @@ it("routes internal links and signed mentions while leaving unbound or edited na
   mounted.rerender(view());
   expect(chip()).toBeUndefined();
   expect(screen.getByText(/@Taylor/)).toBeTruthy();
+});
+
+it("keeps the same discussion, raw message and retained draft while translating live controls", () => {
+  const value = {
+    ...discussion("unknown"),
+    historyLimited: true,
+    hasMore: true,
+  };
+  const older = vi.fn(),
+    recover = vi.fn(),
+    retry = vi.fn();
+  const { container } = render(
+    <HuddleDiscussionView
+      discussion={value}
+      composer={
+        <textarea aria-label="Raw draft editor" defaultValue="Raw draft 한글" />
+      }
+      older={older}
+      recover={recover}
+      retry={retry}
+    />,
+  );
+  const log = screen.getByRole("log", { name: "Huddle messages" });
+  const thread = screen.getByRole("tab", { name: "Thread" });
+  const editor = screen.getByRole("textbox", { name: "Raw draft editor" });
+  assert(editor instanceof HTMLTextAreaElement);
+  editor.focus();
+  editor.setSelectionRange(4, 9);
+  const text =
+    container.querySelector(".message-body") ?? screen.getByText("Hello");
+  for (const language of ["ko", "en"] as const) {
+    act(() => setLanguage(language));
+    expect(
+      screen.getByRole("log", {
+        name: language === "ko" ? "허들 메시지" : "Huddle messages",
+      }),
+    ).toBe(log);
+    expect(
+      screen.getByRole("tab", {
+        name: language === "ko" ? "스레드" : "Thread",
+      }),
+    ).toBe(thread);
+    expect(screen.getByRole("textbox", { name: "Raw draft editor" })).toBe(
+      editor,
+    );
+    expect(editor.value).toBe("Raw draft 한글");
+    expect(editor.selectionStart).toBe(4);
+    expect(editor.selectionEnd).toBe(9);
+    expect(editor).toHaveFocus();
+    expect(
+      screen.getByText(
+        language === "ko"
+          ? "최근 메시지 200개를 표시합니다."
+          : "Showing the latest 200 messages.",
+      ),
+    ).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      language === "ko"
+        ? "전송 여부가 확인되지 않았습니다. 다시 시도하면 같은 메시지를 보냅니다."
+        : "Delivery hasn’t been confirmed. Retry sends the same message.",
+    );
+    expect(text).toBeInTheDocument();
+    expect(screen.getByText("Hello")).toBeVisible();
+    expect(screen.getByText("Alex")).toBeVisible();
+    expect(older).not.toHaveBeenCalled();
+    expect(recover).not.toHaveBeenCalled();
+    expect(retry).not.toHaveBeenCalled();
+  }
+  act(() => setLanguage("ko"));
+  fireEvent.click(screen.getByRole("button", { name: "이전 메시지 불러오기" }));
+  expect(older).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+  expect(recover).toHaveBeenCalledExactlyOnceWith("message");
+  expect(editor).toHaveFocus();
+  fireEvent.click(screen.getByRole("button", { name: "버리기" }));
+  expect(recover).toHaveBeenLastCalledWith("message", true);
+  fireEvent.click(screen.getByRole("tab", { name: "실시간 대화록" }));
+  expect(screen.getByText("실시간 대화록이 없습니다")).toBeVisible();
+});
+
+it.each(["loading", "ready"] as const)(
+  "translates the %s empty room while keeping the same read-only log",
+  (status) => {
+    const value = {
+      ...discussion("failed"),
+      rows: [],
+      status,
+      writable: false,
+    };
+    render(
+      <HuddleDiscussionView
+        discussion={value}
+        composer={null}
+        older={() => {}}
+        retry={() => {}}
+        recover={() => {}}
+      />,
+    );
+    const log = screen.getByRole("log");
+    for (const language of ["ko", "en"] as const) {
+      act(() => setLanguage(language));
+      expect(screen.getByRole("log")).toBe(log);
+      expect(
+        screen.getByText(
+          status === "loading"
+            ? language === "ko"
+              ? "대화를 불러오는 중…"
+              : "Loading conversation…"
+            : language === "ko"
+              ? "아직 메시지가 없습니다"
+              : "No messages yet",
+        ),
+      ).toBeVisible();
+      if (status === "ready")
+        expect(
+          screen.getByText(
+            language === "ko"
+              ? "이 허들 대화는 읽기 전용입니다."
+              : "This Huddle conversation is read-only.",
+          ),
+        ).toBeVisible();
+    }
+  },
+);
+it("preserves a retained raw read error even when it matches an owned delivery caption", () => {
+  const value = { ...discussion("failed"), error: "Message wasn’t delivered." };
+  const retry = vi.fn();
+  render(
+    <HuddleDiscussionView
+      discussion={value}
+      composer={null}
+      older={() => {}}
+      retry={retry}
+      recover={() => {}}
+    />,
+  );
+  const alert = screen.getByRole("alert");
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("alert")).toBe(alert);
+  expect(alert).toHaveTextContent("Message wasn’t delivered. 다시 시도");
+  const action = alert.querySelector("button");
+  assert(action instanceof HTMLButtonElement);
+  fireEvent.click(action);
+  expect(retry).toHaveBeenCalledExactlyOnceWith();
+  expect(screen.getByRole("log")).toHaveFocus();
 });

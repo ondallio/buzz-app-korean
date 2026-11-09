@@ -1,4 +1,5 @@
 import type { LocalAgentSource } from "../agents/local-activity";
+import { localError } from "../../shared/i18n/deferred-message";
 // FOUNDATION: One relay session owns reads, local intent, delivery and shared views.
 import { createSoloPreferences, soloGroups } from "./solo-preferences";
 import { npubEncode } from "nostr-tools/nip19";
@@ -1572,11 +1573,9 @@ export function createRelaySession(
         liveSnapshot.status !== "connected" &&
         !addressesPartnerOnly)
     )
-      throw new Error("Refresh channel membership before mentioning anyone");
+      throw localError("relayErrors.refreshMentionMembership");
     if (pubkeys.some((key) => !channel.members?.includes(key)))
-      throw new Error(
-        "A selected recipient is no longer a channel member; remove them or refresh membership",
-      );
+      throw localError("relayErrors.recipientNoLongerMember");
   }
   function validateCanvasWrite(event: Pick<EventData, "kind" | "tags">) {
     if (event.kind !== 40100) return;

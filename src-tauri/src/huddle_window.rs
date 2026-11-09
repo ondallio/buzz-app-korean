@@ -331,6 +331,11 @@ pub(crate) async fn huddle_window_open<R: tauri::Runtime>(
             tauri::WebviewUrl::App("huddle.html".into()),
         )
         .title("Huddle — Buzz")
+        .on_document_title_changed(|window, title| {
+            if let Err(error) = window.set_title(&title) {
+                eprintln!("Could not update Huddle window title: {error}");
+            }
+        })
         .inner_size(520.0, 560.0)
         .min_inner_size(360.0, 400.0)
         .center()
@@ -767,6 +772,7 @@ mod tests {
             serde_json::json!([
                 "allow-huddle-window-watch",
                 "allow-huddle-window-action",
+                "allow-system-language",
                 "allow-media-download",
                 "allow-clipboard-write-text",
                 { "identifier": "opener:allow-open-url", "allow": [{ "url": "https://*" }, { "url": "http://*" }] }

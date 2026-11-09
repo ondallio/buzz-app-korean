@@ -1,4 +1,35 @@
 import { en as adminStaffEn, ko as adminStaffKo } from "./catalogs/admin-staff";
+import { en as huddleMainEn, ko as huddleMainKo } from "./catalogs/huddle-main";
+import { en as huddleCallEn, ko as huddleCallKo } from "./catalogs/huddle-call";
+import {
+  en as huddleDiscussionEn,
+  ko as huddleDiscussionKo,
+} from "./catalogs/huddle-discussion";
+import {
+  en as huddleCompanionEn,
+  ko as huddleCompanionKo,
+} from "./catalogs/huddle-companion";
+import {
+  en as githubSettingsEn,
+  ko as githubSettingsKo,
+} from "./catalogs/github-settings";
+import {
+  en as directMessageEn,
+  ko as directMessageKo,
+} from "./catalogs/direct-message";
+import { en as agentScopeEn, ko as agentScopeKo } from "./catalogs/agent-scope";
+import {
+  en as relayErrorsEn,
+  ko as relayErrorsKo,
+} from "./catalogs/relay-errors";
+import {
+  en as agentMemoryEn,
+  ko as agentMemoryKo,
+} from "./catalogs/agent-memory";
+import {
+  en as communityAdminEn,
+  ko as communityAdminKo,
+} from "./catalogs/community-admin";
 import {
   en as statusFocusEn,
   ko as statusFocusKo,
@@ -159,6 +190,16 @@ export const english = {
   ...terminalSettingsEn,
   ...typesafeSettingsEn,
   ...adminStaffEn,
+  ...huddleMainEn,
+  ...huddleCallEn,
+  ...huddleDiscussionEn,
+  ...huddleCompanionEn,
+  ...githubSettingsEn,
+  ...directMessageEn,
+  ...agentScopeEn,
+  ...relayErrorsEn,
+  ...agentMemoryEn,
+  ...communityAdminEn,
   ...statusFocusEn,
   ...agentsDetailsEn,
   ...workflowsListEn,
@@ -201,6 +242,16 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...terminalSettingsKo,
   ...typesafeSettingsKo,
   ...adminStaffKo,
+  ...huddleMainKo,
+  ...huddleCallKo,
+  ...huddleDiscussionKo,
+  ...huddleCompanionKo,
+  ...githubSettingsKo,
+  ...directMessageKo,
+  ...agentScopeKo,
+  ...relayErrorsKo,
+  ...agentMemoryKo,
+  ...communityAdminKo,
   ...statusFocusKo,
   ...agentsDetailsKo,
   ...workflowsListKo,

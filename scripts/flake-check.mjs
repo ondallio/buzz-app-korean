@@ -195,8 +195,13 @@ export const repeatableLines = (specs) =>
     .filter((spec) => !spec.tags.some((tag) => excludedTags.includes(tag)))
     .map((spec) => spec.line);
 
-const run = (command, args) => {
-  const result = spawnSync(command, args, { cwd: root, encoding: "utf8" });
+const listingOptions = { maxBuffer: 4 * 1024 ** 2 };
+const run = (command, args, options = {}) => {
+  const result = spawnSync(command, args, {
+    cwd: root,
+    encoding: "utf8",
+    ...options,
+  });
   if (result.error) throw result.error;
   return result;
 };
@@ -215,18 +220,22 @@ const cell = (value) => String(value).replaceAll("|", "\\|");
 // Test start lines per file. Vitest filters are substrings, so an argument may
 // list neighbouring files too; those drop out of the map.
 export function listVitest(files) {
-  const result = run(pnpm, [
-    "--silent",
-    "exec",
-    "vitest",
-    "list",
-    "--json",
-    "--includeTaskLocation",
-    // Runtime collection and run filters must use the same call-site locations.
-    // Static collection can map parameterized tests to a different source line.
-    "--staticParse=false",
-    ...files,
-  ]);
+  const result = run(
+    pnpm,
+    [
+      "--silent",
+      "exec",
+      "vitest",
+      "list",
+      "--json",
+      "--includeTaskLocation",
+      // Runtime collection and run filters must use the same call-site locations.
+      // Static collection can map parameterized tests to a different source line.
+      "--staticParse=false",
+      ...files,
+    ],
+    listingOptions,
+  );
   if (result.status !== 0) throw new Error(`vitest list: ${result.stderr}`);
   const starts = new Map(files.map((file) => [file, []]));
   for (const { file, location } of JSON.parse(result.stdout))
@@ -250,16 +259,20 @@ function* reportSpecs(suites, groups) {
 // ignore measurement files, and Playwright reports a run selecting nothing as
 // an error, so a selection of only measurement files lists no specs.
 export function listBrowser(files) {
-  const result = run(pnpm, [
-    "--silent",
-    "test:browser:ci",
-    "--project",
-    "chromium",
-    "--no-deps",
-    "--list",
-    "--reporter=json",
-    ...files,
-  ]);
+  const result = run(
+    pnpm,
+    [
+      "--silent",
+      "test:browser:ci",
+      "--project",
+      "chromium",
+      "--no-deps",
+      "--list",
+      "--reporter=json",
+      ...files,
+    ],
+    listingOptions,
+  );
   const report = JSON.parse(result.stdout);
   const empty =
     report.errors.length === 1 &&

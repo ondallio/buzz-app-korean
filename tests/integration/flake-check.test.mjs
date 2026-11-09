@@ -271,6 +271,79 @@ test("the selection executes every case of a multiline Vitest parameterized test
   );
 });
 
+// Replace only the listing executable boundary. The real collector and
+// spawnSync options still capture a real child's valid, bounded JSON output.
+for (const runner of ["vitest", "browser"]) {
+  for (const oversized of [false, true]) {
+    test(`${runner} listing ${oversized ? "rejects output above four MiB" : "retains every location above one MiB"}`, () => {
+      const root = fileURLToPath(new URL("../../", import.meta.url));
+      const file =
+        runner === "vitest"
+          ? "src/large.test.ts"
+          : "tests/browser/large.spec.mjs";
+      const count = 4247;
+      const titleSize = oversized ? 1100 : 320;
+      const payload = `
+        const title = 'x'.repeat(${titleSize});
+        const entries = Array.from({length:${count}}, (_, i) => ({
+          name: title + i,
+          title: title + i,
+          file: ${JSON.stringify(runner === "vitest" ? join(root, file) : "large.spec.mjs")},
+          location: {line:i + 1, column:1},
+          line:i + 1, tags:[], tests:[{}]
+        }));
+        const output = JSON.stringify(${runner === "vitest" ? "entries" : "{errors:[],suites:[{title:'large.spec.mjs',specs:entries}]}"});
+        if (Buffer.byteLength(output) ${oversized ? "<=" : ">="} 4 * 1024 ** 2 || Buffer.byteLength(output) <= 1024 ** 2) throw new Error('Invalid byte-bound fixture');
+        process.stdout.write(output);
+      `;
+      const production = new URL(
+        "../../scripts/flake-check.mjs",
+        import.meta.url,
+      ).href;
+      const executable = join(root, "bin/pnpm");
+      const wrapper = `
+        import {spawnSync as actual} from 'node:child_process';
+        export function spawnSync(command,args,options) {
+          if(command !== ${JSON.stringify(executable)}) throw new Error('Unexpected listing executable');
+          return actual(process.execPath,['--input-type=module','-e',${JSON.stringify(payload)}],options);
+        }
+      `;
+      const script = `
+        import assert from 'node:assert/strict';
+        import {registerHooks} from 'node:module';
+        registerHooks({resolve(specifier,context,next) {
+          if(specifier === 'node:child_process' && context.parentURL === ${JSON.stringify(production)})
+            return {url:${JSON.stringify(`data:text/javascript,${encodeURIComponent(wrapper)}`)},shortCircuit:true};
+          return next(specifier,context);
+        }});
+        const {listVitest,listBrowser}=await import(${JSON.stringify(production)});
+        const collect=()=>${runner === "vitest" ? "listVitest" : "listBrowser"}([${JSON.stringify(file)}]);
+        ${
+          oversized
+            ? "assert.throws(collect, {code:'ENOBUFS'});"
+            : `
+          const entries=collect().get(${JSON.stringify(file)});
+          assert.equal(entries.length,${count});
+          assert.deepEqual(entries.map((entry)=>${runner === "vitest" ? "entry" : "entry.line"}), Array.from({length:${count}},(_,i)=>i+1));
+          ${runner === "browser" ? `assert.deepEqual(entries.map(entry=>entry.title),Array.from({length:${count}},(_,i)=>'x'.repeat(${titleSize})+i));` : ""}
+        `
+        }
+      `;
+      const result = spawnSync(
+        process.execPath,
+        ["--input-type=module", "-e", script],
+        {
+          encoding: "utf8",
+          timeout: 20000,
+          maxBuffer: 128 * 1024,
+        },
+      );
+      assert.equal(result.error, undefined);
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+    });
+  }
+}
+
 test("hunks inside tests select those tests; shared code, new or unlisted files select the whole file", () => {
   const bodies = [
     { start: 10, end: 22, line: 10 },

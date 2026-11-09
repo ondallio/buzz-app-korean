@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import {
+  act,
   cleanup,
   render,
   screen,
@@ -17,6 +18,8 @@ import type { RelayEvent } from "../../features/relay/events";
 import { keypair, signed, type Key } from "../../features/relay/testing";
 import type { RelayData } from "../../features/relay/service";
 import { CommunityAdmin } from "./CommunityAdmin";
+import { setLanguage } from "../../shared/i18n";
+import { publicKeyLabels } from "../../shared/identity/public-key";
 import { apply } from "./index";
 import { createCommunityMembership } from "./membership";
 
@@ -151,6 +154,7 @@ function relay(viewer: string) {
 }
 
 beforeEach(() => {
+  setLanguage("en");
   roster = new Map(INITIAL);
   vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
   vi.stubEnv("VITE_BUZZ_LIVE", "");
@@ -164,6 +168,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  setLanguage("en");
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -416,5 +421,61 @@ it("still mints invite links natively", async () => {
   });
   expect(await within(dialog).findByDisplayValue(url)).toBeVisible();
   expect(invoke).toHaveBeenCalledOnce();
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+it("membership localization keeps the native-contract signer, target and role through a live confirmation", async () => {
+  const user = userEvent.setup();
+  const published = host(ownerKey, () => undefined);
+  const { relay: data } = relay(owner);
+  render(<CommunityAdmin relay={data} active={() => true} />);
+  const label = `Mo · ${publicKeyLabels([owner, admin, member]).get(member)}`;
+  await user.click(
+    await screen.findByRole("button", { name: `Actions for ${label}` }),
+  );
+  await user.click(await screen.findByRole("menuitem", { name: "Make admin" }));
+  const dialog = screen.getByRole("alertdialog", {
+    name: `Make admin: ${label}?`,
+  });
+  const confirm = within(dialog).getByRole("button", { name: "Make admin" });
+  await waitFor(() => expect(confirm).toHaveFocus());
+  act(() => setLanguage("ko"));
+  expect(
+    screen.getByRole("alertdialog", {
+      name: `${label}님을 관리자로 변경할까요?`,
+    }),
+  ).toBe(dialog);
+  expect(within(dialog).getByRole("button", { name: "관리자로 변경" })).toBe(
+    confirm,
+  );
+  expect(confirm).toHaveFocus();
+  expect(published).toHaveLength(0);
+  act(() => setLanguage("en"));
+  expect(
+    screen.getByRole("alertdialog", { name: `Make admin: ${label}?` }),
+  ).toBe(dialog);
+  await user.click(confirm);
+  await waitFor(() => expect(published).toHaveLength(1));
+  const event = published[0];
+  if (!event) throw new Error("Expected one signed fixture event");
+  expect(verifyEvent(event)).toBe(true);
+  expect(
+    published.map(({ kind, pubkey, content, tags }) => ({
+      kind,
+      pubkey,
+      content,
+      tags,
+    })),
+  ).toEqual([
+    {
+      kind: 9032,
+      pubkey: owner,
+      content: "",
+      tags: [
+        ["p", member],
+        ["role", "admin"],
+      ],
+    },
+  ]);
   expect(fetch).not.toHaveBeenCalled();
 });

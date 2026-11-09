@@ -697,7 +697,7 @@ test("member search reuses unchanged rows and owner observations", async ({
   await expect(
     dialog
       .getByRole("navigation", { name: "Agents member pages" })
-      .getByText("1 of 2"),
+      .getByText("1 of 2", { exact: true }),
   ).toBeVisible();
   const before = await page.evaluate(() => window.ownerChecks);
   const workBefore = await page.evaluate(() => ({

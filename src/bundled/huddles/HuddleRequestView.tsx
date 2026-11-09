@@ -1,3 +1,6 @@
+import { Children } from "react";
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
 import { ProfileBackdrop } from "../../features/profiles/ProfileBackdrop";
 import { PhoneIcon, PhoneEndIcon } from "../../shared/design-system/icons";
 import { HuddleMinimizeIcon } from "./HuddleMinimizeIcon";
@@ -19,12 +22,13 @@ export function HuddleRequestView({
   act(action: HuddleAction): void;
   error?: string | undefined;
 }) {
+  useLanguage();
   const caller = view.participants[0];
   return (
     <main
       ref={focus.requestRef}
       className={`${styles.window} ${styles.requestWindow}`}
-      aria-label="Incoming Huddle request"
+      aria-label={t("huddleCall.incoming")}
     >
       <ProfileBackdrop src={caller?.picture} />
       <header className={styles.windowHeader}>
@@ -33,7 +37,7 @@ export function HuddleRequestView({
             size="large"
             shape="round"
             variant="ghost"
-            aria-label="Minimize Huddle request"
+            aria-label={t("huddleCall.minimizeRequest")}
             onClick={() => act("minimize")}
             icon={<HuddleMinimizeIcon />}
           />
@@ -83,29 +87,50 @@ export function HuddleRequestView({
               size="large"
               shape="round"
               variant="glass"
-              aria-label={view.phase === "connecting" ? "Cancel" : "Decline"}
-              title={view.phase === "connecting" ? "Cancel" : "Decline"}
+              aria-label={t(
+                view.phase === "connecting"
+                  ? "huddleCall.cancel"
+                  : "huddleCall.decline",
+              )}
+              title={t(
+                view.phase === "connecting"
+                  ? "huddleCall.cancel"
+                  : "huddleCall.decline",
+              )}
               ref={focus.cancel}
               onClick={() => act("decline")}
               icon={<PhoneEndIcon className="text-call-leave" />}
             />
           </div>
           <p className={`${styles.requestTitle} text-body-strong text-primary`}>
-            <span
-              className={styles.requestName}
-              title={caller?.name ?? "Someone"}
-            >
-              {caller?.name ?? "Someone"}
-            </span>{" "}
-            <span>is calling</span>
+            {Children.map(
+              rich("huddleCall.calling", {
+                caller: (
+                  <span
+                    className={styles.requestName}
+                    title={caller?.name ?? t("huddleCall.someone")}
+                  >
+                    {caller?.name ?? t("huddleCall.someone")}
+                  </span>
+                ),
+              }),
+              (part) =>
+                typeof part === "string" ? (
+                  part ? (
+                    <span>{part}</span>
+                  ) : null
+                ) : (
+                  part
+                ),
+            )}
           </p>
           <div className={styles.requestAction}>
             <IconButton
               size="large"
               shape="round"
               variant="glass"
-              aria-label="Join"
-              title="Join"
+              aria-label={t("huddleCall.join")}
+              title={t("huddleCall.join")}
               data-huddle-join=""
               disabled={view.phase === "connecting"}
               onClick={() => {

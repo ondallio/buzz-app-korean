@@ -4,6 +4,7 @@ import { test, expect } from "./fixture.mjs";
 const members = Array.from({ length: 2525 }, (_, i) =>
   (i + 10000).toString(16).padStart(64, "0"),
 );
+const peopleHeading = `People · ${new Intl.NumberFormat("en-US").format(2526)}`;
 const channelId = "11111111-1111-4111-8111-111111111111";
 test.use({
   pluginFixtures: true,
@@ -32,21 +33,21 @@ test("large channel members stays usable while browsing and searching the roster
   await expect(dialog.getByText("Loading members…")).toHaveCount(0);
   await expect(list.getByRole("listitem").first()).toBeVisible();
   await expect(
-    list.getByRole("heading", { name: "People · 2526" }),
+    list.getByRole("heading", { name: peopleHeading }),
   ).toBeVisible();
   expect(await list.getByRole("listitem").count()).toBeLessThan(100);
   const pages = list.getByRole("navigation", { name: "People member pages" });
   await pages.getByRole("button", { name: "Next" }).click();
-  await expect(pages.getByText("2 of 51")).toBeVisible();
+  await expect(pages.getByText("2 of 51", { exact: true })).toBeVisible();
   await expect(
-    list.getByRole("heading", { name: "People · 2526" }),
+    list.getByRole("heading", { name: peopleHeading }),
   ).toBeFocused();
   await expect(list.getByRole("listitem").first()).toBeInViewport();
   await pages.getByRole("button", { name: "Previous" }).click();
-  await expect(pages.getByText("1 of 51")).toBeVisible();
+  await expect(pages.getByText("1 of 51", { exact: true })).toBeVisible();
   await expect(list.getByRole("listitem").first()).toBeInViewport();
   await pages.getByRole("button", { name: "Next" }).click();
-  await expect(pages.getByText("2 of 51")).toBeVisible();
+  await expect(pages.getByText("2 of 51", { exact: true })).toBeVisible();
   await expect(list.getByRole("listitem").first()).toBeInViewport();
   await pages.scrollIntoViewIfNeeded();
   await page.screenshot({
@@ -66,7 +67,7 @@ test("large channel members stays usable while browsing and searching the roster
   await dialog.getByRole("searchbox").fill(members.at(-1));
   await expect(list.getByRole("listitem")).toHaveCount(1);
   await dialog.getByRole("searchbox").fill("");
-  await expect(pages.getByText("1 of 51")).toBeVisible();
+  await expect(pages.getByText("1 of 51", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();

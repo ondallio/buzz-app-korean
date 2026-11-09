@@ -1,3 +1,5 @@
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
 import { useSyncExternalStore, type ComponentProps } from "react";
 import { Avatar } from "../../shared/design-system/ui/Avatar";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
@@ -15,12 +17,22 @@ export type AgentScopeReader = Pick<Agents, "subscribe" | "memberships">;
 
 const noSubscribe = () => () => {};
 const descriptions = {
-  Agents: "These are your agents imported into this community on this device.",
-  Memory:
-    "Memories are specific to this community and aren’t shared with other communities.",
-  Avatar:
-    "This avatar is specific to this community and isn’t shared with other communities.",
-};
+  Agents: {
+    description: "agentScope.agentsDescription",
+    trigger: "agentScope.agentsTrigger",
+    title: "agentScope.agentsTitle",
+  },
+  Memory: {
+    description: "agentScope.memoryDescription",
+    trigger: "agentScope.memoryTrigger",
+    title: "agentScope.memoryTitle",
+  },
+  Avatar: {
+    description: "agentScope.avatarDescription",
+    trigger: "agentScope.onlyIn",
+    title: "agentScope.avatarTitle",
+  },
+} as const;
 
 /** Count remaining memberships, including offline rows, only for local agents.
  * Other agents keep their hints because their full membership set is unknown. */
@@ -55,6 +67,7 @@ export function AgentCommunityScope({
   open?: boolean | undefined;
   onOpenChange?: ComponentProps<typeof PopoverRoot>["onOpenChange"];
 }) {
+  useLanguage();
   if (!community) return null;
   const { name, src } = community;
   return (
@@ -66,24 +79,29 @@ export function AgentCommunityScope({
             <Button
               variant="plain"
               size="inline"
-              aria-label={`Only in ${name}`}
+              aria-label={t("agentScope.onlyIn", { community: name })}
               style={{ maxWidth: "100%" }}
             >
               <span className="flex min-w-0 flex-wrap items-center gap-2 text-subtle">
-                Only in{" "}
-                <Avatar
-                  src={src}
-                  alt=""
-                  fallback={name}
-                  shape="squircle"
-                  size="compact"
-                />
-                <span className="min-w-0 break-words">{name}</span>
+                {rich("agentScope.onlyIn", {
+                  community: (
+                    <>
+                      <Avatar
+                        src={src}
+                        alt=""
+                        fallback={name}
+                        shape="squircle"
+                        size="compact"
+                      />
+                      <span className="min-w-0 break-words">{name}</span>
+                    </>
+                  ),
+                })}
               </span>
             </Button>
           ) : (
             <IconButton
-              aria-label={`${scope} scope: ${name}`}
+              aria-label={t(descriptions[scope].trigger, { community: name })}
               variant="avatar"
               shape="squircle"
               size="xs"
@@ -105,7 +123,7 @@ export function AgentCommunityScope({
       <PopoverPopup
         side={scope === "Avatar" ? "bottom" : "top"}
         align={scope === "Avatar" ? "start" : "center"}
-        aria-label={`${scope} scope`}
+        aria-label={t(descriptions[scope].title)}
       >
         <div className="mb-2 flex items-center gap-2 text-body-sm">
           <Avatar
@@ -117,7 +135,9 @@ export function AgentCommunityScope({
           />
           <span className="min-w-0 break-words">{name}</span>
         </div>
-        <p className="m-0 text-body-sm text-subtle">{descriptions[scope]}</p>
+        <p className="m-0 text-body-sm text-subtle">
+          {t(descriptions[scope].description)}
+        </p>
       </PopoverPopup>
     </PopoverRoot>
   );

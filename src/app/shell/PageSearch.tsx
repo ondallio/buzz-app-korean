@@ -282,6 +282,7 @@ export function PageSearch({
         variant="inverted"
         size="sm"
         shape="capsule"
+        data-global-search-trigger=""
         aria-label={t("search.buzz")}
         title={t("search.buzzShortcut", {
           shortcut: formatBinding(binding, apple).text,
