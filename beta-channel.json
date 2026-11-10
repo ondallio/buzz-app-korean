@@ -3,12 +3,12 @@
   "repository": "ondallio/buzz-app-korean",
   "identifier": "io.github.ondallio.buzz-korean-beta",
   "platform": "darwin-aarch64",
-  "version": "0.7.0-korean.1",
+  "version": "0.7.0-korean.2",
   "endpoint": "https://github.com/ondallio/buzz-app-korean/releases/download/korean-beta-feed/latest.json",
   "publicKey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdBRjFCMTlDOUJCOEFGRTYKUldUbXI3aWJuTEh4ZXBSczBxMlFHOWRzbEZ2UjNtU084RmZ2dVI4NE4vUjFURitBRGpZYjBqY00K",
   "source": {
     "repository": "block/buzz-app",
-    "tag": "v0.7.0-preview.258.1",
-    "commit": "c9239f737f4985979eb5939e84c33ab3da2b1321"
+    "tag": "v0.7.0-preview.260.1",
+    "commit": "58116b826171d190a7376fc57b0509c32c507dde"
   }
 }

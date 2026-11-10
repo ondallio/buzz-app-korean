@@ -333,6 +333,9 @@ async function relayAuthority(fetch, relay) {
       nip11.supported_extensions.includes("nip-cl"),
     // NIP-AR sync: REQ with `"artifact": "current"` keeps a set current.
     artifactSync: nip11.artifacts?.sync?.version === 1,
+    artifactSupport:
+      Array.isArray(nip11.supported_extensions) &&
+      nip11.supported_extensions.includes("nip-ar"),
     // Bridge search accepts `search_sort: "newest"`.
     searchSort:
       Array.isArray(nip11.supported_extensions) &&
@@ -1045,6 +1048,14 @@ export function relayBrokerPlugin({
                 send(builderlab.snapshot());
                 return;
               }
+              if (action === "capabilities" && req.method === "GET")
+                return json(
+                  res,
+                  200,
+                  await builderlab.capabilities(
+                    url.searchParams.get("revision"),
+                  ),
+                );
               if (action === "auth" && req.method === "GET")
                 return json(res, 200, { auth: await builderlab.auth() });
               if (req.method !== "POST")
@@ -1629,7 +1640,7 @@ export function relayBrokerPlugin({
                 30178,
                 40100,
                 1984,
-                45010,
+                ...((await getAuthority(relay)).artifactSupport ? [45010] : []),
                 ...WORKFLOW_KINDS,
                 ...((await getAuthority(relay)).channelCreation ? [9007] : []),
               ],

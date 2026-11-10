@@ -49,7 +49,7 @@ export const en = {
   "profileEditing.background": "Background",
   "profileEditing.uploadingAvatar": "Uploading avatar…",
   "profileEditing.selectCommunity":
-    "Select a community in the sidebar to upload an image or emoji. Your local default can use a public HTTPS image URL.",
+    "Select a community to upload an image or emoji. Your local default can use a public HTTPS image URL.",
   "profileEditing.removeAvatar": "Remove avatar",
   "profileEditing.emojiLoadFailed":
     "Could not load the emoji picker. Reopen it to retry.",
@@ -151,7 +151,7 @@ export const ko: Record<keyof typeof en, string> = {
   "profileEditing.background": "배경",
   "profileEditing.uploadingAvatar": "아바타 업로드 중…",
   "profileEditing.selectCommunity":
-    "이미지나 이모지를 업로드하려면 사이드바에서 커뮤니티를 선택해 주세요. 로컬 기본값에는 공개 HTTPS 이미지 URL을 사용할 수 있습니다.",
+    "이미지나 이모지를 업로드하려면 커뮤니티를 선택해 주세요. 로컬 기본값에는 공개 HTTPS 이미지 URL을 사용할 수 있습니다.",
   "profileEditing.removeAvatar": "아바타 제거",
   "profileEditing.emojiLoadFailed":
     "이모지 선택기를 불러오지 못했습니다. 다시 열어 시도해 주세요.",

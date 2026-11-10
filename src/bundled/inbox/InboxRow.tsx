@@ -89,7 +89,7 @@ export const incompletePreview = (
       : t("inbox.previewUpdating")
     : undefined;
 
-/** Who sent a row and where, as the Inbox page and its sidebar preview name it. */
+/** Who sent a row and where, as the Inbox page and its dock preview name it. */
 export function rowIdentity(
   item: InboxItem,
   channel: ChannelSummary | undefined,

@@ -239,6 +239,10 @@ import {
   ko as githubPullLinksKo,
 } from "./catalogs/github-pull-links";
 import {
+  en as soloLifetimeEn,
+  ko as soloLifetimeKo,
+} from "./catalogs/solo-lifetime";
+import {
   en as pluginRequestsEn,
   ko as pluginRequestsKo,
 } from "./catalogs/plugin-requests";
@@ -294,6 +298,7 @@ export const english = {
   ...channelFormsEn,
   ...sharedUiEn,
   ...githubPullLinksEn,
+  ...soloLifetimeEn,
   ...emojiPickerEn,
   ...customEmojiEn,
   ...resourcePickerEn,
@@ -375,6 +380,7 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...channelFormsKo,
   ...sharedUiKo,
   ...githubPullLinksKo,
+  ...soloLifetimeKo,
   ...emojiPickerKo,
   ...customEmojiKo,
   ...resourcePickerKo,

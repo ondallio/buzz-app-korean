@@ -83,7 +83,9 @@ mention anyone. Explicit agent watches on that room can still receive them.
   community** when that account is linked to this device’s key and may create one.
   Choose an available address, then **Create community** joins it right away,
   with no **Join Community** confirmation. Other Builderlab deployments do not
-  offer it during setup. When the owner of a community with no channels yet
+  offer it during setup. Later, **Create community** in **Settings → Plugins →
+  Builderlab** opens the join for the new community at once; after its profile
+  step it opens and is listed in the community picker. When the owner of a community with no channels yet
   opens Messages, Buzz creates one open **#general**, marked as the starter
   channel for new members, and opens it.
   Existing community profiles are preserved and skip setup. A new profile needs a name; an avatar is optional. A returning account may restore
@@ -148,7 +150,15 @@ mention anyone. Explicit agent watches on that room can still receive them.
   offers **Sign in**. **Not now** closes the prompt and changes nothing.
 - A community invite or address connects someone to a community; creating an
   identity alone does not grant membership. The same identity can be used in
-  more than one community.
+  more than one community. To add another, choose **Join a community** in the
+  community picker and paste an invite link or type an address such as
+  `relay.example.com`; an invite link fills in its invite code. Paste the whole
+  link there; a code on its own is refused.
+- Community owners and admins invite people with **Invite members** in the
+  community's **Membership** settings (also reached from **Invite to community**
+  in the community picker's right-click menu). The dialog creates an invite
+  link with an expiry and use limit to copy, or adds someone directly by npub.
+  The desktop app also shows that link as a QR code to scan with a phone.
 - Set or clear your status from the profile menu, or with **Update status** /
   **Set a status** on your own profile. On a profile or in the profile menu,
   hover the status emoji to see its `:name:`.
@@ -276,6 +286,14 @@ revokes all of them, and a pairing unused for 30 days expires.
   notice ends this recovery option.
   Solo chats can also be shared with other people; do not describe every Solo
   chat as visible only to its creator.
+  New chats start **Ongoing** unless **Chat settings** chooses **Temporary**,
+  which archives the chat after a set time without activity. To start every new
+  chat temporary, open the community's **Settings → Local settings** and choose
+  a lifetime under **New Solo chats**: Ongoing, or Temporary after 1 day, 7
+  days or 2 weeks. It saves at once and applies on this device to this
+  community and account only. It covers chats started with **New chat**; a
+  chat's own settings can still choose another lifetime, and existing chats do
+  not change.
 - **Team** contains community channels and their threads. Use the **@** picker
   to address a channel member. A full name typed after **@** and followed by
   Space or closing punctuation, such as `,`, `.` or `'`, selects that person or
@@ -287,7 +305,7 @@ revokes all of them, and a pairing unused for 30 days expires.
   Folders are optional unless **Work in a new worktree** is on. In that mode,
   add at least one project folder; the form shows a message beside Folders
   until you add one or turn worktree mode off.
-- **Activity** (the bell in the sidebar) collects DMs, ordinary responses in Solo chats, mentions of you, and
+- **Activity** (the bell in the app dock) collects DMs, ordinary responses in Solo chats, mentions of you, and
   replies in threads you started, replied in, or follow. Solo chats appear under All, not DMs; their nested
   threads stay separate. Agent-only coordination stays out. The tabs (All, Threads, Mentions, DMs, Reactions) narrow it by
   kind, and **From** by sender (Anyone, People or Agents). Turn on **Unread** to see only what you haven't read:
@@ -316,7 +334,9 @@ revokes all of them, and a pairing unused for 30 days expires.
   reply to you that arrives after you leave lights the row again, as does any
   newer message; **Mark as unread** still shows on it. On another device, rows
   with unread mentions, DMs or replies to you light again until you read them.
-- **Communities** have their own channels, people, and agents. Switching
+- **Communities** have their own channels, people, and agents. Switch with
+  the community switcher at the bottom of the dock; in **Personal space**,
+  Messages offers **Choose a community**, which opens it. Switching
   communities changes the available context. A channel reopens where you
   stopped reading, or at the latest message once you had caught up. You and
   the person asking may have different channel access. A link alone never
@@ -414,6 +434,10 @@ revokes all of them, and a pairing unused for 30 days expires.
 - **Channel, people, and message search** shows “Searching…” beside each section heading
   if a lookup takes more than a second. You can open results already shown
   while the rest of the search finishes.
+- **Search while offline**: while a community is offline or still connecting,
+  search finds and opens the conversations saved on this device, and a line
+  under the results says so. Messages, people and open channels are searched
+  once it connects; while it is offline, **Retry connection** tries again.
 - **Join** in a View only chat or channel adds you as a viewer, with a sidebar
   entry and normal unread tracking. Notifications follow your existing settings
   and mention/thread rules. You appear in People as **Viewing only**; you still
@@ -752,7 +776,9 @@ available rather than silently discarding it.
   where it runs; received tool details take precedence.
   Available model, effort and session controls keep their gauge beside Send.
   Activity keeps its transcript and feed guidance without a separate workspace
-  note.
+  note. Opened from a conversation, it shows that conversation's turns;
+  **Show all conversations** lists the agent's other turns too. It shows only
+  turns captured while Buzz has been open.
 - An agent card link, `buzz://agent/new?card=<id>` (a Builderlab card's
   **Add to Buzz**), opens **Create agent** filled in with the card's name,
   picture and instructions, on desktop and mobile. Nothing is created until you
@@ -801,6 +827,9 @@ available rather than silently discarding it.
   depend on the type. Do not assume a provider is configured or signed in.
   Builderlab shows **Unavailable for this account** when signed in without
   remote-agent access. Manage its account in **Settings → Builderlab**.
+  Builderlab permissions are re-read at most once a minute while the app uses
+  them, so a newly granted or removed permission applies without signing in
+  again; a failed check keeps the previous permissions.
   Claude runs with an Anthropic API key pasted under **Anthropic API key**
   there, once for every Claude agent. When creating a Claude agent or editing
   one that runs on this computer, click **Add key** beside **Harness** to open
