@@ -6,6 +6,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode, useState } from "react";
@@ -221,10 +222,12 @@ it.each(["complete", "cancel", "abandon", "observe"] as const)(
     } finally {
       await act(async () => held.resolve(credential));
     }
-    expect(session.snapshot().status).toBe(
-      outcome === "cancel" || outcome === "abandon"
-        ? "signed-out"
-        : "signed-in",
+    await waitFor(() =>
+      expect(session.snapshot().status).toBe(
+        outcome === "cancel" || outcome === "abandon"
+          ? "signed-out"
+          : "signed-in",
+      ),
     );
     expect(acquire).toHaveBeenCalledOnce();
     session.dispose();
