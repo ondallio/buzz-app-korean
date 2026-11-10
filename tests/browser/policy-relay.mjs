@@ -1,6 +1,35 @@
 import { expect } from "@playwright/test";
 import { verifyEvent } from "nostr-tools";
+import { matchFilter } from "nostr-tools/filter";
 import { createHash } from "node:crypto";
+
+/** Exact opt-in Drafts/Sent reads over the fixture's signed community corpus. */
+export function draftsSentAnswer(filter, viewer, events) {
+  if (filter.authors) {
+    expect([
+      { kinds: [9], authors: [viewer], limit: 100 },
+      { kinds: [40003, 5, 9005], authors: [viewer], limit: 500 },
+    ]).toContainEqual(filter);
+  } else {
+    expect(filter).toEqual({
+      "#e": expect.any(Array),
+      kinds: [40002, 40008, 9],
+      limit: 500,
+    });
+    const roots = filter["#e"];
+    expect(roots.length).toBeGreaterThan(0);
+    expect(roots.length).toBeLessThanOrEqual(150);
+    expect(roots).toEqual([...new Set(roots)].sort());
+    for (const id of roots)
+      expect(events.some((event) => event.id === id && event.kind === 9)).toBe(
+        true,
+      );
+  }
+  return [...new Map(events.map((event) => [event.id, event])).values()]
+    .filter((event) => matchFilter(filter, event))
+    .toSorted((a, b) => b.created_at - a.created_at || a.id.localeCompare(b.id))
+    .slice(0, filter.limit);
+}
 
 /** Model the relay boundaries that matter to this journey, not a replacement
  * session: AUTH, explicit channel fan-out, EOSE, CLOSED and HTTP quota reasons.
@@ -16,6 +45,7 @@ export function policyRelay({
   acceptPublication,
   latencyMs = 0,
   holdOlder = true,
+  draftsSent = false,
 }) {
   const sockets = [];
   // A page can close between sending a publication and its acceptance. The
@@ -230,6 +260,11 @@ export function policyRelay({
           "payload",
           createHash("sha256").update(init.body).digest("hex"),
         ]);
+        if (draftsSent)
+          expect([
+            "https://primary.example",
+            "https://secondary.example",
+          ]).toContain(new URL(url).origin);
         const filters = JSON.parse(init.body);
         if (new URL(url).pathname === "/profiles/search")
           return Response.json(searchProfiles(communityOf(url), filters));
@@ -420,6 +455,26 @@ export function policyRelay({
           }
           return Response.json(
             filters.flatMap((filter) => answer(communityOf(url), filter)),
+          );
+        }
+        if (
+          draftsSent &&
+          filters.some(
+            (filter) =>
+              filter.authors &&
+              !filter["#h"] &&
+              filter.kinds?.some((kind) => [9, 40003].includes(kind)),
+          )
+        ) {
+          expect(filters).toEqual([
+            { kinds: [9], authors: [viewer], limit: 100 },
+            { kinds: [40003, 5, 9005], authors: [viewer], limit: 500 },
+          ]);
+          const community = communityOf(url);
+          for (const filter of filters)
+            report.queries.push({ community, filter, at: performance.now() });
+          return Response.json(
+            filters.flatMap((filter) => answer(community, filter)),
           );
         }
         if (filters.length !== 1) {

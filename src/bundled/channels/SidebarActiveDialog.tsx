@@ -3,6 +3,7 @@ import { Button } from "../../shared/design-system/ui/Button";
 import { Dialog } from "../../shared/design-system/ui/Dialog";
 import { Field } from "../../shared/design-system/ui/Field";
 import { Radio, RadioGroup } from "../../shared/design-system/ui/RadioGroup";
+import { t, useLanguage } from "../../shared/i18n";
 import { DEFAULT_ACTIVE_WINDOW_SECONDS } from "../../features/relay/sidebar-preferences";
 import styles from "./SidebarActiveDialog.module.css";
 
@@ -23,6 +24,7 @@ export function SidebarActiveDialog({
   close: () => void;
   finalFocus: RefObject<HTMLButtonElement | null>;
 }) {
+  useLanguage();
   const form = useRef<HTMLDivElement>(null);
   const days = seconds / 86400;
   const [preset, setPreset] = useState(
@@ -48,7 +50,7 @@ export function SidebarActiveDialog({
     <Dialog
       size="compact"
       open
-      title="Active in the last"
+      title={t("sidebarSectionDialogs.activeTitle")}
       headerGap="compact"
       footerGap="compact"
       onOpenChange={(open) => !open && close()}
@@ -62,25 +64,29 @@ export function SidebarActiveDialog({
       actions={
         <>
           <Button disabled={pending} onClick={close}>
-            Cancel
+            {t("channelForms.cancel")}
           </Button>
           <Button
             variant="prominent"
             loading={pending}
             onClick={() => void submit()}
           >
-            Apply
+            {t("terminalSettings.apply")}
           </Button>
         </>
       }
     >
       <div ref={form} className={styles.form}>
-        <Field label="Time frame" labelVisibility="hidden" nativeLabel={false}>
+        <Field
+          label={t("sidebarSectionDialogs.timeFrame")}
+          labelVisibility="hidden"
+          nativeLabel={false}
+        >
           <RadioGroup
             value={preset}
             onValueChange={setPreset}
             disabled={pending}
-            aria-label="Time frame"
+            aria-label={t("sidebarSectionDialogs.timeFrame")}
           >
             <div className={styles.presets}>
               {[1, 7, 30, 90].map((days) => (
@@ -88,7 +94,12 @@ export function SidebarActiveDialog({
                   key={days}
                   value={String(days)}
                   variant="tile"
-                  label={activeWindowLabel(days * 86400)}
+                  label={t(
+                    days === 1
+                      ? "sidebarSectionDialogs.day"
+                      : "sidebarSectionDialogs.days",
+                    { days },
+                  )}
                 />
               ))}
             </div>
@@ -101,7 +112,7 @@ export function SidebarActiveDialog({
         )}
         {pending && (
           <p role="status" className="sr-only">
-            Saving filter and waiting for confirmation…
+            {t("sidebarSectionDialogs.savingFilter")}
           </p>
         )}
       </div>

@@ -13,6 +13,10 @@ import { afterEach, expect, it, vi } from "vitest";
 import { setLanguage } from "../../shared/i18n/language";
 import { UpdateSettings } from "./UpdateSettings";
 import { createUpdates, type UpdatePlatform, type Updates } from "./updates";
+import channel from "../../../beta-channel.json" with { type: "json" };
+
+const english = `Korean beta 1.2.3 · based on official ${channel.source.tag}`;
+const korean = `한글판 베타 1.2.3 · 공식 ${channel.source.tag} 기반`;
 
 const native = vi.hoisted(() => ({
   getVersion: vi.fn(async () => "1.2.3"),
@@ -117,12 +121,12 @@ it("explains builds without automatic updates", async () => {
   expect(screen.getByRole("button", { name: "Check again" })).toBeVisible();
 });
 
-it("uses the installed version as the card title without a separate description", async () => {
+it("shows the installed Korean beta version and its official base as the card title", async () => {
   native.isTauri.mockReturnValue(true);
   try {
     renderSettings({});
     expect(
-      await screen.findByRole("heading", { name: "Version 1.2.3", level: 3 }),
+      await screen.findByRole("heading", { name: english, level: 3 }),
     ).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Update status" })).toBeNull();
     expect(
@@ -131,17 +135,17 @@ it("uses the installed version as the card title without a separate description"
       ),
     ).toBeNull();
     const heading = screen.getByRole("heading", {
-      name: "Version 1.2.3",
+      name: english,
       level: 3,
     });
     act(() => setLanguage("ko"));
-    expect(screen.getByRole("heading", { name: "버전 1.2.3", level: 3 })).toBe(
+    expect(screen.getByRole("heading", { name: korean, level: 3 })).toBe(
       heading,
     );
     act(() => setLanguage("en"));
-    expect(
-      screen.getByRole("heading", { name: "Version 1.2.3", level: 3 }),
-    ).toBe(heading);
+    expect(screen.getByRole("heading", { name: english, level: 3 })).toBe(
+      heading,
+    );
     expect(native.getVersion).toHaveBeenCalledOnce();
   } finally {
     native.isTauri.mockReturnValue(false);

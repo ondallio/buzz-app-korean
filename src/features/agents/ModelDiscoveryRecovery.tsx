@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 
@@ -15,6 +16,7 @@ export function ModelDiscoveryRecovery({
   retry(): void;
   disabled?: boolean;
 }) {
+  useLanguage();
   const field = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const [focused, setFocused] = useState(false);
@@ -40,7 +42,7 @@ export function ModelDiscoveryRecovery({
           onBlur={() => setFocused(false)}
           onClick={retry}
         >
-          Try again
+          {t("app.retry")}
         </Button>
       )}
     </>

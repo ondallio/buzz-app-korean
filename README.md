@@ -1,3 +1,27 @@
+# Buzz 한글판 베타 (Buzz Korean Beta)
+
+> [!NOTE]
+> 비공식 커뮤니티 배포판입니다. Block이 만들거나 지원하지 않습니다.
+> Unofficial community build. Not made or supported by Block.
+
+| 항목 | 값 |
+| --- | --- |
+| 한글판 베타 버전 | `0.7.0-korean.1` |
+| 기반 공식 버전 | [block/buzz-app `v0.7.0-preview.258.1`](https://github.com/block/buzz-app/releases/tag/v0.7.0-preview.258.1) |
+| 기반 커밋 | `c9239f737f49` |
+| 대상 | macOS (Apple Silicon) |
+
+- 공식 Buzz 1.0 베타에 한국어·영어 화면 전환을 더한 버전입니다. 번역은 진행 중이라 영어로 남은 화면이 있습니다.
+- 앱 이름은 **Buzz Korean Beta**이고, 창 제목과 **설정 → 소프트웨어 업데이트**에서 위 버전을 확인할 수 있습니다.
+- 공식 Buzz와 따로 설치되며, 기존 Buzz의 계정·키를 자동으로 가져오지 않습니다.
+- 예전 Buzz 0.x 한글판은 [ondallio/buzz-korean](https://github.com/ondallio/buzz-korean)에 있습니다.
+- 버전 정보는 [`beta-channel.json`](beta-channel.json)에 있습니다. 공식 버전이 바뀌면 여기와 위 표를 함께 고칩니다.
+- 라이선스는 원본과 같은 Apache 2.0입니다.
+
+아래는 공식 Buzz 안내문 원문입니다.
+
+---
+
 # Buzz
 
 Your people, your agents, your projects — all in one place. Buzz is a desktop

@@ -2,6 +2,7 @@ import { useId, useState, type RefObject } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Dialog } from "../../shared/design-system/ui/Dialog";
 import { Input } from "../../shared/design-system/ui/Input";
+import { t, useLanguage } from "../../shared/i18n";
 
 /** Mounted after the launching menu closes, so focus has one modal owner. */
 export function RenameSidebarSection({
@@ -15,6 +16,7 @@ export function RenameSidebarSection({
   close: () => void;
   finalFocus: RefObject<HTMLButtonElement | null>;
 }) {
+  useLanguage();
   const formId = useId();
   const [name, setName] = useState(title);
   const [pending, setPending] = useState(false);
@@ -41,13 +43,13 @@ export function RenameSidebarSection({
       open
       onOpenChange={(open) => !open && close()}
       preventClose={pending}
-      title="Rename section"
+      title={t("sidebarSectionDialogs.renameTitle")}
       headerGap="compact"
       finalFocus={finalFocus}
       actions={
         <>
           <Button disabled={pending} onClick={close}>
-            Cancel
+            {t("channelForms.cancel")}
           </Button>
           <Button
             form={formId}
@@ -56,7 +58,7 @@ export function RenameSidebarSection({
             loading={pending}
             disabled={!next}
           >
-            Rename
+            {t("channelsMenus.solo.rename")}
           </Button>
         </>
       }
@@ -70,8 +72,8 @@ export function RenameSidebarSection({
       >
         <Input
           autoFocus
-          aria-label="Section name"
-          placeholder="Section name"
+          aria-label={t("sidebarSectionDialogs.name")}
+          placeholder={t("sidebarSectionDialogs.name")}
           required
           maxLength={256}
           disabled={pending}
@@ -83,7 +85,7 @@ export function RenameSidebarSection({
       {error && <p role="alert">{error}</p>}
       {pending && (
         <p role="status" className="sr-only">
-          Renaming section and waiting for confirmation…
+          {t("sidebarSectionDialogs.renaming")}
         </p>
       )}
     </Dialog>

@@ -53,6 +53,8 @@ import { AppServer, listModels, needsSignIn, type Spawn } from "./rpc";
 import type { CodexRuntime, SavedConversation } from "./runtime";
 import type { CodexSetup } from "./setup";
 import { readTranscript, TURN_LIMIT } from "./transcript";
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
 
 const label = ({ channelId, name, root }: SavedConversation) =>
   `${name || channelId.slice(0, 8)} · ${root ? `thread ${root.slice(0, 8)}` : "channel"}`;
@@ -351,12 +353,14 @@ function CodexSignIn({
   check(): void;
   disabled: boolean;
 }) {
+  useLanguage();
   const [open, setOpen] = useState(false);
   const { running, output } = useSyncExternalStore(
     login.subscribe,
     login.snapshot,
   );
-  const action = step === "install" ? "Install Codex" : "Sign in";
+  const action =
+    step === "install" ? t("codexAuthUi.install") : t("accessDialogs.signIn");
   // A step's process ends before the check that follows it, which may still
   // find the step needed; until it answers, neither button starts another.
   return (
@@ -376,8 +380,14 @@ function CodexSignIn({
       </Button>
       <Dialog
         open={open}
-        title={step === "install" ? "Set up Codex" : "Sign in to Codex"}
-        description={step === "login" ? "Continue in your browser." : undefined}
+        title={
+          step === "install"
+            ? t("codexAuthUi.setupTitle")
+            : t("codexAuthUi.signInTitle")
+        }
+        description={
+          step === "login" ? t("codexAuthUi.continueBrowser") : undefined
+        }
         onOpenChange={(next) => {
           setOpen(next);
           if (!next) void login.cancel();
@@ -387,8 +397,8 @@ function CodexSignIn({
           {step === "install" && (
             <p role="status" className="m-0">
               {checking && !running
-                ? "Checking Codex…"
-                : "Codex is not installed."}
+                ? t("codexAuthUi.checking")
+                : t("codexAuthUi.missing")}
             </p>
           )}
           {/* One button per slot, so focus stays put as Install becomes
@@ -410,16 +420,15 @@ function CodexSignIn({
                 focusableWhenDisabled
                 onClick={() => void (running ? login.cancel() : check())}
               >
-                {running ? "Cancel" : "Check again"}
+                {running
+                  ? t("channelForms.cancel")
+                  : t("accessDialogs.checkAgain")}
               </Button>
             )}
           </div>
           {step === "install" && (
             <p className="m-0 text-body-sm text-subtle">
-              Downloads Buzz's own copy of Codex (about 130 MB) from
-              releases.openai.com and keeps it on the latest release. It does
-              not change the <code>codex</code> in your terminal, and uses the
-              same sign-in and settings.
+              {rich("codexAuthUi.download", { command: <code>codex</code> })}
             </p>
           )}
           {output && (
@@ -427,11 +436,11 @@ function CodexSignIn({
               items={[
                 {
                   value: "details",
-                  title: "Setup details",
+                  title: t("codexAuthUi.details"),
                   content: (
                     <pre
                       role="log"
-                      aria-label="Setup output"
+                      aria-label={t("codexAuthUi.output")}
                       className="m-0 max-h-60 overflow-auto whitespace-pre-wrap break-all text-caption"
                     >
                       {output}
@@ -558,6 +567,7 @@ export function createTabs(
     onReadyChange,
     ...props
   }: AgentCreateProps<Config>) {
+    useLanguage();
     const current = readConfig(config);
     const {
       data,
@@ -611,11 +621,11 @@ export function createTabs(
         <Button
           variant={props.modelAppearance ?? "ghost"}
           size="xs"
-          aria-label="Model settings"
+          aria-label={t("codexCreate.modelSettings")}
           disabled={props.disabled || !openSettings}
           onClick={openSettings}
         >
-          {current.model || "Codex default"}
+          {current.model || t("codexCreate.defaultModel")}
         </Button>
       );
     if (step)
@@ -636,7 +646,7 @@ export function createTabs(
           value={current.model}
           defaultModel={catalogModel(providerDefaults.model, data)?.model ?? ""}
           defaultLabel={providerDefaultLabel(providerDefaults.model, data)}
-          defaultDescription="Following the provider's model default"
+          defaultDescription={t("codexCreate.followDefault")}
           loading={checking}
           error={error}
           retry={retry}
@@ -651,7 +661,7 @@ export function createTabs(
           current.model &&
           !catalogModel(current.model, data) && (
             <p role="status" className="m-0 text-body-sm text-subtle">
-              This model isn’t available. Choose another model to continue.
+              {t("codexCreate.modelUnavailable")}
             </p>
           )}
       </div>
@@ -664,6 +674,7 @@ export function createTabs(
     onChange,
     disabled,
   }: AgentCreateProps<Config>) {
+    useLanguage();
     const current = readConfig(config);
     const { data, checking, bound } = useProvider(agent);
     const { effort } = current;
@@ -700,19 +711,46 @@ export function createTabs(
       selected,
       data,
     );
+    const effortLabels = new Map<string, string>([
+      ["none", t("codexCreate.none")],
+      ["minimal", t("codexCreate.minimal")],
+      ["low", t("codexCreate.low")],
+      ["medium", t("codexCreate.medium")],
+      ["high", t("codexCreate.high")],
+      ["xhigh", t("codexCreate.extraHigh")],
+      ["max", t("codexCreate.maximum")],
+      ["ultra", t("codexCreate.ultra")],
+    ]);
+    const displayEffort = (value: string) =>
+      effortLabels.get(value) ?? effortName(value);
+    const defaultEffort = effective.effort || selected?.defaultReasoningEffort;
+    const resting = defaultEffort
+      ? displayEffort(defaultEffort)
+      : t("codexCreate.automatic");
+    const displayedEfforts = efforts.map((option) => ({
+      ...option,
+      label: !option.value
+        ? t("codexCreate.defaultOption", { effort: resting })
+        : data &&
+            !selected?.supportedReasoningEfforts.some(
+              (choice) => choice.reasoningEffort === option.value,
+            )
+          ? t("codexCreate.unavailableOption", {
+              effort: displayEffort(option.value),
+            })
+          : displayEffort(option.value),
+    }));
     return (
       <Select
         key={current.model || "inherited"}
-        label="Thinking"
-        valueLabel={
-          current.effort
-            ? undefined
-            : codexDefaultEffortLabel(effective.effort, selected)
+        label={t("codexCreate.thinking")}
+        valueLabel={current.effort ? undefined : resting}
+        valueSuffix={
+          current.effort ? undefined : t("codexCreate.defaultSuffix")
         }
-        valueSuffix={current.effort ? undefined : " · Default"}
         variant="compact"
         value={current.effort}
-        groups={[{ label: "", options: efforts }]}
+        groups={[{ label: "", options: displayedEfforts }]}
         disabled={disabled || checking || !selected}
         onValueChange={(effort) => onChange(readConfig({ ...current, effort }))}
       />

@@ -13,11 +13,12 @@ import { LinkLabel } from "../links/InlineLink";
 import inlineStyles from "../../shared/InlineReference.module.css";
 import {
   describeIssue,
-  describePull,
   issueIcons,
   issueState,
   stateIcons,
 } from "./pull-state-view";
+import { displayPull } from "./pull-state-display";
+import { useLanguage } from "../../shared/i18n";
 import type { PullStates } from "./pull-states";
 import { parseGitHubReference } from "./references";
 import styles from "./GitHub.module.css";
@@ -26,6 +27,7 @@ import styles from "./GitHub.module.css";
  * as its icon, in place of the GitHub logo, and a pasted link named by its
  * repository, number and title. */
 export function PullLink({ url, states }: { url: string; states: PullStates }) {
+  useLanguage();
   const identity =
     parseGitHubReference(url, { pullSubtargets: true })?.url ?? url;
   // A composer decoration or preview shows what is already known and reads
@@ -47,7 +49,7 @@ export function PullLink({ url, states }: { url: string; states: PullStates }) {
   const Icon = issue
     ? issueIcons[state ? issueState(state) : "open"]
     : stateIcons[state?.state ?? "open"];
-  const words = (issue ? describeIssue : describePull)({
+  const words = (issue ? describeIssue : displayPull)({
     state,
     failed: read === "failed",
   });

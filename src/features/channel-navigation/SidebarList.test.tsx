@@ -14,6 +14,7 @@ test("the sidebar list fades only the edges with rows scrolled past them", () =>
   );
   const list = screen.getByRole("navigation", { name: "Conversations" });
   expect(ref.current).toBe(list);
+  expect(list).toHaveAttribute("data-conversation-list", "");
   expect(list).toHaveAttribute("data-scroll-fade", "scrolled");
   // At rest with nothing past either edge, the list stays crisp.
   expect(list).not.toHaveAttribute("data-overflow-start");
@@ -27,4 +28,16 @@ test("the sidebar list fades only the edges with rows scrolled past them", () =>
   fireEvent.scroll(list);
   expect(list).toHaveAttribute("data-overflow-start");
   expect(list).not.toHaveAttribute("data-overflow-end");
+});
+
+test("a non-navigation sidebar list adds no conversation marker or navigation landmark", () => {
+  const view = render(
+    <SidebarList>
+      <button type="button">Raw row</button>
+    </SidebarList>,
+  );
+  expect(view.container.querySelector("nav")).toBeNull();
+  expect(view.container.querySelector("[data-conversation-list]")).toBeNull();
+  expect(view.getByRole("button", { name: "Raw row" })).toBeInTheDocument();
+  view.unmount();
 });

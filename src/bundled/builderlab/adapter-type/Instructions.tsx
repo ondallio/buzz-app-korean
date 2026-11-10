@@ -1,3 +1,6 @@
+import { t, useLanguage } from "../../../shared/i18n";
+import { rich } from "../../../shared/i18n/rich";
+import { localError } from "../../../shared/i18n/deferred-message";
 import {
   useEffect,
   useState,
@@ -6,7 +9,6 @@ import {
 } from "react";
 import type { AgentViewProps } from "../../../features/agents/service";
 import { AgentExecutionNote } from "../../../features/agents/AgentExecutionNote";
-import { executionCopy } from "../../../features/agents/execution-location";
 import { PreferenceRow } from "../../../shared/design-system/ui/PreferenceRow";
 import { SettingsGroup } from "../../../shared/design-system/ui/SettingsGroup";
 import inlineStyles from "../../../shared/InlineReference.module.css";
@@ -53,10 +55,9 @@ export function createSettingsTab(
         current.signal.throwIfAborted();
         if (session.credential() !== credential)
           throw new DOMException("Builderlab session changed.", "AbortError");
-        if (!remote)
-          throw new Error("Agent not found in this Builderlab account.");
+        if (!remote) throw localError("builderlabSettings.notFound");
         if (remote.status !== "Active")
-          throw new Error("Only Active agents can have their settings edited.");
+          throw localError("builderlabSettings.activeOnly");
         setLoaded({
           agent: remote,
           subject: credential.account.subject,
@@ -94,6 +95,7 @@ export function createSettingsTab(
     settingsContent,
     settingsHost,
   }: AgentViewProps) {
+    useLanguage();
     const [revision, setRevision] = useState(0);
     const login = useSyncExternalStore(session.subscribe, session.snapshot);
     const signedIn = login.status === "signed-in";
@@ -116,10 +118,9 @@ export function createSettingsTab(
           <>
             <SettingsGroup>
               <PreferenceRow
-                title="Runtime"
-                subtitle={
-                  <>
-                    Hosted and managed by{" "}
+                title={t("builderlabSettings.runtime")}
+                subtitle={rich("builderlabSettings.hostedBy", {
+                  link: (
                     <a
                       className={inlineStyles.link}
                       href={import.meta.env.VITE_BUZZ_BUILDERLAB_URL}
@@ -128,19 +129,18 @@ export function createSettingsTab(
                     >
                       Builderlab
                     </a>
-                    .
-                  </>
-                }
+                  ),
+                })}
               />
               {signedIn && (
                 <PreferenceRow
-                  title="Workspace"
-                  subtitle={`Remote runtime shared with your other agents in this workspace by default. ${executionCopy.remote.description}`}
+                  title={t("builderlabSettings.workspace")}
+                  subtitle={t("builderlabSettings.workspaceDescription")}
                 />
               )}
               <PreferenceRow
-                title="Sessions"
-                subtitle="One session per thread"
+                title={t("builderlabSettings.sessions")}
+                subtitle={t("builderlabSettings.oneSession")}
               />
             </SettingsGroup>
             {settingsContent}

@@ -15,7 +15,7 @@ const unread = '<span data-channel-unread=""></span>';
 const activity = '<span data-channel-activity=""></span>';
 /** Rows are `id` or `id:` plus markup; `*id` is the open one; `s-id` is Solo. */
 function sidebar(rows: string[], wrap = (html: string) => html) {
-  document.body.innerHTML = `<aside><nav aria-label="Subscribed channels">${wrap(
+  document.body.innerHTML = `<aside><nav data-conversation-list aria-label="Subscribed channels">${wrap(
     rows
       .map((spec) => {
         const [name = "", markup = ""] = spec.split(":");
@@ -83,7 +83,7 @@ it("steps over a conversation listed twice, including the open one", () => {
 });
 
 it("ignores rows in collapsed sections and hidden panes but not a collapsed sidebar", () => {
-  document.body.innerHTML = `<aside inert><nav aria-label="Subscribed channels">
+  document.body.innerHTML = `<aside inert><nav data-conversation-list aria-label="Subscribed channels">
     <section hidden><button data-solo-channel-id="s-hidden"></button></section>
     <div inert><button data-channel-id="closed"></button></div>
     <button data-channel-id="a"></button>

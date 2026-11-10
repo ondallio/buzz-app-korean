@@ -16,7 +16,7 @@ import { platform, arch } from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { relayBrokerPlugin } from "../../browser-host/relay-broker.mjs";
-import { policyRelay } from "./policy-relay.mjs";
+import { policyRelay, draftsSentAnswer } from "./policy-relay.mjs";
 import { buildApp } from "./build.mjs";
 import { fixtureBody } from "./fixture-body.mjs";
 import { watchPageErrors } from "./page-errors.mjs";
@@ -34,6 +34,9 @@ export const historySize = 640;
 // broker/subscriber and model only the upstream relay policy with ephemeral keys.
 export const test = base.extend({
   productionBroker: [false, { option: true }],
+  draftsSent: [false, { option: true }],
+  // Exercise real NIP-11 authority discovery without enabling read-state scenarios.
+  relayAuthorityDiscovery: [false, { option: true }],
   enabledPlugins: [[], { option: true }],
   builderlab: [{}, { option: true }],
   /** The production broker's live setup deadline. It runs in Node, so the
@@ -116,6 +119,8 @@ export const test = base.extend({
       browserName,
       browser,
       productionBroker,
+      draftsSent,
+      relayAuthorityDiscovery,
       enabledPlugins,
       builderlab,
       liveSetupTimeoutMs,
@@ -1055,6 +1060,25 @@ export const test = base.extend({
         .map((entry) => entry.event);
     };
     const answer = (community, filter) => {
+      if (
+        draftsSent &&
+        ((filter.authors &&
+          !filter["#h"] &&
+          filter.kinds?.some((kind) => [9, 40003].includes(kind))) ||
+          (filter["#e"] && filter.kinds?.includes(40002)))
+      ) {
+        expect(["primary", "secondary"]).toContain(community);
+        const events = [...histories.entries()]
+          .filter(([key]) => key.startsWith(`${community}/`))
+          .flatMap(([, events]) => events)
+          .concat(community === "primary" ? targetEvents : [])
+          .concat(
+            report.publications
+              .filter((item) => item.community === community)
+              .map((item) => item.event),
+          );
+        return draftsSentAnswer(filter, viewer, events);
+      }
       // These ordinary fixture channels have no Huddle creation receipt.
       if (filter.kinds?.length === 1 && filter.kinds[0] === 9007) return [];
       // The real relay can return both current metadata and rosters in one query.
@@ -2107,6 +2131,7 @@ export const test = base.extend({
     };
     const relay = productionBroker
       ? policyRelay({
+          draftsSent,
           viewer,
           relayAuthor: getPublicKey(relayKey),
           answer,
@@ -2457,7 +2482,7 @@ export const test = base.extend({
                   communityAliases: fixtureAliases,
                   identity: () => userKey.slice(),
                   agentLibrary: () => ({ definitions: [], identities: [] }),
-                  ...(readState || channelLifecycle
+                  ...(readState || channelLifecycle || relayAuthorityDiscovery
                     ? {}
                     : {
                         authority: async () => ({

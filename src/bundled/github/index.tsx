@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { ResolvePull } from "./ResolvePull";
 import type { PullChecklist as Checklist } from "./pull";
 import { Button } from "../../shared/design-system/ui/Button";
@@ -34,7 +35,12 @@ import { PublicChecklist, PullChecklist } from "./PullChecklist";
 import styles from "./GitHub.module.css";
 import inlineStyles from "../../shared/InlineReference.module.css";
 import { GitHubBody } from "./GitHubBody";
-import { relativeTimestamp } from "../../shared/relative-timestamp";
+import {
+  formattingLocale,
+  languagePreference,
+} from "../../shared/i18n/language";
+import { rich } from "../../shared/i18n/rich";
+import { clockHourCycle, useClockFormat } from "../../shared/clock-preference";
 import type { RelaySession } from "../../features/relay/session";
 import { ownSolo } from "../../features/solo/labels";
 import { createSoloPulls, writeLink, type SoloPulls } from "./solo-pull";
@@ -306,17 +312,94 @@ function usePullPanel(states: PullStates, url: string, enabled: boolean) {
 }
 
 const labels = {
-  repository: "Repository",
-  pull: "Pull request",
-  issue: "Issue",
-  commit: "Commit",
-};
+  repository: "githubRead.kind.repository",
+  pull: "githubRead.kind.pull",
+  issue: "githubRead.kind.issue",
+  commit: "githubRead.kind.commit",
+} as const;
 const icons = {
   repository: FolderSimpleIcon,
   pull: GitPullRequestIcon,
   issue: GitHubIssueIcon,
   commit: GitCommitIcon,
 };
+
+// These captions belong to the finite UI fields constructed by data/object/pull.
+function factCaption(label: string) {
+  switch (label) {
+    case "Branch":
+      return t("githubRead.fact.branch");
+    case "Files changed":
+      return t("githubRead.fact.files");
+    case "Changes":
+      return t("githubRead.changes");
+    case "Comments":
+      return t("githubRead.fact.comments");
+    case "Stars":
+      return t("githubRead.fact.stars");
+    case "Language":
+      return t("githubRead.fact.language");
+    case "Default branch":
+      return t("githubRead.fact.defaultBranch");
+    default:
+      return label;
+  }
+}
+function stateCaption(state: string) {
+  switch (state) {
+    case "open":
+      return t("githubRead.state.open");
+    case "closed":
+      return t("githubRead.state.closed");
+    case "Draft":
+      return t("githubRead.state.draft");
+    case "Merged":
+      return t("githubRead.state.merged");
+    default:
+      return state;
+  }
+}
+function countCaption(value: number) {
+  return languagePreference() === "en"
+    ? String(value)
+    : new Intl.NumberFormat(formattingLocale()).format(value);
+}
+// Keep the canonical elapsed-age ladder; never parse its English output.
+function updatedAge(unixSeconds: number, nowSeconds = Date.now() / 1000) {
+  const age = Math.max(0, nowSeconds - unixSeconds);
+  if (age < 60) return t("githubRead.age.now");
+  if (age < 3600) {
+    const count = Math.floor(age / 60);
+    return t(count === 1 ? "githubRead.age.minute" : "githubRead.age.minutes", {
+      count,
+    });
+  }
+  if (age < 86400) {
+    const count = Math.floor(age / 3600);
+    return t(count === 1 ? "githubRead.age.hour" : "githubRead.age.hours", {
+      count,
+    });
+  }
+  if (age < 604800) {
+    const count = Math.floor(age / 86400);
+    return t(count === 1 ? "githubRead.age.day" : "githubRead.age.days", {
+      count,
+    });
+  }
+  return t("githubRead.age.date", {
+    date: new Date(unixSeconds * 1000).toLocaleDateString(formattingLocale(), {
+      month: "short",
+      day: "numeric",
+    }),
+  });
+}
+function updatedTitle(value: string) {
+  const hourCycle = clockHourCycle();
+  return new Date(value).toLocaleString(
+    formattingLocale(),
+    hourCycle ? { hourCycle } : {},
+  );
+}
 
 export function GitHubPanel({
   target,
@@ -341,6 +424,7 @@ export function GitHubPanel({
   /** Links a pull request to the chat the panel was opened from. */
   chatLink?: ((url: string) => ReactNode) | undefined;
 }) {
+  useLanguage();
   const [attempt, retry] = useState(0);
   const reference = useMemo(() => parseGitHubReference(target), [target]);
   const own = useMemo(
@@ -360,7 +444,7 @@ export function GitHubPanel({
       retry={() => retry(attempt + 1)}
     />
   ) : (
-    <p className="notice">Unsupported GitHub link.</p>
+    <p className="notice">{t("githubRead.unsupported")}</p>
   );
 }
 
@@ -387,6 +471,8 @@ function ObjectPanel({
     | undefined;
   retry(): void;
 }) {
+  useLanguage();
+  useClockFormat();
   const isPull = reference.kind === "pull";
   const pull = usePullPanel(states, reference.url, isPull);
   const [view, setView] = useState<"summary" | "changes">("summary");
@@ -437,7 +523,7 @@ function ObjectPanel({
           target="_blank"
           rel="noreferrer"
         >
-          {typeof result === "object" ? result.title : labels.pull}{" "}
+          {typeof result === "object" ? result.title : t(labels.pull)}{" "}
           <span className={styles.titleNumber}>{reference.label}</span>
         </a>
       ) : (
@@ -473,13 +559,13 @@ function ObjectPanel({
                   {repositoryName}
                 </a>
               </div>
-              <small>{labels[reference.kind]}</small>
+              <small>{t(labels[reference.kind])}</small>
             </>
           ) : (
             <>
               <small>{reference.repository}</small>
               <strong>
-                {labels[reference.kind]} {reference.label}
+                {t(labels[reference.kind])} {reference.label}
               </strong>
             </>
           )}
@@ -497,22 +583,22 @@ function ObjectPanel({
       {files && (
         <div className={styles.views}>
           <Tabs
-            label="Pull request view"
+            label={t("githubRead.view")}
             variant="segmented"
             size="sm"
             value={view}
             items={[
-              { value: "summary", label: "Summary" },
+              { value: "summary", label: t("githubRead.summary") },
               {
                 value: "changes",
-                label: "Changes",
+                label: t("githubRead.changes"),
                 trailing: counts && (
                   <span className={styles.tabCounts}>
                     <span className={styles.additions}>
-                      +{counts.additions}
+                      +{countCaption(counts.additions)}
                     </span>{" "}
                     <span className={styles.deletions}>
-                      −{counts.deletions}
+                      −{countCaption(counts.deletions)}
                     </span>
                   </span>
                 ),
@@ -542,14 +628,14 @@ function ObjectPanel({
           target="_blank"
           rel="noreferrer"
         >
-          Open on GitHub <ArrowSquareOutIcon size={14} />
+          {t("githubRead.external")} <ArrowSquareOutIcon size={14} />
         </a>
       )}
       {!showChanges && (
         <>
           {reference.kind === "pull" && typeof result !== "object" && title}
           {result === undefined ? (
-            <p role="status">Loading from GitHub…</p>
+            <p role="status">{t("githubRead.loading")}</p>
           ) : typeof result === "string" ? (
             <div role="alert">
               <p>{result}</p>
@@ -568,11 +654,11 @@ function ObjectPanel({
                   }
                 >
                   <span className={styles.errorActionLabel}>
-                    Open on Github
+                    {t("githubRead.errorExternal")}
                   </span>
                 </Button>
                 <Button type="button" onClick={retry}>
-                  Retry
+                  {t("githubRead.retry")}
                 </Button>
               </div>
             </div>
@@ -590,24 +676,25 @@ function ObjectPanel({
                     }
                   >
                     {StateIcon && <StateIcon size={12} aria-hidden="true" />}
-                    {result.state}
+                    {stateCaption(result.state)}
                   </span>
                 )}
                 {result.author && (
                   <span>
-                    by{" "}
-                    {result.authorUrl ? (
-                      <a
-                        className={inlineStyles.link}
-                        href={result.authorUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {result.author}
-                      </a>
-                    ) : (
-                      result.author
-                    )}
+                    {rich("githubRead.author", {
+                      author: result.authorUrl ? (
+                        <a
+                          className={inlineStyles.link}
+                          href={result.authorUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {result.author}
+                        </a>
+                      ) : (
+                        result.author
+                      ),
+                    })}
                   </span>
                 )}
               </div>
@@ -616,10 +703,14 @@ function ObjectPanel({
                 <dl className={styles.facts}>
                   {result.facts.map(([label, value]) => (
                     <div key={label}>
-                      <dt>{label}</dt>
+                      <dt>{factCaption(label)}</dt>
                       <dd>
                         {typeof value !== "object" ? (
-                          value
+                          typeof value === "number" ? (
+                            countCaption(value)
+                          ) : (
+                            value
+                          )
                         ) : "head" in value ? (
                           <>
                             {value.head.url ? (
@@ -655,11 +746,11 @@ function ObjectPanel({
                         ) : (
                           <>
                             <span className={styles.additions}>
-                              +{value.additions}
+                              +{countCaption(value.additions)}
                             </span>
                             {" / "}
                             <span className={styles.deletions}>
-                              −{value.deletions}
+                              −{countCaption(value.deletions)}
                             </span>
                           </>
                         )}
@@ -668,19 +759,17 @@ function ObjectPanel({
                   ))}
                   {reference.kind === "pull" && (
                     <div>
-                      <dt>Last updated</dt>
+                      <dt>{t("githubRead.updated")}</dt>
                       <dd>
                         {result.updatedAt ? (
                           <time
                             dateTime={result.updatedAt}
-                            title={new Date(result.updatedAt).toLocaleString()}
+                            title={updatedTitle(result.updatedAt)}
                           >
-                            {relativeTimestamp(
-                              Date.parse(result.updatedAt) / 1000,
-                            )}
+                            {updatedAge(Date.parse(result.updatedAt) / 1000)}
                           </time>
                         ) : (
-                          "Unavailable"
+                          t("githubRead.unavailable")
                         )}
                       </dd>
                     </div>
@@ -743,9 +832,7 @@ function ObjectPanel({
       )}
       {typeof loaded === "object" && (
         <p className={styles.note}>
-          {loaded.signedIn
-            ? "Read with your gh sign-in."
-            : "Public GitHub data · Sign in to the gh CLI to see private repositories and merge from here."}
+          {loaded.signedIn ? t("githubRead.signedIn") : t("githubRead.public")}
         </p>
       )}
     </div>

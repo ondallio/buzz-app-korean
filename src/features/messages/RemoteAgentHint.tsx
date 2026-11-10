@@ -5,6 +5,7 @@ import type { ComposerSession } from "./composer-session";
 import { CloudIcon } from "../../shared/design-system/icons";
 import iconStyles from "./RemoteAgentHint.module.css";
 import styles from "./Messages.module.css";
+import { t, useLanguage } from "../../shared/i18n";
 
 const noSubscribe = () => () => {};
 
@@ -45,16 +46,29 @@ export function RemoteWorkIcon({
 }
 
 export function RemoteAgentHint(props: RemoteAgentProps) {
+  useLanguage();
   const detail = useRemoteDetail(props);
+  const agent =
+    props.viewer && props.viewer === props.session?.viewer
+      ? props.session.agentChoices
+          .snapshot()
+          .identities.find((choice) => choice.pubkey === props.pubkey)
+      : undefined;
   return detail ? (
-    <Tooltip content={detail}>
+    <Tooltip
+      content={t(
+        agent?.runtime === "block.builderlab/builderlab"
+          ? "activityGroup.remoteBuilderlab"
+          : "activityGroup.remoteMachine",
+      )}
+    >
       <span
         className={styles.authorOwner}
         // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users need access to the execution details in the tooltip.
         tabIndex={0}
       >
         <span aria-hidden="true">· </span>
-        Remote
+        {t("activityGroup.remote")}
       </span>
     </Tooltip>
   ) : null;

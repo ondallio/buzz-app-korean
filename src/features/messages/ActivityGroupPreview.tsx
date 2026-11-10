@@ -5,11 +5,7 @@ import { useActivityTypingReplacement } from "../conversation/typing-presentatio
 import { useActivityFocusHandoff } from "./use-activity-focus-handoff";
 import { useRef, type ReactNode } from "react";
 import { ActivityDisclosure } from "./ActivityDisclosure";
-import {
-  ActivityOutcome,
-  activityOutcomeLabel,
-  activityOutcomeReason,
-} from "./ActivityOutcome";
+import { ActivityOutcome, activityOutcomeLabel } from "./ActivityOutcome";
 import { AgentResponsePreview } from "./AgentResponsePreview";
 import { RemoteAgentHint, RemoteWorkIcon } from "./RemoteAgentHint";
 import { useActivityIndicator } from "./use-activity-indicator";
@@ -19,6 +15,7 @@ import type { ActivityPresentation } from "./activity-presentation";
 import type { ChannelMessage, Profile } from "../relay/contracts";
 import { avatarMedia } from "../../shared/avatar-source";
 import { messagePreviewText } from "../conversation/message-preview-text";
+import { t, useLanguage } from "../../shared/i18n";
 
 /** One stable disclosure for a run of activity, showing its latest speaker. */
 export function ActivityGroupPreview({
@@ -46,6 +43,7 @@ export function ActivityGroupPreview({
   layout?: "timeline" | "thread";
   renderHistory?: (row: ChannelMessage) => ReactNode;
 }) {
+  useLanguage();
   const container = useRef<HTMLDivElement>(null);
   const disclosure = useRef<HTMLButtonElement>(null);
   const resolveName = useChannelIdentityNames(session, group.latest.channelId);
@@ -91,15 +89,22 @@ export function ActivityGroupPreview({
   const preview =
     text.length > 280 ? `${text.slice(0, 279).join("")}…` : text.join("");
   const outcomeText = outcomes
-    .map(
-      (entry) => `${named(entry.agent)}: ${activityOutcomeLabel(entry.state)}`,
+    .map((entry) =>
+      entry.state === "error"
+        ? t("activityGroup.namedFailed", { name: named(entry.agent) })
+        : entry.state === "stopped"
+          ? t("activityGroup.namedStopped", { name: named(entry.agent) })
+          : t("activityGroup.namedOutcome", {
+              name: named(entry.agent),
+              outcome: String(activityOutcomeLabel(entry.state)),
+            }),
     )
     .join("; ");
-  const namedPreview = `${speaker}: ${preview}`;
+  const namedPreview = t("messageRow.audience", { author: speaker, preview });
   const summaryLabel = [
     outcomeText,
     working
-      ? `${speaker}: still working — ${preview}`
+      ? t("activityGroup.stillWorking", { name: speaker, preview })
       : !outcomeText && namedPreview,
   ]
     .filter(Boolean)
@@ -128,7 +133,12 @@ export function ActivityGroupPreview({
         trigger={disclosure}
         expanded={expanded}
         onToggle={onToggle}
-        label={`${expanded ? "Collapse" : "Show"} activity history: ${summaryLabel}`}
+        label={t(
+          expanded
+            ? "activityGroup.collapseHistory"
+            : "activityGroup.showHistory",
+          { summary: summaryLabel },
+        )}
         icon={
           <RemoteWorkIcon
             session={session}
@@ -189,12 +199,22 @@ export function ActivityGroupPreview({
                   !row.attachments.length,
               ),
           )
-          .map((entry) => (
-            <p key={entry.agent} className="text-body-sm">
-              {participants.length > 1 && `${named(entry.agent)}: `}
-              {activityOutcomeReason(entry.state, entry.reason)}
-            </p>
-          ))}
+          .map((entry) => {
+            const reason =
+              entry.state === "error"
+                ? entry.reason || t("activityGroup.failureReason")
+                : t("activityGroup.stoppedReason");
+            return (
+              <p key={entry.agent} className="text-body-sm">
+                {participants.length > 1
+                  ? t("activityGroup.namedReason", {
+                      name: named(entry.agent),
+                      reason,
+                    })
+                  : reason}
+              </p>
+            );
+          })}
         {renderHistory &&
           history.map((entry) => (
             <div key={entry.id}>{renderHistory(entry)}</div>

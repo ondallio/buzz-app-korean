@@ -12,6 +12,7 @@ import remarkBreaks from "remark-breaks";
 import type { PhrasingContent, Root, RootContent } from "mdast";
 import { MediaAttachment } from "../../features/messages/MediaAttachment";
 import { AudioAttachment } from "../../features/messages/AudioAttachment";
+import { t, useLanguage } from "../../shared/i18n";
 import {
   MAX_MARKDOWN_LENGTH,
   MAX_MARKDOWN_DEPTH,
@@ -195,6 +196,11 @@ function EmbeddedAttachment({
   );
 }
 
+function AttachmentFallbackLabel() {
+  useLanguage();
+  return t("githubBodyAttachment.open");
+}
+
 export const GitHubBody = memo(function GitHubBody({
   body,
   bodyHtml,
@@ -223,7 +229,7 @@ export const GitHubBody = memo(function GitHubBody({
     const attachment = attachmentFor(source, metadata, image);
     const link = (
       <a href={source} target="_blank" rel="noreferrer">
-        {label || attachment?.name || "Open attachment"}
+        {label || attachment?.name || <AttachmentFallbackLabel />}
       </a>
     );
     if (!attachment) return link;

@@ -9,6 +9,8 @@ import {
   type TabsLabels,
 } from "../shared/design-system/ui/TabsLabels";
 import { DialogLabelsProvider } from "../shared/design-system/ui/DialogLabels";
+import { FieldLabelsProvider } from "../shared/design-system/ui/FieldLabels";
+import { ComboboxLabelsProvider } from "../shared/design-system/ui/Combobox";
 import { t, translate, useLanguage } from "../shared/i18n";
 
 /** Product language stays outside generic design-system components. */
@@ -42,7 +44,11 @@ export function LanguageProviders({ children }: { children: ReactNode }) {
       <DialogLabelsProvider closeLabel={t("dialog.close")}>
         <ChipLabelsProvider labels={chipLabels}>
           <TabsLabelsProvider labels={tabsLabels}>
-            {children}
+            <FieldLabelsProvider optionalLabel={t("fieldLabels.optional")}>
+              <ComboboxLabelsProvider searchLabel={t("search.search")}>
+                {children}
+              </ComboboxLabelsProvider>
+            </FieldLabelsProvider>
           </TabsLabelsProvider>
         </ChipLabelsProvider>
       </DialogLabelsProvider>

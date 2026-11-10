@@ -32,6 +32,7 @@ import {
   uploadAvatar,
 } from "../../features/profiles/avatar-upload";
 import { AgentCreateDialog } from "./AgentCreateDialog";
+import { setLanguage } from "../../shared/i18n";
 import {
   BuilderlabLogoIcon,
   CodexLogoIcon,
@@ -69,7 +70,11 @@ vi.mock("motion/react", async (actual) => ({
   useReducedMotion: () => motion.reduced,
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+});
 // jsdom has no object URLs; an upload previews its file through one.
 beforeEach(() => {
   vi.stubGlobal(
@@ -1711,4 +1716,475 @@ it("shows an agent card's pack avatar as that Gloopie", () => {
     "aria-selected",
     "true",
   );
+});
+
+it("keeps a real creation draft, form IDs and focused selection live across locales without another create, then retains an opaque failure and retries the raw input", async () => {
+  let reject: (reason: Error) => void = () => {
+    throw new Error("Missing create gate");
+  };
+  let attempts = 0;
+  const held = new Promise<Agent>((_resolve, no) => {
+    reject = no;
+  });
+  const { agents, onCreated, onClose, dialog } = setup([notes], () =>
+    ++attempts === 1 ? held : Promise.resolve(made),
+  );
+  const name = within(dialog).getByRole("textbox", { name: "Name" });
+  const instructions = within(dialog).getByRole("textbox", {
+    name: "Instructions",
+  });
+  if (
+    !(name instanceof HTMLInputElement) ||
+    !(instructions instanceof HTMLTextAreaElement)
+  )
+    throw new Error("Missing creation fields");
+  const rawName = "Create agent {name} 한글",
+    raw = "Help me plan my week and prioritize tasks.";
+  fireEvent.change(name, { target: { value: rawName } });
+  fireEvent.change(instructions, { target: { value: raw } });
+  const form = within(dialog).getByRole("form", { name: "New agent" }),
+    id = form.id;
+  const create = createButton(),
+    harness = within(dialog).getByRole("combobox", { name: "Harness" });
+  instructions.focus();
+  instructions.setSelectionRange(2, 9);
+  for (const language of ["ko", "en"] as const) {
+    act(() => setLanguage(language));
+    expect(
+      screen.getByRole("dialog", {
+        name: language === "ko" ? "에이전트 만들기" : "Create agent",
+      }),
+    ).toBe(dialog);
+    expect(
+      within(dialog).getByRole("form", {
+        name: language === "ko" ? "새 에이전트" : "New agent",
+      }),
+    ).toBe(form);
+    expect(
+      within(dialog).getByRole("textbox", {
+        name: language === "ko" ? "이름" : "Name",
+      }),
+    ).toBe(name);
+    expect(
+      within(dialog).getByRole("textbox", {
+        name: language === "ko" ? "지침" : "Instructions",
+      }),
+    ).toBe(instructions);
+    expect(
+      within(dialog).getByRole("combobox", {
+        name: language === "ko" ? "하네스" : "Harness",
+      }),
+    ).toBe(harness);
+    expect(
+      within(dialog).getByRole("button", {
+        name: language === "ko" ? "에이전트 만들기" : "Create agent",
+      }),
+    ).toBe(create);
+    expect(form.id).toBe(id);
+    expect(create).toHaveAttribute("form", id);
+    expect(name).toHaveValue(rawName);
+    expect(instructions).toHaveValue(raw);
+    expect(instructions).toHaveFocus();
+    expect(instructions.selectionStart).toBe(2);
+    expect(instructions.selectionEnd).toBe(9);
+    expect(agents.create).not.toHaveBeenCalled();
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  }
+  fireEvent.keyDown(dialog, { key: "Escape" });
+  expect(dialog).toBeVisible();
+  expect(onClose).not.toHaveBeenCalled();
+  fireEvent.click(create);
+  await waitFor(() => expect(agents.create).toHaveBeenCalledOnce());
+  const payload = agents.create.mock.calls[0]?.[0];
+  expect(payload).toEqual({
+    type: notes.key,
+    name: rawName,
+    picture: expect.any(String),
+    config: { notes: "start", instructions: raw },
+  });
+  expect(name).toBeDisabled();
+  expect(instructions).toBeDisabled();
+  act(() => setLanguage("ko"));
+  expect(within(dialog).getByRole("button", { name: "닫기" })).toBeDisabled();
+  fireEvent.submit(form);
+  expect(agents.create).toHaveBeenCalledOnce();
+  expect(create).toBeDisabled();
+  await act(async () => reject(new Error("Create agent")));
+  const alert = screen.getByRole("alert");
+  for (const language of ["en", "ko"] as const) {
+    act(() => setLanguage(language));
+    expect(screen.getByRole("alert")).toBe(alert);
+    expect(alert.textContent).toBe("Create agent");
+    expect(name).toHaveValue(rawName);
+    expect(instructions).toHaveValue(raw);
+    expect(agents.create).toHaveBeenCalledOnce();
+  }
+  fireEvent.click(create);
+  await waitFor(() => expect(onCreated).toHaveBeenCalledExactlyOnceWith(made));
+  expect(agents.create.mock.calls).toEqual([[payload], [payload]]);
+  expect(onClose).not.toHaveBeenCalled();
+});
+
+it("keeps proposed-update data and requester text raw while translating the same form and never creates a new agent", async () => {
+  const agent: Agent = {
+    ...made,
+    key: "raw-update-key",
+    name: "Create agent {name}",
+    type: notes.key,
+    picture: "https://example.test/raw-avatar.png",
+    config: {
+      notes: "kept",
+      instructions: "Help me plan my week and prioritize tasks.",
+    },
+  };
+  let finish: () => void = () => {
+    throw new Error("Missing update gate");
+  };
+  const held = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const save = vi.fn(() => held),
+    create = vi.fn(),
+    onCreated = vi.fn(),
+    onClose = vi.fn();
+  const requester = "Save changes {requester}";
+  render(
+    <AgentCreateDialog
+      agents={{ create } as unknown as Agents}
+      types={[notes]}
+      onCreated={onCreated}
+      onClose={onClose}
+      update={{
+        agent,
+        onSave: save,
+        request: {
+          id: "request",
+          requester: "requester",
+          requesterName: requester,
+          owner: made.owner,
+          community: "here",
+          agent: made.pubkey,
+          agentName: agent.name,
+          agentType: notes.key,
+          name: "New agent",
+        },
+      }}
+    />,
+  );
+  const dialog = screen.getByRole("dialog", {
+    name: "Edit Create agent {name}",
+  });
+  const form = within(dialog).getByRole("form", {
+    name: "Edit Create agent {name}",
+  });
+  const name = within(dialog).getByRole("textbox", { name: "Name" });
+  const instructions = within(dialog).getByRole("textbox", {
+    name: "Instructions",
+  });
+  if (!(instructions instanceof HTMLTextAreaElement))
+    throw new Error("Missing update textarea");
+  fireEvent.change(name, { target: { value: "Reviewed 한글" } });
+  const raw = "Instructions {name}\n원문 지침";
+  fireEvent.change(instructions, { target: { value: raw } });
+  instructions.focus();
+  instructions.setSelectionRange(1, 6);
+  const button = screen.getByRole("button", { name: "Save changes" });
+  for (const language of ["ko", "en"] as const) {
+    act(() => setLanguage(language));
+    const title =
+      language === "ko"
+        ? "Create agent {name} 편집"
+        : "Edit Create agent {name}";
+    expect(screen.getByRole("dialog", { name: title })).toBe(dialog);
+    expect(within(dialog).getByRole("form", { name: title })).toBe(form);
+    expect(dialog).toHaveAccessibleDescription(
+      language === "ko"
+        ? `${requester}님이 변경을 제안했습니다. 저장하기 전에는 적용되지 않습니다.`
+        : `${requester} proposed these changes. Nothing changes until you save.`,
+    );
+    expect(
+      within(dialog).getByRole("textbox", {
+        name: language === "ko" ? "지침" : "Instructions",
+      }),
+    ).toBe(instructions);
+    expect(instructions).toHaveValue(raw);
+    expect(instructions).toHaveFocus();
+    expect(instructions.selectionStart).toBe(1);
+    expect(instructions.selectionEnd).toBe(6);
+    expect(name).toHaveValue("Reviewed 한글");
+    expect(save).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+  }
+  try {
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledExactlyOnceWith({
+        type: notes.key,
+        name: "Reviewed 한글",
+        picture: agent.picture,
+        config: { notes: "kept", instructions: raw },
+      }),
+    );
+    act(() => setLanguage("ko"));
+    expect(instructions).toBeDisabled();
+    expect(name).toBeDisabled();
+    expect(button).toBeDisabled();
+    fireEvent.submit(form);
+    expect(save).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "닫기" })).toBeDisabled();
+  } finally {
+    await act(async () => finish());
+  }
+  expect(create).not.toHaveBeenCalled();
+  expect(onCreated).not.toHaveBeenCalled();
+  expect(onClose).not.toHaveBeenCalled();
+});
+
+it.each(["request", "card"] as const)(
+  "keeps the %s source description and raw authored draft while its surrounding dialog translates",
+  (mode) => {
+    const create = vi.fn(),
+      onClose = vi.fn(),
+      onCreated = vi.fn();
+    const rawName = "Create agent",
+      raw = "Help me plan my week and prioritize tasks.",
+      requester = "Instructions {requester}";
+    const type: RegisteredAgentType = {
+      ...notes,
+      adopt: (carry, config) => ({
+        ...(config as Notes),
+        instructions: carry.instructions ?? (config as Notes).instructions,
+      }),
+    };
+    render(
+      <AgentCreateDialog
+        agents={{ create } as unknown as Agents}
+        types={[type]}
+        onClose={onClose}
+        onCreated={onCreated}
+        {...(mode === "request"
+          ? {
+              request: {
+                id: "request",
+                requester: "a".repeat(64),
+                requesterName: requester,
+                owner: made.owner,
+                community: "here",
+                type: type.key,
+                name: rawName,
+                instructions: raw,
+              },
+            }
+          : { draft: { name: rawName, picture: "", instructions: raw } })}
+      />,
+    );
+    const dialog = screen.getByRole("dialog", { name: "Create agent" }),
+      form = within(dialog).getByRole("form", { name: "New agent" });
+    const name = within(dialog).getByRole("textbox", { name: "Name" });
+    const instructions = within(dialog).getByRole("textbox", {
+      name: "Instructions",
+    });
+    name.focus();
+    for (const language of ["ko", "en"] as const) {
+      act(() => setLanguage(language));
+      expect(
+        screen.getByRole("dialog", {
+          name: language === "ko" ? "에이전트 만들기" : "Create agent",
+        }),
+      ).toBe(dialog);
+      expect(
+        within(dialog).getByRole("form", {
+          name: language === "ko" ? "새 에이전트" : "New agent",
+        }),
+      ).toBe(form);
+      const description =
+        mode === "request"
+          ? language === "ko"
+            ? `${requester}님이 이 에이전트 생성을 요청했습니다. 만들기 전에 설정을 검토해 주세요.`
+            : `${requester} requested this agent. Review its settings before creating it.`
+          : language === "ko"
+            ? "에이전트 카드에서 가져왔습니다. 만들기 전에 설정을 검토해 주세요."
+            : "From an agent card. Review its settings before creating it.";
+      expect(dialog).toHaveAccessibleDescription(description);
+      expect(
+        within(dialog).getByRole("textbox", {
+          name: language === "ko" ? "이름" : "Name",
+        }),
+      ).toBe(name);
+      expect(name).toHaveValue(rawName);
+      expect(name).toHaveFocus();
+      expect(instructions).toHaveValue(raw);
+      expect(create).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(onCreated).not.toHaveBeenCalled();
+    }
+  },
+);
+
+it.each([false, true])(
+  "keeps the empty-name guard and its live error without creating or saving in update mode %s",
+  (updating) => {
+    const animation = vi.fn();
+    Element.prototype.animate = animation;
+    const create = vi.fn(),
+      save = vi.fn(),
+      onClose = vi.fn();
+    render(
+      <AgentCreateDialog
+        agents={{ create } as unknown as Agents}
+        types={[echo]}
+        onClose={onClose}
+        onCreated={vi.fn()}
+        {...(updating
+          ? {
+              update: {
+                agent: {
+                  ...made,
+                  key: "raw-key",
+                  name: "",
+                  config: { reply: "" },
+                },
+                onSave: save,
+                request: {
+                  id: "request",
+                  requester: "requester",
+                  requesterName: "Raw",
+                  owner: made.owner,
+                  community: "here",
+                  agent: made.pubkey,
+                  agentName: "",
+                  agentType: made.type,
+                  name: "",
+                },
+              },
+            }
+          : {})}
+      />,
+    );
+    const name = screen.getByRole("textbox", { name: "Name" }),
+      form = screen.getByRole("form");
+    fireEvent.submit(form);
+    const error = screen.getByRole("alert");
+    for (const language of ["ko", "en"] as const) {
+      act(() => setLanguage(language));
+      expect(screen.getByRole("alert")).toBe(error);
+      expect(error).toHaveTextContent(
+        updating
+          ? language === "ko"
+            ? "에이전트 이름을 입력하세요"
+            : "Name the agent"
+          : language === "ko"
+            ? "에이전트를 만들려면 이름을 입력하세요"
+            : "Add a name to create your agent",
+      );
+      expect(name).toHaveFocus();
+      expect(name).toHaveValue("");
+      expect(create).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(animation).toHaveBeenCalledOnce();
+    }
+  },
+);
+
+it("translates remote-introduction controls without remounting its retained draft or changing the explicit continue action", async () => {
+  const { agents, dialog, onClose } = setup([remoteEcho]);
+  const name = within(dialog).getByRole("textbox", { name: "Name" }),
+    reply = within(dialog).getByRole("textbox", { name: "Reply" });
+  fireEvent.change(name, { target: { value: "Create agent 한글" } });
+  fireEvent.change(reply, { target: { value: "Raw provider config" } });
+  fireEvent.click(createButton());
+  const intro = screen.getByRole("dialog", { name: "Meet your remote agent" });
+  const next = within(intro).getByRole("button", { name: "Let’s go" });
+  next.focus();
+  for (const language of ["ko", "en"] as const) {
+    act(() => setLanguage(language));
+    expect(
+      screen.getByRole("dialog", {
+        name:
+          language === "ko"
+            ? "원격 에이전트를 만나 보세요"
+            : "Meet your remote agent",
+      }),
+    ).toBe(intro);
+    expect(
+      within(intro).getByRole("button", {
+        name: language === "ko" ? "시작하기" : "Let’s go",
+      }),
+    ).toBe(next);
+    expect(next).toHaveFocus();
+    expect(name).toHaveValue("Create agent 한글");
+    expect(reply).toHaveValue("Raw provider config");
+    expect(agents.create).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  }
+  act(() => setLanguage("ko"));
+  fireEvent.click(
+    within(intro).getByRole("button", { name: "에이전트 설정으로 돌아가기" }),
+  );
+  expect(screen.getByRole("dialog", { name: "에이전트 만들기" })).toBe(intro);
+  expect(within(intro).getByRole("textbox", { name: "이름" })).toBe(name);
+  expect(name).toHaveValue("Create agent 한글");
+  expect(reply).toHaveValue("Raw provider config");
+  fireEvent.click(
+    within(intro).getByRole("button", { name: "에이전트 만들기" }),
+  );
+  fireEvent.click(within(intro).getByRole("button", { name: "시작하기" }));
+  await waitFor(() => expect(agents.create).toHaveBeenCalledOnce());
+  expect(agents.create).toHaveBeenCalledWith({
+    type: remoteEcho.key,
+    name: "Create agent 한글",
+    picture: expect.any(String),
+    config: { reply: "Raw provider config" },
+  });
+});
+
+it("keeps an open harness popup, group label nodes and keyboard selection when only their captions change language", async () => {
+  const { dialog, user, agents } = setup([remoteEcho, notes]);
+  const trigger = within(dialog).getByRole("combobox", { name: "Harness" });
+  const name = within(dialog).getByRole("textbox", { name: "Name" });
+  fireEvent.change(name, { target: { value: "Raw agent 한글" } });
+  await user.click(trigger);
+  const popup = await screen.findByRole("listbox");
+  const remote = within(popup).getByText("Remote"),
+    local = within(popup).getByText("Local");
+  const remoteOption = within(popup).getByRole("option", {
+      name: "Builderlab",
+    }),
+    localOption = within(popup).getByRole("option", { name: "Notes" });
+  await waitFor(() => expect(remoteOption).toHaveFocus());
+  await user.keyboard("{ArrowDown}");
+  await waitFor(() => expect(localOption).toHaveFocus());
+  for (const language of ["ko", "en"] as const) {
+    act(() => setLanguage(language));
+    expect(screen.getByRole("listbox")).toBe(popup);
+    expect(within(popup).getByText(language === "ko" ? "원격" : "Remote")).toBe(
+      remote,
+    );
+    expect(within(popup).getByText(language === "ko" ? "로컬" : "Local")).toBe(
+      local,
+    );
+    expect(within(popup).getByRole("option", { name: "Notes" })).toBe(
+      localOption,
+    );
+    expect(localOption).toHaveFocus();
+    expect(remoteOption).toHaveAttribute("aria-selected", "true");
+    expect(name).toHaveValue("Raw agent 한글");
+    expect(agents.create).not.toHaveBeenCalled();
+  }
+  await user.keyboard("{Enter}");
+  await waitFor(() => expect(trigger).toHaveFocus());
+  expect(trigger).toHaveTextContent("Notes");
+  expect(within(dialog).getByRole("textbox", { name: "Notes" })).toHaveValue(
+    "start",
+  );
+  fireEvent.click(createButton());
+  await waitFor(() => expect(agents.create).toHaveBeenCalledOnce());
+  expect(agents.create).toHaveBeenCalledWith({
+    type: notes.key,
+    name: "Raw agent 한글",
+    picture: expect.any(String),
+    config: { notes: "start", instructions: "Be brief." },
+  });
 });

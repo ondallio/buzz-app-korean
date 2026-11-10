@@ -14,6 +14,115 @@ import {
   ko as githubSettingsKo,
 } from "./catalogs/github-settings";
 import {
+  en as agentProviderHostEn,
+  ko as agentProviderHostKo,
+} from "./catalogs/agent-provider-host";
+import {
+  en as attachmentMediaEn,
+  ko as attachmentMediaKo,
+} from "./catalogs/attachment-media";
+import {
+  en as agentCreateEn,
+  ko as agentCreateKo,
+} from "./catalogs/agent-create";
+import {
+  en as fieldLabelsEn,
+  ko as fieldLabelsKo,
+} from "./catalogs/field-labels";
+import {
+  en as messageMediaParentEn,
+  ko as messageMediaParentKo,
+} from "./catalogs/message-media-parent";
+import {
+  en as agentModelUiEn,
+  ko as agentModelUiKo,
+} from "./catalogs/agent-model-ui";
+import {
+  en as builderlabCreateUiEn,
+  ko as builderlabCreateUiKo,
+} from "./catalogs/builderlab-create-ui";
+import {
+  en as messageRowDetailsEn,
+  ko as messageRowDetailsKo,
+} from "./catalogs/message-row-details";
+import {
+  en as builderlabLoginUiEn,
+  ko as builderlabLoginUiKo,
+} from "./catalogs/builderlab-login-ui";
+import {
+  en as builderlabSettingsUiEn,
+  ko as builderlabSettingsUiKo,
+} from "./catalogs/builderlab-settings-ui";
+import {
+  en as messageActivityGroupsEn,
+  ko as messageActivityGroupsKo,
+} from "./catalogs/message-activity-groups";
+import {
+  en as activityAccessoryEn,
+  ko as activityAccessoryKo,
+} from "./catalogs/activity-accessory";
+import {
+  en as agentSaveUiEn,
+  ko as agentSaveUiKo,
+} from "./catalogs/agent-save-ui";
+import { en as draftsSentEn, ko as draftsSentKo } from "./catalogs/drafts-sent";
+import {
+  en as codexCreateUiEn,
+  ko as codexCreateUiKo,
+} from "./catalogs/codex-create-ui";
+import {
+  en as sidebarSectionDialogsEn,
+  ko as sidebarSectionDialogsKo,
+} from "./catalogs/sidebar-section-dialogs";
+import {
+  en as claudeCreateUiEn,
+  ko as claudeCreateUiKo,
+} from "./catalogs/claude-create-ui";
+import {
+  en as sidebarSectionParentEn,
+  ko as sidebarSectionParentKo,
+} from "./catalogs/sidebar-section-parent";
+import {
+  en as unreadBadgeEn,
+  ko as unreadBadgeKo,
+} from "./catalogs/unread-badge";
+import {
+  en as sidebarUnreadNavigationEn,
+  ko as sidebarUnreadNavigationKo,
+} from "./catalogs/sidebar-unread-navigation";
+import {
+  en as unreadOptionsEn,
+  ko as unreadOptionsKo,
+} from "./catalogs/unread-options";
+import {
+  en as codexAuthUiEn,
+  ko as codexAuthUiKo,
+} from "./catalogs/codex-auth-ui";
+import {
+  en as claudeAuthUiEn,
+  ko as claudeAuthUiKo,
+} from "./catalogs/claude-auth-ui";
+import {
+  en as workflowWebhookSecretEn,
+  ko as workflowWebhookSecretKo,
+} from "./catalogs/workflow-webhook-secret";
+import {
+  en as githubBodyAttachmentEn,
+  ko as githubBodyAttachmentKo,
+} from "./catalogs/github-body-attachment";
+import {
+  en as githubReadFrameEn,
+  ko as githubReadFrameKo,
+} from "./catalogs/github-read-frame";
+import {
+  en as workflowOperationsUiEn,
+  ko as workflowOperationsUiKo,
+} from "./catalogs/workflow-operations-ui";
+import {
+  en as workflowChannelUiEn,
+  ko as workflowChannelUiKo,
+} from "./catalogs/workflow-channel-ui";
+import {
   en as directMessageEn,
   ko as directMessageKo,
 } from "./catalogs/direct-message";
@@ -126,6 +235,10 @@ import {
 } from "./catalogs/profile-editing";
 import { en as sharedUiEn, ko as sharedUiKo } from "./catalogs/shared-ui";
 import {
+  en as githubPullLinksEn,
+  ko as githubPullLinksKo,
+} from "./catalogs/github-pull-links";
+import {
   en as pluginRequestsEn,
   ko as pluginRequestsKo,
 } from "./catalogs/plugin-requests";
@@ -180,6 +293,7 @@ export const english = {
   ...mediaViewingEn,
   ...channelFormsEn,
   ...sharedUiEn,
+  ...githubPullLinksEn,
   ...emojiPickerEn,
   ...customEmojiEn,
   ...resourcePickerEn,
@@ -195,6 +309,34 @@ export const english = {
   ...huddleDiscussionEn,
   ...huddleCompanionEn,
   ...githubSettingsEn,
+  ...agentProviderHostEn,
+  ...attachmentMediaEn,
+  ...agentCreateEn,
+  ...fieldLabelsEn,
+  ...messageMediaParentEn,
+  ...agentModelUiEn,
+  ...builderlabCreateUiEn,
+  ...messageRowDetailsEn,
+  ...builderlabLoginUiEn,
+  ...builderlabSettingsUiEn,
+  ...messageActivityGroupsEn,
+  ...activityAccessoryEn,
+  ...agentSaveUiEn,
+  ...draftsSentEn,
+  ...codexCreateUiEn,
+  ...sidebarSectionDialogsEn,
+  ...claudeCreateUiEn,
+  ...sidebarSectionParentEn,
+  ...unreadBadgeEn,
+  ...sidebarUnreadNavigationEn,
+  ...unreadOptionsEn,
+  ...codexAuthUiEn,
+  ...claudeAuthUiEn,
+  ...workflowWebhookSecretEn,
+  ...githubBodyAttachmentEn,
+  ...githubReadFrameEn,
+  ...workflowOperationsUiEn,
+  ...workflowChannelUiEn,
   ...directMessageEn,
   ...agentScopeEn,
   ...relayErrorsEn,
@@ -232,6 +374,7 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...mediaViewingKo,
   ...channelFormsKo,
   ...sharedUiKo,
+  ...githubPullLinksKo,
   ...emojiPickerKo,
   ...customEmojiKo,
   ...resourcePickerKo,
@@ -247,6 +390,34 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...huddleDiscussionKo,
   ...huddleCompanionKo,
   ...githubSettingsKo,
+  ...agentProviderHostKo,
+  ...attachmentMediaKo,
+  ...agentCreateKo,
+  ...fieldLabelsKo,
+  ...messageMediaParentKo,
+  ...agentModelUiKo,
+  ...builderlabCreateUiKo,
+  ...messageRowDetailsKo,
+  ...builderlabLoginUiKo,
+  ...builderlabSettingsUiKo,
+  ...messageActivityGroupsKo,
+  ...activityAccessoryKo,
+  ...agentSaveUiKo,
+  ...draftsSentKo,
+  ...codexCreateUiKo,
+  ...sidebarSectionDialogsKo,
+  ...claudeCreateUiKo,
+  ...sidebarSectionParentKo,
+  ...unreadBadgeKo,
+  ...sidebarUnreadNavigationKo,
+  ...unreadOptionsKo,
+  ...codexAuthUiKo,
+  ...claudeAuthUiKo,
+  ...workflowWebhookSecretKo,
+  ...githubBodyAttachmentKo,
+  ...githubReadFrameKo,
+  ...workflowOperationsUiKo,
+  ...workflowChannelUiKo,
   ...directMessageKo,
   ...agentScopeKo,
   ...relayErrorsKo,

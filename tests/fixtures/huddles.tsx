@@ -620,6 +620,7 @@ function Fixture() {
           <IconButton
             variant="chrome"
             aria-label="Search Buzz"
+            data-global-search-trigger=""
             icon={<MagnifyingGlassIcon size={16} />}
           />
           <IconButton

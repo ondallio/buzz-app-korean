@@ -1,4 +1,4 @@
-/** The sidebar's navigation landmark, which scopes every scan below. */
+/** Canonical English label for the sidebar's navigation landmark. */
 export const CONVERSATION_LIST_LABEL = "Subscribed channels";
 /** What a row shows when it has unread messages or thread activity. */
 export const UNREAD_MARKERS = "[data-channel-unread], [data-channel-activity]";
@@ -16,9 +16,7 @@ const rowId = (row: HTMLElement) =>
  * sidebar, does not count: the order still exists and can be stepped through.
  */
 export function conversationRows(root: ParentNode = document) {
-  const list = root.querySelector<HTMLElement>(
-    `nav[aria-label="${CONVERSATION_LIST_LABEL}"]`,
-  );
+  const list = root.querySelector<HTMLElement>("nav[data-conversation-list]");
   if (!list) return [];
   return [...list.querySelectorAll<HTMLButtonElement>(ROWS)].filter((row) => {
     const blocked = row.closest("[hidden], [inert]");

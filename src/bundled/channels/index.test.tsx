@@ -31,7 +31,7 @@ function registered() {
   );
 }
 function sidebar(...rows: string[]) {
-  document.body.innerHTML = `<nav aria-label="Subscribed channels">${rows
+  document.body.innerHTML = `<nav data-conversation-list aria-label="Subscribed channels">${rows
     .map(
       (row) =>
         `<button data-channel-id="${row.replace("*", "")}" ${row.startsWith("*") ? 'aria-current="page"' : ""}>${row}</button>`,

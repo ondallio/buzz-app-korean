@@ -1,0 +1,41 @@
+export const en = {
+  "codexCreate.modelSettings": "Model settings",
+  "codexCreate.defaultModel": "Codex default",
+  "codexCreate.followDefault": "Following the provider's model default",
+  "codexCreate.modelUnavailable":
+    "This model isn’t available. Choose another model to continue.",
+  "codexCreate.thinking": "Thinking",
+  "codexCreate.automatic": "Automatic",
+  "codexCreate.defaultSuffix": " · Default",
+  "codexCreate.defaultOption": "{effort} · Default",
+  "codexCreate.unavailableOption": "{effort} (unavailable)",
+  "codexCreate.none": "None",
+  "codexCreate.minimal": "Minimal",
+  "codexCreate.low": "Low",
+  "codexCreate.medium": "Medium",
+  "codexCreate.high": "High",
+  "codexCreate.extraHigh": "Extra high",
+  "codexCreate.maximum": "Maximum",
+  "codexCreate.ultra": "Ultra",
+} as const;
+
+export const ko: Record<keyof typeof en, string> = {
+  "codexCreate.modelSettings": "모델 설정",
+  "codexCreate.defaultModel": "Codex 기본값",
+  "codexCreate.followDefault": "공급자의 기본 모델을 따릅니다",
+  "codexCreate.modelUnavailable":
+    "이 모델을 사용할 수 없습니다. 계속하려면 다른 모델을 선택하세요.",
+  "codexCreate.thinking": "사고",
+  "codexCreate.automatic": "자동",
+  "codexCreate.defaultSuffix": " · 기본값",
+  "codexCreate.defaultOption": "{effort} · 기본값",
+  "codexCreate.unavailableOption": "{effort} (사용 불가)",
+  "codexCreate.none": "없음",
+  "codexCreate.minimal": "최소",
+  "codexCreate.low": "낮음",
+  "codexCreate.medium": "중간",
+  "codexCreate.high": "높음",
+  "codexCreate.extraHigh": "매우 높음",
+  "codexCreate.maximum": "최대",
+  "codexCreate.ultra": "최고",
+};

@@ -1,3 +1,6 @@
+import { localMessage } from "../../shared/i18n/deferred-message";
+import { TranslatedMessage } from "../../shared/i18n/Message";
+import { t, useLanguage } from "../../shared/i18n";
 import { activityTranscript } from "../../features/agents/activity-transcript";
 import { useRecordedActivityAgents } from "../../features/conversation/typing-presentation";
 import { useToastNotification } from "../../shared/design-system/ui/Toast";
@@ -107,6 +110,7 @@ export function ActivityAccessory(props: ActivityProps) {
 function MessageActivity(
   props: ActivityProps & { stoppedAgent?: string; threadScoped?: boolean },
 ) {
+  useLanguage();
   const { session, channelId, message, canOpen, stoppedAgent } = props;
   const messageId = message?.id;
   const recorded = useRecordedActivityAgents(session, channelId, messageId);
@@ -227,6 +231,7 @@ function MessageActivity(
         agent: entry.agent,
         name: named(entry.agent),
         picture: profiles.get(entry.agent)?.picture,
+        remoteRuntime: choice?.runtime,
         remoteStatus: session.viewer
           ? remoteWorkDetail(choice?.execution, choice?.runtime)
           : undefined,
@@ -246,9 +251,7 @@ function MessageActivity(
   const section = useRef<HTMLElement>(null);
   const focusAfterRetry = () =>
     section.current
-      ?.querySelector<HTMLButtonElement>(
-        'button[aria-label^="View agent activity:"]',
-      )
+      ?.querySelector<HTMLButtonElement>("button[data-agent-activity-trigger]")
       ?.focus();
   const retained = useRef<Entry[]>([]);
   const [leaving, setLeaving] = useState<Entry[] | null>(null);
@@ -302,7 +305,7 @@ function MessageActivity(
       data-arrive="grow"
       data-leaving={shown.length ? undefined : ""}
       data-buzz-ui=""
-      aria-label="Agent activity on this message"
+      aria-label={t("activityAccessory.region")}
       aria-hidden={shown.length ? undefined : true}
     >
       <AgentResponsePreview
@@ -349,6 +352,8 @@ type Entry = {
   picture: string | undefined;
   /** Active fallback for a known remote agent without current step details. */
   remoteStatus: string | undefined;
+  /** Display provenance only; remoteStatus remains the canonical producer value. */
+  remoteRuntime: string | undefined;
   working: boolean;
   state: RequestWork["state"];
   reason: string | undefined;
@@ -373,6 +378,7 @@ function ActivityBubble({
   compact?: boolean;
   onRetried: () => void;
 }) {
+  useLanguage();
   const [expanded, setExpanded] = useState(false);
   const message = props.message;
   const controls = new Map(
@@ -408,7 +414,12 @@ function ActivityBubble({
       queueMicrotask(onRetried);
     } catch (error) {
       notify(
-        `Couldn’t retry ${entry.name}. ${error instanceof Error ? error.message : String(error)}`,
+        <TranslatedMessage
+          value={localMessage("activityGroup.retryFailed", {
+            name: entry.name,
+            reason: error instanceof Error ? error.message : String(error),
+          })}
+        />,
         "error",
       );
     }
@@ -499,6 +510,38 @@ function ActivityBubble({
           : entry.working
             ? "working"
             : "status unknown";
+  // Keep label()/stepText canonical for activity classification; only these sinks translate.
+  const displayLabel = (entry: Entry) => {
+    if (!entry.lifecycle)
+      return t(
+        entry.state === "error"
+          ? "activityAccessory.failedState"
+          : entry.state === "stopped"
+            ? "messageRow.stopped"
+            : entry.working
+              ? "activityAccessory.workingState"
+              : "activityAccessory.unknownState",
+      );
+    if (entry.state === "error" || entry.state === "unknown")
+      return entry.reason || t("activityAccessory.requestFailed");
+    if (entry.state === "stopped") return t("messageRow.stopped");
+    if (entry.state === "waiting") return t("activityAccessory.received");
+    if (entry.state === "working")
+      return entry.step ? label(entry) : t("activityAccessory.starting");
+    if (entry.state === "superseded") return t("activityAccessory.continued");
+    return t("activityAccessory.finished");
+  };
+  const summary = (remote: boolean) =>
+    entries
+      .map((entry) =>
+        t(
+          remote && entry.remoteStatus
+            ? "activityAccessory.summaryRemote"
+            : "activityAccessory.summaryEntry",
+          { name: entry.name, state: displayLabel(entry) },
+        ),
+      )
+      .join("; ");
   const failedEntries = entries.filter((entry) => entry.state === "error");
   const otherEntries = entries.filter(
     (entry) => !failedEntries.includes(entry),
@@ -559,7 +602,9 @@ function ActivityBubble({
           )}
           <WarningCircleIcon size={12} aria-hidden="true" />
           <span>
-            {failedCount === 1 ? "Couldn’t finish" : `${failedCount} failed`}
+            {failedCount === 1
+              ? t("messageRow.failed")
+              : t("activityAccessory.failedMany", { count: failedCount })}
           </span>
         </span>
       )}
@@ -580,13 +625,21 @@ function ActivityBubble({
           <div key={entry.agent} className={styles.previews}>
             {compact && (
               <p className="text-body-sm">
-                {activityOutcomeReason(entry.state, entry.reason)}
+                {entry.state === "error" && entry.reason
+                  ? activityOutcomeReason(entry.state, entry.reason)
+                  : t(
+                      entry.state === "error"
+                        ? "activityGroup.failureReason"
+                        : "activityGroup.stoppedReason",
+                    )}
               </p>
             )}
             <NavigationCard>
               <NavigationItem
                 variant="option"
-                aria-label={`View activity for ${entry.name}`}
+                aria-label={t("activityAccessory.viewFor", {
+                  name: entry.name,
+                })}
                 disabled={!target || !props.canOpen(target)}
                 onClick={() => {
                   if (
@@ -613,16 +666,25 @@ function ActivityBubble({
                     <ShimmerText
                       active={stopping || entry.working || starting(entry)}
                     >
-                      {(stopping ? "Stopping…" : undefined) ??
+                      {(stopping
+                        ? t("messageActions.typing.stopping")
+                        : undefined) ??
                         (compact
-                          ? "View activity"
+                          ? t("messageRow.viewActivity")
                           : entry.lifecycle || entry.state === "error"
-                            ? label(entry)
+                            ? displayLabel(entry)
                             : !entry.working
-                              ? "Activity interrupted or out of date"
+                              ? t("activityAccessory.interrupted")
                               : (preview?.title ??
-                                entry.remoteStatus ??
-                                "Waiting for activity details"))}
+                                (entry.remoteStatus
+                                  ? t(
+                                      entry.remoteRuntime ===
+                                        "block.builderlab/builderlab"
+                                        ? "activityAccessory.remoteBuilderlab"
+                                        : "activityAccessory.remoteMachine",
+                                    )
+                                  : entry.remoteStatus) ??
+                                t("activityAccessory.waitingDetails")))}
                     </ShimmerText>
                     {preview?.detail && (
                       <span className={styles.detail}>
@@ -640,19 +702,23 @@ function ActivityBubble({
                     <Button
                       size="sm"
                       variant="subtle"
-                      aria-label={`Retry ${entry.name}`}
+                      aria-label={t("activityGroup.retryName", {
+                        name: entry.name,
+                      })}
                       onClick={(event) => {
                         event.stopPropagation();
                         retry(entry);
                       }}
                     >
-                      Retry
+                      {t("messageActions.retry")}
                     </Button>
                   )}
                   <IconButton
                     size="sm"
                     variant="ghost"
-                    aria-label={`Dismiss error from ${entry.name}`}
+                    aria-label={t("activityGroup.dismissName", {
+                      name: entry.name,
+                    })}
                     icon={<XIcon />}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -672,7 +738,9 @@ function ActivityBubble({
                   <Button
                     size="sm"
                     variant="plain"
-                    aria-label={`Stop ${entry.name}`}
+                    aria-label={t("activityAccessory.stopName", {
+                      name: entry.name,
+                    })}
                     loading={stopping}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -688,7 +756,7 @@ function ActivityBubble({
                       className={styles.stopIcon}
                       aria-hidden="true"
                     />
-                    <span>Stop</span>
+                    <span>{t("messageActions.typing.stopLabel")}</span>
                   </Button>
                 </span>
               ) : undefined}
@@ -706,7 +774,12 @@ function ActivityBubble({
         trigger={trigger}
         container={popup}
         interactive={interactive}
-        label={`${expanded ? "Collapse" : "Show"} activity history: ${entries.map((entry) => `${entry.name}, ${label(entry)}`).join("; ")}`}
+        label={t(
+          expanded
+            ? "activityGroup.collapseHistory"
+            : "activityGroup.showHistory",
+          { summary: summary(false) },
+        )}
         summary={content}
         expandedSummary={content}
       >
@@ -740,7 +813,10 @@ function ActivityBubble({
             type="button"
             className={messageStyles.activityBubbleTrigger}
             data-activity-summary=""
-            aria-label={`View agent activity: ${entries.map((entry) => `${entry.name}, ${entry.remoteStatus ? "remote, " : ""}${label(entry)}`).join("; ")}`}
+            data-agent-activity-trigger=""
+            aria-label={t("activityAccessory.viewAgents", {
+              summary: summary(true),
+            })}
           >
             {content}
           </button>
@@ -755,7 +831,7 @@ function ActivityBubble({
         }
         side="top"
         padding="list"
-        aria-label="Agent activity"
+        aria-label={t("activityAccessory.popup")}
       >
         {expanded && details}
       </PopoverPopup>

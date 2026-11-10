@@ -7,6 +7,8 @@ export const en = {
   "settingsHost.updatesRecoveryTitle": "Software Updates",
   "settingsHost.updateStatus": "Update status",
   "settingsHost.version": "Version {version}",
+  "settingsHost.koreanBetaVersion":
+    "Korean beta {version} · based on official {source}",
   "settingsHost.updateIdle": "Check if a new version is available.",
   "settingsHost.updateChecking": "Checking for updates…",
   "settingsHost.updateLatest": "You're on the latest version.",
@@ -190,6 +192,8 @@ export const ko: Record<keyof typeof en, string> = {
   "settingsHost.updatesRecoveryTitle": "소프트웨어 업데이트",
   "settingsHost.updateStatus": "업데이트 상태",
   "settingsHost.version": "버전 {version}",
+  "settingsHost.koreanBetaVersion":
+    "한글판 베타 {version} · 공식 {source} 기반",
   "settingsHost.updateIdle": "새 버전이 있는지 확인해 보세요.",
   "settingsHost.updateChecking": "업데이트를 확인하고 있습니다…",
   "settingsHost.updateLatest": "최신 버전을 사용하고 있습니다.",

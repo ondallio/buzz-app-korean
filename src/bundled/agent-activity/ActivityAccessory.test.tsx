@@ -1,3 +1,4 @@
+import { setLanguage } from "../../shared/i18n";
 import { ActivityGroupPreview } from "../../features/messages/ActivityGroupPreview";
 // @vitest-environment jsdom
 import {
@@ -20,7 +21,7 @@ import {
 } from "@testing-library/react";
 
 import { Profiler } from "react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
   ActivityAccessory,
   ActivityTypingReplacement,
@@ -46,7 +47,9 @@ vi.mock("../../shared/design-system/ui/Toast", async (original) => ({
   useToastNotification: () => notify,
 }));
 
+beforeEach(() => setLanguage("en"));
 afterEach(() => {
+  setLanguage("en");
   cleanup();
   notify.mockReset();
   vi.useRealTimers();
@@ -1393,10 +1396,17 @@ it("says why a failed request could not be retried, keeping it to try again or d
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry Blossom" }));
     expect(retry).toHaveBeenCalledOnce();
-    expect(notify).toHaveBeenCalledExactlyOnceWith(
+    expect(notify).toHaveBeenCalledOnce();
+    expect(notify.mock.calls[0]?.[1]).toBe("error");
+    const toast = render(notify.mock.calls[0]?.[0]);
+    expect(toast.container).toHaveTextContent(
       "Couldn’t retry Blossom. Blossom isn't running here.",
-      "error",
     );
+    act(() => setLanguage("ko"));
+    expect(toast.container).toHaveTextContent(
+      "Blossom 다시 시도에 실패했습니다. Blossom isn't running here.",
+    );
+    act(() => setLanguage("en"));
     expect(screen.getByText("Provider unavailable")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Retry Blossom" }),
@@ -2213,6 +2223,421 @@ it.each([
       expect(local).not.toHaveAccessibleName(/remote/);
       expect(within(local).queryByText("Remote")).not.toBeInTheDocument();
     } finally {
+      f.dispose();
+    }
+  },
+);
+
+it.each(["en", "ko"] as const)(
+  "hands focused Retry to its replacement live trigger in %s",
+  async (language) => {
+    const local = createLocalAgentActivity();
+    const f = fixture(local);
+    const base = f.props.session.agentActivity;
+    const retryRequest = vi.fn(base.retry),
+      dismiss = vi.fn(base.dismissError);
+    const session = {
+      ...f.props.session,
+      agentActivity: { ...base, retry: retryRequest, dismissError: dismiss },
+    };
+    const again = vi.fn(() => void begin());
+    function begin() {
+      return local.begin(
+        {
+          scope: "test",
+          channelId: "c",
+          threadRootId: root,
+          messageId: root,
+          agent: A,
+        },
+        again,
+      );
+    }
+    const view = render(<ActivityAccessory {...f.props} session={session} />);
+    try {
+      act(() =>
+        begin().finish({
+          ok: false,
+          error: "Opaque Provider unavailable 한글",
+        }),
+      );
+      openBubble();
+      const button = screen.getByRole("button", { name: "Retry Blossom" });
+      button.focus();
+      act(() => setLanguage(language));
+      expect(button).toHaveAccessibleName(
+        language === "ko" ? "Blossom 다시 시도" : "Retry Blossom",
+      );
+      fireEvent.click(button);
+      await act(async () => vi.runAllTicks());
+      const replacement = screen.getByRole("button", {
+        name:
+          language === "ko"
+            ? "에이전트 활동 보기: Blossom, 요청 받음 · 시작 대기 중"
+            : "View agent activity: Blossom, Received · waiting to start",
+      });
+      expect(replacement).toHaveFocus();
+      expect(replacement).toHaveAttribute("aria-expanded", "false");
+      expect(retryRequest).toHaveBeenCalledExactlyOnceWith(A, "c", root);
+      expect(again).toHaveBeenCalledOnce();
+      expect(dismiss).not.toHaveBeenCalled();
+      expect(f.props.open).not.toHaveBeenCalled();
+      expect(notify).not.toHaveBeenCalled();
+      expect(local.reader.work()).toEqual([
+        expect.objectContaining({
+          scope: "test",
+          channelId: "c",
+          messageId: root,
+          threadRootId: root,
+          agent: A,
+          state: "waiting",
+        }),
+      ]);
+      expect(
+        screen.queryByText("Opaque Provider unavailable 한글"),
+      ).not.toBeInTheDocument();
+    } finally {
+      view.unmount();
+      f.dispose();
+    }
+  },
+);
+
+it.each([
+  "",
+  "Could not finish this request",
+  "Starting",
+  "Raw diagnostic 한글 {name}",
+])(
+  "keeps normalized and supplied reasons raw while owned failure controls translate: %s",
+  (reason) => {
+    const local = createLocalAgentActivity(),
+      f = fixture(local);
+    const view = render(<ActivityAccessory {...f.props} />);
+    try {
+      act(() =>
+        local
+          .begin({
+            scope: "test",
+            channelId: "c",
+            threadRootId: root,
+            messageId: root,
+            agent: A,
+          })
+          .finish({ ok: false, error: reason }),
+      );
+      const trigger = screen.getByRole("button", {
+        name: `Show activity history: Blossom, ${reason || "Could not finish this request"}`,
+      });
+      fireEvent.click(trigger);
+      const item = screen.getByRole("button", {
+        name: "View activity for Blossom",
+      });
+      item.focus();
+      act(() => setLanguage("ko"));
+      expect(
+        screen.getByRole("region", { name: "이 메시지의 에이전트 활동" }),
+      ).toBeVisible();
+      expect(screen.getByRole("button", { name: "Blossom 활동 보기" })).toBe(
+        item,
+      );
+      expect(item).toHaveFocus();
+      expect(trigger).toHaveAccessibleName(
+        `활동 기록 접기: Blossom, ${reason || "Could not finish this request"}`,
+      );
+      expect(
+        screen.getByText(reason || "Could not finish this request"),
+      ).toBeVisible();
+      expect(
+        screen.getByRole("button", { name: "Blossom의 오류 닫기" }),
+      ).toBeEnabled();
+      expect(
+        screen.queryByRole("button", { name: "Blossom 다시 시도" }),
+      ).not.toBeInTheDocument();
+      expect(local.reader.work()[0]).toMatchObject({
+        state: "error",
+        error: reason || "Could not finish this request",
+      });
+      expect(f.props.open).not.toHaveBeenCalled();
+      act(() => setLanguage("en"));
+      expect(trigger).toHaveAccessibleName(
+        `Collapse activity history: Blossom, ${reason || "Could not finish this request"}`,
+      );
+    } finally {
+      view.unmount();
+      f.dispose();
+    }
+  },
+);
+
+it("keeps local state and canonical Sending-a-message classification while finite captions update", async () => {
+  const local = createLocalAgentActivity(),
+    f = fixture(local);
+  const work = local.begin({
+    scope: "test",
+    channelId: "c",
+    threadRootId: root,
+    messageId: root,
+    agent: A,
+  });
+  const view = render(<ActivityAccessory {...f.props} />);
+  try {
+    const trigger = screen.getByRole("button", {
+      name: "View agent activity: Blossom, Received · waiting to start",
+    });
+    fireEvent.click(trigger);
+    await act(async () => vi.advanceTimersToNextFrame());
+    const item = screen.getByRole("button", {
+      name: "View activity for Blossom",
+    });
+    item.focus();
+    act(() => setLanguage("ko"));
+    expect(item).toHaveTextContent("요청 받음 · 시작 대기 중");
+    expect(item).toHaveFocus();
+    expect(trigger).toHaveAccessibleName(
+      "에이전트 활동 보기: Blossom, 요청 받음 · 시작 대기 중",
+    );
+    act(() => work.started());
+    expect(item).toHaveTextContent("시작 중");
+    expect(local.reader.work()[0]?.state).toBe("working");
+    act(() => work.step("send_message"));
+    expect(trigger).toHaveAccessibleName(
+      "에이전트 활동 보기: Blossom, Sending a message",
+    );
+    expect(
+      within(trigger).queryByText("Sending a message"),
+    ).not.toBeInTheDocument();
+    act(() => work.step("Read", "Starting {name}.txt"));
+    expect(item).toHaveTextContent("Reading Starting {name}.txt");
+    expect(local.reader.work()[0]?.step).toEqual({
+      tool: "Read",
+      target: "Starting {name}.txt",
+    });
+    expect(screen.getByRole("button", { name: "Blossom 활동 보기" })).toBe(
+      item,
+    );
+    expect(f.props.open).not.toHaveBeenCalled();
+  } finally {
+    view.unmount();
+    f.dispose();
+  }
+});
+
+it.each([
+  [
+    "block.builderlab/builderlab",
+    "Running remotely on Builderlab…",
+    "Builderlab에서 원격으로 실행 중…",
+  ],
+  [
+    "other/provider",
+    "Running on a remote machine…",
+    "원격 컴퓨터에서 실행 중…",
+  ],
+] as const)(
+  "projects only known remote work provenance without translating a supplied Agent name: %s",
+  async (runtime, en, ko) => {
+    const f = fixture();
+    const base = f.props.session.agentChoices;
+    const choices = {
+      ...base.snapshot(),
+      identities: [
+        {
+          pubkey: B,
+          name: "Agent",
+          managed: false,
+          execution: "remote",
+          runtime,
+        },
+      ],
+    };
+    Object.assign(f.props.session, {
+      agentChoices: { ...base, snapshot: () => choices },
+    });
+    f.profiles.set(B, { name: "Agent", isAgent: true });
+    const view = render(<ActivityAccessory {...f.props} />);
+    try {
+      f.send(B, "remote", 1, "turn_started", { triggeringEventIds: [root] });
+      const trigger = screen.getByRole("button", {
+        name: "View agent activity: Agent, remote, working",
+      });
+      fireEvent.click(trigger);
+      await act(async () => vi.advanceTimersToNextFrame());
+      const dialog = screen.getByRole("dialog", { name: "Agent activity" });
+      const item = screen.getByRole("button", {
+        name: "View activity for Agent",
+      });
+      expect(item).toHaveTextContent(en);
+      item.focus();
+      act(() => setLanguage("ko"));
+      expect(screen.getByRole("dialog", { name: "에이전트 활동" })).toBe(
+        dialog,
+      );
+      expect(trigger).toHaveAccessibleName(
+        "에이전트 활동 보기: Agent, 원격, 작업 중",
+      );
+      expect(screen.getByRole("button", { name: "Agent 활동 보기" })).toBe(
+        item,
+      );
+      expect(item).toHaveTextContent(ko);
+      expect(item).toHaveFocus();
+      expect(choices.identities[0]).toMatchObject({
+        name: "Agent",
+        execution: "remote",
+        runtime,
+      });
+      expect(f.props.open).not.toHaveBeenCalled();
+      act(() => setLanguage("en"));
+      expect(item).toHaveTextContent(en);
+    } finally {
+      view.unmount();
+      f.dispose();
+    }
+  },
+);
+
+it("localizes the failed count while preserving each raw error and exact dismiss boundary", () => {
+  const local = createLocalAgentActivity(),
+    f = fixture(local);
+  const view = render(<ActivityAccessory {...f.props} />);
+  try {
+    act(() => {
+      for (const agent of [A, B])
+        local
+          .begin({
+            scope: "test",
+            channelId: "c",
+            threadRootId: root,
+            messageId: root,
+            agent,
+          })
+          .finish({ ok: false, error: agent === A ? "Raw A" : "Raw B" });
+    });
+    const trigger = screen.getByRole("button", {
+      name: "Show activity history: Blossom, Raw A; Bubbles, Raw B",
+    });
+    expect(trigger).toHaveTextContent("2 failed");
+    fireEvent.click(trigger);
+    act(() => setLanguage("ko"));
+    expect(trigger).toHaveTextContent("접기");
+    expect(screen.getByText("2개 실패")).toBeVisible();
+    expect(trigger).toHaveAccessibleName(
+      "활동 기록 접기: Blossom, Raw A; Bubbles, Raw B",
+    );
+    const dismiss = screen.getByRole("button", { name: "Blossom의 오류 닫기" });
+    fireEvent.click(dismiss);
+    expect(local.reader.work().find((row) => row.agent === A)?.dismissed).toBe(
+      true,
+    );
+    expect(
+      local.reader.work().find((row) => row.agent === B)?.dismissed,
+    ).toBeUndefined();
+    expect(screen.getByText("Raw B")).toBeVisible();
+    expect(f.props.open).not.toHaveBeenCalled();
+  } finally {
+    view.unmount();
+    f.dispose();
+  }
+});
+
+it.each([undefined, ""])(
+  "projects an actually absent/empty reason at the typed snapshot boundary without English matching: %s",
+  (reason) => {
+    const f = fixture(),
+      base = f.props.session.agentActivity;
+    const raw = {
+      scope: "test",
+      channelId: "c",
+      threadRootId: root,
+      messageId: root,
+      agent: A,
+      state: "error" as const,
+      startedAt: 1,
+      ...(reason === undefined ? {} : { error: reason }),
+    };
+    const snapshot = { ...base.snapshot(), local: [raw] };
+    const session = {
+      ...f.props.session,
+      agentActivity: { ...base, snapshot: () => snapshot },
+    };
+    const view = render(<ActivityAccessory {...f.props} session={session} />);
+    try {
+      const trigger = screen.getByRole("button", {
+        name: "Show activity history: Blossom, Could not finish this request",
+      });
+      fireEvent.click(trigger);
+      act(() => setLanguage("ko"));
+      expect(trigger).toHaveAccessibleName(
+        "활동 기록 접기: Blossom, 이 요청을 완료하지 못했습니다",
+      );
+      expect(
+        screen.getByText(
+          "요청을 완료하기 전에 종료되었습니다. 새 스레드에서 다시 시도하거나 다른 모델을 선택하세요.",
+        ),
+      ).toBeVisible();
+      expect(snapshot.local).toEqual([raw]);
+      expect(f.props.open).not.toHaveBeenCalled();
+    } finally {
+      view.unmount();
+      f.dispose();
+    }
+  },
+);
+
+it.each([false, true])(
+  "keeps Korean pending Stop and user-moved-focus ownership unchanged: %s",
+  async (moved) => {
+    const local = createLocalAgentActivity(),
+      f = fixture(local);
+    let release = () => {};
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const stop = vi.fn(() => pending);
+    const view = render(
+      <>
+        <button type="button">Other task</button>
+        <ActivityAccessory {...f.props} />
+      </>,
+    );
+    try {
+      act(() =>
+        local
+          .begin({
+            scope: "test",
+            channelId: "c",
+            threadRootId: root,
+            messageId: root,
+            agent: A,
+          })
+          .interruptible(stop),
+      );
+      openBubble();
+      await act(async () => vi.advanceTimersToNextFrame());
+      const button = screen.getByRole("button", { name: "Stop Blossom" });
+      button.focus();
+      act(() => setLanguage("ko"));
+      expect(screen.getByRole("button", { name: "Blossom 중지" })).toBe(button);
+      fireEvent.click(button);
+      expect(stop).toHaveBeenCalledOnce();
+      expect(button).toHaveAttribute("aria-disabled", "true");
+      expect(screen.getByText("중지 중…")).toBeVisible();
+      const other = screen.getByRole("button", { name: "Other task" });
+      if (moved) act(() => other.focus());
+      await act(async () => release());
+      await act(async () => vi.runAllTicks());
+      expect(button).not.toBeInTheDocument();
+      const outcome = screen.getByRole("button", {
+        name: "활동 기록 접기: Blossom, 중지됨",
+      });
+      expect(outcome).toHaveAttribute("aria-expanded", "true");
+      expect(moved ? other : outcome).toHaveFocus();
+      expect(local.reader.work()[0]?.state).toBe("stopped");
+      expect(stop).toHaveBeenCalledOnce();
+      expect(f.props.open).not.toHaveBeenCalled();
+    } finally {
+      await act(async () => release());
+      view.unmount();
       f.dispose();
     }
   },

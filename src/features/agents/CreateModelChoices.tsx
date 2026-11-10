@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { Button } from "../../shared/design-system/ui/Button";
 import { ModelPicker, type ModelChoice } from "./ModelPicker";
 
@@ -37,6 +38,7 @@ export function CreateModelChoices({
   error?: string;
   retry?: () => void;
 }) {
+  useLanguage();
   return (
     <>
       <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
@@ -53,7 +55,7 @@ export function CreateModelChoices({
         />
         {error && retry && (
           <Button size="sm" disabled={loading || disabled} onClick={retry}>
-            Try again
+            {t("app.retry")}
           </Button>
         )}
       </div>

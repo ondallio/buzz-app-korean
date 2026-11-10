@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const sourceRepo = "block/buzz-app";
-const destination = "ondallio/buzz-korean";
+const destination = "ondallio/buzz-app-korean";
 const endpoint = `https://github.com/${destination}/releases/download/korean-beta-feed/latest.json`;
 const officialFeed = `https://github.com/${sourceRepo}/releases/download/preview-feed/latest.json`;
 const number = "(0|[1-9][0-9]*)";

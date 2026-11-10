@@ -1,3 +1,9 @@
+import { t, useLanguage } from "../../../shared/i18n";
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../../shared/i18n/deferred-message";
 import {
   useEffect,
   useLayoutEffect,
@@ -71,6 +77,7 @@ export function createCreationFields(
     harnessControl: ReactNode;
     onReadyChange?: (ready: boolean) => void;
   }) {
+    useLanguage();
     const draft = config as CreationConfig;
     const login = useSyncExternalStore(session.subscribe, session.snapshot);
     const [catalog, setCatalog] = useState<
@@ -78,7 +85,7 @@ export function createCreationFields(
     >();
     const loaded = catalog?.login === login ? catalog : undefined;
     const models = loaded?.models;
-    const [error, setError] = useState("");
+    const [error, setError] = useState<DisplayMessage>("");
     const [revision, setRevision] = useState(0);
     const controls = useRef<HTMLDivElement>(null);
     // biome-ignore lint/correctness/useExhaustiveDependencies: revision retries catalog loading without changing the draft.
@@ -96,7 +103,7 @@ export function createCreationFields(
             setError(
               reason instanceof Error
                 ? reason.message
-                : "Could not load models.",
+                : localMessage("builderlabCreate.catalogFallback"),
             );
         },
       );
@@ -166,10 +173,13 @@ export function createCreationFields(
         <SettingsGroup>
           {harnessControl}
           <ModelFamilyMenu
-            label="Model"
+            label={t("agentCreate.model")}
             align="end"
             selected={
               model ? modelChoice(model) : { id: "", label: "Choose a model" }
+            }
+            selectionLabel={
+              model ? undefined : t("builderlabCreate.chooseModel")
             }
             models={(models ?? []).map(modelChoice)}
             disabled={choicesDisabled}
@@ -184,13 +194,13 @@ export function createCreationFields(
             }}
           />
           <Select
-            label="Thinking"
+            label={t("agentCreate.thinking")}
             variant="preference"
             align="end"
             name="builderlab-effort"
             required
             value={supported ? draft.reasoningEffort : ""}
-            placeholder="Choose thinking"
+            placeholder={t("builderlabCreate.chooseThinking")}
             disabled={choicesDisabled || !model || !!wrongAccount}
             groups={[
               {
@@ -208,8 +218,7 @@ export function createCreationFields(
         </SettingsGroup>
         {signedIn && wrongAccount && (
           <p role="status" className="m-0 text-body-sm text-secondary">
-            These choices belong to another Builderlab account. Choose a model
-            and thinking level again.
+            {t("builderlabCreate.wrongAccount")}
           </p>
         )}
         {signedIn && !models?.length && (
@@ -218,8 +227,8 @@ export function createCreationFields(
             className={`m-0 text-body-sm ${error ? "text-danger" : "text-secondary"}`}
           >
             {models
-              ? "No models are available. Retry when the catalog is available."
-              : error || "Loading models…"}
+              ? t("builderlabCreate.emptyCatalog")
+              : resolveMessage(error) || t("agentModel.loadingModels")}
           </p>
         )}
         {login.status === "signed-in" && (error || models?.length === 0) && (
@@ -228,7 +237,7 @@ export function createCreationFields(
               disabled={disabled}
               onClick={() => setRevision((value) => value + 1)}
             >
-              Retry models
+              {t("builderlabCreate.retryModels")}
             </Button>
           </div>
         )}

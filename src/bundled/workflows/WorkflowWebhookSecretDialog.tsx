@@ -3,6 +3,13 @@ import { Button } from "../../shared/design-system/ui/Button";
 import { Dialog } from "../../shared/design-system/ui/Dialog";
 import { ConfirmAction } from "./ConfirmAction";
 import { writeClipboardText } from "../../shared/clipboard";
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  localMessage,
+  resolveMessage,
+  type LocalMessage,
+} from "../../shared/i18n/deferred-message";
+import { rich } from "../../shared/i18n/rich";
 
 /** Shown when the user leaves before revealing or copying; the relay cannot re-issue the secret. */
 export const continueWithoutSecret = {
@@ -28,12 +35,16 @@ export function WorkflowWebhookSecretDialog({
   take: () => string | undefined;
   onContinue: () => void;
 }) {
+  useLanguage();
   const id = useId();
   const [secret, setSecret] = useState<string>();
   const [revealed, setRevealed] = useState(false);
   const [handled, setHandled] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [notice, setNotice] = useState<{ text: string; error: boolean }>();
+  const [notice, setNotice] = useState<{
+    text: LocalMessage;
+    error: boolean;
+  }>();
   const taken = useRef(false);
   useEffect(() => {
     // StrictMode re-runs mount effects on the same instance; the ref keeps the
@@ -47,16 +58,21 @@ export function WorkflowWebhookSecretDialog({
     try {
       await writeClipboardText(value);
       setNotice({
-        text: `${label === "URL" ? "URL" : "Secret"} copied.`,
+        text: localMessage(
+          label === "URL"
+            ? "workflowSecret.urlCopied"
+            : "workflowSecret.secretCopied",
+        ),
         error: false,
       });
       if (label === "secret") setHandled(true);
     } catch {
       setNotice({
-        text:
+        text: localMessage(
           label === "secret"
-            ? "Couldn’t copy the secret. Reveal it and copy it manually."
-            : "Couldn’t copy the URL. Select it and copy it manually.",
+            ? "workflowSecret.secretCopyFailed"
+            : "workflowSecret.urlCopyFailed",
+        ),
         error: true,
       });
     }
@@ -73,17 +89,17 @@ export function WorkflowWebhookSecretDialog({
         onOpenChange={(open) => {
           if (!open) leave();
         }}
-        title="Webhook ready"
-        description="This private secret is shown once and cannot be recovered. Copy and store it before continuing."
+        title={t("workflowSecret.title")}
+        description={t("workflowSecret.description")}
         actions={
           <Button variant="primary" onClick={leave}>
-            Continue
+            {t("workflowSecret.continue")}
           </Button>
         }
       >
         <div className="workflow-secret">
           <p id={`${id}-url`} className="text-label-sm">
-            Webhook URL
+            {t("workflowSecret.url")}
           </p>
           {hookUrl ? (
             <div className="workflow-secret-row">
@@ -94,17 +110,18 @@ export function WorkflowWebhookSecretDialog({
                 {hookUrl}
               </code>
               <Button size="compact" onClick={() => void copy(hookUrl, "URL")}>
-                Copy URL
+                {t("workflowSecret.copyUrl")}
               </Button>
             </div>
           ) : (
             <p className="text-body-sm text-secondary">
-              The relay’s HTTP address is unavailable from this host. Send
-              requests to <code>/hooks/{workflowId}</code> on the relay.
+              {rich("workflowSecret.noAddress", {
+                path: <code>/hooks/{workflowId}</code>,
+              })}
             </p>
           )}
           <p id={`${id}-secret`} className="text-label-sm">
-            X-Webhook-Secret header
+            {t("workflowSecret.header")}
           </p>
           <div className="workflow-secret-row">
             <code
@@ -112,7 +129,7 @@ export function WorkflowWebhookSecretDialog({
               data-testid="webhook-secret"
             >
               {secret === undefined
-                ? "Unavailable"
+                ? t("workflowSecret.unavailable")
                 : revealed
                   ? secret
                   : "•".repeat(24)}
@@ -120,7 +137,9 @@ export function WorkflowWebhookSecretDialog({
             <Button
               size="compact"
               aria-label={
-                revealed ? "Hide webhook secret" : "Reveal webhook secret"
+                revealed
+                  ? t("workflowSecret.hideLabel")
+                  : t("workflowSecret.revealLabel")
               }
               disabled={secret === undefined}
               onClick={() => {
@@ -128,7 +147,7 @@ export function WorkflowWebhookSecretDialog({
                 setHandled(true);
               }}
             >
-              {revealed ? "Hide" : "Reveal"}
+              {revealed ? t("workflowSecret.hide") : t("workflowSecret.reveal")}
             </Button>
             <Button
               size="compact"
@@ -137,12 +156,12 @@ export function WorkflowWebhookSecretDialog({
                 secret !== undefined && void copy(secret, "secret")
               }
             >
-              Copy secret
+              {t("workflowSecret.copySecret")}
             </Button>
           </div>
           {secret === undefined && (
             <p role="alert" className="text-body-sm text-danger">
-              This secret is no longer available from this session.
+              {t("workflowSecret.gone")}
             </p>
           )}
           {notice && (
@@ -150,7 +169,7 @@ export function WorkflowWebhookSecretDialog({
               role="status"
               className={`text-body-sm ${notice.error ? "text-danger" : "text-secondary"}`}
             >
-              {notice.text}
+              {resolveMessage(notice.text)}
             </p>
           )}
         </div>
@@ -158,6 +177,10 @@ export function WorkflowWebhookSecretDialog({
       {confirming && (
         <ConfirmAction
           {...continueWithoutSecret}
+          title={t("workflowSecret.leaveTitle")}
+          description={t("workflowSecret.leaveDescription")}
+          action={t("workflowSecret.continue")}
+          cancel={t("workflowSecret.goBack")}
           onCancel={() => setConfirming(false)}
           onConfirm={() => {
             setConfirming(false);

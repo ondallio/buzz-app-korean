@@ -1,13 +1,10 @@
+import { t, useLanguage } from "../../../shared/i18n";
+import { rich } from "../../../shared/i18n/rich";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { Header } from "../../../shared/design-system/ui/Header";
 import { Button } from "../../../shared/design-system/ui/Button";
 import { brokerBuilderlab } from "../dev-session";
 import { nativeBuilderlab, type BuilderlabSession } from "../session";
-
-const kept = () =>
-  brokerBuilderlab()
-    ? "Your sign-in stays on the development server through app reloads, until you sign out or the session expires."
-    : "Buzz keeps your sign-in in your system keychain until you sign out.";
 
 export function Login({
   session,
@@ -15,7 +12,7 @@ export function Login({
   active,
   showHeading = true,
   cancelOnUnmount = true,
-  unavailableReason = "Open the Buzz desktop app to sign in with Builderlab.",
+  unavailableReason = t("builderlabLogin.desktopRequired"),
   openIdentity,
 }: {
   session: BuilderlabSession;
@@ -28,6 +25,7 @@ export function Login({
   /** Opens Identity, where an FI build's shared organization sign-in ends. */
   openIdentity?: (() => void) | undefined;
 }) {
+  useLanguage();
   const state = useSyncExternalStore(
     session.subscribe,
     session.snapshot,
@@ -52,8 +50,16 @@ export function Login({
   }, [showsIdentity]);
   const intro =
     state.status === "signed-in"
-      ? kept()
-      : `Connect your Builderlab account. ${kept()}`;
+      ? t(
+          brokerBuilderlab()
+            ? "builderlabLogin.brokerSignedIn"
+            : "builderlabLogin.nativeSignedIn",
+        )
+      : t(
+          brokerBuilderlab()
+            ? "builderlabLogin.brokerSignedOut"
+            : "builderlabLogin.nativeSignedOut",
+        );
   return (
     <div data-buzz-ui="" className="flex flex-col items-start gap-4">
       {showHeading ? (
@@ -69,14 +75,16 @@ export function Login({
         <>
           <p role="status" className="text-body-sm text-secondary">
             {state.checking
-              ? "Checking your Builderlab sign-in…"
+              ? t("builderlabCreate.checking")
               : state.status === "pending"
-                ? "Finish sign-in in your browser, then return to Buzz."
+                ? t("builderlabLogin.finishBrowser")
                 : state.account
                   ? state.account.email
-                    ? `Signed in as ${state.account.email}.`
-                    : "Signed in to Builderlab."
-                  : "Sign in securely in your browser."}
+                    ? t("builderlabLogin.signedInEmail", {
+                        email: state.account.email,
+                      })
+                    : t("builderlabLogin.signedIn")
+                  : t("builderlabLogin.secureBrowser")}
           </p>
           {state.error && (
             <p role="alert" className="text-body-sm text-danger">
@@ -87,22 +95,22 @@ export function Login({
             // The native session is shared with community sign-in, so it
             // ends only where that sign-in is managed.
             <p className="m-0 text-body-sm text-secondary">
-              Builderlab uses your organization sign-in. To sign out, go to{" "}
-              {openIdentity ? (
-                <Button
-                  ref={identityLink}
-                  variant="link"
-                  size="inline"
-                  onClick={() => {
-                    if (active()) openIdentity();
-                  }}
-                >
-                  Identity → Organization sign-in
-                </Button>
-              ) : (
-                "Identity → Organization sign-in"
-              )}
-              .
+              {rich("builderlabLogin.organization", {
+                link: openIdentity ? (
+                  <Button
+                    ref={identityLink}
+                    variant="link"
+                    size="inline"
+                    onClick={() => {
+                      if (active()) openIdentity();
+                    }}
+                  >
+                    {t("builderlabLogin.organizationLink")}
+                  </Button>
+                ) : (
+                  t("builderlabLogin.organizationLink")
+                ),
+              })}
             </p>
           ) : (
             <Button
@@ -123,12 +131,12 @@ export function Login({
               }}
             >
               {state.checking
-                ? "Checking sign-in"
+                ? t("builderlabLogin.checkingAction")
                 : state.status === "pending"
-                  ? "Cancel sign-in"
+                  ? t("accessDialogs.cancelSignIn")
                   : state.status === "signed-in"
-                    ? "Sign out"
-                    : "Sign in with Builderlab"}
+                    ? t("accessDialogs.signOut")
+                    : t("identityMore.signInBuilderlab")}
             </Button>
           )}
         </>

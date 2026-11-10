@@ -14,6 +14,7 @@ import { PreferenceRow } from "../../shared/design-system/ui/PreferenceRow";
 import { SettingsGroup } from "../../shared/design-system/ui/SettingsGroup";
 import { ProviderDialog } from "./ProviderDialog";
 import type { PageNavigation } from "../../features/navigation/service";
+import { t, useLanguage } from "../../shared/i18n";
 
 export function AgentDefaults({
   agents,
@@ -24,6 +25,7 @@ export function AgentDefaults({
   navigation?: PageNavigation | undefined;
   onProvider?: ((provider?: string) => void) | undefined;
 }) {
+  useLanguage();
   const types = useSyncExternalStore(
     agents.subscribe,
     agents.types,
@@ -41,7 +43,7 @@ export function AgentDefaults({
   }, [types]);
   return (
     <div className="mt-section-gap">
-      <InlineHeader title="Harness defaults" />
+      <InlineHeader title={t("agentProviderHost.defaults")} />
       <SettingsGroup>
         {types.map((type) => {
           if (!type.provider) return null;
@@ -52,9 +54,11 @@ export function AgentDefaults({
                 <Button
                   size="sm"
                   disabled
-                  aria-label={`${type.title}, unavailable`}
+                  aria-label={t("agentProviderHost.unavailableName", {
+                    provider: type.title,
+                  })}
                 >
-                  Unavailable
+                  {t("agentProviderHost.unavailable")}
                 </Button>
               }
             />
@@ -116,7 +120,8 @@ function ProviderDefaults({
   }
   const label =
     state.readiness === "attention"
-      ? (state.attentionLabel ?? `Set up ${type.title}`)
+      ? (state.attentionLabel ??
+        t("agentProviderHost.setup", { provider: type.title }))
       : type.title;
   const Icon = type.icon;
   const DefaultControl = provider.DefaultControl;
@@ -160,7 +165,9 @@ function ProviderDefaults({
               }}
               className="flex flex-wrap items-center gap-2"
             >
-              <span className="text-body-sm text-subtle">Default model</span>
+              <span className="text-body-sm text-subtle">
+                {t("agentProviderHost.defaultModel")}
+              </span>
               <DefaultControl
                 onConfigure={() => {
                   setOpen(true);
@@ -173,7 +180,9 @@ function ProviderDefaults({
                 focusTarget.current = node;
               }}
               size="sm"
-              aria-label={`${label}, ${state.readiness}`}
+              aria-label={t(`agentProviderHost.${state.readiness}Name`, {
+                label,
+              })}
               aria-describedby={description["aria-describedby"]}
               aria-busy={checking || undefined}
               disabled={checking}
@@ -187,10 +196,10 @@ function ProviderDefaults({
                 />
               )}
               {checking
-                ? "Checking…"
+                ? t("agentProviderHost.checking")
                 : state.readiness === "attention"
                   ? label
-                  : "Edit configuration"}
+                  : t("agentProviderHost.edit")}
             </Button>
           );
         }}

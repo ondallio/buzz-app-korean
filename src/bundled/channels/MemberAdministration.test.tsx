@@ -345,6 +345,8 @@ it.each([
 
 it("cancels an addition from the split menu and retains the search and keyboard focus", async () => {
   const t = await setup("owner", "absent");
+  const members = screen.getByRole("dialog");
+  const search = screen.getByRole("searchbox");
   await t.user.type(screen.getByRole("searchbox"), "Morgan");
   const trigger = await screen.findByRole("button", {
     name: /^Add Morgan .* as$/,
@@ -364,12 +366,26 @@ it("cancels an addition from the split menu and retains the search and keyboard 
   await t.user.click(
     screen.getByRole("button", { name: /^Add Morgan .* as$/ }),
   );
+  // Pointer opening is scheduled on the menu's next animation frame.
+  const reopened = await screen.findByRole("menu");
+  await vi.waitFor(() => {
+    expect(reopened).toBeVisible();
+    expect(reopened.contains(document.activeElement)).toBe(true);
+    expect(
+      screen.getByRole("button", { name: /^Add Morgan .* as$/ }),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
   await t.user.keyboard("{Escape}");
   await vi.waitFor(() =>
     expect(
       screen.getByRole("button", { name: /^Add Morgan .* as$/ }),
     ).toHaveFocus(),
   );
+  expect(screen.getByRole("dialog")).toBe(members);
+  expect(members).toBeInTheDocument();
+  expect(screen.getByRole("searchbox")).toBe(search);
+  expect(search).toHaveValue("Morgan");
+  expect(t.publish).not.toHaveBeenCalled();
 });
 
 it.each(["member", "guest"])(

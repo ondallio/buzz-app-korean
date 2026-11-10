@@ -7,6 +7,7 @@ import { EmptyState } from "../../shared/design-system/ui/EmptyState";
 import { ArrowsClockwiseIcon } from "../../shared/design-system/icons";
 import { Header } from "../../shared/design-system/ui/Header";
 import type { Updates } from "./updates";
+import { koreanBetaSource } from "./korean-beta";
 
 export function UpdateSettings({
   updates,
@@ -74,7 +75,10 @@ export function UpdateSettings({
         icon={<ArrowsClockwiseIcon />}
         title={
           version
-            ? t("settingsHost.version", { version })
+            ? t("settingsHost.koreanBetaVersion", {
+                version,
+                source: koreanBetaSource,
+              })
             : t("settingsHost.updateStatus")
         }
         description={

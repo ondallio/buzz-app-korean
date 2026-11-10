@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "repository": "ondallio/buzz-korean",
+  "repository": "ondallio/buzz-app-korean",
   "identifier": "io.github.ondallio.buzz-korean-beta",
   "platform": "darwin-aarch64",
   "version": "0.7.0-korean.1",
-  "endpoint": "https://github.com/ondallio/buzz-korean/releases/download/korean-beta-feed/latest.json",
+  "endpoint": "https://github.com/ondallio/buzz-app-korean/releases/download/korean-beta-feed/latest.json",
   "publicKey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdBRjFCMTlDOUJCOEFGRTYKUldUbXI3aWJuTEh4ZXBSczBxMlFHOWRzbEZ2UjNtU084RmZ2dVI4NE4vUjFURitBRGpZYjBqY00K",
   "source": {
     "repository": "block/buzz-app",

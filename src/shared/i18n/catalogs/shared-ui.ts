@@ -1,4 +1,5 @@
 export const en = {
+  "panels.close": "Close {label} panel",
   "tabs.close": "Close {label} tab",
   "tabs.actions": "Actions for {label} tab",
   "tabs.rename": "Rename tab",
@@ -29,6 +30,7 @@ export const en = {
 } as const;
 
 export const ko: Record<keyof typeof en, string> = {
+  "panels.close": "{label} 패널 닫기",
   "tabs.close": "{label} 탭 닫기",
   "tabs.actions": "{label} 탭 작업",
   "tabs.rename": "탭 이름 바꾸기",

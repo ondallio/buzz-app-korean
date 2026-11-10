@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import type { RelayData } from "../relay/service";
 import { useChannelList, useRelayConnection } from "../relay/react";
 import { CountBadge } from "../../shared/design-system/ui/CountBadge";
@@ -7,6 +8,7 @@ import { listed } from "./scope";
 
 /** Sidebar count of unsent drafts in the current community. */
 export function DraftsSentBadge({ relay }: { relay: RelayData }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const session =
     connection.status === "ready" ? connection.session : undefined;
@@ -21,7 +23,12 @@ export function DraftsSentBadge({ relay }: { relay: RelayData }) {
     <span className={styles.badge}>
       <CountBadge
         count={count}
-        label={`${count} draft${count === 1 ? "" : "s"}`}
+        label={t(
+          count === 1
+            ? "draftsSent.page.draftCountOne"
+            : "draftsSent.page.draftCountMany",
+          { count },
+        )}
       />
     </span>
   ) : null;

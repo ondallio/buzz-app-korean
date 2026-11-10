@@ -5507,10 +5507,22 @@ export class AgentsService extends Service implements Agents {
     this.reading.set(origin, binding);
     const { session, viewer, controller } = binding;
     try {
-      const events = await session.read(
-        [{ kinds: [30177], authors: [viewer], limit: 500 }],
-        { signal: controller.signal, priority: "background", fresh: true },
-      );
+      const readOwner = () =>
+        session.read([{ kinds: [30177], authors: [viewer], limit: 500 }], {
+          signal: controller.signal,
+          priority: "background",
+          fresh: true,
+        });
+      const events = await readOwner().catch((error: unknown) => {
+        if (
+          !(error instanceof Error || error instanceof DOMException) ||
+          error.name !== "AbortError" ||
+          controller.signal.aborted ||
+          this.bound.get(origin)?.binding !== binding
+        )
+          throw error;
+        return readOwner();
+      });
       if (this.bound.get(origin)?.binding !== binding) return;
       const edits = this.edits.get(origin);
       const read = listingsOf(events, viewer).filter(

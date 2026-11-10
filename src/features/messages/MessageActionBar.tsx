@@ -355,6 +355,7 @@ function MessageActionBarControls({
             {onReply && (
               <IconButton
                 hint={replyDisabled ? "helpful" : "familiar"}
+                data-message-reply=""
                 aria-label={t("messages.action.reply")}
                 title={
                   replyDisabled

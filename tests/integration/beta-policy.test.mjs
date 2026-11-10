@@ -222,7 +222,7 @@ test("follows only one official asset hop to the exact public release CDN", asyn
   assert.equal(count, 2);
 });
 
-test("generates an updater-enabled release overlay with matching public compile inputs", () => {
+test("generates an updater-enabled release overlay with matching public compile inputs", async () => {
   const result = betaReleaseConfig(channel);
   assert.equal(result.config.identifier, channel.identifier);
   assert.equal(result.config.version, channel.version);
@@ -234,6 +234,19 @@ test("generates an updater-enabled release overlay with matching public compile 
     `buzz-${channel.identifier}`,
   ]);
   assert.equal(result.config.bundle.createUpdaterArtifacts, true);
+  const base = JSON.parse(
+    await readFile(
+      new URL("../../src-tauri/tauri.conf.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.deepEqual(
+    result.config.app.windows,
+    base.app.windows.map((window) => ({
+      ...window,
+      title: `Buzz Korean Beta ${channel.version}`,
+    })),
+  );
   assert.deepEqual(result.environment, {
     BUZZ_DISTRIBUTION_ID: channel.identifier,
     BUZZ_UPDATER_PUBLIC_KEY: channel.publicKey,

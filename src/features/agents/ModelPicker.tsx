@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 // A type's model choice, shared by agent types for the New agent dialog and
 // their settings. Each type decides whether its catalog accepts custom IDs.
 import {
@@ -91,6 +92,7 @@ export function CustomModelDialog({
   onClose(): void;
   finalFocus?: ComponentProps<typeof Dialog>["finalFocus"];
 }) {
+  useLanguage();
   const [model, setModel] = useState(initialValue);
   const input = useRef<HTMLInputElement>(null);
   const form = useId();
@@ -101,20 +103,20 @@ export function CustomModelDialog({
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      title="Custom model"
+      title={t("agentModel.custom")}
       headerGap="compact"
       initialFocus={input}
       finalFocus={finalFocus}
       actions={
         <>
-          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={onClose}>{t("messages.cancel")}</Button>
           <Button
             form={form}
             type="submit"
             variant="prominent"
             disabled={!model.trim()}
           >
-            Use model
+            {t("agentModel.useModel")}
           </Button>
         </>
       }
@@ -128,11 +130,11 @@ export function CustomModelDialog({
           if (value) onSubmit(value);
         }}
       >
-        <Field label="Model ID" labelVisibility="hidden">
+        <Field label={t("agentModel.modelID")} labelVisibility="hidden">
           <Input
             ref={input}
             value={model}
-            placeholder="Enter a model ID"
+            placeholder={t("agentModel.enterID")}
             required
             autoCorrect="off"
             autoCapitalize="none"
@@ -147,7 +149,7 @@ export function CustomModelDialog({
 
 /** `value` is a model ID, or "" for the type's default, `defaultLabel`. */
 export function ModelPicker({
-  label = "Model",
+  label = t("agentCreate.model"),
   groupByFamily = false,
   leading,
   onConfigure,
@@ -197,6 +199,7 @@ export function ModelPicker({
   disabled?: boolean;
   description?: string | undefined;
 }) {
+  useLanguage();
   const [customModel, setCustomModel] = useState<string | null>(null);
   const control = useRef<HTMLDivElement>(null);
   const defaultChoice = models.find((model) => model.id === defaultModel);
@@ -215,7 +218,9 @@ export function ModelPicker({
     listed.push({
       id: value,
       label: value,
-      description: allowCustomModel ? "Custom model" : "Unavailable model",
+      description: t(
+        allowCustomModel ? "agentModel.custom" : "agentModel.unavailable",
+      ),
       unlisted: true,
     });
   // The default takes part in telling names apart, even when it is not a row.
@@ -228,7 +233,7 @@ export function ModelPicker({
     shown.find((model) => model.id === (value || defaultModel)) ?? shownDefault;
   const inherited = value === "";
   const selectedLabel = inherited
-    ? `${selected.label} · Default`
+    ? t("agentModel.modelDefault", { model: selected.label })
     : selected.label;
   const discovering = loading && !pending;
   const choices =
@@ -275,6 +280,9 @@ export function ModelPicker({
             selected={
               discovering ? { ...selected, label: "Loading models…" } : selected
             }
+            selectionLabel={
+              discovering ? t("agentModel.loadingModels") : undefined
+            }
             defaultChoice={includeDefault ? shownDefault : undefined}
             disabled={disabled}
             loading={loading || pending}
@@ -286,9 +294,17 @@ export function ModelPicker({
           <Select
             label={label}
             value={selected.id}
-            valueLabel={discovering ? "Loading models…" : selected.label}
-            valueSuffix={!discovering && inherited ? " · Default" : undefined}
-            valueTitle={discovering ? "Loading models…" : selectedLabel}
+            valueLabel={
+              discovering ? t("agentModel.loadingModels") : selected.label
+            }
+            valueSuffix={
+              !discovering && inherited
+                ? ` · ${t("agentModel.default")}`
+                : undefined
+            }
+            valueTitle={
+              discovering ? t("agentModel.loadingModels") : selectedLabel
+            }
             leading={modelLogo(`${selected.id} ${selected.label}`)}
             variant={compact ? "compact" : "preference"}
             appearance={appearance}
@@ -300,10 +316,15 @@ export function ModelPicker({
                 options: choices.map((model, index) => ({
                   value: model.id,
                   label:
-                    includeDefault && model.id === ""
-                      ? `${model.label} · Default`
-                      : model.label,
-                  description: model.description,
+                    model === CUSTOM_MODEL_ACTION
+                      ? t("agentModel.custom")
+                      : includeDefault && model.id === ""
+                        ? t("agentModel.modelDefault", { model: model.label })
+                        : model.label,
+                  description:
+                    model === CUSTOM_MODEL_ACTION
+                      ? t("agentModel.enterID")
+                      : model.description,
                   // The empty fragment reserves Select's icon column only in mixed lists.
                   leading: hasOptionLogos
                     ? (optionLogos[index] ?? <></>)
@@ -321,7 +342,7 @@ export function ModelPicker({
         )}
         {!groupByFamily && onEffortChange && efforts && efforts.length > 1 && (
           <Select
-            label="Thinking effort"
+            label={t("agentModel.thinkingEffort")}
             value={effort ?? ""}
             valueLabel={effortLabel}
             variant={compact ? "compact" : "preference"}

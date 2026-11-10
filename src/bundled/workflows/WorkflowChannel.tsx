@@ -20,7 +20,7 @@ import { Button } from "../../shared/design-system/ui/Button";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
 import { ConfirmAction } from "./ConfirmAction";
 import { WorkflowEditor } from "./WorkflowEditor";
-import { messages, WorkflowOperations } from "./WorkflowOperations";
+import { WorkflowOperations } from "./WorkflowOperations";
 import { WorkflowRuns } from "./WorkflowRuns";
 import { saveAwaitsReadback } from "./WorkflowLanding";
 import { exactSaveReadback } from "./editor-model";
@@ -31,6 +31,12 @@ import {
   type ChannelLabel,
   channelIcon,
 } from "../../features/channels/channel-icon";
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 
 type Draft = {
   editorKey: number;
@@ -76,6 +82,7 @@ export function WorkflowChannel({
   onClose: () => void;
   onDelete: (definition: WorkflowDefinition) => void;
 }) {
+  useLanguage();
   const { snapshot, refresh } = useWorkflowView(
     useCallback(
       () => capability.definitions(channelId),
@@ -97,7 +104,7 @@ export function WorkflowChannel({
     WorkflowDefinition | "new" | "close" | null
   >(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<DisplayMessage | null>(null);
   const [createdRun, setCreatedRun] = useState<string>();
   const [runRequest, setRunRequest] = useState<string>();
   const operation = draft?.operationId
@@ -236,7 +243,7 @@ export function WorkflowChannel({
       setError(
         cause instanceof Error
           ? cause.message
-          : "The workflow could not be submitted. Your draft is retained.",
+          : localMessage("workflowChannel.submitFailed"),
       );
     }
   };
@@ -255,8 +262,8 @@ export function WorkflowChannel({
       setConfirmDelete(false);
       setError(
         capability.availability.delete
-          ? "You no longer have permission to delete this workflow. Refresh and try again."
-          : "Workflow deletion is unavailable on this connection.",
+          ? localMessage("workflowChannel.deletePermissionLost")
+          : localMessage("workflowChannel.deleteUnavailable"),
       );
       return;
     }
@@ -289,7 +296,9 @@ export function WorkflowChannel({
     } catch (cause) {
       submission.current = null;
       setError(
-        cause instanceof Error ? cause.message : "Run could not be submitted.",
+        cause instanceof Error
+          ? cause.message
+          : localMessage("workflowChannel.runFailed"),
       );
     }
   };
@@ -308,46 +317,45 @@ export function WorkflowChannel({
     // A created run rereads the history behind the Runs tab.
     if (active.runId) setCreatedRun(active.runId);
   }, [operations]);
+  const errorText = resolveMessage(error);
   let blocked: string | undefined;
   if (!capability.availability.save)
-    blocked = "Saving is unavailable from this host.";
+    blocked = t("workflowChannel.saveUnavailable");
   else if (unresolvedWrite && !draft?.operationId)
     blocked = unresolved.every((item) => item.action === "trigger")
-      ? messages.trigger.pending
-      : "Check saved configuration or review Recent activity before continuing.";
+      ? t("workflowOperations.trigger.pending")
+      : t("workflowChannel.checkSaved");
   else if (draft?.operationId)
     blocked =
       operation?.outcome === "succeeded"
-        ? "Configuration saved; waiting for a readback of this exact revision. Check saved configuration or review the current version in Recent activity."
+        ? t("workflowChannel.awaitingReadback")
         : operation?.outcome === "rejected"
-          ? "Draft retained. Review the error below before continuing."
+          ? t("workflowChannel.rejectedDraft")
           : undefined;
-  if (!snapshot) return <p role="status">Reading configurations…</p>;
+  if (!snapshot) return <p role="status">{t("workflowChannel.reading")}</p>;
   const ChannelIcon = channelIcon(channel);
   return (
-    <section aria-label={`Workflows in ${channel.name}`}>
+    <section aria-label={t("workflowChannel.region", { name: channel.name })}>
       {snapshot.status === "loading" && !snapshot.data.items.length && (
-        <p role="status">Reading configurations…</p>
+        <p role="status">{t("workflowChannel.reading")}</p>
       )}
       {snapshot.status === "idle" && (
-        <p role="status">Configurations cleared. Refresh to read again.</p>
+        <p role="status">{t("workflowChannel.cleared")}</p>
       )}
       {snapshot.status === "unavailable" && (
-        <p role="status">Workflow definitions are unavailable.</p>
+        <p role="status">{t("workflowChannel.definitionsUnavailable")}</p>
       )}
       {snapshot.status === "error" && (
         <p role="alert" className="text-danger">
-          {snapshot.error ??
-            "Configurations could not be read. Use Refresh configurations to retry."}
+          {snapshot.error ?? t("workflowChannel.readFailed")}
         </p>
       )}
       {snapshot.data.partial && (
-        <p className="text-secondary">This is a bounded, partial list.</p>
+        <p className="text-secondary">{t("workflowChannel.partial")}</p>
       )}
       {!capability.availability.save && (
         <p role="status" className="text-secondary">
-          Creating and saving workflows is unavailable from this host. You can
-          browse saved configurations, but cannot save changes here yet.
+          {t("workflowChannel.readOnlyHost")}
         </p>
       )}
       {draft &&
@@ -375,8 +383,8 @@ export function WorkflowChannel({
             run={
               !readonly && (
                 <IconButton
-                  aria-label="Run now"
-                  title="Run now"
+                  aria-label={t("workflowChannel.runNow")}
+                  title={t("workflowChannel.runNow")}
                   disabled={
                     dirty ||
                     !!draft.operationId ||
@@ -405,12 +413,11 @@ export function WorkflowChannel({
                     <MenuIcon>
                       <TrashIcon size={14} />
                     </MenuIcon>
-                    Delete workflow
+                    {t("workflowChannel.delete")}
                   </MenuItem>
                   {!canDelete && (
                     <MenuNote id={deleteReasonId}>
-                      Only the author or their verified agent owner can delete
-                      this workflow.
+                      {t("workflowChannel.authorOnly")}
                     </MenuNote>
                   )}
                 </>
@@ -434,33 +441,32 @@ export function WorkflowChannel({
                   <div className="workflow-options">
                     {snapshot.status === "error" ? (
                       <p role="alert" className="text-danger">
-                        {snapshot.error ??
-                          "Configurations could not be read. Refresh to retry."}
+                        {snapshot.error ?? t("workflowChannel.readFailedShort")}
                       </p>
                     ) : (
-                      <p role="status">Reading configurations…</p>
+                      <p role="status">{t("workflowChannel.reading")}</p>
                     )}
                     <Button
                       disabled={snapshot.status === "loading"}
                       onClick={() => void refresh()}
                     >
-                      Refresh configurations
+                      {t("workflowChannel.refresh")}
                     </Button>
                   </div>
                 )}
                 {!capability.availability.delete && (
                   <p className="text-body-sm text-secondary">
-                    You can't delete workflows here.
+                    {t("workflowChannel.noDelete")}
                   </p>
                 )}
-                {error && (
+                {errorText && (
                   <p role="alert" className="text-danger">
-                    {error}
+                    {errorText}
                   </p>
                 )}
                 {runOperation?.outcome === "succeeded" && (
                   <p role="status" className="text-body-sm text-secondary">
-                    {messages.trigger.succeeded}
+                    {t("workflowOperations.trigger.succeeded")}
                   </p>
                 )}
                 {operation?.outcome === "rejected" && (
@@ -471,7 +477,7 @@ export function WorkflowChannel({
                       setDraft(rest);
                     }}
                   >
-                    Continue editing retained draft
+                    {t("workflowChannel.continueEditing")}
                   </Button>
                 )}
                 <WorkflowOperations
@@ -492,17 +498,18 @@ export function WorkflowChannel({
             details={
               <>
                 <p className="text-body-sm text-subtle">
-                  Unsaved changes stay in this editor. Leaving or reloading
-                  discards them without cancelling submitted operations.
+                  {t("workflowChannel.unsaved")}
                 </p>
                 {draft.original && (
                   <details>
-                    <summary>Configuration details</summary>
+                    <summary>{t("workflowChannel.details")}</summary>
                     <p className="text-mono-sm workflow-key">
-                      Owner: {draft.original.owner}
+                      {t("workflowChannel.owner", { id: draft.original.owner })}
                     </p>
                     <p className="text-mono-sm workflow-key">
-                      Revision: {draft.original.revision}
+                      {t("workflowChannel.revision", {
+                        id: draft.original.revision,
+                      })}
                     </p>
                   </details>
                 )}
@@ -511,9 +518,10 @@ export function WorkflowChannel({
           >
             {pendingSelection && (
               <ConfirmAction
-                title="Leave this draft?"
-                description="Unsaved draft changes will be discarded. Any submitted operation stays with the captured community session; leaving does not cancel or repeat it."
-                action="Leave draft"
+                title={t("workflowChannel.leaveTitle")}
+                description={t("workflowChannel.leaveDescription")}
+                action={t("workflowChannel.leaveAction")}
+                cancel={t("workflowChannel.keepEditing")}
                 destructive
                 onConfirm={() => open(pendingSelection)}
                 onCancel={() => setPendingSelection(null)}
@@ -521,12 +529,12 @@ export function WorkflowChannel({
             )}
             {confirmDelete && (
               <ConfirmAction
-                title="Delete this workflow?"
-                description="The saved workflow may remain visible. Work already running may continue."
-                action="Delete workflow"
-                cancel="Cancel"
+                title={t("workflowChannel.deleteTitle")}
+                description={t("workflowChannel.deleteDescription")}
+                action={t("workflowChannel.delete")}
+                cancel={t("workflowChannel.cancel")}
                 destructive
-                error={error}
+                error={errorText}
                 onConfirm={remove}
                 onCancel={() => setConfirmDelete(false)}
               />

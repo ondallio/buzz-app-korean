@@ -1,3 +1,10 @@
+import { t, useLanguage } from "../../../shared/i18n";
+import {
+  errorMessage,
+  localError,
+  localMessage,
+} from "../../../shared/i18n/deferred-message";
+import { TranslatedMessage } from "../../../shared/i18n/Message";
 import {
   useEffect,
   useId,
@@ -31,24 +38,20 @@ import { SignInAction } from "./SignInAction";
 import { effortLabel, modelChoice } from "./models";
 
 const statuses = {
-  "setup-required": "Choose a model and thinking level to finish setup.",
-  "model-unavailable":
-    "The saved model is no longer available. Choose another model and thinking level.",
-  "effort-unsupported":
-    "The saved thinking level is no longer supported. Choose a supported level.",
-  unknown:
-    "The server has not confirmed the saved model selection. Choose a model and thinking level.",
-};
+  "setup-required": "builderlabSettings.setupRequired",
+  "model-unavailable": "builderlabSettings.modelUnavailable",
+  "effort-unsupported": "builderlabSettings.effortUnsupported",
+  unknown: "builderlabSettings.unknownSelection",
+} as const;
+const fallback = localMessage("builderlabSettings.fallback");
 const message = (reason: unknown) =>
   reason instanceof Error
-    ? reason.message
+    ? errorMessage(reason)
     : typeof reason === "string"
       ? reason
-      : "Could not load model settings.";
+      : fallback;
 const accessDenied = (reason: unknown) =>
   reason instanceof Error && "status" in reason && reason.status === 403;
-const accountMismatchMessage =
-  "Sign in to the Builderlab account that loaded these settings.";
 
 export function ModelSettings({
   client,
@@ -65,6 +68,7 @@ export function ModelSettings({
     | { agent: RemoteAgent; subject: string; email?: string }
     | { pending: boolean; error: unknown; retry(): void };
 }) {
+  useLanguage();
   const login = useSyncExternalStore(session.subscribe, session.snapshot);
   const [retrySignIn, setRetrySignIn] = useState<
     "switching" | "waiting" | "ready"
@@ -180,9 +184,9 @@ export function ModelSettings({
     setError("");
     try {
       if (session.credential().account.subject !== subject)
-        throw new Error(accountMismatchMessage);
+        throw localError("builderlabSettings.accountMismatch");
       if (saved.status !== "Active")
-        throw new Error("Only Active agents can have their settings edited.");
+        throw localError("builderlabSettings.activeOnly");
       if (saveModel && instructionsChanged)
         await client.configure(
           saved.pubkey,
@@ -205,15 +209,19 @@ export function ModelSettings({
         (row) => row.pubkey === saved.pubkey,
       );
       signal.throwIfAborted();
-      if (!remote)
-        throw new Error("Agent not found in this Builderlab account.");
+      if (!remote) throw localError("builderlabSettings.notFound");
       // Model readback must not replace the instructions draft with an omitted
       // or stale value. Only model fields need server validity confirmation.
       setSaved({ ...remote, instructions });
       setModelId(remote.modelId ?? "");
       setEffort(remote.reasoningEffort ?? "");
       if (remote.modelSelectionStatus === "valid")
-        notify("Model preferences saved", "success");
+        notify(
+          <TranslatedMessage
+            value={localMessage("builderlabSettings.saved")}
+          />,
+          "success",
+        );
     } catch (reason) {
       if (!signal.aborted && session.snapshot().status === "signed-in")
         setError(reason);
@@ -239,19 +247,27 @@ export function ModelSettings({
           ? "Still loading…"
           : "…"
         : "—";
+  const placeholderLabel =
+    login.status === "signed-in" && pending && slow
+      ? t("builderlabSettings.stillLoading")
+      : placeholder;
   const failure = hasAccess ? loadError || error || catalogError : "";
   return (
     <LoadingRegion
       pending={pending}
-      label={agent ? "Loading models…" : "Loading settings…"}
+      label={
+        agent
+          ? t("agentModel.loadingModels")
+          : t("builderlabSettings.loadingSettings")
+      }
       statusVisibility="screen-reader"
       feedback={
         hasAccess && !failure && slow && pending ? (
           <div className="grid justify-items-start gap-2">
             <p role="status" className="m-0 text-body-sm text-secondary">
               {agent
-                ? "Models are taking longer to load."
-                : "Settings are taking longer to load."}
+                ? t("builderlabSettings.modelsSlow")
+                : t("builderlabSettings.settingsSlow")}
             </p>
             <Button
               onClick={() => {
@@ -259,7 +275,9 @@ export function ModelSettings({
                 else setRevision((value) => value + 1);
               }}
             >
-              {agent ? "Retry models" : "Retry"}
+              {agent
+                ? t("builderlabCreate.retryModels")
+                : t("builderlabCreate.retry")}
             </Button>
           </div>
         ) : undefined
@@ -283,9 +301,20 @@ export function ModelSettings({
               ? "Couldn’t save changes"
               : "Couldn’t load models"
         }
+        titleLabel={t(
+          loadError
+            ? "builderlabSettings.loadSettingsTitle"
+            : error
+              ? "builderlabSettings.saveTitle"
+              : "builderlabSettings.loadModelsTitle",
+        )}
         message={message(failure)}
         action={{
-          label: loadError ? "Retry" : error ? "Try again" : "Retry models",
+          label: loadError
+            ? t("builderlabCreate.retry")
+            : error
+              ? t("builderlabSettings.tryAgain")
+              : t("builderlabCreate.retryModels"),
           disabled: loadError ? false : error ? disabled : busy,
           run: () => {
             if (loadError && "retry" in settings) settings.retry();
@@ -304,11 +333,17 @@ export function ModelSettings({
       >
         {hasAccess && saved && saved.modelSelectionStatus !== "valid" && (
           <p role="status" className="m-0 text-body-sm text-warning">
-            {statuses[saved.modelSelectionStatus ?? "unknown"]}
+            {t(statuses[saved.modelSelectionStatus ?? "unknown"])}
             {saved.modelId &&
-              ` Saved model: ${models?.find((choice) => choice.id === saved.modelId)?.displayName ?? saved.modelId}.`}
+              t("builderlabSettings.savedModel", {
+                model:
+                  models?.find((choice) => choice.id === saved.modelId)
+                    ?.displayName ?? saved.modelId,
+              })}
             {saved.reasoningEffort &&
-              ` Saved thinking: ${effortLabel(saved.reasoningEffort)}.`}
+              t("builderlabSettings.savedThinking", {
+                effort: effortLabel(saved.reasoningEffort),
+              })}
           </p>
         )}
         <SettingsGroup>
@@ -327,7 +362,7 @@ export function ModelSettings({
               <div>
                 {harnessControl?.(action) ?? (
                   <PreferenceRow
-                    title="Harness"
+                    title={t("agentCreate.harness")}
                     trailing={
                       <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                         <span className="flex min-w-0 items-center gap-2">
@@ -341,7 +376,7 @@ export function ModelSettings({
                 )}
                 {login.status === "signed-out" && !waitingToRetry && (
                   <p className="m-0 pb-3 text-body-sm text-secondary">
-                    Sign in to edit settings. You can still message this agent.
+                    {t("builderlabSettings.signInHint")}
                   </p>
                 )}
                 {feedback && <div className="pb-3">{feedback}</div>}
@@ -349,7 +384,7 @@ export function ModelSettings({
             )}
           />
           <ModelFamilyMenu
-            label="Model"
+            label={t("agentCreate.model")}
             align="end"
             selected={
               model
@@ -359,6 +394,13 @@ export function ModelSettings({
                     label: models?.length ? "Choose a model" : placeholder,
                   }
             }
+            selectionLabel={
+              model
+                ? undefined
+                : models?.length
+                  ? t("builderlabCreate.chooseModel")
+                  : placeholderLabel
+            }
             models={(models ?? []).map(modelChoice)}
             disabled={busy || !models?.length}
             onChange={(next) => {
@@ -367,11 +409,15 @@ export function ModelSettings({
             }}
           />
           <Select
-            label="Thinking"
+            label={t("agentCreate.thinking")}
             variant="preference"
             align="end"
             value={valid ? effort : ""}
-            placeholder={models?.length ? "Choose thinking" : placeholder}
+            placeholder={
+              models?.length
+                ? t("builderlabCreate.chooseThinking")
+                : placeholderLabel
+            }
             disabled={busy || !model}
             groups={[
               {
@@ -386,7 +432,7 @@ export function ModelSettings({
         </SettingsGroup>
         {hasAccess && models?.length === 0 && (
           <p className="m-0 text-body-sm text-secondary">
-            No models are available. Retry when the catalog is available.
+            {t("builderlabCreate.emptyCatalog")}
           </p>
         )}
         <AnimatePresence initial={false}>
@@ -401,10 +447,10 @@ export function ModelSettings({
               transition={{ duration: reducedMotion ? 0 : 0.22 }}
             >
               <Field
-                label="Instructions"
+                label={t("agentCreate.instructions")}
                 error={
                   hasAccess && !validInstructions(instructions)
-                    ? "Use text or leave this empty."
+                    ? t("builderlabSettings.invalidInstructions")
                     : undefined
                 }
               >
@@ -432,7 +478,7 @@ export function ModelSettings({
               disabled={busy}
               onClick={() => setRevision((value) => value + 1)}
             >
-              Retry models
+              {t("builderlabCreate.retryModels")}
             </Button>
           </div>
         )}

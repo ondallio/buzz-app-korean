@@ -8,6 +8,8 @@
 // names and shapes when changing it.
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Field } from "../../shared/design-system/ui/Field";
 import { Input } from "../../shared/design-system/ui/Input";
@@ -17,9 +19,6 @@ import type { ClaudeSetup } from "./setup";
 
 const NO_KEY =
   "Claude needs an Anthropic API key. Add one in Settings → Agent setup → Harness defaults → Claude → Edit configuration.";
-/** What setup says first: the key is one for all of Claude, not per agent. */
-const KEY_ONCE =
-  "Claude requires an API key to connect to your account. Create one at console.anthropic.com and paste it below. You only have to set this up once, and Buzz keeps it securely on this computer.";
 const REJECTED_KEY =
   "Anthropic rejected the Claude API key. It may have been revoked or run out of credit. Paste a working key in Settings → Agent setup → Harness defaults → Claude → Edit configuration.";
 
@@ -209,10 +208,13 @@ export function SignIn({
   variant?: "full" | "compact";
   onSaved?: (() => void) | undefined;
 }) {
+  useLanguage();
   return (
     <div className="grid gap-3">
       {/* One paragraph says it all; the field adds no description of its own. */}
-      <p className="m-0 text-body-sm text-secondary">{KEY_ONCE}</p>
+      <p className="m-0 text-body-sm text-secondary">
+        {t("claudeAuthUi.keyOnce")}
+      </p>
       <KeyForm
         setup={setup}
         disabled={disabled}
@@ -232,10 +234,11 @@ export function SignedIn({
   setup: ClaudeSetup;
   onSaved?: (() => void) | undefined;
 }) {
+  useLanguage();
   return (
     <div className="grid gap-2">
       <p className="m-0 text-body-sm text-subtle">
-        Claude runs with your Anthropic API key.
+        {t("claudeAuthUi.signedIn")}
       </p>
       <KeyForm setup={setup} replace onSaved={onSaved} />
     </div>
@@ -249,24 +252,22 @@ export function Missing({
 }: {
   openSettings?: (() => void) | undefined;
 }) {
+  useLanguage();
   return (
     <p className="m-0 text-body-sm text-secondary">
-      Claude is missing an API key.{" "}
-      {openSettings ? (
-        <>
-          Head to{" "}
-          <button
-            type="button"
-            className={inlineStyles.link}
-            onClick={openSettings}
-          >
-            Settings
-          </button>{" "}
-          to add one.
-        </>
-      ) : (
-        "Add one in Settings → Agent setup."
-      )}
+      {openSettings
+        ? rich("claudeAuthUi.missingSettings", {
+            settings: (
+              <button
+                type="button"
+                className={inlineStyles.link}
+                onClick={openSettings}
+              >
+                {t("navigation.settings")}
+              </button>
+            ),
+          })
+        : t("claudeAuthUi.missing")}
     </p>
   );
 }
@@ -284,6 +285,7 @@ function KeyForm({
   replace?: boolean;
   onSaved?: (() => void) | undefined;
 }) {
+  useLanguage();
   const [key, setKey] = useState("");
   const [saving, setSaving] = useState<AbortController>();
   // Kept until the form closes.
@@ -312,10 +314,11 @@ function KeyForm({
     // Not a form: it sits inside agent creation's and Settings' own.
     <div className="grid gap-2" aria-busy={saving ? true : undefined}>
       <Field
-        label={replace ? "Replace API key" : "Anthropic API key"}
+        label={
+          replace ? t("claudeAuthUi.replaceKey") : t("claudeAuthUi.apiKey")
+        }
         {...(replace && {
-          description:
-            "Create a key at console.anthropic.com. Buzz keeps it securely on this computer and gives it only to Claude, so commands your Claude agents run can read it.",
+          description: t("claudeAuthUi.replaceDescription"),
         })}
       >
         <Input
@@ -342,7 +345,7 @@ function KeyForm({
           loading={!!saving}
           onClick={() => void save()}
         >
-          Save key
+          {t("claudeAuthUi.saveKey")}
         </Button>
         {saved && (
           <p

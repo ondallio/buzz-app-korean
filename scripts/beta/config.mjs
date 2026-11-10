@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { koreanDesktopConfig } from "../korean-desktop-config.mjs";
@@ -8,10 +9,24 @@ import { validateChannel } from "./policy.mjs";
 export function betaReleaseConfig(channel) {
   validateChannel(channel);
   const config = koreanDesktopConfig(channel.identifier);
+  // Tauri merges --config as a JSON merge patch, which replaces arrays whole,
+  // so carry every base window field and change only its title.
+  const base = JSON.parse(
+    readFileSync(
+      new URL("../../src-tauri/tauri.conf.json", import.meta.url),
+      "utf8",
+    ),
+  );
   return {
     config: {
       ...config,
       version: channel.version,
+      app: {
+        windows: base.app.windows.map((window) => ({
+          ...window,
+          title: `${config.productName} ${channel.version}`,
+        })),
+      },
       bundle: { createUpdaterArtifacts: true },
       plugins: {
         ...config.plugins,

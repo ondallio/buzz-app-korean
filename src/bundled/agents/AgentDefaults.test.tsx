@@ -9,7 +9,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { registerNavigationShortcuts } from "../../app/shortcuts";
@@ -26,8 +26,15 @@ import { createMemoryHistory } from "../../features/navigation/history";
 import type { PageNavigation } from "../../features/navigation/service";
 import { ShortcutsService } from "../../features/shortcuts/service";
 import { AgentDefaults } from "./AgentDefaults";
+import { setLanguage } from "../../shared/i18n";
+import { ProviderDialogActions } from "../../features/agents/ProviderDialogActions";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  setLanguage("en");
+  localStorage.clear();
+  vi.restoreAllMocks();
+});
 
 function fixture(initial: AgentProviderSnapshot = { readiness: "ready" }) {
   let state = initial;
@@ -219,3 +226,290 @@ it.each(["Escape", "Close"])(
     expect(screen.queryByRole("button")).toBeNull();
   },
 );
+
+it("keeps the ready provider control and pending readiness check through live locale changes", async () => {
+  const { agents, check } = fixture();
+  let finish: () => void = () => {
+    throw new Error("Missing check gate");
+  };
+  check.mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  render(<AgentDefaults agents={agents} />);
+  const control = screen.getByRole("button", { name: "Echo, ready" });
+  control.focus();
+  try {
+    for (const language of ["ko", "en"] as const) {
+      act(() => setLanguage(language));
+      expect(
+        screen.getByRole("button", {
+          name: language === "ko" ? "Echo, 준비됨" : "Echo, ready",
+        }),
+      ).toBe(control);
+      expect(control).toHaveTextContent(
+        language === "ko" ? "설정 편집" : "Edit configuration",
+      );
+      expect(
+        screen.getByRole("heading", {
+          name: language === "ko" ? "하네스 기본값" : "Harness defaults",
+        }),
+      ).toBeVisible();
+      expect(control).toHaveFocus();
+      expect(control).toBeEnabled();
+      expect(check).toHaveBeenCalledOnce();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    }
+  } finally {
+    await act(async () => finish());
+  }
+});
+
+it.each(["checking", "attention"] as const)(
+  "keeps %s raw readiness and contribution captions without rechecking or dispatching an action on locale",
+  (readiness) => {
+    const { agents, type, check } = fixture({
+      readiness,
+      attentionLabel: "Edit configuration",
+    });
+    const attention = vi.fn();
+    Object.assign(type.provider, { attentionAction: attention });
+    render(<AgentDefaults agents={agents} />);
+    const control = screen.getByRole("button", {
+      name:
+        readiness === "checking"
+          ? "Echo, checking"
+          : "Edit configuration, attention",
+    });
+    for (const language of ["ko", "en"] as const) {
+      act(() => setLanguage(language));
+      const expected =
+        readiness === "checking"
+          ? language === "ko"
+            ? "Echo, 확인 중"
+            : "Echo, checking"
+          : language === "ko"
+            ? "Edit configuration, 확인 필요"
+            : "Edit configuration, attention";
+      expect(screen.getByRole("button", { name: expected })).toBe(control);
+      expect(control).toHaveTextContent(
+        readiness === "attention"
+          ? "Edit configuration"
+          : language === "ko"
+            ? "확인 중…"
+            : "Checking…",
+      );
+      expect(control).toHaveProperty("disabled", readiness === "checking");
+      expect(type.provider.snapshot().readiness).toBe(readiness);
+      expect(check).toHaveBeenCalledOnce();
+      expect(attention).not.toHaveBeenCalled();
+    }
+    if (readiness === "attention") {
+      fireEvent.click(control);
+      expect(attention).toHaveBeenCalledExactlyOnceWith();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    }
+  },
+);
+
+it.each([null, "", undefined])(
+  "preserves the attention label %s distinction and raw description tokens",
+  (attentionLabel) => {
+    const raw = "Default model {provider} \\q 한글";
+    const { agents, check } = fixture({
+      readiness: "attention",
+      attentionDescription: raw,
+      ...(attentionLabel === undefined ? {} : { attentionLabel }),
+    });
+    render(<AgentDefaults agents={agents} />);
+    const description = screen.getByText(raw);
+    const control = screen.queryByRole("button");
+    for (const language of ["ko", "en"] as const) {
+      act(() => setLanguage(language));
+      expect(screen.getByText(raw)).toBe(description);
+      expect(description.textContent).toBe(raw);
+      if (attentionLabel === null)
+        expect(screen.queryByRole("button")).toBeNull();
+      else {
+        const label =
+          attentionLabel === ""
+            ? ""
+            : language === "ko"
+              ? "Echo 설정"
+              : "Set up Echo";
+        expect(
+          screen.getByRole("button", {
+            name: `${label}, ${language === "ko" ? "확인 필요" : "attention"}`,
+          }),
+        ).toBe(control);
+        expect(control?.textContent).toBe(label);
+      }
+      expect(check).toHaveBeenCalledOnce();
+    }
+  },
+);
+
+it("retains a focused contribution default control and draft while rechecking and translating only the host caption", () => {
+  const { agents, type, update, check } = fixture();
+  function RawDefault() {
+    const [draft, setDraft] = useState("Edit configuration {label} 한글");
+    return (
+      <input
+        aria-label="Raw default"
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+    );
+  }
+  Object.assign(type.provider, { DefaultControl: RawDefault });
+  render(<AgentDefaults agents={agents} />);
+  const control = screen.getByRole("textbox", { name: "Raw default" });
+  expect(control instanceof HTMLInputElement).toBe(true);
+  if (!(control instanceof HTMLInputElement)) throw new Error("Missing input");
+  fireEvent.change(control, {
+    target: { value: "Checking… {label} \\q 한글" },
+  });
+  control.focus();
+  control.setSelectionRange(2, 8);
+  update({ readiness: "checking" });
+  for (const language of ["ko", "en"] as const) {
+    act(() => setLanguage(language));
+    expect(
+      screen.getByText(language === "ko" ? "기본 모델" : "Default model"),
+    ).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "Raw default" })).toBe(control);
+    expect(control).toHaveValue("Checking… {label} \\q 한글");
+    expect(control).toHaveFocus();
+    expect(control.selectionStart).toBe(2);
+    expect(control.selectionEnd).toBe(8);
+    expect(type.provider.snapshot().readiness).toBe("checking");
+    expect(check).toHaveBeenCalledOnce();
+  }
+  update({ readiness: "ready" });
+  expect(screen.getByRole("textbox", { name: "Raw default" })).toBe(control);
+});
+
+it("keeps the raw provider title, real footer portal and focused body draft while blocking work continues across locales", async () => {
+  const { agents, type, update, check } = fixture();
+  type.title = "Edit configuration";
+  function RawBody() {
+    const [draft, setDraft] = useState("Checking… {label} 한글");
+    return (
+      <>
+        <input
+          aria-label="Harness defaults"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+        <p role="alert">Provider controls are unavailable.</p>
+        <ProviderDialogActions>
+          <button type="button">Raw footer action</button>
+        </ProviderDialogActions>
+      </>
+    );
+  }
+  type.provider.DialogBody = RawBody;
+  render(<AgentDefaults agents={agents} />);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Edit configuration, ready" }),
+  );
+  const dialog = await screen.findByRole("dialog", {
+    name: "Edit configuration",
+  });
+  const field = screen.getByRole("textbox", { name: "Harness defaults" });
+  if (!(field instanceof HTMLInputElement))
+    throw new Error("Missing body input");
+  const footer = screen.getByRole("button", { name: "Raw footer action" });
+  await waitFor(() =>
+    expect(footer.closest(".buzz-dialog-actions")).not.toBeNull(),
+  );
+  field.focus();
+  field.setSelectionRange(1, 6);
+  update({ readiness: "ready", blocking: true });
+  const close = screen.getByRole("button", { name: "Close" });
+  for (const language of ["ko", "en"] as const) {
+    act(() => setLanguage(language));
+    expect(screen.getByRole("dialog", { name: "Edit configuration" })).toBe(
+      dialog,
+    );
+    expect(screen.getByRole("textbox", { name: "Harness defaults" })).toBe(
+      field,
+    );
+    expect(screen.getByRole("button", { name: "Raw footer action" })).toBe(
+      footer,
+    );
+    expect(field).toHaveFocus();
+    expect(field).toHaveValue("Checking… {label} 한글");
+    expect(field.selectionStart).toBe(1);
+    expect(field.selectionEnd).toBe(6);
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Provider controls are unavailable.",
+    );
+    expect(close).toBeDisabled();
+    expect(check).toHaveBeenCalledOnce();
+  }
+  update({ readiness: "ready" });
+  expect(close).toBeEnabled();
+});
+
+it("translates a retained provider-dialog failure without retrying its failed contribution or altering its raw title", async () => {
+  const { agents, type, check } = fixture();
+  const body = vi.fn(() => {
+    throw new Error("Opaque contribution failure");
+  });
+  type.provider.DialogBody = body;
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  render(<AgentDefaults agents={agents} />);
+  const opener = screen.getByRole("button", { name: "Echo, ready" });
+  fireEvent.click(opener);
+  const dialog = await screen.findByRole("dialog", { name: "Echo" });
+  const alert = screen.getByRole("alert"),
+    attempts = body.mock.calls.length;
+  for (const language of ["ko", "en"] as const) {
+    act(() => setLanguage(language));
+    expect(screen.getByRole("dialog", { name: "Echo" })).toBe(dialog);
+    expect(screen.getByRole("alert")).toBe(alert);
+    expect(alert).toHaveTextContent(
+      language === "ko"
+        ? "공급자 설정을 사용할 수 없습니다."
+        : "Provider controls are unavailable.",
+    );
+    expect(body).toHaveBeenCalledTimes(attempts);
+    expect(check).toHaveBeenCalledOnce();
+  }
+});
+
+it("translates a retained unavailable-defaults boundary and preserves a provider name that matches owned English", () => {
+  const { agents, type, check } = fixture();
+  type.title = "Harness defaults";
+  const snapshot = vi
+    .spyOn(type.provider, "snapshot")
+    .mockImplementation(() => {
+      throw new Error("Opaque snapshot failure");
+    });
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  render(<AgentDefaults agents={agents} />);
+  const control = screen.getByRole("button", {
+      name: "Harness defaults, unavailable",
+    }),
+    attempts = snapshot.mock.calls.length;
+  for (const language of ["ko", "en"] as const) {
+    act(() => setLanguage(language));
+    expect(
+      screen.getByRole("button", {
+        name:
+          language === "ko"
+            ? "Harness defaults, 사용할 수 없음"
+            : "Harness defaults, unavailable",
+      }),
+    ).toBe(control);
+    expect(control).toHaveTextContent(
+      language === "ko" ? "사용할 수 없음" : "Unavailable",
+    );
+    expect(control).toBeDisabled();
+    expect(snapshot).toHaveBeenCalledTimes(attempts);
+    expect(check).toHaveBeenCalledOnce();
+  }
+});

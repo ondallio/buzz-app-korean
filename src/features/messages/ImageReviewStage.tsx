@@ -229,7 +229,7 @@ export function ImageReviewStage({
   if (!selected)
     return (
       <p className={styles.mediaReviewUnavailable} role="status">
-        Image unavailable
+        {t("mediaViewing.image.unavailable")}
       </p>
     );
   return (

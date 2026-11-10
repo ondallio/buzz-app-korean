@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { ModelDiscoveryRecovery } from "../../features/agents/ModelDiscoveryRecovery";
 import activityStyles from "../../features/agents/ActivityLayout.module.css";
 import { formatItemTimestamp } from "../../shared/datetime";
@@ -413,6 +414,7 @@ export function createTabs({
     onReadyChange,
     ...props
   }: AgentCreateProps<Config>) {
+    useLanguage();
     const current = readConfig(config);
     const state = useSetupCatalog();
     const providerDefaults = useSyncExternalStore(
@@ -432,7 +434,7 @@ export function createTabs({
     if (!state.status)
       return (
         <span role="status" className="text-body-sm text-secondary">
-          Checking sign-in…
+          {t("claudeCreate.checkingSignIn")}
         </span>
       );
     // A library card is one agent's: the key is added once, in Settings.
@@ -463,7 +465,7 @@ export function createTabs({
           providerDefaults.model,
           state.models,
         )}
-        defaultDescription="Following the provider's model default"
+        defaultDescription={t("claudeCreate.followDefault")}
         loading={state.modelsChecking}
         error={state.modelsError}
         retry={() => void setup.loadModels(true)}
@@ -492,6 +494,7 @@ export function createTabs({
     onChange,
     disabled,
   }: AgentCreateProps<Config>) {
+    useLanguage();
     const current = readConfig(config);
     const { effort, model } = current;
     const state = useSetupCatalog();
@@ -538,14 +541,43 @@ export function createTabs({
       state.models,
       current.effort,
     );
+    const effortLabels = new Map<string, string>([
+      ["none", t("claudeCreate.none")],
+      ["minimal", t("claudeCreate.minimal")],
+      ["low", t("claudeCreate.low")],
+      ["medium", t("claudeCreate.medium")],
+      ["high", t("claudeCreate.high")],
+      ["xhigh", t("claudeCreate.extraHigh")],
+      ["max", t("claudeCreate.maximum")],
+      ["ultra", t("claudeCreate.ultra")],
+    ]);
+    const displayEffort = (value: string) =>
+      effortLabels.get(value) ?? effortLabel(value);
+    const available = createEffortsFor(
+      model || providerDefaults.model,
+      state.models,
+    );
+    const displayedOptions = effortOptions.map((option) => ({
+      ...option,
+      label: !option.value
+        ? t("claudeCreate.defaultOption")
+        : state.models.length &&
+            !available.some((level) => level.id === option.value)
+          ? t("claudeCreate.unavailableOption", {
+              effort: displayEffort(option.value),
+            })
+          : displayEffort(option.value),
+    }));
     return (
       <Select
-        label="Thinking"
-        valueLabel={current.effort ? undefined : "Automatic"}
-        valueSuffix={current.effort ? undefined : " · Default"}
+        label={t("claudeCreate.thinking")}
+        valueLabel={current.effort ? undefined : t("claudeCreate.automatic")}
+        valueSuffix={
+          current.effort ? undefined : t("claudeCreate.defaultSuffix")
+        }
         variant="compact"
         value={current.effort}
-        groups={[{ label: "", options: effortOptions }]}
+        groups={[{ label: "", options: displayedOptions }]}
         disabled={
           disabled ||
           state.status?.state !== "ready" ||
@@ -671,6 +703,7 @@ export function createTabs({
     harnessControl: ReactNode;
     onReadyChange?: (ready: boolean) => void;
   }) {
+    useLanguage();
     const { state, resolving, signedOut } = useCredentials(agent);
     // Only missing credentials hold creation: an agent made before Claude is
     // installed waits for the download, as it did with the Model row alone.
@@ -680,14 +713,14 @@ export function createTabs({
       <SettingsGroup>
         {harnessControl}
         <PreferenceRow
-          title="Model"
+          title={t("claudeCreate.model")}
           trailing={
             signedOut ? (
               <Select
-                label="Model"
+                label={t("claudeCreate.model")}
                 variant="compact"
                 value=""
-                groups={options([["", "Default"]])}
+                groups={options([["", t("claudeCreate.default")]])}
                 disabled
                 onValueChange={() => {}}
               />
@@ -697,7 +730,7 @@ export function createTabs({
           }
         />
         <PreferenceRow
-          title="Thinking"
+          title={t("claudeCreate.thinking")}
           trailing={<CreateThinking {...(agent && { agent })} {...props} />}
         />
       </SettingsGroup>

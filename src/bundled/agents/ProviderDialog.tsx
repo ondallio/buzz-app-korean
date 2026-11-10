@@ -6,6 +6,7 @@ import {
   contributionKey,
 } from "../../features/conversation/ContributionBoundary";
 import { Dialog } from "../../shared/design-system/ui/Dialog";
+import { t, useLanguage } from "../../shared/i18n";
 
 export function ProviderDialog({
   type,
@@ -19,6 +20,7 @@ export function ProviderDialog({
   visit?: boolean;
   onClose(): void;
 }) {
+  useLanguage();
   const provider = type?.provider;
   if (!type || !provider) return null;
   return (
@@ -34,7 +36,7 @@ export function ProviderDialog({
           finalFocus={() => finalFocus.current}
         >
           <p role="alert" className="m-0 text-body-sm text-danger">
-            Provider controls are unavailable.
+            {t("agentProviderHost.controlsUnavailable")}
           </p>
         </Dialog>
       }

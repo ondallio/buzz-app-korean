@@ -1,4 +1,5 @@
 import { useMediaReadRecovery } from "./use-media-read-recovery";
+import { formattingLocale, t, useLanguage } from "../../shared/i18n";
 import { useConversationPresentation } from "../conversation/ConversationPresentation";
 import { prepareReviewEntrance } from "./use-review-entrance";
 import { useMediaCorners } from "./use-media-corners";
@@ -86,7 +87,7 @@ export function MediaAttachment({
   attachment,
   media,
   mode = "inline",
-  imageDescription = "Attachment preview",
+  imageDescription = t("mediaViewing.image.preview"),
   preload = "auto",
   seekTo,
   seekRequest,
@@ -94,8 +95,9 @@ export function MediaAttachment({
   onOpenReview,
   compact = false,
   overlayCount = 0,
-  label = "Open video fullscreen",
+  label = t("attachmentMedia.videoOpenFullscreen"),
 }: MediaAttachmentProps) {
+  const language = useLanguage();
   const active = useConversationPresentation();
   const corners = useMediaCorners();
   const source = media(attachment.url);
@@ -139,8 +141,8 @@ export function MediaAttachment({
     return (
       <span className={styles.attachmentUnavailable} role="status">
         {attachment.kind === "video"
-          ? "Video unavailable"
-          : "Image unavailable"}
+          ? t("attachmentMedia.videoUnavailable")
+          : t("mediaViewing.image.unavailable")}
       </span>
     );
 
@@ -148,8 +150,8 @@ export function MediaAttachment({
     return (
       <span className={styles.attachmentUnavailable} role="status">
         {attachment.kind === "video"
-          ? "Video unavailable"
-          : "Image unavailable"}
+          ? t("attachmentMedia.videoUnavailable")
+          : t("mediaViewing.image.unavailable")}
       </span>
     );
 
@@ -161,7 +163,7 @@ export function MediaAttachment({
           className={`${styles.mediaPreview} ${mode === "thread" ? styles.mediaPreviewThread : ""}`}
           style={previewStyle}
           type="button"
-          aria-label="Open image fullscreen"
+          aria-label={t("attachmentMedia.imageOpenFullscreen")}
           data-image-preview=""
           data-media-preview=""
           onClick={(event) => {
@@ -196,7 +198,7 @@ export function MediaAttachment({
           viewerOpen &&
           createPortal(
             <MediaViewer
-              title="Image attachment"
+              title={t("attachmentMedia.imageTitle")}
               close={() => setViewerOpen(false)}
             >
               <img
@@ -361,7 +363,10 @@ export function MediaAttachment({
           </span>
           {overlayCount > 0 && (
             <span className={styles.imageOverflow} aria-hidden="true">
-              +{overlayCount}
+              +
+              {new Intl.NumberFormat(formattingLocale(language)).format(
+                overlayCount,
+              )}
             </span>
           )}
         </span>
@@ -405,7 +410,7 @@ export function MediaAttachment({
               size="compact"
               variant="media"
               type="button"
-              aria-label="Open video fullscreen"
+              aria-label={t("attachmentMedia.videoOpenFullscreen")}
               onClick={(event) => {
                 prepareReviewEntrance(event);
                 video.current?.pause();
@@ -429,7 +434,7 @@ export function MediaAttachment({
         viewerOpen &&
         createPortal(
           <MediaViewer
-            title="Video attachment"
+            title={t("attachmentMedia.videoTitle")}
             close={() => setViewerOpen(false)}
           >
             <VideoPlayer
@@ -462,6 +467,7 @@ export function MediaViewer({
   close(): void;
   children: ReactNode;
 }) {
+  useLanguage();
   const backdrop = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   useModalBoundary(backdrop, closeButton, close);
@@ -490,7 +496,7 @@ export function MediaViewer({
                 size="compact"
                 ref={closeButton}
                 type="button"
-                aria-label="Close fullscreen viewer"
+                aria-label={t("mediaViewing.review.close")}
                 onClick={close}
                 icon={<XIcon size={20} aria-hidden="true" />}
               />

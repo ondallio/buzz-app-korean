@@ -12,7 +12,8 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { CONVERSATION_LIST_LABEL, UNREAD_MARKERS } from "./conversation-rows";
+import { UNREAD_MARKERS } from "./conversation-rows";
+import { t, useLanguage } from "../../shared/i18n";
 import styles from "./Channels.module.css";
 
 export type UnreadDmPreview = {
@@ -86,6 +87,7 @@ export function SidebarUnread({
   listRef?: RefObject<HTMLElement | null>;
   dmPreviews?: ReadonlyMap<string, UnreadDmPreview>;
 }) {
+  useLanguage();
   const ownList = useRef<HTMLElement>(null);
   const list = listRef ?? ownList;
   const content = useRef<HTMLDivElement>(null);
@@ -196,7 +198,16 @@ export function SidebarUnread({
       >
         <Button
           variant={attention ? "prominent" : "subtle"}
-          aria-label={`${count} unread ${count === 1 ? "conversation" : "conversations"} ${edge}`}
+          aria-label={t(
+            edge === "above"
+              ? count === 1
+                ? "sidebarUnreadNavigation.aboveOne"
+                : "sidebarUnreadNavigation.aboveMany"
+              : count === 1
+                ? "sidebarUnreadNavigation.belowOne"
+                : "sidebarUnreadNavigation.belowMany",
+            { count },
+          )}
           data-edge={edge}
           data-attention={attention}
           size="xs"
@@ -228,14 +239,16 @@ export function SidebarUnread({
               <span>·</span>
             </span>
           )}
-          <span className={styles.unreadEdgeLabel}>{count} unread</span>
+          <span className={styles.unreadEdgeLabel}>
+            {t("sidebarUnreadNavigation.count", { count })}
+          </span>
         </Button>
       </div>
     );
   });
   return (
     <SidebarList
-      navigation={{ label: CONVERSATION_LIST_LABEL, ref: list }}
+      navigation={{ label: t("sidebarUnreadNavigation.landmark"), ref: list }}
       contentRef={content}
       overlay={edgeCues}
     >

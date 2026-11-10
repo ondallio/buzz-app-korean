@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowSquareOutIcon } from "../../shared/design-system/icons/index";
 import { LoadingRegion } from "../../shared/design-system/ui/LoadingRegion";
@@ -23,6 +24,7 @@ export function PullFiles({
   pull: Parameters<GitHubDiff>[0];
   diff: GitHubDiff;
 }) {
+  useLanguage();
   const { repository, base, head, merged } = pull;
   const [result, setResult] = useState<string | Error>();
   useEffect(() => {
@@ -50,7 +52,7 @@ export function PullFiles({
   return (
     <LoadingRegion
       pending={result === undefined}
-      label="Loading changes from GitHub…"
+      label={t("githubRead.loadingChanges")}
       feedback={
         result instanceof Error ? (
           <div role="alert">
@@ -61,7 +63,7 @@ export function PullFiles({
               target="_blank"
               rel="noreferrer"
             >
-              Open on GitHub <ArrowSquareOutIcon size={14} />
+              {t("githubRead.external")} <ArrowSquareOutIcon size={14} />
             </a>
           </div>
         ) : undefined
@@ -80,7 +82,7 @@ export function PullFiles({
             ))}
           </div>
         ) : (
-          <p className={styles.files}>No file changes.</p>
+          <p className={styles.files}>{t("githubRead.emptyChanges")}</p>
         ))}
     </LoadingRegion>
   );

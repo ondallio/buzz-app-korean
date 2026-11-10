@@ -1,5 +1,6 @@
 import { Field as BaseField } from "@base-ui/react/field";
 import type { ComponentProps, ReactNode } from "react";
+import { useFieldOptionalLabel } from "./FieldLabels";
 
 export type FieldProps = Omit<
   ComponentProps<typeof BaseField.Root>,
@@ -29,6 +30,7 @@ export function Field({
   controlId,
   ...props
 }: FieldProps) {
+  const optionalLabel = useFieldOptionalLabel();
   return (
     <BaseField.Root
       {...props}
@@ -48,7 +50,7 @@ export function Field({
         {optional && (
           <>
             {" "}
-            <span className="buzz-field-optional">Optional</span>
+            <span className="buzz-field-optional">{optionalLabel}</span>
           </>
         )}
       </BaseField.Label>

@@ -55,6 +55,10 @@ Base UI continues to own dismissal, focus restoration and keyboard behavior.
 Toast hosts similarly supply region/dismiss labels on `ToastProvider`; completed
 toast titles and actions can contain live React text without recreating a toast.
 
+`ComboboxLabelsProvider` supplies the popup search name and placeholder. The host
+owns the copy; standalone controls retain the English default. Changing the label
+does not change the query, selected value, filtering, focus or popup lifetime.
+
 `ChipLabelsProvider` supplies complete accessible names and kind labels for inline
 chips. The host owns translated phrases; scoped faces, authored names, addresses,
 loading state and preview actions keep their existing owners. Outside the provider,
@@ -187,6 +191,8 @@ help, status, warnings, and section-specific explanations with their content.
 Ordinary flow Dialogs use sticky header and footer bars over the scrolling body.
 Their full backgrounds combine a surface-color gradient and progressive blur;
 labels and actions remain sharp. Reduced transparency uses an opaque surface.
+Their title/action band stays opaque; only the bottom padding gutter fades.
+Compact headers without that gutter stay opaque across their full height.
 `ScrollEdgeMaterial` owns this treatment, shared with the agent Save footer.
 Only the sticky footer's gradient gutter passes pointer input to the body.
 Its content row owns pointer input and horizontal overflow, including text,
@@ -1084,6 +1090,8 @@ Field groups label, input, help and error using Base UI. Input and Textarea
 carry the shared field appearance. RadioGroup is for one choice, Checkbox for an
 independent choice and Switch for an immediate on/off setting. Use the native
 form semantics exposed by those Base UI primitives rather than duplicating them.
+`FieldLabelsProvider` supplies the optional suffix; standalone fields default to
+English "Optional". The host owns localized copy; validation remains with Base UI.
 
 `Checkbox` and `Radio` default to 40px rows with 20px controls. For compact
 inline choices, use `size="sm"`: 32px rows, 16px controls, and an 8px label gap.
