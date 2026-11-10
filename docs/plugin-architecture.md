@@ -1078,7 +1078,9 @@ in the bottom drawer by default or the existing companion column when the contri
 sets `channelPlacement: "side"`. The bottom drawer closes when the viewer leaves the
 channel. A side-column panel stays open in the channel's workspace: leaving the channel
 or page unmounts it, and returning shows it again until the viewer closes it, another
-channel panel or Details replaces it, or the plugin is disabled. While the channel is read-only or cached it stays hidden. With `channelPlacement: "tab"` the launcher instead
+channel panel or Details replaces it, or the plugin is disabled. While the channel is read-only or cached it stays hidden. For a side panel, `pressed` means the panel is shown in
+the open pane, not merely selected: while the pane is hidden the panel stays selected but
+reads unpressed, and `toggle` shows it again. With `channelPlacement: "tab"` the launcher instead
 opens one tab per channel in the side pane, grouped with thread and other panel tabs;
 a new target replaces that tab, and a link tab already open for the target becomes it.
 The tab receives `PanelProps.context` too, so it can open or push further tabs. A launcher
@@ -2672,8 +2674,11 @@ that were not asked are dropped.
 
 The user chooses the provider in Settings > Decisions API, and the choice is
 kept on this device. Until they choose, the first default provider that is on
-answers: Builderlab (`block.builderlab/builderlab`), then TypeSafe
-(`buzz.typesafe/typesafe`). The same holds while a chosen default is not on.
+and can answer (`ready` or `unconfirmed`) does: Builderlab
+(`block.builderlab/builderlab`), then TypeSafe (`buzz.typesafe/typesafe`).
+When none can, TypeSafe is the provider, and the status is `checking` while
+another default is still finding out whether it can answer. The same holds
+while a chosen default is not on.
 Decision text can include private messages, so no other provider gets it
 without that choice: while a chosen provider that is not a default is not on,
 decisions are `unavailable` and are not sent to another provider. `ctx.decisions.backend()`
@@ -2685,7 +2690,7 @@ so send only what the decision needs.
 | Provider | Plugin | Credentials |
 |----------|--------|-------------|
 | `buzz.typesafe/typesafe` | TypeSafe (bundled, on by default) | The user's TypeSafe key, kept and read only by native code (`src-tauri/src/decisions.rs`) |
-| `block.builderlab/builderlab` | Builderlab (bundled, in desktop builds with a Builderlab); registered only while the user is signed in to an account Builderlab allows decisions for | The user's Builderlab sign-in, which native code sends with each call. Builderlab answers with Jev and bills the request's `community`; its server allows up to 32 questions per call |
+| `block.builderlab/builderlab` | Builderlab (bundled, in desktop builds with a Builderlab); registered while the user is signed in, and `needs-setup` unless Builderlab allows the account decisions | The user's Builderlab sign-in, which native code sends with each call. Builderlab answers with Jev and bills the request's `community`; its server allows up to 32 questions per call |
 
 ## In-app keyboard shortcuts
 

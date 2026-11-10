@@ -75,7 +75,7 @@ test("reports unchanged official source and leaves the pin untouched", async () 
 
 test("distinguishes a new source from a new tag rebuilding the same source", async () => {
   for (const commit of [channel.source.commit, "a".repeat(40)]) {
-    const f = fixture({ tag: "v0.7.0-preview.259.1", commit });
+    const f = fixture({ tag: "v0.7.0-preview.261.1", commit });
     const result = await discoverUpstream(channel, f.download);
     assert.equal(result.updateAvailable, true);
     assert.equal(result.sourceChanged, commit !== channel.source.commit);
@@ -92,7 +92,7 @@ test("discovers a new base version without rewriting the Korean build version", 
   const result = await discoverUpstream(channel, f.download);
   assert.equal(result.available.tag, "v0.8.0-preview.1.1");
   assert.equal(result.updateAvailable, true);
-  assert.equal(channel.version, "0.7.0-korean.1");
+  assert.equal(channel.version, "0.7.0-korean.2");
   assert.equal(f.calls.length, 5);
 });
 
@@ -101,7 +101,7 @@ test("rejects rollback, moved tags and inconsistent or unpublished receipts", as
     { tag: "v0.7.0-preview.257.9" },
     { commit: "c".repeat(40) },
     { source: "d".repeat(40) },
-    { tag: "v0.7.0-preview.259.1", releasePatch: { draft: true } },
+    { tag: "v0.7.0-preview.261.1", releasePatch: { draft: true } },
     { feedPatch: { version: "0.7.0-preview.0259.1" } },
     { feedPatch: { version: "../main" } },
     { feedPatch: { version: "0.7.0" } },

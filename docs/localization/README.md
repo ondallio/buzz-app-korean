@@ -4,8 +4,8 @@ This is an unofficial Korean/English localization of the new Buzz desktop app.
 It is incomplete reviewable source. No beta installer or update feed has been
 published from this source.
 
-The official baseline is block/buzz-app tag v0.7.0-preview.258.1, commit
-c9239f737f4985979eb5939e84c33ab3da2b1321. Buzz 1.0 beta is the marketing name;
+The official baseline is block/buzz-app tag v0.7.0-preview.260.1, commit
+58116b826171d190a7376fc57b0509c32c507dde. Buzz 1.0 beta is the marketing name;
 0.7.0 is the upstream source version. The configured Korean candidate version
 is 0.7.0-korean.1, not a released installer.
 

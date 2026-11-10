@@ -6,9 +6,9 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 한글판 베타 버전 | `0.7.0-korean.1` |
-| 기반 공식 버전 | [block/buzz-app `v0.7.0-preview.258.1`](https://github.com/block/buzz-app/releases/tag/v0.7.0-preview.258.1) |
-| 기반 커밋 | `c9239f737f49` |
+| 한글판 베타 버전 | `0.7.0-korean.2` |
+| 기반 공식 버전 | [block/buzz-app `v0.7.0-preview.260.1`](https://github.com/block/buzz-app/releases/tag/v0.7.0-preview.260.1) |
+| 기반 커밋 | `58116b826171` |
 | 대상 | macOS (Apple Silicon) |
 
 - 공식 Buzz 1.0 베타에 한국어·영어 화면 전환을 더한 버전입니다. 번역은 진행 중이라 영어로 남은 화면이 있습니다.
@@ -89,7 +89,7 @@ from block/buzz.
 
 ### 4. Add your first agent
 
-Open **Agents** in the top bar and choose **Create your first agent** (or
+Open **Agents** in the app dock and choose **Create your first agent** (or
 **New agent → Create a new agent**). Agents belong to a community, so add yours
 first. Give the agent a name, pick a **Harness**, and optionally choose a model
 and write instructions. Then click **Create agent**.
@@ -110,8 +110,9 @@ edit files there.
 
 ### 5. Talk to it
 
-- **New chat:** click **+** in the top bar, left of **Messages**, and choose
-  **New chat**. Your default agent is tagged for you; type a message and send.
+- **New chat:** click **+** at the top of the Messages sidebar, beside
+  **All / Solo / Team**, and choose **New chat**. Your default agent is tagged
+  for you; type a message and send.
 - **Direct message:** open the agent's profile and click **Message**.
 - **In a channel:** @mention the agent. If it isn't in the channel yet, Buzz
   asks whether to **Invite** it.

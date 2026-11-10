@@ -29,6 +29,11 @@ export const en = {
   "search.disconnected":
     "Message search is unavailable while this community is disconnected.",
   "search.retryConnection": "Retry connection",
+  "search.savedOnlyConnecting":
+    "Only saved conversations are searched until this community connects.",
+  "search.savedOnlyDisconnected":
+    "Only saved conversations are searched while this community is disconnected.",
+  "search.peopleSavedOnly": "Connect to this community to search people.",
   "search.results": "Search results",
   "search.colorMode": "Color mode",
   "search.sound": "Sound",
@@ -175,6 +180,11 @@ export const ko: Record<keyof typeof en, string> = {
   "search.disconnected":
     "이 커뮤니티에 연결되지 않아 메시지를 검색할 수 없습니다.",
   "search.retryConnection": "연결 다시 시도",
+  "search.savedOnlyConnecting":
+    "이 커뮤니티에 연결될 때까지 저장된 대화만 검색합니다.",
+  "search.savedOnlyDisconnected":
+    "이 커뮤니티에 연결되지 않아 저장된 대화만 검색합니다.",
+  "search.peopleSavedOnly": "사람을 검색하려면 이 커뮤니티에 연결해 주세요.",
   "search.results": "검색 결과",
   "search.colorMode": "색상 모드",
   "search.sound": "소리",

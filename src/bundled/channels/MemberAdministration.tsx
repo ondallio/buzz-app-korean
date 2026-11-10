@@ -306,6 +306,7 @@ export function MemberRow({
                     size="sm"
                     shape="row-end"
                     aria-label={t("channelPages.members.actions", { name })}
+                    data-member={pubkey}
                     icon={<DotsThreeIcon size={18} aria-hidden="true" />}
                   />
                 }

@@ -123,7 +123,7 @@ async function walk(directory) {
 }
 await walk(path.join(root, "src"));
 const report = {
-  source: "block/buzz-app@c9239f737f4985979eb5939e84c33ab3da2b1321",
+  source: "block/buzz-app@58116b826171d190a7376fc57b0509c32c507dde",
   catalogKeys: Object.keys(english).length,
   koreanEntries: Object.keys(english).filter((key) => korean[key]?.trim())
     .length,

@@ -197,6 +197,8 @@ it("mints a bounded invite and surfaces relay refusals", async () => {
   expect(calls.filter((c) => c.route === "invite")).toEqual([
     { route: "invite", body: { ttl_secs: 3 * 24 * 60 * 60, max_uses: null } },
   ]);
+  // QR codes come from the native renderer; the browser host has none.
+  expect(screen.queryByRole("img")).toBeNull();
   // Admins cannot grant admin, so direct addition has no role choice.
   await user.type(
     screen.getByRole("textbox", { name: "Public identity" }),
@@ -817,7 +819,7 @@ it("membership localization retains a held invite, raw identity, settings choice
     expect([identity.selectionStart, identity.selectionEnd]).toEqual([3, 9]);
     expect(
       within(dialog).getByRole("button", { name: "초대 만료 기간 선택" }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     expect(within(dialog).getByLabelText("커뮤니티 초대 링크")).toHaveAttribute(
       "placeholder",
       "초대 링크를 만드는 중…",

@@ -104,7 +104,8 @@ it("shows recent versions relatively and older dates with an exact timestamp", (
   };
   const old = {
     ...rev("old", undefined, "old"),
-    created_at: Date.UTC(2025, 9, 27, 18) / 1000,
+    // Local noon keeps the calendar day "Oct 27" in every time zone.
+    created_at: new Date(2025, 9, 27, 12).getTime() / 1000,
   };
   try {
     render(
@@ -141,7 +142,7 @@ it("shows recent versions relatively and older dates with an exact timestamp", (
     );
     expect(oldTime).toBeVisible();
     expect(oldTime.tagName).toBe("TIME");
-    expect(oldTime).toHaveAttribute("datetime", "2025-10-27T18:00:00.000Z");
+    expect(oldTime).toHaveAttribute("datetime", oldDate.toISOString());
     expect(oldTime).toHaveAttribute(
       "title",
       new Intl.DateTimeFormat("en-US", {

@@ -1,6 +1,8 @@
 export const en = {
   "identityMore.addressLabel": "Community address or invite link",
   "identityMore.addressInvalid": "Enter a community address or invite link.",
+  "identityMore.pasteWholeInvite":
+    "Paste the whole invite link, not only its code.",
   "identityMore.addressPlaceholder": "Paste a link or address",
   "identityMore.readFileFailed": "Couldn’t read that file.",
   "identityMore.importFailed": "Couldn’t import this key.",
@@ -140,6 +142,8 @@ export const en = {
 export const ko: Record<keyof typeof en, string> = {
   "identityMore.addressLabel": "커뮤니티 주소 또는 초대 링크",
   "identityMore.addressInvalid": "커뮤니티 주소나 초대 링크를 입력해 주세요.",
+  "identityMore.pasteWholeInvite":
+    "초대 코드만이 아니라 초대 링크 전체를 붙여넣어 주세요.",
   "identityMore.addressPlaceholder": "링크나 주소 붙여넣기",
   "identityMore.readFileFailed": "파일을 읽지 못했습니다.",
   "identityMore.importFailed": "이 키를 가져오지 못했습니다.",

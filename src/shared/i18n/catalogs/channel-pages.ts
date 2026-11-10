@@ -3,7 +3,8 @@ export const en = {
   "channelPages.conversation": "Conversation",
   "channelPages.welcome": "Your channels, one conversation.",
   "channelPages.welcomeDescription":
-    "Use the community picker in the top bar to choose or add a community. Your profile and settings work without a community.",
+    "Choose a community to see its channels, or join one. Your profile and settings work without a community.",
+  "channelPages.chooseCommunity": "Choose a community",
   "channelPages.cannotConnect": "Can’t connect",
   "channelPages.connectionRetrying":
     "Check your connection. We’ll keep trying.",
@@ -54,7 +55,8 @@ export const ko: Record<keyof typeof en, string> = {
   "channelPages.conversation": "대화",
   "channelPages.welcome": "모든 채널의 대화를 한곳에서.",
   "channelPages.welcomeDescription":
-    "상단 표시줄의 커뮤니티 선택기에서 커뮤니티를 선택하거나 추가하세요. 커뮤니티 없이도 프로필과 설정을 사용할 수 있습니다.",
+    "커뮤니티를 선택해 채널을 확인하거나 새로 참여하세요. 커뮤니티 없이도 프로필과 설정을 사용할 수 있습니다.",
+  "channelPages.chooseCommunity": "커뮤니티 선택",
   "channelPages.cannotConnect": "연결할 수 없습니다",
   "channelPages.connectionRetrying":
     "연결 상태를 확인해 주세요. 계속 연결을 시도하겠습니다.",
