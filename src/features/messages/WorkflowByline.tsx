@@ -10,6 +10,8 @@ import {
 } from "../../shared/design-system/ui/Popover";
 import { profileTarget } from "../profiles/target";
 import styles from "./Messages.module.css";
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
 
 export function WorkflowByline({
   ownerId,
@@ -22,24 +24,30 @@ export function WorkflowByline({
   canOpenLink?: ((url: string) => boolean) | undefined;
   onOpenLink(url: string): boolean;
 }) {
+  useLanguage();
   const target = profileTarget(ownerId);
   return (
     <span className={styles.workflowAttribution}>
-      <strong className={styles.author}>Workflow</strong>
+      <strong className={styles.author}>{t("messageRow.workflow")}</strong>
       <span className={styles.workflowOwner}>
-        <span aria-hidden="true">· </span>owned by{" "}
-        {target && canOpenLink?.(target) ? (
-          <Button
-            variant="link"
-            size="inline"
-            aria-label={`View workflow owner ${ownerName} profile`}
-            onClick={() => onOpenLink(target)}
-          >
-            {ownerName}
-          </Button>
-        ) : (
-          ownerName
-        )}
+        <span aria-hidden="true">· </span>
+        {rich("messageRow.workflowOwner", {
+          owner:
+            target && canOpenLink?.(target) ? (
+              <Button
+                variant="link"
+                size="inline"
+                aria-label={t("messageRow.viewWorkflowOwner", {
+                  name: ownerName,
+                })}
+                onClick={() => onOpenLink(target)}
+              >
+                {ownerName}
+              </Button>
+            ) : (
+              ownerName
+            ),
+        })}
       </span>
       <PopoverRoot>
         <PopoverTrigger
@@ -48,16 +56,15 @@ export function WorkflowByline({
             <IconButton
               size="xs"
               variant="ghost"
-              aria-label="Workflow message details"
+              aria-label={t("messageRow.workflowDetails")}
               icon={<InfoIcon />}
             />
           }
         />
         <PopoverPopup size="compact">
-          <PopoverTitle>Workflow message</PopoverTitle>
+          <PopoverTitle>{t("messageRow.workflowMessage")}</PopoverTitle>
           <PopoverDescription>
-            Sent automatically by a workflow. Its owner set it up but didn’t
-            send this message personally.
+            {t("messageRow.workflowExplanation")}
           </PopoverDescription>
         </PopoverPopup>
       </PopoverRoot>

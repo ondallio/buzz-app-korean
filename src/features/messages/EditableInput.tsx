@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import {
   useLayoutEffect,
   useRef,
@@ -1338,9 +1339,9 @@ export function EditableInput({
     /** True, or the reason shown by the host. The link must survive its context. */
     const insertResource = (value: ComposerResource): true | string => {
       if (!editable() || composing.current || editor.composing)
-        return "The message can't be edited right now";
+        return t("messages.composer.editNotReady");
       const resource = composerResource(value);
-      if (!resource) return "This link can't be added";
+      if (!resource) return t("v1msg.link.cannotAdd");
       const { from, to, $from } = editor.state.selection;
       const stored = editor.state.storedMarks ?? $from.marks();
       const { code } = composerSchema.marks;
@@ -1349,7 +1350,7 @@ export function EditableInput({
         code.isInSet(stored) ||
         editor.state.doc.rangeHasMark(from, to, code)
       )
-        return "Links can't be added inside code";
+        return t("v1msg.link.insideCode");
       const marks = $from.parent.type
         .allowedMarks(stored)
         .filter((mark) => !resourceBlockingMarks().includes(mark.type));
@@ -1372,7 +1373,7 @@ export function EditableInput({
           },
         )
       )
-        return "Links can't be added inside another link";
+        return t("v1msg.link.insideLink");
       // A preceding `!` would make an image; `\` would escape the bracket.
       const gap = /[!\\]$/.test(source.draft.text.slice(0, start));
       const tr = closeHistory(editor.state.tr).replaceWith(
@@ -1393,11 +1394,11 @@ export function EditableInput({
       );
       const next = projectComposerDocument(tr.doc);
       if (next.tokens.filter((token) => token.node.attrs.resource).length > 32)
-        return "Add at most 32 links to one message";
+        return t("v1msg.link.tooMany");
       if (composerMarkdown(next.draft).length > current.current.maxLength)
-        return "Message is too long to add this link";
+        return t("v1msg.link.tooLong");
       if (brokenResources(tr.doc, next).length)
-        return "Links can't be added inside code or other Markdown here";
+        return t("v1msg.link.insideMarkdown");
       editor.dispatch(tr.scrollIntoView());
       editor.focus();
       return true;

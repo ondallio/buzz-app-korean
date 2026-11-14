@@ -1,3 +1,9 @@
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { TypingIndicator } from "./TypingIndicator";
 import { workflowLabel } from "../relay/workflow-attribution";
 import { MessageEditScope } from "./MessageEditScope";
@@ -190,8 +196,8 @@ function ResolvedReview({
         error={
           snapshot.error ??
           (snapshot.root
-            ? "Attachment unavailable."
-            : "Original message unavailable.")
+            ? localMessage("mediaViewing.review.attachmentUnavailable")
+            : localMessage("mediaViewing.review.originalUnavailable"))
         }
         unavailable
         retry={view.refresh}
@@ -211,7 +217,7 @@ function ResolvedReview({
     return (
       <ReviewShell
         {...props}
-        error="Original message unavailable."
+        error={localMessage("mediaViewing.review.originalUnavailable")}
         unavailable
         retry={view.refresh}
       />
@@ -274,10 +280,11 @@ function ReviewShell({
   timecodesSeekable?: boolean;
   loading?: boolean;
   unavailable?: boolean;
-  error?: string;
+  error?: DisplayMessage;
   retry?: () => void | Promise<void>;
 }) {
   const source = session.media(attachment.url);
+  useLanguage();
   // Listener unavailability is not a playback error the selection resets.
   const sourceUnavailable = useMediaElementSource(
     attachment.kind === "video" ? source : undefined,
@@ -363,7 +370,11 @@ function ReviewShell({
       : attachment;
   const mediaTitle =
     displayedAttachment.name?.trim() ||
-    (displayedAttachment.kind === "video" ? "Video" : "Image");
+    t(
+      displayedAttachment.kind === "video"
+        ? "mediaViewing.review.videoTitle"
+        : "mediaViewing.review.imageTitle",
+    );
   const mediaIndex = mediaAttachments.findIndex(
     (item) => item.url === attachment.url,
   );
@@ -412,7 +423,11 @@ function ReviewShell({
   return (
     <MediaReviewFrame
       title={mediaTitle}
-      label={attachment.kind === "video" ? "Video review" : "Image viewer"}
+      label={t(
+        attachment.kind === "video"
+          ? "mediaViewing.review.videoLabel"
+          : "mediaViewing.review.imageLabel",
+      )}
       isVideo={attachment.kind === "video"}
       video={video}
       frame={frame}
@@ -431,17 +446,20 @@ function ReviewShell({
             <div className={styles.imageReviewSwitcher}>
               <IconButton
                 size="compact"
-                aria-label="Previous media"
+                aria-label={t("mediaViewing.review.previous")}
                 disabled={mediaIndex <= 0}
                 onClick={() => navigateMedia(-1)}
                 icon={<CaretLeftIcon size={20} />}
               />
               <span aria-live="polite" aria-atomic="true">
-                {mediaIndex + 1} / {mediaAttachments.length}
+                {t("mediaViewing.position", {
+                  index: mediaIndex + 1,
+                  count: mediaAttachments.length,
+                })}
               </span>
               <IconButton
                 size="compact"
-                aria-label="Next media"
+                aria-label={t("mediaViewing.review.next")}
                 disabled={mediaIndex >= mediaAttachments.length - 1}
                 onClick={() => navigateMedia(1)}
                 icon={<CaretRightIcon size={20} />}
@@ -450,7 +468,11 @@ function ReviewShell({
           )}
           <IconButton
             size="compact"
-            aria-label={commentsOpen ? "Hide comments" : "Show comments"}
+            aria-label={t(
+              commentsOpen
+                ? "mediaViewing.review.hideComments"
+                : "mediaViewing.review.showComments",
+            )}
             aria-pressed={commentsOpen}
             onClick={(event) => {
               prepareSidebarMotion(event.detail > 0);
@@ -467,7 +489,8 @@ function ReviewShell({
           className={styles.mediaReviewConversation}
           inert={!commentsOpen}
           aria-hidden={!commentsOpen || undefined}
-          aria-label="Media comments"
+          aria-label={t("mediaViewing.review.commentsLabel")}
+          data-media-comments=""
           data-attachment-drop-zone=""
         >
           <div className={styles.mediaReviewConversationContent}>
@@ -476,14 +499,14 @@ function ReviewShell({
                 variant="compact"
                 title={
                   <PanelHeaderLabel
-                    title="Comments"
+                    title={t("mediaViewing.review.commentsTitle")}
                     icon={<ChatCircleIcon size={20} />}
                   />
                 }
                 actions={
                   rootId ? (
                     <span className={styles.mediaReviewCommentCount}>
-                      {replies.length}
+                      {t("mediaViewing.count", { count: replies.length })}
                     </span>
                   ) : undefined
                 }
@@ -511,7 +534,7 @@ function ReviewShell({
                   <div className={styles.mediaReviewTimeOption}>
                     <span>{videoTime(currentTime)}</span>
                     <Checkbox
-                      label="Comment at current frame"
+                      label={t("mediaViewing.review.commentFrame")}
                       checked={includeTime}
                       onCheckedChange={setIncludeTime}
                     />
@@ -544,10 +567,11 @@ function ReviewShell({
               </MessageEditScope>
             ) : (
               <p className={styles.empty} role={error ? "alert" : "status"}>
-                {error ?? "Loading comments…"}
+                {resolveMessage(error) ??
+                  t("mediaViewing.review.loadingComments")}
                 {retry && !unavailable && (
                   <Button size="sm" type="button" onClick={retryThread}>
-                    Retry
+                    {t("mediaViewing.review.retry")}
                   </Button>
                 )}
               </p>
@@ -565,10 +589,15 @@ function ReviewShell({
           className={styles.mediaReviewUnavailable}
           role={error ? "alert" : "status"}
         >
-          {error ?? (loading ? "Loading media…" : "Media unavailable")}
+          {resolveMessage(error) ??
+            t(
+              loading
+                ? "mediaViewing.review.loading"
+                : "mediaViewing.review.unavailable",
+            )}
           {retry && unavailable && (
             <Button size="sm" type="button" onClick={retryThread}>
-              Retry
+              {t("mediaViewing.review.retry")}
             </Button>
           )}
         </p>
@@ -659,6 +688,7 @@ function ReviewComments({
     agentPubkeys,
   );
   const stableActivity = useStableRowActivity();
+  useLanguage();
   const comments = useRef<HTMLElement>(null);
   useEffect(() => {
     if (selectedComment)
@@ -699,7 +729,8 @@ function ReviewComments({
         ref={comments}
         data-message-scroller
         className={styles.mediaReviewThread}
-        aria-label="Media comments"
+        aria-label={t("mediaViewing.review.commentsLabel")}
+        data-media-comments=""
       >
         {replies.map((row, index) => {
           return (
@@ -749,11 +780,13 @@ function ReviewComments({
         />
         {!replies.length && (
           <p className={styles.threadNote}>
-            No comments yet. Add the first below.
+            {t("mediaViewing.review.emptyComments")}
           </p>
         )}
         {limited && (
-          <p className={styles.threadNote}>Thread history limit reached.</p>
+          <p className={styles.threadNote}>
+            {t("mediaViewing.review.historyLimit")}
+          </p>
         )}
       </section>
     </LinkThreadTabContext>

@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { messageEditText, validateMessageEdit } from "./message-edit";
 import {
   useEffect,
@@ -144,13 +145,11 @@ export function useMessageEdit(session: ComposerSession, restore: () => void) {
       }
       if (!body.trim()) return;
       if (!current || !lastEditableMessage(session, [current])) {
-        setError("This message is no longer available to edit.");
+        setError(t("messages.composer.editUnavailable"));
         return;
       }
       if (source(current) !== source(target)) {
-        setError(
-          "This message changed while you were editing. Copy your changes, then cancel and reopen it.",
-        );
+        setError(t("v1msg.edit.changed"));
         return;
       }
       if (body === initial.current || body === source(target)) {

@@ -142,7 +142,7 @@ export function ReplyBranch({
 }
 
 function threadHistory(element: HTMLElement) {
-  return element.closest<HTMLElement>('[aria-label="Thread messages"]');
+  return element.closest<HTMLElement>("[data-message-scroller]");
 }
 
 /** Moves focus lost with a removed element to the first surviving target. */

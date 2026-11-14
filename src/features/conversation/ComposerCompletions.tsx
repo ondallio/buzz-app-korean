@@ -1,3 +1,5 @@
+import { t, useLanguage } from "../../shared/i18n";
+import type { en as completionMessages } from "../../shared/i18n/catalogs/completion-display";
 import {
   readComposerSnapshot,
   composerMarkdownContext,
@@ -43,6 +45,62 @@ import {
 import type { CompletionEditor } from "./useCompletionEditor";
 import styles from "./Completions.module.css";
 import { Tooltip } from "../../shared/design-system/ui/Tooltip";
+
+type CompletionTextKey = Exclude<
+  keyof typeof completionMessages,
+  | "completionDisplay.suggestions"
+  | "completionDisplay.unavailable"
+  | "completionDisplay.agentName"
+  | "completionDisplay.detail"
+>;
+
+type NameKey = "v1msg.completion.folders" | "v1msg.completion.skills";
+
+// Keep contribution metadata and provider publications canonical. Only exact
+// bundled identities/original titles own the display copy projected here.
+const completionNames: Readonly<
+  Record<string, readonly [string, CompletionTextKey | NameKey]>
+> = {
+  "buzz.emoji/typeahead": ["Emoji", "completionDisplay.emoji"],
+  "buzz.mentions/typeahead": ["Mention", "completionDisplay.mention"],
+  "buzz.channels/channel-typeahead": ["Channel", "completionDisplay.channel"],
+  "buzz.mentions/folders": ["Folders", "v1msg.completion.folders"],
+  "buzz.mentions/skills": ["Skills", "v1msg.completion.skills"],
+};
+function completionTitle(provider: Contribution<ComposerCompletion>): string {
+  const entry = Object.hasOwn(completionNames, provider.key)
+    ? completionNames[provider.key]
+    : undefined;
+  return entry &&
+    provider.key === `${provider.pluginId}/${provider.id}` &&
+    entry[0] === provider.title
+    ? t(entry[1])
+    : provider.title;
+}
+const emojiCopy: Readonly<Record<string, CompletionTextKey>> = {
+  "Unicode emoji": "completionDisplay.unicode",
+  "Community emoji": "completionDisplay.community",
+  "Searching emoji…": "completionDisplay.searchingEmoji",
+  "Community emoji unavailable; Unicode results shown.":
+    "completionDisplay.communityUnavailable",
+  "Unicode emoji unavailable. Custom matches shown.":
+    "completionDisplay.unicodeUnavailable",
+};
+function completionCopy(
+  provider: Contribution<ComposerCompletion>,
+  value: string | undefined,
+): string | undefined {
+  const key =
+    provider.pluginId === "buzz.emoji" &&
+    provider.id === "typeahead" &&
+    provider.key === "buzz.emoji/typeahead" &&
+    provider.title === "Emoji" &&
+    value &&
+    Object.hasOwn(emojiCopy, value)
+      ? emojiCopy[value]
+      : undefined;
+  return key ? t(key) : value;
+}
 
 const RETRY = Symbol("retry-completion");
 
@@ -185,6 +243,7 @@ export function ComposerCompletions({
     key?: string,
   ): boolean;
 }) {
+  useLanguage();
   const providers = useSyncExternalStore(
     registry.subscribe,
     registry.snapshot,
@@ -245,7 +304,9 @@ export function ComposerCompletions({
       ])}
       fallback={
         <span role="status">
-          {match.provider.title} suggestions unavailable
+          {t("completionDisplay.unavailable", {
+            provider: completionTitle(match.provider),
+          })}
         </span>
       }
     >
@@ -296,6 +357,7 @@ function OwnedCompletion({
     key?: string,
   ): boolean;
 }) {
+  useLanguage();
   const id = useId();
   const compact = provider.pluginId === "buzz.emoji";
   const mention = provider.pluginId === "buzz.mentions";
@@ -406,7 +468,7 @@ function OwnedCompletion({
       ? items.length
       : items.findIndex((item) => item.id === selected);
   const selectedIndex = index < 0 ? 0 : index;
-  const status = result?.status;
+  const status = completionCopy(provider, result?.status);
   function accept(index: number, key = "click") {
     const published = latest.current;
     if (!active() || !published) return false;
@@ -567,7 +629,9 @@ function OwnedCompletion({
           <section
             ref={popup}
             className={styles.popup}
-            aria-label={`${provider.title} suggestions`}
+            aria-label={t("completionDisplay.suggestions", {
+              provider: completionTitle(provider),
+            })}
             data-compact={compact || undefined}
             data-mention={named || undefined}
             data-channel={channel || undefined}
@@ -575,7 +639,9 @@ function OwnedCompletion({
             <div
               id={id}
               role="listbox"
-              aria-label={`${provider.title} suggestions`}
+              aria-label={t("completionDisplay.suggestions", {
+                provider: completionTitle(provider),
+              })}
               ref={list}
               className={styles.list}
             >
@@ -600,7 +666,12 @@ function OwnedCompletion({
                   aria-disabled={!!item.disabled}
                   aria-label={
                     compact && item.detail
-                      ? `${item.label} ${item.detail}`
+                      ? t("completionDisplay.detail", {
+                          label: item.label,
+                          detail:
+                            completionCopy(provider, item.detail) ??
+                            item.detail,
+                        })
                       : undefined
                   }
                   id={`${id}-${i}`}
@@ -659,14 +730,19 @@ function OwnedCompletion({
                             <RobotIcon />
                           </span>
                         )}
-                        {item.agent && <span className="sr-only"> Agent</span>}
+                        {item.agent && (
+                          <span className="sr-only">
+                            {" "}
+                            {t("mentionPicker.agent")}
+                          </span>
+                        )}
                       </span>
                     ) : (
                       item.label
                     )}
                     {item.detail && (
                       <small aria-hidden={compact || undefined}>
-                        {item.detail}
+                        {completionCopy(provider, item.detail)}
                       </small>
                     )}
                   </span>
@@ -699,7 +775,7 @@ function OwnedCompletion({
                   }
                   onClick={() => accept(items.length)}
                 >
-                  Retry suggestions
+                  {t("completionDisplay.retry")}
                 </div>
               )}
             </div>

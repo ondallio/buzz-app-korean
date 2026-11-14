@@ -1,4 +1,5 @@
 import { WarningCircleIcon } from "../../shared/design-system/icons";
+import { t, useLanguage } from "../../shared/i18n";
 
 export function activityOutcomeLabel(state: string) {
   if (state === "error") return "Couldn’t finish";
@@ -23,6 +24,7 @@ export function ActivityOutcome({
   state: string;
   name?: string | undefined;
 }) {
+  useLanguage();
   const label = activityOutcomeLabel(state);
   return label ? (
     <span
@@ -30,7 +32,9 @@ export function ActivityOutcome({
     >
       {name && <span className="text-subtle">{name} ·</span>}
       {state === "error" && <WarningCircleIcon size={12} aria-hidden="true" />}
-      <span>{label}</span>
+      <span>
+        {t(state === "error" ? "messageRow.failed" : "messageRow.stopped")}
+      </span>
     </span>
   ) : null;
 }

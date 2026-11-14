@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { SearchField } from "../../shared/design-system/ui/SearchField";
 import { Button } from "../../shared/design-system/ui/Button";
@@ -36,6 +37,7 @@ export function GifPicker({
   onQueryChange(query: string): void;
   select(gif: KlipyGif): void;
 }) {
+  useLanguage();
   const [query, setQuery] = useState(initialQuery);
   const [gifs, setGifs] = useState<KlipyGif[]>();
   const [error, setError] = useState<string>();
@@ -72,8 +74,9 @@ export function GifPicker({
           variant="capsule"
           inputRef={input}
           aria-describedby={unavailable ? unavailableId : undefined}
-          label="Search GIFs"
-          placeholder="Search GIFs"
+          label={t("emojiPicker.searchGifs")}
+          clearLabel={t("emojiPicker.clearGifs")}
+          placeholder={t("emojiPicker.searchGifs")}
           spellCheck={false}
           autoCorrect="off"
           autoCapitalize="off"
@@ -102,7 +105,7 @@ export function GifPicker({
                   retryDiscovery();
                 }}
               >
-                Retry GIF availability
+                {t("emojiPicker.retryDiscovery")}
               </Button>
             )}
           </div>
@@ -110,7 +113,7 @@ export function GifPicker({
           <div
             className={styles.gifLoading}
             role="status"
-            aria-label="Loading GIFs"
+            aria-label={t("emojiPicker.loadingGifs")}
           >
             {LOADING_TILES.map((tile) => (
               <span key={tile} />
@@ -126,7 +129,7 @@ export function GifPicker({
                 retry(attempt + 1);
               }}
             >
-              Try again
+              {t("emojiPicker.tryAgain")}
             </Button>
           </div>
         ) : gifs?.length ? (
@@ -135,7 +138,7 @@ export function GifPicker({
               <button
                 key={`${gif.id}-${gif.slug}`}
                 type="button"
-                aria-label={`Choose ${gif.title}`}
+                aria-label={t("emojiPicker.chooseGif", { title: gif.title })}
                 title={gif.title}
                 onClick={() => select(gif)}
               >
@@ -150,10 +153,12 @@ export function GifPicker({
             ))}
           </div>
         ) : (
-          <div className={styles.gifEmpty}>No GIFs found.</div>
+          <div className={styles.gifEmpty}>{t("emojiPicker.noGifs")}</div>
         )}
       </div>
-      <div className={styles.gifAttribution}>Powered by KLIPY</div>
+      <div className={styles.gifAttribution}>
+        {t("emojiPicker.attribution")}
+      </div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import {
   useCallback,
   useLayoutEffect,
@@ -45,7 +46,7 @@ export function useVoiceCapture(
     )
       return false;
     if (store.snapshot().length >= MAX_ATTACHMENT_FILES) {
-      report(`Attach at most ${MAX_ATTACHMENT_FILES} files per message.`);
+      report(t("v1msg.upload.tooMany", { count: MAX_ATTACHMENT_FILES }));
       return false;
     }
     const value = { component, token: {} };
@@ -74,7 +75,7 @@ export function useVoiceCapture(
             report(
               error instanceof Error
                 ? error.message
-                : "Could not attach voice note.",
+                : t("v1msg.voice.attachFailed"),
             );
             return false;
           }

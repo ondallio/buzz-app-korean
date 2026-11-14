@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { invoke } from "@tauri-apps/api/core";
 import { useLayoutEffect } from "react";
 import {
@@ -48,6 +49,7 @@ export function FolderCompletion({
   ComposerCompletionProps,
   "scope" | "channelId" | "threadRootId" | "query" | "publish"
 >) {
+  useLanguage();
   // The host remounts this provider on every keystroke. One `!` token in one
   // composer, under one preference, is the lifetime that lists the folders once.
   const folders = useHeldListing(
@@ -74,7 +76,7 @@ export function FolderCompletion({
       .map((folder) => ({
         id: `folder:${folder.path}`,
         label: folder.name,
-        detail: `Local folder · ${folder.displayPath}`,
+        detail: t("v1msg.completion.localFolder", { path: folder.displayPath }),
         edit: {
           token: {
             kind: "folder" as const,

@@ -3,6 +3,13 @@ import type { ChannelLifecycleCapability } from "../relay/channel-lifecycle";
 import { ChannelLifecycleUnconfirmed } from "../relay/channel-lifecycle";
 import { Button } from "../../shared/design-system/ui/Button";
 import { useToastClearance } from "../../shared/design-system/ui/Toast";
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  errorMessage,
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import styles from "./Messages.module.css";
 
 /** Archived and read-only channels share the public preview's lower notice.
@@ -32,6 +39,7 @@ export function ChannelJoinNotice({
   onJoin(): void;
   onHeightChange?(height: number): void;
 }) {
+  useLanguage();
   const notice = useRef<HTMLElement>(null);
   // Notices float above Join, not over it.
   useToastClearance(notice);
@@ -50,7 +58,10 @@ export function ChannelJoinNotice({
     observer.observe(element);
     return () => observer.disconnect();
   }, [onHeightChange]);
-  const [state, setState] = useState<{ channelId: string; error?: string }>();
+  const [state, setState] = useState<{
+    channelId: string;
+    error?: DisplayMessage;
+  }>();
   const controller = useRef<AbortController | undefined>(undefined);
   useEffect(() => () => controller.current?.abort(), []);
   const pending = state?.channelId === channelId && state.error === undefined;
@@ -72,10 +83,14 @@ export function ChannelJoinNotice({
           channelId,
           error:
             reason instanceof ChannelLifecycleUnconfirmed
-              ? "Join may have taken effect, but it is not confirmed yet. Try again to check."
+              ? localMessage("messageNotices.joinUnconfirmed")
               : reason instanceof Error
-                ? reason.message
-                : `Couldn’t join this ${place}.`,
+                ? errorMessage(reason)
+                : localMessage(
+                    place === "chat"
+                      ? "messageNotices.chat.failed"
+                      : "messageNotices.channel.failed",
+                  ),
         });
       },
     );
@@ -87,12 +102,22 @@ export function ChannelJoinNotice({
       ref={notice}
       aria-label={
         archived
-          ? `Archived ${place}`
+          ? t(
+              place === "chat"
+                ? "messageNotices.chat.archivedLabel"
+                : "messageNotices.channel.archivedLabel",
+            )
           : readOnly
-            ? `Read-only ${place}`
-            : place === "chat"
-              ? "Chat preview"
-              : "Channel preview"
+            ? t(
+                place === "chat"
+                  ? "messageNotices.chat.readOnlyLabel"
+                  : "messageNotices.channel.readOnlyLabel",
+              )
+            : t(
+                place === "chat"
+                  ? "messageNotices.chat.previewLabel"
+                  : "messageNotices.channel.previewLabel",
+              )
       }
       aria-hidden={!visible}
       inert={!visible}
@@ -105,14 +130,36 @@ export function ChannelJoinNotice({
       >
         <p className="max-w-md px-2 text-center text-body-sm text-subtle">
           {archived
-            ? `This ${place} is archived`
+            ? t(
+                place === "chat"
+                  ? "messageNotices.chat.archived"
+                  : "messageNotices.channel.archived",
+              )
             : readOnly
               ? joinRole === "guest"
-                ? `This ${place} is read-only${canJoin ? ". Join to keep it in your sidebar and appear as a viewer." : ""}`
-                : "Read-only access"
+                ? canJoin
+                  ? t(
+                      place === "chat"
+                        ? "messageNotices.chat.readOnlyJoin"
+                        : "messageNotices.channel.readOnlyJoin",
+                    )
+                  : t(
+                      place === "chat"
+                        ? "messageNotices.chat.readOnly"
+                        : "messageNotices.channel.readOnly",
+                    )
+                : t("messageNotices.readOnlyAccess")
               : canJoin
-                ? `Join ${place} to send messages`
-                : `You’re previewing this ${place}`}
+                ? t(
+                    place === "chat"
+                      ? "messageNotices.chat.joinPrompt"
+                      : "messageNotices.channel.joinPrompt",
+                  )
+                : t(
+                    place === "chat"
+                      ? "messageNotices.chat.preview"
+                      : "messageNotices.channel.preview",
+                  )}
         </p>
         {canJoin && (
           <Button
@@ -121,7 +168,7 @@ export function ChannelJoinNotice({
             loading={pending}
             onClick={join}
           >
-            Join
+            {t("messageNotices.join")}
           </Button>
         )}
         {canJoin && error && (
@@ -129,7 +176,7 @@ export function ChannelJoinNotice({
             className="max-w-sm basis-full px-2 pb-1 text-body-sm text-danger"
             role="alert"
           >
-            {error}
+            {resolveMessage(error)}
           </p>
         )}
       </div>

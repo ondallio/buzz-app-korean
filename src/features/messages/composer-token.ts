@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import type { JsonValue } from "../navigation/targets";
 
 /** A host-internal semantic editor atom, separate from notification
@@ -58,5 +59,7 @@ export function composerTokenText(token: ComposerToken) {
 }
 
 export function composerTokenName(token: ComposerToken) {
-  return `${token.kind === "folder" ? "Folder" : "Skill"} ${token.label}`;
+  return token.kind === "folder"
+    ? t("v1msg.token.folder", { label: token.label })
+    : t("v1msg.token.skill", { label: token.label });
 }

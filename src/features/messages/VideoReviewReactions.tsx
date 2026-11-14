@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
 import { useState, useSyncExternalStore, type RefObject } from "react";
 import type { RelaySession } from "../relay/session";
@@ -26,6 +27,7 @@ export function VideoReviewReactions({
   videoRef: RefObject<HTMLVideoElement | null>;
   extensions?: ConversationExtensions | undefined;
 }) {
+  useLanguage();
   const channels = useSyncExternalStore(
     session.channels.subscribeList,
     session.channels.list,
@@ -54,20 +56,22 @@ export function VideoReviewReactions({
       return true;
     } catch (reason) {
       setError(
-        reason instanceof Error ? reason.message : "Could not post reaction.",
+        reason instanceof Error
+          ? reason.message
+          : t("v1msg.videoReactions.failed"),
       );
       return false;
     }
   };
   return (
     <div className={styles.reactions} data-review-chrome="">
-      <fieldset aria-label="React at current frame">
+      <fieldset aria-label={t("v1msg.videoReactions.label")}>
         {["😂", "😍", "😮", "🙌", "👍", "👎"].map((emoji) => (
           <IconButton
             size="sm"
             key={emoji}
             disabled={disabled}
-            aria-label={`React ${emoji} at current frame`}
+            aria-label={t("v1msg.videoReactions.emoji", { emoji })}
             onClick={() => select(emoji)}
             icon={
               <span

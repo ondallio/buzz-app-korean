@@ -3,6 +3,7 @@ import { ArrowsClockwiseIcon } from "../../shared/design-system/icons";
 import { useEffect, useState } from "react";
 import type { ChannelMessage } from "../relay/contracts";
 import { DELIVERY_GRACE_MS, deliveryFeedback } from "./delivery";
+import { t, useLanguage } from "../../shared/i18n";
 import styles from "./Messages.module.css";
 
 export function DeliveryNotice({
@@ -12,6 +13,7 @@ export function DeliveryNotice({
   row: ChannelMessage;
   retry?: ((id: string) => void) | undefined;
 }) {
+  useLanguage();
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (!row.delivery || row.delivery === "seen") return;
@@ -23,21 +25,30 @@ export function DeliveryNotice({
   }, [row.createdAt, row.delivery]);
   const feedback = deliveryFeedback(row, now);
   if (!feedback) return null;
+  const message =
+    row.delivery === "failed"
+      ? t("messageNotices.delivery.failed")
+      : row.deliveryError
+        ? t("messageNotices.delivery.unconfirmedError", {
+            error: row.deliveryError,
+          })
+        : t("messageNotices.delivery.unconfirmed");
   const canRetry =
     (row.delivery === "failed" || row.delivery === "unknown") && retry;
   return (
     <div className={styles.delivery}>
       <span role="status" className={canRetry ? "sr-only" : undefined}>
-        {feedback}
+        {message}
       </span>
       {canRetry && (
         <Button
           size="inline"
           variant="ghost"
-          title={feedback}
+          title={message}
           onClick={() => retry(row.id)}
         >
-          <ArrowsClockwiseIcon size={12} aria-hidden="true" /> Retry
+          <ArrowsClockwiseIcon size={12} aria-hidden="true" />{" "}
+          {t("messageNotices.delivery.retry")}
         </Button>
       )}
     </div>

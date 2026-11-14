@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useRef, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -50,6 +51,7 @@ export function MediaReviewFrame({
   restoreFocus?: RefObject<HTMLElement | null> | undefined;
   close(): void;
 }) {
+  useLanguage();
   const backdrop = useRef<HTMLDivElement>(null);
   const { dismiss } = useReviewEntrance(
     frame,
@@ -104,7 +106,7 @@ export function MediaReviewFrame({
             !(target instanceof Element) ||
             !event.currentTarget.contains(target) ||
             target.closest(
-              'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="slider"], [role="menu"], [role="listbox"], [aria-label="Media comments"], [aria-label="Playback speed"]',
+              'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="slider"], [role="menu"], [role="listbox"], [data-media-comments], [aria-label="Playback speed"]',
             )
           )
             return;
@@ -154,7 +156,7 @@ export function MediaReviewFrame({
                 <IconButton
                   size="compact"
                   type="button"
-                  aria-label="Close fullscreen viewer"
+                  aria-label={t("mediaViewing.review.close")}
                   data-review-dismiss=""
                   onClick={(event) => dismiss(event.detail > 0)}
                   icon={<XIcon size={20} aria-hidden="true" />}

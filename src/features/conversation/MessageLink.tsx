@@ -1,4 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { useLanguage } from "../../shared/i18n/language";
+import { t } from "../../shared/i18n";
 import { useConversationPresentation } from "./ConversationPresentation";
 import {
   useContext,
@@ -112,6 +114,7 @@ export function MessageLink({
   interactive?: boolean;
   channelPrivate?: boolean;
 }) {
+  useLanguage();
   const active = useConversationPresentation();
   const renderers = useSyncExternalStore(
     registry?.subscribe ?? subscribe,
@@ -172,12 +175,17 @@ export function MessageLink({
   );
   const chipName =
     chatName || sentChatName || destination?.channelId.slice(0, 8);
-  const chatLabel = chatChip ? `Chat: ${chipName}` : undefined;
+  const chatLabel = chatChip
+    ? t("v1msg.link.chat", { name: chipName ?? "" })
+    : undefined;
   const named = namedChannel(reference);
   const withheld = reference.state === "withheld";
   // The authored label is message text, so it stays; the lock marks it. A raw
   // destination has no name to show.
-  const shown = withheld && label === undefined ? "Private channel" : children;
+  const shown =
+    withheld && label === undefined
+      ? t("search.privateChannelLabel")
+      : children;
   // A raw message destination names its author once read; a draft never reads.
   const byline = useLinkedMessageByline(
     interactive && label === undefined && children === undefined
@@ -190,7 +198,11 @@ export function MessageLink({
     label ??
     byline ??
     directoryLabel ??
-    (named ? `#${named.name}` : withheld ? "Private channel" : undefined);
+    (named
+      ? `#${named.name}`
+      : withheld
+        ? t("search.privateChannelLabel")
+        : undefined);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<HTMLAnchorElement>();
   const [copying, setCopying] = useState(false);
@@ -216,10 +228,10 @@ export function MessageLink({
     setNotice(undefined);
     try {
       await writeClipboardText(url);
-      setNotice({ text: "Link copied", error: false });
+      setNotice({ text: t("messages.action.linkCopied"), error: false });
     } catch {
       setNotice({
-        text: "Couldn’t copy the link. Try again from the link menu.",
+        text: t("v1msg.link.copyFailed"),
         error: true,
       });
     } finally {
@@ -257,7 +269,7 @@ export function MessageLink({
         setNotice(undefined);
         void invoke("plugin:opener|open_url", { url }).catch(() => {
           setNotice({
-            text: "Couldn’t open the link in your browser.",
+            text: t("v1msg.link.browserFailed"),
             error: true,
           });
         });
@@ -318,14 +330,12 @@ export function MessageLink({
         aria-label={
           chatLabel
             ? withheld
-              ? `${chatLabel}, unavailable`
-              : `Open ${chatLabel}`
+              ? t("v1msg.link.chatUnavailableLabel", { label: chatLabel })
+              : t("v1msg.link.openLabel", { label: chatLabel })
             : display
         }
         aria-description={
-          chatChip && withheld
-            ? "Chat unavailable. You don’t have access, or it no longer exists."
-            : description
+          chatChip && withheld ? t("v1msg.link.chatUnavailable") : description
         }
         data-link-label={label ?? ""}
         data-panel-target={panelTarget ? url : undefined}
@@ -333,7 +343,7 @@ export function MessageLink({
         title={
           chatLabel
             ? withheld
-              ? `${chatLabel}. Chat unavailable. You don’t have access, or it no longer exists.`
+              ? t("v1msg.link.chatUnavailableTitle", { label: chatLabel })
               : chatLabel
             : withheld
               ? previewFailures.withheld
@@ -379,7 +389,7 @@ export function MessageLink({
         ? undefined
         : preview
           ? {
-              label: "Message preview",
+              label: t("v1msg.link.messagePreview"),
               body: previewOpen && (
                 <BuzzLinkPreview
                   key={messageViewKey(host, scope, url)}
@@ -391,7 +401,7 @@ export function MessageLink({
             }
           : named
             ? {
-                label: "Channel preview",
+                label: t("messageNotices.channel.previewLabel"),
                 body: <ChannelLinkPreview channel={named} />,
               }
             : offered
@@ -418,9 +428,9 @@ export function MessageLink({
     const root =
       card ??
       (active && interactive && session && referenced
-        ? { label: "Channel preview", body: null }
+        ? { label: t("messageNotices.channel.previewLabel"), body: null }
         : active && interactive && host && entry
-          ? { label: "Link preview", body: null }
+          ? { label: t("v1msg.link.linkPreview"), body: null }
           : undefined);
     // A card with its own controls is not itself the link's destination.
     const controls = !!card && "controls" in card;
@@ -479,7 +489,7 @@ export function MessageLink({
               <MenuIcon>
                 <MessageReplyIcon size={16} />
               </MenuIcon>
-              Open link
+              {t("v1msg.link.open")}
             </MenuItem>
           ) : (
             <MenuLinkItem
@@ -491,14 +501,14 @@ export function MessageLink({
               <MenuIcon>
                 <BrowserIcon size={16} />
               </MenuIcon>
-              Open in browser
+              {t("v1msg.link.openBrowser")}
             </MenuLinkItem>
           )}
           <MenuItem disabled={copying} onClick={() => void copy()}>
             <MenuIcon>
               <CopyIcon size={16} />
             </MenuIcon>
-            Copy link
+            {t("messages.action.copyLink")}
           </MenuItem>
         </MenuPopup>
       </ContextMenuRoot>
@@ -525,9 +535,7 @@ export function MessageLink({
           onDismiss={() => setNotice(undefined)}
         />
       )}
-      {unavailable && (
-        <span role="status"> This Buzz link couldn’t be opened here.</span>
-      )}
+      {unavailable && <span role="status"> {t("v1msg.link.cannotOpen")}</span>}
     </>
   );
   return (

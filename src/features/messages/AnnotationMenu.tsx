@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, type RefObject } from "react";
 import {
   MenuItem,
@@ -23,6 +24,7 @@ export function AnnotationMenu({
   input: RefObject<ComposerInputElement | null>;
   onClose(): void;
 }) {
+  useLanguage();
   const { mark, revision } = request;
   useEffect(() => {
     const element = input.current;
@@ -51,7 +53,10 @@ export function AnnotationMenu({
         anchor={request.anchor}
         size="compact"
         finalFocus={input}
-        aria-label={`${mark.label}: “${mark.text}”`}
+        aria-label={t("v1msg.annotation.label", {
+          label: mark.label,
+          text: mark.text,
+        })}
       >
         <MenuNote>{mark.label}</MenuNote>
         {mark.replacements.map((choice) => (

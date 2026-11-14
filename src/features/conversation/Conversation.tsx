@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { ActivityIndicatorPresentation } from "./typing-presentation";
 import {
   createContext,
@@ -301,6 +302,7 @@ export function ConversationTimeline(
 }
 
 export function ConversationComposer(props: Own<MessageComposerProps>) {
+  useLanguage();
   const { onOpenMediaReview: _, ...shared } = useConversation();
   // Alone, a Solo chat addresses agents; shared, it is a conversation.
   const withPeople = useSoloHasPeople(
@@ -314,8 +316,8 @@ export function ConversationComposer(props: Own<MessageComposerProps>) {
       {...(shared.soloConversation
         ? {
             label: withPeople
-              ? "Message this conversation"
-              : "Message your agents",
+              ? t("v1msg.composer.conversation")
+              : t("v1msg.composer.agents"),
           }
         : {})}
       chatPresentation={shared.ownSoloConversation}

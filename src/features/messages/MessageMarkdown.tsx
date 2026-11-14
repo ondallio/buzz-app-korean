@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useChannelIdentityNames } from "../identity-names/react";
 import {
   createContext,
@@ -561,6 +562,7 @@ function PreparedMessageMarkdown({
   prepared: Extract<PreparedMarkdown, { kind: "markdown" }>;
   resolveName: (pubkey: string, fallback: string) => string;
 }) {
+  useLanguage();
   const row =
     prepared.content === sourceRow.content
       ? sourceRow
@@ -683,7 +685,9 @@ function PreparedMessageMarkdown({
           data-mention-self={key && key === session?.viewer ? "" : undefined}
           data-profile-target={target}
           data-mention-name={label}
-          aria-label={clickable ? `View ${label} profile` : undefined}
+          aria-label={
+            clickable ? t("messageRow.viewProfile", { name: label }) : undefined
+          }
           onClick={
             clickable
               ? (event) => {
@@ -845,6 +849,7 @@ function MessageSpoiler({
   children: ReactNode;
   interactive: boolean;
 }) {
+  useLanguage();
   const [revealed, setRevealed] = useState(false);
   return (
     // `data-spoiler` is the mark the composer parses; selection copy reads it.
@@ -853,7 +858,9 @@ function MessageSpoiler({
         <button
           type="button"
           className={styles.spoilerMask}
-          aria-label={revealed ? "Hide spoiler" : "Reveal spoiler"}
+          aria-label={
+            revealed ? t("v1msg.spoiler.hide") : t("v1msg.spoiler.reveal")
+          }
           aria-expanded={revealed}
           onClick={(event) => {
             event.stopPropagation();

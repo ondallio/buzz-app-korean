@@ -1,3 +1,10 @@
+import { t, useLanguage, formattingLocale } from "../../shared/i18n";
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
+import { attachmentDraftCount } from "../messages/attachment-draft";
 import { DraftPreview } from "./DraftPreview";
 import type { ConversationHostServices } from "../conversation/ConversationHost";
 import type { ConversationExtensions } from "../conversation/contracts";
@@ -20,7 +27,6 @@ import type { Navigation } from "../../features/navigation/controller";
 import { useIdentityNames } from "../../features/identity-names/react";
 import { channelIcon } from "../channels/channel-icon";
 import { avatarMedia } from "../../shared/avatar-source";
-import { relativeTimestamp } from "../../shared/relative-timestamp";
 import {
   ArrowsClockwiseIcon,
   MessageReplyIcon,
@@ -55,9 +61,7 @@ import {
 import { clearDraft, useDrafts } from "./drafts";
 import {
   SENT_LIMIT,
-  clockTime,
   dayLabel,
-  fullTime,
   matches,
   preview,
   sentEntries,
@@ -75,6 +79,7 @@ type Place = {
   /** Everyone else in a DM or Solo chat. */
   members: readonly string[];
   available: boolean;
+  displayNames?: readonly DisplayMessage[];
 };
 type Status = {
   tone: "new" | "last" | "quiet";
@@ -89,6 +94,7 @@ type Row = {
   activity?: Activity | undefined;
   status?: Status | undefined;
   placeholder?: boolean | undefined;
+  emptySelected?: boolean | undefined;
 };
 
 /** The conversation a row's status is read from: its thread, its DM or Solo chat, or its post's replies. */
@@ -98,8 +104,69 @@ const conversationOf = ({ entry, shape }: { entry: Entry; shape: Shape }) =>
     : shape === "room"
       ? entry.channelId
       : entry.id;
-const plural = (count: number, word: string) =>
-  `${count} ${word}${count === 1 ? "" : "s"}`;
+// Display-only dates retain this page's existing ladder/options, not model output.
+function displayRelative(seconds: number, now: number) {
+  const age = Math.max(0, now - seconds);
+  if (age < 60) return t("draftsSent.dates.justNow");
+  const unit = age < 3600 ? "minute" : age < 86400 ? "hour" : "day";
+  const count = Math.floor(
+    age / (unit === "minute" ? 60 : unit === "hour" ? 3600 : 86400),
+  );
+  if (age < 604800) {
+    const keys = {
+      minute: ["draftsSent.dates.minuteOne", "draftsSent.dates.minuteMany"],
+      hour: ["draftsSent.dates.hourOne", "draftsSent.dates.hourMany"],
+      day: ["draftsSent.dates.dayOne", "draftsSent.dates.dayMany"],
+    } as const;
+    return t(keys[unit][count === 1 ? 0 : 1], { count });
+  }
+  return t("draftsSent.dates.onDate", {
+    date: new Date(seconds * 1000).toLocaleDateString(formattingLocale(), {
+      month: "short",
+      day: "numeric",
+    }),
+  });
+}
+function displayDay(seconds: number, now: number) {
+  const then = new Date(seconds * 1000),
+    today = new Date(now);
+  const midnight = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const days = Math.round((midnight(today) - midnight(then)) / 86400000);
+  if (days === 0) return t("date.today");
+  if (days === 1) return t("date.yesterday");
+  return then.toLocaleDateString(formattingLocale(), {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    ...(then.getFullYear() === today.getFullYear() ? {} : { year: "numeric" }),
+  });
+}
+function displayClock(seconds: number) {
+  return new Date(seconds * 1000).toLocaleTimeString(formattingLocale(), {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+function displayFullTime(seconds: number) {
+  return new Date(seconds * 1000).toLocaleString(formattingLocale(), {
+    dateStyle: "full",
+    timeStyle: "short",
+  });
+}
+function displayPlace(place: Place) {
+  if (place.kind === "unknown") return t("draftsSent.places.unavailable");
+  if (place.kind !== "dm") return place.title;
+  if (!place.members.length) return t("draftsSent.places.self");
+  const names = place.displayNames?.map((name) => resolveMessage(name)) ?? [];
+  const first = names.slice(0, 3).join(", ");
+  return names.length > 3
+    ? t("draftsSent.places.namesMore", {
+        names: first,
+        count: names.length - 3,
+      })
+    : first;
+}
 
 function useNow() {
   const [now, setNow] = useState(() => Date.now());
@@ -125,6 +192,7 @@ export function DraftsSentPage({
   panels: ConversationHostServices["panels"];
   extensions?: ConversationExtensions | undefined;
 }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const scope = scopeOf(connection);
   useEffect(() => {
@@ -132,7 +200,7 @@ export function DraftsSentPage({
   }, [navigation]);
   return (
     <PanelFrame scope={connection.scope} companion={companion}>
-      <FullPageSurface aria-label="Drafts & sent">
+      <FullPageSurface aria-label={t("navigation.draftsSent")}>
         {connection.status === "ready" && scope ? (
           <ScopedPage
             key={`${connection.generation}:${connection.scope}`}
@@ -149,8 +217,8 @@ export function DraftsSentPage({
             <div className={styles.sections}>
               <EmptyState
                 icon={<SendIcon size={24} />}
-                title="Choose a community"
-                description="Your drafts and sent messages appear once a community is selected."
+                title={t("draftsSent.page.chooseCommunity")}
+                description={t("draftsSent.page.chooseCommunityDescription")}
               />
             </div>
           </div>
@@ -161,11 +229,12 @@ export function DraftsSentPage({
 }
 
 function Header({ actions }: { actions?: React.ReactNode }) {
+  useLanguage();
   return (
     <PanelHeader
       title={
         <PanelHeaderLabel
-          title="Drafts & sent"
+          title={t("navigation.draftsSent")}
           icon={<SendIcon size="1rem" />}
         />
       }
@@ -189,6 +258,7 @@ function ScopedPage({
   host: ConversationHostServices;
   extensions?: ConversationExtensions | undefined;
 }) {
+  useLanguage();
   type Visit = {
     entry: Entry;
     draft: boolean;
@@ -200,7 +270,7 @@ function ScopedPage({
   const focusAfterClose = useRef<HTMLElement | null>(null);
   const selectedIndex = useRef(0);
   const neighborAfterClose = useRef<HTMLElement | null>(null);
-  const [announcement, setAnnouncement] = useState("");
+  const [announcement, setAnnouncement] = useState<Place>();
   useLayoutEffect(() => {
     if (!selected && focusAfterClose.current) {
       const target = focusAfterClose.current;
@@ -231,7 +301,7 @@ function ScopedPage({
       ? "sent"
       : "drafts",
   );
-  const [notice, setNotice] = useState<string>();
+  const [notice, setNotice] = useState<DisplayMessage>();
   const searchInput = useRef<HTMLInputElement>(null);
   const { sent, refresh: refreshSent } = useSent(session, viewer);
 
@@ -257,6 +327,15 @@ function ScopedPage({
           profiles.get(key)?.name || "Unknown person",
           candidates,
         );
+
+  const displayName = (
+    key: string,
+    candidates?: readonly string[],
+  ): DisplayMessage =>
+    key === viewer
+      ? localMessage("draftsSent.places.you")
+      : resolveName(key, profiles.get(key)?.name || "", candidates) ||
+        localMessage("draftsSent.places.unknownPerson");
 
   function place(channelId: string): Place {
     const channel = byId.get(channelId);
@@ -287,6 +366,7 @@ function ScopedPage({
         kind: "dm",
         members,
         available,
+        displayNames: members.map((key) => displayName(key, members)),
       };
     }
     if (channel.channelType === "solo")
@@ -306,12 +386,15 @@ function ScopedPage({
   useLayoutEffect(() => {
     if (currentIndex >= 0) selectedIndex.current = currentIndex;
   }, [currentIndex]);
-  const entries: (Entry & { placeholder?: boolean })[] = [...drafts.entries];
+  const entries: (Entry & { placeholder?: boolean; emptySelected?: true })[] = [
+    ...drafts.entries,
+  ];
   if (selected?.draft && currentIndex < 0)
     entries.splice(selectedIndex.current, 0, {
       ...selected.entry,
       text: "Empty draft",
       placeholder: true,
+      emptySelected: true,
     });
   const shownDrafts = entries.filter((entry) =>
     listed(byId.get(entry.channelId)),
@@ -381,41 +464,77 @@ function ScopedPage({
     // a count is a minimum, and "You're last" can't be known.
     const complete = entry.createdAt !== undefined && entry.createdAt > floor;
     const latest = activity.after[activity.after.length - 1];
-    const from = latest
-      ? `latest from ${nameOf(latest.author)}, ${relativeTimestamp(latest.created_at, now / 1000)}`
+    const latestName = latest ? resolveMessage(displayName(latest.author)) : "";
+    const latestTime = latest
+      ? displayRelative(latest.created_at, now / 1000)
       : "";
     if (shape === "post") {
       if (!activity.replies) return undefined;
-      const label = complete
-        ? plural(activity.replies, "reply").replace("replys", "replies")
-        : `${activity.replies}+ replies`;
-      // The count stays, but your newer reply in its thread settles whether it's waiting on you.
+      const label = t(
+        complete
+          ? activity.replies === 1
+            ? "draftsSent.status.postOne"
+            : "draftsSent.status.postMany"
+          : "draftsSent.status.postPartial",
+        { count: activity.replies },
+      );
       return {
         tone: newest && activity.after.length ? "new" : "quiet",
         icon: "reply",
         label,
-        detail: from ? `${label}, ${from}` : label,
+        detail: latest
+          ? t(
+              complete
+                ? activity.replies === 1
+                  ? "draftsSent.status.postLatestOne"
+                  : "draftsSent.status.postLatestMany"
+                : "draftsSent.status.postLatestPartial",
+              { count: activity.replies, name: latestName, time: latestTime },
+            )
+          : label,
       };
     }
     // Older messages in a conversation you posted in again are settled by the newer one.
     if (!newest) return undefined;
-    const word = shape === "thread" ? "reply" : "message";
-    const words = shape === "thread" ? "replies" : "messages";
     const count = activity.after.length;
     if (!count)
       return complete
         ? {
             tone: "last",
             icon: "check",
-            label: "You’re last",
-            detail: `No ${words} after yours`,
+            label: t("draftsSent.status.last"),
+            detail: t(
+              shape === "thread"
+                ? "draftsSent.status.noReplies"
+                : "draftsSent.status.noMessages",
+            ),
           }
         : undefined;
-    const shown = count > 99 ? "99+" : complete ? String(count) : `${count}+`;
     return {
       tone: "new",
-      label: `${shown} after you`,
-      detail: `${complete ? count : `At least ${count}`} ${count === 1 && complete ? word : words} after yours, ${from}`,
+      label:
+        count > 99
+          ? t("draftsSent.status.afterCapped")
+          : t(
+              complete
+                ? "draftsSent.status.after"
+                : "draftsSent.status.afterPartial",
+              { count },
+            ),
+      detail: t(
+        shape === "thread"
+          ? complete
+            ? count === 1
+              ? "draftsSent.status.replyOne"
+              : "draftsSent.status.replyMany"
+            : "draftsSent.status.replyPartial"
+          : complete
+            ? count === 1
+              ? "draftsSent.status.messageOne"
+              : "draftsSent.status.messageMany"
+            : "draftsSent.status.messagePartial",
+        { count, name: latestName, time: latestTime },
+      ),
     };
   }
 
@@ -429,6 +548,7 @@ function ScopedPage({
       place: where,
       shape,
       placeholder: "placeholder" in entry ? entry.placeholder : undefined,
+      emptySelected: "emptySelected" in entry ? entry.emptySelected : undefined,
       activity:
         shape === "post"
           ? undefined
@@ -468,6 +588,24 @@ function ScopedPage({
 
   const text = (row: Row) =>
     row.placeholder ? row.entry.text : preview(row.entry.text, "Attachment");
+  const displayText = (row: Row) => {
+    if (row.emptySelected) return t("draftsSent.places.emptyDraft");
+    if (row.placeholder) {
+      const count = attachmentDraftCount(
+        session,
+        `${session.scope}:${row.entry.id}`,
+      );
+      return count
+        ? t(
+            count === 1
+              ? "draftsSent.places.fileOne"
+              : "draftsSent.places.fileMany",
+            { count },
+          )
+        : t("draftsSent.places.chatOrGif");
+    }
+    return preview(row.entry.text, "") || t("draftsSent.places.attachment");
+  };
   const visibleDrafts = draftRows.filter((row) =>
     matches(text(row), row.place.title, search),
   );
@@ -494,11 +632,9 @@ function ScopedPage({
           : { messageId: entry.id }),
       });
       if (result.status === "failed")
-        setNotice(
-          "This conversation could not be opened. It may have been removed, or your access may have changed.",
-        );
+        setNotice(localMessage("draftsSent.feedback.openUnavailable"));
     } catch {
-      setNotice("This conversation could not be opened. Try again.");
+      setNotice(localMessage("draftsSent.feedback.openFailed"));
     }
   }
 
@@ -516,8 +652,7 @@ function ScopedPage({
         : (neighbor ?? searchInput.current);
     visit.current = undefined;
     setSelected(undefined);
-    if (sent)
-      setAnnouncement(`Sent to ${place(current.entry.channelId).title}.`);
+    if (sent) setAnnouncement(place(current.entry.channelId));
   }
 
   /** Clears one draft and keeps keyboard focus in the list: the next row's clear
@@ -531,7 +666,7 @@ function ScopedPage({
     try {
       clearDraft(session, entry.id);
     } catch {
-      setNotice("This draft could not be cleared. Try again.");
+      setNotice(localMessage("draftsSent.feedback.clearFailed"));
       return;
     }
     if (visit.current?.entry.id === entry.id) {
@@ -548,16 +683,27 @@ function ScopedPage({
     const person = place.kind === "dm" ? (place.members[0] ?? viewer) : viewer;
     const profile = profiles.get(person);
     const Icon = channelIcon(byId.get(entry.channelId));
-    const context = entry.threadRootId ? "· Thread" : undefined;
-    const line = text(item);
+    const context = entry.threadRootId ? (
+      <>· {t("messages.thread.title")}</>
+    ) : undefined;
+    const line = displayText(item);
+    const title = displayPlace(place);
     const time = entry.createdAt
       ? draft
-        ? relativeTimestamp(entry.createdAt, now / 1000)
-        : clockTime(entry.createdAt)
+        ? displayRelative(entry.createdAt, now / 1000)
+        : displayClock(entry.createdAt)
       : "";
-    const where = `${place.title}${entry.threadRootId ? ", thread" : ""}`;
     const label = [
-      `${draft ? "Continue draft" : "View message"} in ${where}: ${line}`,
+      t(
+        draft
+          ? entry.threadRootId
+            ? "draftsSent.rows.continueThread"
+            : "draftsSent.rows.continue"
+          : entry.threadRootId
+            ? "draftsSent.rows.viewThread"
+            : "draftsSent.rows.view",
+        { place: title, text: line },
+      ),
       status?.detail,
     ]
       .filter(Boolean)
@@ -572,7 +718,7 @@ function ScopedPage({
         title={
           draft || place.available
             ? undefined
-            : "This conversation is not available right now"
+            : t("draftsSent.rows.unavailable")
         }
         onClick={(event) => {
           if (visit.current?.entry.id === entry.id) return;
@@ -588,7 +734,7 @@ function ScopedPage({
           );
           visit.current = next;
           setSelected(next);
-          setAnnouncement("");
+          setAnnouncement(undefined);
           setNotice(undefined);
         }}
         avatar={
@@ -605,7 +751,7 @@ function ScopedPage({
             shape={destinationIcon || profile?.isAgent ? "squircle" : "circle"}
           />
         }
-        sender={<span className={styles.destinationName}>{place.title}</span>}
+        sender={<span className={styles.destinationName}>{title}</span>}
         source={context}
         time={
           <span className={styles.rowMeta}>
@@ -629,7 +775,7 @@ function ScopedPage({
               {time && entry.createdAt !== undefined && (
                 <time
                   dateTime={new Date(entry.createdAt * 1000).toISOString()}
-                  title={fullTime(entry.createdAt)}
+                  title={displayFullTime(entry.createdAt)}
                 >
                   {time}
                 </time>
@@ -649,8 +795,13 @@ function ScopedPage({
               <IconButton
                 variant="bare"
                 icon={<TrashIcon size={16} aria-hidden="true" />}
-                aria-label={`Clear draft in ${where}: ${line}`}
-                title="Clear draft"
+                aria-label={t(
+                  entry.threadRootId
+                    ? "draftsSent.rows.clearThread"
+                    : "draftsSent.rows.clear",
+                  { place: title, text: line },
+                )}
+                title={t("draftsSent.rows.clearTitle")}
                 data-clear-draft=""
                 onClick={(event) => clear(entry, event.currentTarget)}
               />
@@ -663,12 +814,17 @@ function ScopedPage({
     );
   }
 
-  const groups: { label: string; rows: Row[] }[] = [];
+  const groups: { label: string; timestamp: number; rows: Row[] }[] = [];
   for (const item of visibleSent) {
     const label = dayLabel(item.entry.createdAt ?? 0, now);
     const last = groups[groups.length - 1];
     if (last?.label === label) last.rows.push(item);
-    else groups.push({ label, rows: [item] });
+    else
+      groups.push({
+        label,
+        timestamp: item.entry.createdAt ?? 0,
+        rows: [item],
+      });
   }
   const refresh = () => {
     session.channels.refreshList?.();
@@ -683,7 +839,7 @@ function ScopedPage({
         key={selected.entry.id}
         entry={selected.entry}
         mode={selected.draft ? "draft" : "sent"}
-        title={place(selected.entry.channelId).title}
+        title={displayPlace(place(selected.entry.channelId))}
         channel={byId.get(selected.entry.channelId)}
         session={session}
         host={host}
@@ -705,8 +861,9 @@ function ScopedPage({
         variant="default"
         value={search}
         onValueChange={setSearch}
-        label="Search drafts and sent messages"
-        placeholder="Search drafts and sent messages"
+        label={t("draftsSent.page.search")}
+        clearLabel={t("draftsSent.page.clearSearchField")}
+        placeholder={t("draftsSent.page.search")}
         inputRef={searchInput}
       />
     </div>
@@ -718,8 +875,8 @@ function ScopedPage({
         actions={
           <IconButton
             icon={<ArrowsClockwiseIcon size={16} />}
-            aria-label="Refresh"
-            title="Refresh"
+            aria-label={t("draftsSent.page.refresh")}
+            title={t("draftsSent.page.refresh")}
             disabled={sent.status === "loading"}
             onClick={refresh}
           />
@@ -728,22 +885,28 @@ function ScopedPage({
       <div className={styles.tabsToolbar}>
         <div className={styles.typeTabs}>
           <Tabs
-            label="Drafts and sent"
+            label={t("draftsSent.page.tabs")}
             variant="panel"
             size="sm"
             value={view}
             items={[
               {
                 value: "drafts",
-                label: "Drafts",
+                label: t("draftsSent.page.drafts"),
                 panelId: "drafts-view",
                 trailing: shownDrafts.length ? (
                   <span className="text-caption text-subtle">
-                    {shownDrafts.length}
+                    {new Intl.NumberFormat(formattingLocale()).format(
+                      shownDrafts.length,
+                    )}
                   </span>
                 ) : undefined,
               },
-              { value: "sent", label: "Sent", panelId: "sent-view" },
+              {
+                value: "sent",
+                label: t("draftsSent.page.sent"),
+                panelId: "sent-view",
+              },
             ]}
             onValueChange={(next) => {
               visit.current = undefined;
@@ -756,11 +919,13 @@ function ScopedPage({
       </div>
       {notice && (
         <p role="alert" className={styles.notice}>
-          {notice}
+          {resolveMessage(notice)}
         </p>
       )}
       <p role="status" className="sr-only">
-        {announcement}
+        {announcement
+          ? t("draftsSent.feedback.sent", { place: displayPlace(announcement) })
+          : ""}
       </p>
       <div className={styles.sections}>
         <section
@@ -779,23 +944,28 @@ function ScopedPage({
                   role="alert"
                   className={`text-body-sm text-subtle ${styles.sectionCopy}`}
                 >
-                  Some saved drafts could not be read. They are unchanged.
+                  {t("draftsSent.page.unreadableDrafts")}
                 </p>
               )}
               {visibleDrafts.length ? (
-                <ul className={styles.list} aria-label="Drafts">
+                <ul
+                  className={styles.list}
+                  aria-label={t("draftsSent.page.drafts")}
+                >
                   {visibleDrafts.map((item) => row(item, true))}
                 </ul>
               ) : (
                 <EmptyState
                   icon={<SendIcon size={24} />}
                   title={
-                    search ? `No drafts match “${search.trim()}”.` : "No drafts"
+                    search
+                      ? t("draftsSent.page.noDraftMatch", {
+                          search: search.trim(),
+                        })
+                      : t("draftsSent.page.noDrafts")
                   }
                   description={
-                    search
-                      ? undefined
-                      : "Messages you start and don’t send wait here."
+                    search ? undefined : t("draftsSent.page.draftsDescription")
                   }
                   action={
                     search ? (
@@ -806,7 +976,7 @@ function ScopedPage({
                           searchInput.current?.focus();
                         }}
                       >
-                        Clear search
+                        {t("draftsSent.page.clearSearch")}
                       </Button>
                     ) : undefined
                   }
@@ -814,7 +984,7 @@ function ScopedPage({
               )}
               {drafts.limited && (
                 <p className={`text-caption text-subtle ${styles.sectionCopy}`}>
-                  Showing 500 drafts.
+                  {t("draftsSent.page.draftLimit", { count: 500 })}
                 </p>
               )}
             </div>
@@ -837,15 +1007,15 @@ function ScopedPage({
                   role="alert"
                   className={`${styles.notice} ${styles.sectionCopy}`}
                 >
-                  <p>Sent messages could not be loaded.</p>
+                  <p>{t("draftsSent.page.sentLoadFailure")}</p>
                   <Button size="sm" onClick={() => refreshSent.current()}>
-                    Retry
+                    {t("draftsSent.page.retry")}
                   </Button>
                 </div>
               )}
               <LoadingRegion
                 pending={sentLoading}
-                label="Loading sent messages…"
+                label={t("draftsSent.page.loadingSent")}
                 statusVisibility={
                   sentLoading && !groups.length ? "visible" : "screen-reader"
                 }
@@ -854,11 +1024,11 @@ function ScopedPage({
                   groups.map((group) => (
                     <section
                       key={group.label}
-                      aria-label={group.label}
+                      aria-label={displayDay(group.timestamp, now)}
                       className={styles.dayGroup}
                     >
                       <h3 className={`text-caption text-subtle ${styles.day}`}>
-                        {group.label}
+                        {displayDay(group.timestamp, now)}
                       </h3>
                       <ul className={styles.list}>
                         {group.rows.map((item) => row(item, false))}
@@ -868,8 +1038,12 @@ function ScopedPage({
                 ) : sentLoading || sent.status === "error" ? null : search ? (
                   <EmptyState
                     icon={<SendIcon size={24} />}
-                    title={`No sent messages match “${search.trim()}”`}
-                    description={`Search covers your latest ${SENT_LIMIT} messages.`}
+                    title={t("draftsSent.page.noSentMatch", {
+                      search: search.trim(),
+                    })}
+                    description={t("draftsSent.page.searchCoverage", {
+                      count: SENT_LIMIT,
+                    })}
                     action={
                       <Button
                         size="sm"
@@ -878,21 +1052,21 @@ function ScopedPage({
                           searchInput.current?.focus();
                         }}
                       >
-                        Clear search
+                        {t("draftsSent.page.clearSearch")}
                       </Button>
                     }
                   />
                 ) : (
                   <EmptyState
                     icon={<SendIcon size={24} />}
-                    title="Nothing sent yet"
-                    description="Messages you send in this community show up here."
+                    title={t("draftsSent.page.nothingSent")}
+                    description={t("draftsSent.page.sentDescription")}
                   />
                 )}
               </LoadingRegion>
               {sentRows.length >= SENT_LIMIT && (
                 <p className={`text-caption text-subtle ${styles.sectionCopy}`}>
-                  Showing your latest {SENT_LIMIT} messages.
+                  {t("draftsSent.page.sentLimit", { count: SENT_LIMIT })}
                 </p>
               )}
             </div>

@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { validateRecording, type VoiceRecording } from "../relay/voice-media";
 import { useState, useSyncExternalStore } from "react";
 import type { ComposerSession } from "./composer-session";
@@ -155,9 +156,7 @@ export function attachmentDraft(
         ? {
             ...item,
             status: retryRequired ? "error" : "queued",
-            error: retryRequired
-              ? "Upload paused. Retry to continue."
-              : undefined,
+            error: retryRequired ? t("v1msg.upload.paused") : undefined,
             transfer: undefined,
           }
         : item,
@@ -248,9 +247,7 @@ export function attachmentDraft(
           status: "error",
           transfer: undefined,
           error:
-            error instanceof Error
-              ? error.message
-              : "Upload failed. Retry or remove this file.",
+            error instanceof Error ? error.message : t("v1msg.upload.failed"),
         });
       throw error;
     } finally {
@@ -266,7 +263,7 @@ export function attachmentDraft(
   function start(item: DraftAttachment, signal = new AbortController().signal) {
     if (item.status === "error")
       return Promise.reject(
-        new Error(item.error || "Retry or remove this file."),
+        new Error(item.error || t("v1msg.upload.retryOrRemove")),
       );
     const existing = pending.get(item.id);
     if (existing && active.has(item.id)) return abortable(existing, signal);
@@ -310,17 +307,15 @@ export function attachmentDraft(
       const refused = new Map<string, string[]>();
       for (const file of files) {
         const reason = !file.size
-          ? new Error(`${file.name} is empty.`)
+          ? new Error(t("v1msg.upload.empty", { name: file.name }))
           : items.length + admitted.length >= MAX_ATTACHMENT_FILES
             ? new Error(
-                `Attach at most ${MAX_ATTACHMENT_FILES} files per message.`,
+                t("v1msg.upload.tooMany", { count: MAX_ATTACHMENT_FILES }),
               )
             : file.size > UPLOAD_MAX_BYTES
               ? new UploadError("size")
               : retained + file.size > MAX_RETAINED_BYTES
-                ? new Error(
-                    "Attachment drafts are full (1,000 MiB). Send or remove some files first.",
-                  )
+                ? new Error(t("v1msg.upload.full"))
                 : undefined;
         if (!reason) {
           admitted.push(file);
@@ -334,11 +329,16 @@ export function attachmentDraft(
       const left = Array.from(refused, ([reason, names]) => {
         const listed =
           names.length > NAMED_REFUSALS
-            ? `${names.slice(0, NAMED_REFUSALS).join(", ")} and ${names.length - NAMED_REFUSALS} more`
+            ? t("v1msg.upload.namesMore", {
+                names: names.slice(0, NAMED_REFUSALS).join(", "),
+                count: names.length - NAMED_REFUSALS,
+              })
             : names.join(", ");
         return reason
-          ? `${listed}: ${reason}`
-          : `${listed} ${names.length === 1 ? "is" : "are"} empty.`;
+          ? t("v1msg.upload.refused", { names: listed, reason })
+          : names.length === 1
+            ? t("v1msg.upload.empty", { name: listed })
+            : t("v1msg.upload.emptyMany", { names: listed });
       });
       if (!admitted.length) return left;
       items = [
@@ -372,7 +372,7 @@ export function attachmentDraft(
       if (items.some((item) => item.uploaded?.url === attachment.url)) return;
       if (items.length >= MAX_ATTACHMENT_FILES)
         throw new Error(
-          `Attach at most ${MAX_ATTACHMENT_FILES} files per message.`,
+          t("v1msg.upload.tooMany", { count: MAX_ATTACHMENT_FILES }),
         );
       // No local bytes are retained. Send reuses the already uploaded descriptor.
       items = [

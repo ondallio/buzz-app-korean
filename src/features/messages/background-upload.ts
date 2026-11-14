@@ -1,4 +1,9 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import {
+  errorMessage,
+  localMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import type { UploadedAttachment } from "../relay/attachments";
 import type { ComposerSession } from "./composer-session";
 import {
@@ -9,18 +14,33 @@ import {
   type DraftAttachment,
 } from "./attachment-draft";
 
-const recoveryNotice = (recovery: boolean | "conflict", to: string) =>
-  recovery === "conflict"
-    ? `Failed send to ${to} was kept because its draft changed. Clear that draft, then retry recovery before leaving this session.`
-    : `Could not restore the failed send to ${to}. Retry recovery before leaving this session.`;
+const recoveryNotice = (
+  recovery: boolean | "conflict",
+  destination: Destination,
+) =>
+  localMessage(
+    recovery === "conflict"
+      ? destination.thread
+        ? "messageNotices.recovery.conflictThread"
+        : "messageNotices.recovery.conflict"
+      : destination.thread
+        ? "messageNotices.recovery.failedThread"
+        : "messageNotices.recovery.failed",
+    { name: destination.name },
+  );
 
 /** Where a send is going: its conversation's name and, unless only its own
  * entry point opens it (a huddle), a link that opens it. */
-export type Destination = Readonly<{ name: string; link?: string }>;
+export type Destination = Readonly<{
+  name: string;
+  link?: string;
+  /** Display-only context; the conversation name stays literal. */
+  thread?: true;
+}>;
 type Notice = Readonly<{
   id: string;
-  title: string;
-  description?: string;
+  title: DisplayMessage;
+  description?: DisplayMessage;
   destination: Destination;
   retry?: () => void;
 }>;
@@ -125,8 +145,8 @@ function update(queue: Queue) {
 
 function reason(error: unknown) {
   return error instanceof Error && error.message
-    ? error.message
-    : "Unknown error";
+    ? errorMessage(error)
+    : localMessage("messageNotices.unknownError");
 }
 
 /** Takes admitted files after Send; files upload in order, then publish once.
@@ -156,7 +176,9 @@ export function sendInBackground(
   update(queue);
   void (async () => {
     let uploaded: readonly UploadedAttachment[] | undefined;
-    let failure: { title: string; description: string } | undefined;
+    let failure:
+      | { title: DisplayMessage; description: DisplayMessage }
+      | undefined;
     let preparationError: unknown;
     try {
       uploaded = await store.prepareForSend(signal);
@@ -168,9 +190,16 @@ export function sendInBackground(
       if (!signal.aborted) {
         if (uploaded) preparationError = error;
         failure = {
-          title: uploaded
-            ? `Message to ${destination.name} failed to send`
-            : `Upload to ${destination.name} failed`,
+          title: localMessage(
+            uploaded
+              ? destination.thread
+                ? "messageNotices.send.failedThread"
+                : "messageNotices.send.failed"
+              : destination.thread
+                ? "messageNotices.upload.failedThread"
+                : "messageNotices.upload.failed",
+            { name: destination.name },
+          ),
           description: reason(error),
         };
       }
@@ -189,7 +218,7 @@ export function sendInBackground(
             ...queue.notices,
             {
               id: key,
-              title: recoveryNotice(recovery, destination.name),
+              title: recoveryNotice(recovery, destination),
               destination,
               retry: () => {
                 let result: boolean | "conflict" = false;
@@ -203,7 +232,7 @@ export function sendInBackground(
                     item.id === key
                       ? {
                           ...item,
-                          title: recoveryNotice(result, destination.name),
+                          title: recoveryNotice(result, destination),
                         }
                       : item,
                   );

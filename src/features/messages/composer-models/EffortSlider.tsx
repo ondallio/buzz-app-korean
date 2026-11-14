@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../../shared/i18n";
 import { Slider } from "@base-ui/react/slider";
 import {
   useState,
@@ -37,6 +38,7 @@ export function EffortSlider({
   pick(effort: string | undefined): void;
   thumb?: Ref<HTMLInputElement>;
 }) {
+  useLanguage();
   const [pointerMoving, setPointerMoving] = useState(false);
   const rubber = useRubberTrack(disabled);
   const tether = useRef<HTMLDivElement>(null);
@@ -60,7 +62,7 @@ export function EffortSlider({
   const at = set ? index : Math.max(own, 0);
   const last = Math.max(efforts.length - 1, 1);
   const known = set || own >= 0;
-  const level = known ? (efforts[at]?.label ?? "") : "Default";
+  const level = known ? (efforts[at]?.label ?? "") : t("agentModel.default");
   // A tap on the thumb's resting stop changes no value, so commits pick too.
   // Next-run choices clear at the default; chat choices remain explicit.
   const choose = (next: number) => {
@@ -129,8 +131,8 @@ export function EffortSlider({
             inputRef={thumb}
             aria-label={
               chatScoped
-                ? `Effort for ${name} in this chat`
-                : `Effort for ${name}'s next run`
+                ? t("v1msg.models.effortForChat", { name })
+                : t("v1msg.models.effortForNextRun", { name })
             }
             getAriaValueText={() => level}
           >

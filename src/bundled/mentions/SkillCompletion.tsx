@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { invoke } from "@tauri-apps/api/core";
 import { useContext, useLayoutEffect } from "react";
 import { useAgentChoices } from "../../features/agents/use-choices";
@@ -50,6 +51,7 @@ export function SkillCompletion({
   query,
   publish,
 }: ComposerCompletionProps) {
+  useLanguage();
   const addressed = useContext(AddressedAgentsContext);
   const choices = useAgentChoices(session, false);
   const agents = choices.identities.filter((choice) =>
@@ -78,11 +80,14 @@ export function SkillCompletion({
   );
   const several = agents.length > 1;
   const target = folders && agent?.pubkey;
-  const group = agent && `Skills for ${agent.managedName ?? agent.name}`;
+  const group =
+    agent &&
+    t("v1msg.completion.skillsFor", {
+      name: agent.managedName ?? agent.name,
+    });
   useLayoutEffect(() => {
     let result: HostCompletionResult | undefined;
-    if (several)
-      result = { items: [], status: "Mention one agent to choose a skill." };
+    if (several) result = { items: [], status: t("v1msg.completion.oneAgent") };
     else if (target && skills) {
       const needle = query.query.toLowerCase();
       const items = skills.rows

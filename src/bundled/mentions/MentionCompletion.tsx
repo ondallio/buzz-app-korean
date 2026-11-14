@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useProfileGeneration } from "../../features/relay/react";
 import { TeamMentionAvatars } from "./TeamMentionAvatars";
 import {
@@ -70,6 +71,7 @@ export function MentionCompletion({
   query,
   publish,
 }: ComposerCompletionProps) {
+  useLanguage();
   // The host remounts this provider on every keystroke. One `@` token in one
   // composer is the chooser lifetime that keeps the last directory page.
   const model = useMentionChoices(
@@ -237,8 +239,8 @@ export function MentionCompletion({
                 ? undefined
                 : inviteAgents
                   ? parentAdmission
-                    ? "Adds to channel"
-                    : "Adds to chat"
+                    ? t("v1msg.completion.addsChannel")
+                    : t("v1msg.completion.addsChat")
                   : outsideMentionDetail(channel, elsewhere),
             ]
               .filter(Boolean)
@@ -365,28 +367,27 @@ export function MentionCompletion({
         : {}),
       items: next.flatMap((id) => byId.get(id) ?? []),
       ...(model.pending
-        ? { status: "Loading recipients…" }
+        ? { status: t("v1msg.completion.loadingRecipients") }
         : model.directory.error
           ? { status: model.directory.error }
           : !admitted
             ? {}
             : model.archives.status === "error"
-              ? { status: "Archive information unavailable. Retry to refresh." }
+              ? { status: t("v1msg.completion.archivesFailed") }
               : agents.status === "error" || agents.error
-                ? { status: "Could not load agents. Retry to refresh." }
+                ? { status: t("v1msg.completion.agentsFailed") }
                 : admitted && membershipMissing
-                  ? { status: "Channel membership unavailable." }
+                  ? { status: t("mentionPicker.membershipUnavailable") }
                   : admitted && membershipError
-                    ? { status: "Could not refresh channel membership." }
+                    ? { status: t("mentionPicker.membershipFailed") }
                     : // Only a failed read: a member who never set a name is
                       // a complete answer, not an error.
                       error
                       ? {
-                          status:
-                            "Could not load some names. Retry to refresh.",
+                          status: t("v1msg.completion.namesFailed"),
                         }
                       : model.directory.loading
-                        ? { status: "Searching community…" }
+                        ? { status: t("mentionPicker.searchingCommunity") }
                         : teams.status
                           ? { status: teams.status }
                           : {}),
