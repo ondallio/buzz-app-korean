@@ -160,6 +160,8 @@ fn main() {
             "media_stream_base",
             "get_os_idle_seconds",
             "system_hour_cycle",
+            "system_language",
+            "set_desktop_language",
             "workspace_pick_folder",
             "repositories_folder_validate",
             "repositories_folder_list",

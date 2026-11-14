@@ -1,9 +1,28 @@
 import { Combobox as BaseCombobox } from "@base-ui/react/combobox";
-import { useId, type ComponentProps, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useId,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { CaretDownIcon, CircleNotchIcon, CheckIcon } from "../icons";
 import { Field } from "./Field";
 import { InputGroup } from "./InputGroup";
 import { IconButton } from "./IconButton";
+
+const SearchLabel = createContext("Search");
+
+/** The host supplies search copy; Combobox keeps filtering and focus ownership. */
+export function ComboboxLabelsProvider({
+  searchLabel,
+  children,
+}: {
+  searchLabel: string;
+  children: ReactNode;
+}) {
+  return <SearchLabel value={searchLabel}>{children}</SearchLabel>;
+}
 
 /** Shared presentation; callers retain filtering, custom values and async work. */
 function Control({
@@ -126,11 +145,12 @@ function Trigger({
 }
 
 function Search() {
+  const searchLabel = useContext(SearchLabel);
   return (
     <div className="p-2">
       <BaseCombobox.Input
-        aria-label="Search"
-        placeholder="Search"
+        aria-label={searchLabel}
+        placeholder={searchLabel}
         data-buzz-ui=""
         className="buzz-input"
         autoCorrect="off"

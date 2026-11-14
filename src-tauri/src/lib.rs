@@ -92,6 +92,8 @@ use legacy_communities::legacy_communities;
 use local_skills::local_skills_list;
 use os_idle::get_os_idle_seconds;
 use repositories_folder::{repositories_folder_list, repositories_folder_validate};
+#[cfg(target_os = "macos")]
+mod native_language;
 mod relaunch;
 mod relay;
 mod relay_admin;
@@ -801,6 +803,9 @@ fn commands<R: tauri::Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Sen
         media_stream_base,
         get_os_idle_seconds,
         system_clock::system_hour_cycle,
+        system_clock::system_language,
+        #[cfg(target_os = "macos")]
+        native_language::set_desktop_language,
         workspace_pick_folder,
         repositories_folder_validate,
         repositories_folder_list,

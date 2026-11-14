@@ -9,6 +9,7 @@ import {
 } from "../chips/faceResolver";
 
 import { PreviewCard } from "./PreviewCard";
+import { useChipLabels } from "./ChipLabels";
 
 /**
  * A reference to a person, agent, channel, message, or link, shown inline in a
@@ -55,7 +56,8 @@ export function InlineChip({
   const face = useChipFace(address, suppliedFace);
   const Icon = KIND_ICON[address.kind];
   const trigger = CHIP_KIND_TRIGGER[address.kind];
-  const kind = accessibleKind(address.kind);
+  const labels = useChipLabels();
+  const kind = labels.kind(address.kind);
 
   const content = (
     <>
@@ -92,10 +94,10 @@ export function InlineChip({
   );
 
   const accessibleName = face.loading
-    ? `Resolving mention ${face.label}`
+    ? labels.resolving(face.label)
     : face.resolved
-      ? `${kind} ${face.label}${qualifier ? `, ${qualifier.accessibleLabel}` : ""}`
-      : `Unresolved ${kind.toLowerCase()}`;
+      ? labels.resolved(address.kind, face.label, qualifier?.accessibleLabel)
+      : labels.unresolved(address.kind);
   const state = face.loading
     ? "loading"
     : face.resolved
@@ -148,12 +150,4 @@ export function InlineChip({
       ) : null}
     </PreviewCard>
   );
-}
-
-function accessibleKind(kind: ChipKind): string {
-  if (kind === "channel") return "Channel";
-  if (kind === "agent") return "Agent";
-  if (kind === "message") return "Message";
-  if (kind === "link") return "Link";
-  return "Person";
 }

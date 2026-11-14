@@ -1,3 +1,4 @@
+import { useTabsLabels } from "./TabsLabels";
 import { Tabs as BaseTabs } from "@base-ui/react/tabs";
 import { NavigationItem } from "./NavigationItem";
 import { IconButton } from "./IconButton";
@@ -39,6 +40,8 @@ export type TabItem<Value extends string> = {
   /** Increment to briefly identify an already-open navigation tab. */
   attentionRequest?: number | undefined;
   onClose?: (() => void) | undefined;
+  /** Complete accessible close name supplied by the host. */
+  closeLabel?: string | undefined;
   /** Option/Alt+Shift+Arrow moves this tab one position; the caller places it. */
   draggable?: boolean | undefined;
   onMove?: ((delta: -1 | 1) => void) | undefined;
@@ -119,6 +122,7 @@ export function Tabs<Value extends string>({
   /** Brief visual confirmation of a tab arriving after a completed move. */
   arrivalValue?: Value | undefined;
 }) {
+  const labels = useTabsLabels();
   const iconOnly = variant === "segmented-icons" || variant === "dock";
   const [renaming, setRenaming] = useState<Value>();
   if (renaming !== undefined && !items.some((item) => item.value === renaming))
@@ -269,7 +273,8 @@ export function Tabs<Value extends string>({
               {item.onClose && (
                 <IconButton
                   size="xs"
-                  aria-label={`Close ${item.label} tab`}
+                  aria-label={item.closeLabel ?? labels.close(item.label)}
+                  data-tab-close={item.value}
                   onClick={item.onClose}
                   icon={<XIcon size="1rem" aria-hidden="true" />}
                 />
@@ -373,6 +378,7 @@ export function TabMenu({
   closeOthers: (() => boolean) | undefined;
   children: ReactNode;
 }) {
+  const labels = useTabsLabels();
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLElement>(null);
   const [anchor, setAnchor] = useState<HTMLElement>();
@@ -435,7 +441,7 @@ export function TabMenu({
         {children}
       </ContextMenuTrigger>
       <MenuPopup
-        aria-label={`Actions for ${label} tab`}
+        aria-label={labels.actions(label)}
         size="compact"
         anchor={anchor}
         finalFocus={() =>
@@ -456,9 +462,9 @@ export function TabMenu({
             {action.label}
           </MenuItem>
         ))}
-        {onRename && <MenuItem onClick={onRename}>Rename tab</MenuItem>}
+        {onRename && <MenuItem onClick={onRename}>{labels.rename}</MenuItem>}
         {closeOthers && (
-          <MenuItem onClick={closeOthers}>Close other tabs</MenuItem>
+          <MenuItem onClick={closeOthers}>{labels.closeOthers}</MenuItem>
         )}
         {closeAll && (
           <MenuItem
@@ -466,7 +472,7 @@ export function TabMenu({
               closingAll.current = closeAll();
             }}
           >
-            Close all tabs
+            {labels.closeAll}
           </MenuItem>
         )}
       </MenuPopup>
@@ -482,6 +488,7 @@ function TabRename({
   label: string;
   onDone(name: string | undefined): void;
 }) {
+  const labels = useTabsLabels();
   const done = useRef(false);
   const initial = useRef(label);
   const finish = (input: HTMLInputElement, name: string | undefined) => {
@@ -498,7 +505,7 @@ function TabRename({
     <span className="buzz-tabs-rename">
       <Input
         controlSize="sm"
-        aria-label="Tab name"
+        aria-label={labels.name}
         defaultValue={label}
         autoFocus
         // The field keeps its own text menu and middle-click paste rather than

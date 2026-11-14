@@ -17,6 +17,7 @@ export function SearchField({
   error,
   prefix,
   trailing,
+  clearLabel,
   ...inputProps
 }: {
   inputRef?: Ref<HTMLElement>;
@@ -30,6 +31,8 @@ export function SearchField({
   onValueChange: (value: string) => void;
   label?: string;
   placeholder?: string;
+  /** Whole accessible name supplied by the host's language owner. */
+  clearLabel?: string;
 } & Omit<
   ComponentProps<typeof Input>,
   "value" | "onValueChange" | "className" | "ref" | "render" | "type" | "prefix"
@@ -42,7 +45,7 @@ export function SearchField({
         data-empty={!value ? "" : undefined}
         tabIndex={!value ? -1 : 0}
         aria-hidden={!value || undefined}
-        aria-label={`Clear ${label.toLowerCase()}`}
+        aria-label={clearLabel ?? `Clear ${label.toLowerCase()}`}
         icon={<XIcon size={16} aria-hidden="true" />}
         size="sm"
         disabled={inputProps.disabled || inputProps.readOnly}

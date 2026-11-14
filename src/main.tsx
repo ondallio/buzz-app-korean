@@ -14,6 +14,9 @@ import { useRejectUnclaimedDrops } from "./features/messages/use-file-drop";
 import { TooltipProvider } from "./shared/design-system/ui/Tooltip";
 import { clearReactDevMeasures } from "./features/developer/react-dev-timing";
 import { showStartupFailure, startupHandedToReact } from "./app/launch";
+import { useLanguageDocument } from "./shared/i18n/document";
+import { initializeHostLanguage } from "./shared/i18n/host-language";
+import { LanguageProviders } from "./app/LanguageProviders";
 
 // React dev builds otherwise fill the User Timing buffer without limit.
 if (import.meta.env.DEV) clearReactDevMeasures();
@@ -29,7 +32,7 @@ if (!container) {
 // What stops startup shows "Buzz couldn’t open" from public/launch-init.js
 // instead of a stuck launch or empty window; what unmounts the whole app once
 // its launch has ended shows "Buzz stopped working" there.
-void loadAgentStorage().finally(() => {
+void Promise.all([loadAgentStorage(), initializeHostLanguage()]).finally(() => {
   try {
     const services = createServices();
     const root = createRoot(container, {
@@ -37,12 +40,15 @@ void loadAgentStorage().finally(() => {
         showStartupFailure(error, info.componentStack),
     });
     function HostApp() {
+      useLanguageDocument();
       useKeyboardFocusVisibility();
       useRejectUnclaimedDrops();
       return (
-        <TooltipProvider>
-          <App services={services} />
-        </TooltipProvider>
+        <LanguageProviders>
+          <TooltipProvider>
+            <App services={services} />
+          </TooltipProvider>
+        </LanguageProviders>
       );
     }
     root.render(
