@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   AnimatePresence,
   motion,
@@ -37,6 +38,18 @@ import styles from "./ComposerFormattingTools.module.css";
 
 // A short ease-out gives immediate feedback without an entrance delay.
 const reveal = { duration: 0.14, ease: [0.23, 1, 0.32, 1] } as const;
+const formatLabels = {
+  Bold: "messages.format.bold",
+  Italic: "messages.format.italic",
+  Strikethrough: "messages.format.strike",
+  Code: "messages.format.code",
+  "Code block": "messages.format.codeBlock",
+  Link: "messages.format.link",
+  "Bullet list": "messages.format.bullets",
+  "Ordered list": "messages.format.ordered",
+  Quote: "messages.format.quote",
+  Spoiler: "messages.format.spoiler",
+} as const;
 const options = [
   ["Bold", TextBIcon],
   ["Italic", TextItalicIcon],
@@ -84,6 +97,7 @@ export function ComposerFormattingTools({
   toggleFormat(format: ComposerFormat): void;
   editLink(): void;
 }) {
+  useLanguage();
   const [open, setOpen] = useState(false);
   const reduceMotion = useReducedMotion();
   const [keyboardToggle, setKeyboardToggle] = useState(false);
@@ -110,9 +124,9 @@ export function ComposerFormattingTools({
       ref={closedToggle}
       size="sm"
       variant="ghost"
-      aria-label="Toggle formatting"
+      aria-label={t("messages.format.toggle")}
       aria-pressed={open}
-      title="Formatting"
+      title={t("messages.format.title")}
       disabled={disabled}
       onMouseDown={(event) => event.preventDefault()}
       onClick={(event) => change(!open, event.detail === 0)}
@@ -147,8 +161,8 @@ export function ComposerFormattingTools({
                 ref={openToggle}
                 size="sm"
                 variant="subtle"
-                aria-label="Close formatting"
-                title="Close formatting"
+                aria-label={t("messages.format.close")}
+                title={t("messages.format.close")}
                 disabled={disabled}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={(event) => change(false, event.detail === 0)}
@@ -165,7 +179,7 @@ export function ComposerFormattingTools({
             >
               <fieldset
                 className={styles.options}
-                aria-label="Formatting options"
+                aria-label={t("messages.format.options")}
               >
                 {options.map(([label, Icon]) => {
                   const format = composerFormats.find(
@@ -181,11 +195,16 @@ export function ComposerFormattingTools({
                       hint={binding ? "familiar" : "helpful"}
                       key={label}
                       size="sm"
-                      aria-label={label}
+                      aria-label={t(formatLabels[label])}
                       title={
                         binding
-                          ? `${label} (${formatBinding(binding, apple).text})`
-                          : `${label} (preview only)`
+                          ? t("messages.format.binding", {
+                              label: t(formatLabels[label]),
+                              binding: formatBinding(binding, apple).text,
+                            })
+                          : t("messages.format.previewOnly", {
+                              label: t(formatLabels[label]),
+                            })
                       }
                       aria-disabled={binding ? undefined : true}
                       aria-pressed={active}

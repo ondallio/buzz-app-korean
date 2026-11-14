@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import {
   projectMarkdownAttachments,
   scanMarkdown,
@@ -66,8 +67,6 @@ export function validateMessageEdit(
     JSON.stringify([before.urls, before.names]) !==
       JSON.stringify([after.urls, after.names])
   )
-    throw new Error(
-      "Keep attachment links unchanged. Only message text can be edited here.",
-    );
+    throw new Error(t("v1msg.edit.keepAttachments"));
   return content;
 }

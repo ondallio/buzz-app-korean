@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useRef, useState } from "react";
 import type { ComposerSession } from "./composer-session";
 import { canAddMembers } from "../channel-members/members";
@@ -20,6 +21,7 @@ export function useNonmemberMentions(
   channelId: string,
   restoreFocus: () => void,
 ) {
+  useLanguage();
   const [pending, setPending] = useState<Pending>();
   const adding = useRef(false);
   // Mentioning someone outside the channel usually means you want them here,
@@ -35,8 +37,7 @@ export function useNonmemberMentions(
     const request = pending;
     const check = () => {
       request.signal.throwIfAborted();
-      if (!request.current())
-        throw new Error("The draft changed. Close this dialog and send again.");
+      if (!request.current()) throw new Error(t("v1msg.draftChanged"));
     };
     setPending({ ...request, busy: true });
     try {
@@ -88,7 +89,7 @@ export function useNonmemberMentions(
         onOpenChange={(open) => {
           if (!open) pending?.finish(null);
         }}
-        title="Mention people outside this channel?"
+        title={t("v1msg.nonmember.title")}
         description={pending && describe(pending.people, canAdd)}
         preventClose={!!pending?.busy}
         initialFocus={canAdd ? inviteAction : undefined}
@@ -105,7 +106,9 @@ export function useNonmemberMentions(
                 pending?.finish(pending.people.map((person) => person.pubkey))
               }
             >
-              {canAdd ? "Do nothing" : "Send anyway"}
+              {canAdd
+                ? t("v1msg.nonmember.doNothing")
+                : t("v1msg.nonmember.sendAnyway")}
             </Button>
             {canAdd && (
               <Button
@@ -115,7 +118,9 @@ export function useNonmemberMentions(
                 disabled={pending?.busy}
                 onClick={() => void add()}
               >
-                {pending?.busy ? "Inviting…" : "Invite"}
+                {pending?.busy
+                  ? t("v1msg.nonmember.inviting")
+                  : t("v1msg.nonmember.invite")}
               </Button>
             )}
           </>
@@ -123,8 +128,7 @@ export function useNonmemberMentions(
       >
         {pending?.error ? (
           <p role="alert">
-            {pending.error} Your draft is kept. Some people may already have
-            been added.
+            {t("v1msg.nonmember.error", { error: pending.error })}
           </p>
         ) : null}
       </Dialog>
@@ -135,10 +139,11 @@ export function useNonmemberMentions(
 /** Match block/buzz desktop: name the people, then the available outcome. */
 function describe(people: readonly MentionRecipient[], canAdd: boolean) {
   const names = people.map((person) => person.name).join(", ");
-  const verb = people.length === 1 ? "is" : "are";
-  return `${names} ${verb} not in this channel. ${
-    canAdd
-      ? "Invite them to the channel, or send without inviting them."
-      : "You cannot add people to this channel. You can still send without inviting them."
+  return `${
+    people.length === 1
+      ? t("v1msg.nonmember.notInOne", { names })
+      : t("v1msg.nonmember.notInMany", { names })
+  } ${
+    canAdd ? t("v1msg.nonmember.canInvite") : t("v1msg.nonmember.cannotInvite")
   }`;
 }

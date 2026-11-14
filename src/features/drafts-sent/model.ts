@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import type { VisibleEvent } from "../../features/relay/projection";
 import { threadReference } from "../../features/relay/thread-reference";
 import { plainText } from "../../features/notifications/content";
@@ -143,8 +144,8 @@ export function fullTime(seconds: number) {
 export function dayLabel(seconds: number, now = Date.now()) {
   const then = new Date(seconds * 1000);
   const days = Math.round((day(new Date(now)) - day(then)) / 86400000);
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
+  if (days === 0) return t("date.today");
+  if (days === 1) return t("date.yesterday");
   return then.toLocaleDateString([], {
     weekday: "long",
     month: "long",

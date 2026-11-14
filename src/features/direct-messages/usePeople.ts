@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RelaySession } from "../relay/session";
 import type { Profile } from "../relay/contracts";
@@ -138,7 +139,7 @@ export function usePeople(session: RelaySession, query: string) {
             error:
               reason instanceof Error
                 ? reason.message
-                : "Could not load people.",
+                : t("mentionPicker.peopleFailed"),
           }));
         }
       } finally {

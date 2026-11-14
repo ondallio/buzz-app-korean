@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import type { ComposerSession } from "./composer-session";
 import type { ConversationExtensions } from "../conversation/contracts";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
@@ -23,10 +24,14 @@ export function ComposerChatCards({
   disabled: boolean;
   remove(index: number): void;
 }) {
+  useLanguage();
   const directory = useReferenceDirectory(session);
   if (!cards.length) return null;
   return (
-    <section aria-label="Chat attachments" className={styles.composerSoloCards}>
+    <section
+      aria-label={t("v1msg.chatCards.label")}
+      className={styles.composerSoloCards}
+    >
       {cards.map((content, index) => (
         <div className={styles.composerSoloCard} key={content}>
           <div className={styles.composerSoloCardContent}>
@@ -57,7 +62,7 @@ export function ComposerChatCards({
             size="xs"
             shape="round"
             disabled={disabled}
-            aria-label={`Remove chat attachment ${index + 1}`}
+            aria-label={t("v1msg.chatCards.remove", { index: index + 1 })}
             icon={<XIcon size={16} />}
             onClick={() => remove(index)}
           />

@@ -2,6 +2,7 @@ import { Children, type ReactNode, type RefObject, type Ref } from "react";
 import { Avatar } from "../../shared/design-system/ui/Avatar";
 import { CaretUpIcon } from "../../shared/design-system/icons";
 import styles from "./Messages.module.css";
+import { t, useLanguage } from "../../shared/i18n";
 
 /** The conversation's existing activity disclosure, shared by history and outcomes. */
 export function ActivityDisclosure({
@@ -29,6 +30,7 @@ export function ActivityDisclosure({
   interactive?: boolean;
   expandedSummary?: ReactNode;
 }) {
+  useLanguage();
   return (
     <div
       ref={container}
@@ -79,7 +81,7 @@ export function ActivityDisclosure({
                 icon
               )}
               <span className={styles.audiencePreviewText}>
-                {expanded ? "Collapse" : summary}
+                {expanded ? t("messageRow.collapse") : summary}
               </span>
             </button>
           </div>

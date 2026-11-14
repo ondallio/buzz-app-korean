@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useRef, useState } from "react";
 import type { RelaySession } from "../relay/session";
 import type {
@@ -27,6 +28,7 @@ export function useChatLinkSharing(
   channelId: string,
   restoreFocus: () => void,
 ) {
+  useLanguage();
   const [pending, setPending] = useState<Pending>();
   const privateCount =
     pending?.sources.filter((base) => base.visibility === "private").length ??
@@ -121,10 +123,7 @@ export function useChatLinkSharing(
       if (!chatShareDestination(destination)) return true;
       const check = () => {
         signal.throwIfAborted();
-        if (!current())
-          throw new Error(
-            "The draft changed. Close this dialog and send again.",
-          );
+        if (!current()) throw new Error(t("v1msg.draftChanged"));
       };
       const attempts = new Map<string, ChannelDetailsDraft>();
       const confirmingChats: ChannelDetails[] = [];
@@ -165,8 +164,8 @@ export function useChatLinkSharing(
           attempts,
           destination:
             destination?.channelType === "dm"
-              ? "this DM"
-              : `#${destination?.name ?? "channel"}`,
+              ? t("v1msg.share.thisDm")
+              : `#${destination?.name ?? t("v1msg.share.channel")}`,
           busy: false,
         });
       });
@@ -175,17 +174,41 @@ export function useChatLinkSharing(
       <AlertDialog
         key={pending.sources.map((base) => base.version).join(":")}
         title={
-          pending.sources.length > 1 ? "Share these chats?" : "Share this chat?"
+          pending.sources.length > 1
+            ? t("v1msg.share.titleMany")
+            : t("v1msg.share.titleOne")
         }
         description={
           <>
             {privateCount === pending.sources.length
-              ? `This changes ${pending.sources.length > 1 ? "these chats" : "the chat"} from Private to View only and sends your message and chat ${pending.sources.length > 1 ? "links" : "link"} to ${pending.destination}. `
-              : `${privateCount ? "Private chats will change to View only; the other chats will stay View only." : pending.sources.length > 1 ? "These chats are already View only." : "This chat is already View only."} Your message and chat ${pending.sources.length > 1 ? "links" : "link"} will be sent to ${pending.destination}. `}
+              ? pending.sources.length > 1
+                ? t("v1msg.share.changeMany", {
+                    destination: pending.destination,
+                  })
+                : t("v1msg.share.changeOne", {
+                    destination: pending.destination,
+                  })
+              : `${
+                  privateCount
+                    ? t("v1msg.share.mixed")
+                    : pending.sources.length > 1
+                      ? t("v1msg.share.alreadyMany")
+                      : t("v1msg.share.alreadyOne")
+                } ${
+                  pending.sources.length > 1
+                    ? t("v1msg.share.sendLinksMany", {
+                        destination: pending.destination,
+                      })
+                    : t("v1msg.share.sendLinksOne", {
+                        destination: pending.destination,
+                      })
+                }`}{" "}
             <span className="mt-3 block">
               {soloShareDisclosure(pending.sources.length > 1)}
               {pending.sources.length > 1
-                ? ` This applies to: ${pending.sources.map((base) => base.name).join(", ")}.`
+                ? ` ${t("v1msg.share.appliesTo", {
+                    names: pending.sources.map((base) => base.name).join(", "),
+                  })}`
                 : ""}
             </span>
           </>
@@ -203,7 +226,7 @@ export function useChatLinkSharing(
               disabled={pending.busy}
               onClick={() => pending.finish(false)}
             >
-              Cancel
+              {t("messages.cancel")}
             </Button>
             <Button
               ref={proceed}
@@ -212,19 +235,16 @@ export function useChatLinkSharing(
               onClick={() => void share()}
             >
               {pending.checkRequired
-                ? "Check access and send"
+                ? t("v1msg.share.checkAndSend")
                 : pending.error
-                  ? "Retry share and send"
-                  : "Share"}
+                  ? t("v1msg.share.retryAndSend")
+                  : t("v1msg.share.share")}
             </Button>
           </>
         }
       >
         {pending.error && (
-          <p role="alert">
-            {pending.error} Your message has not been sent. Any access change
-            already saved is kept.
-          </p>
+          <p role="alert">{t("v1msg.share.error", { error: pending.error })}</p>
         )}
       </AlertDialog>
     ),

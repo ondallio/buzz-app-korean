@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useLayoutEffect, useId, useRef, useState } from "react";
 import type { ReactionToolProps } from "../../features/conversation/contracts";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
@@ -13,6 +14,7 @@ export function createReactionPicker() {
     disabled,
     select,
   }: ReactionToolProps) {
+    useLanguage();
     const [open, setOpen] = useState(false);
     const trigger = useRef<HTMLButtonElement>(null);
     const close = useRef(() => {
@@ -40,8 +42,8 @@ export function createReactionPicker() {
           size="toolbar"
           shape="round"
           type="button"
-          aria-label="Add reaction"
-          title="Add reaction"
+          aria-label={t("emojiPicker.addReaction")}
+          title={t("emojiPicker.addReaction")}
           aria-haspopup="dialog"
           aria-expanded={open && !disabled}
           aria-controls={open && !disabled ? id : undefined}

@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useProfileGeneration } from "../relay/react";
 import { Popover } from "@base-ui/react/popover";
 import { EffortSlider } from "./composer-models/EffortSlider";
@@ -124,6 +125,7 @@ function ComposerModelsFor({
   startsThread: boolean;
   place: SessionPlace;
 }) {
+  useLanguage();
   const [open, setOpen] = useState(false);
   const [retry, setRetry] = useState(0);
   const unavailableDescriptionId = useId();
@@ -225,7 +227,7 @@ function ComposerModelsFor({
       onResolved(
         null,
         inventoryFailed || mentioned.some((choice) => choice.failed)
-          ? "Saved model and effort choices could not be loaded. Open model and effort controls to retry or reset them."
+          ? t("v1msg.models.savedFailed")
           : undefined,
       );
       return () => onResolved(undefined);
@@ -307,7 +309,13 @@ function ComposerModelsFor({
       [selected && runs.label, effort !== undefined && supportedEffort?.label]
         .filter(Boolean)
         .join(" · ");
-    return text ? [choices.length > 1 ? `${choice.name}: ${text}` : text] : [];
+    return text
+      ? [
+          choices.length > 1
+            ? t("v1msg.models.named", { name: choice.name, text })
+            : text,
+        ]
+      : [];
   });
   const unavailableDescription = choices.flatMap((choice) => {
     const unavailable = unavailableSavedPick(
@@ -317,7 +325,11 @@ function ComposerModelsFor({
       explicitOnly,
     );
     return unavailable
-      ? [choices.length > 1 ? `${choice.name}: ${unavailable}` : unavailable]
+      ? [
+          choices.length > 1
+            ? t("v1msg.models.named", { name: choice.name, text: unavailable })
+            : unavailable,
+        ]
       : [];
   });
   const pick = (pubkey: string, next: RunPick) => {
@@ -331,13 +343,19 @@ function ComposerModelsFor({
   };
   const label =
     choices.length > 0 && choices.every((choice) => choice.automatic)
-      ? `Session controls${resettable ? " for this chat" : ""}`
+      ? resettable
+        ? t("v1msg.models.sessionChat")
+        : t("v1msg.models.session")
       : choices.some((choice) => choice.session)
-        ? `Model, effort, and session controls${resettable ? " for this chat" : ""}`
+        ? resettable
+          ? t("v1msg.models.allChat")
+          : t("v1msg.models.all")
         : resettable
-          ? "Model and effort for this chat"
-          : "Model and effort for the next run";
-  const target = resettable ? "this chat" : "next run";
+          ? t("v1msg.models.chat")
+          : t("v1msg.models.nextRun");
+  const target = resettable
+    ? t("v1msg.models.targetChat")
+    : t("v1msg.models.targetNextRun");
   const unavailableDescriptionText = unavailableDescription.join(" ");
   return (
     <Popover.Root open={open && !disabled} onOpenChange={setOpen}>
@@ -361,7 +379,11 @@ function ComposerModelsFor({
             }
             title={
               picked.length
-                ? `${label}. ${target}: ${picked.join(", ")}`
+                ? t("v1msg.models.title", {
+                    label,
+                    target,
+                    picked: picked.join(", "),
+                  })
                 : label
             }
             icon={<GaugeIcon size={18} aria-hidden="true" />}
@@ -386,7 +408,7 @@ function ComposerModelsFor({
             <div
               className="sr-only"
               role="status"
-              aria-label="Saved model and effort availability"
+              aria-label={t("v1msg.models.availability")}
               aria-atomic="true"
             >
               <span className={styles.statusCopy}>
@@ -397,12 +419,12 @@ function ComposerModelsFor({
               <div className={`${styles.agent} floating-surface`}>
                 <PanelHeader
                   variant="card"
-                  title={<PanelHeaderLabel title="Model and effort" />}
+                  title={<PanelHeaderLabel title={t("v1msg.models.heading")} />}
                 />
                 <div className={styles.controls}>
                   <div className={styles.status}>
                     <span className={styles.statusCopy} role="alert">
-                      Agents could not be loaded.
+                      {t("v1msg.models.agentsFailed")}
                     </span>
                     {onRetryInventory && (
                       <Button
@@ -412,7 +434,7 @@ function ComposerModelsFor({
                           setOpen(false);
                         }}
                       >
-                        Retry agents
+                        {t("v1msg.models.retryAgents")}
                       </Button>
                     )}
                   </div>
@@ -437,7 +459,7 @@ function ComposerModelsFor({
                   setOpen(false);
                 }}
               >
-                Reset model and effort
+                {t("v1msg.models.reset")}
               </Button>
             )}
             {choices.map((choice, index) => (
@@ -499,21 +521,22 @@ function unavailableSavedPick(
     choice.current === runs.id;
   const fallback = runs.id
     ? !modelIsKnown
-      ? "Send omits model and effort overrides; the agent or provider decides which model runs"
-      : `Using ${runs.label}${
-          defaultEffort
-            ? ` with its default effort (${defaultEffort.label})`
-            : runs.efforts.length
-              ? " with the provider's default effort"
-              : ""
-        }`
-    : "No supported model is listed in the loaded catalog. Send omits model and effort overrides and uses the agent's defaults";
+      ? t("v1msg.models.fallbackUnknown")
+      : defaultEffort
+        ? t("v1msg.models.fallbackDefaultEffort", {
+            model: runs.label,
+            effort: defaultEffort.label,
+          })
+        : runs.efforts.length
+          ? t("v1msg.models.fallbackProviderEffort", { model: runs.label })
+          : t("v1msg.models.fallbackModel", { model: runs.label })
+    : t("v1msg.models.fallbackNone");
   const reason = unavailableModel
-    ? "Saved model is unavailable."
+    ? t("v1msg.models.savedModelUnavailable")
     : modelIsKnown && runs.id
-      ? `Saved effort is unavailable for ${runs.label}.`
-      : "Saved effort is unavailable.";
-  return `${reason} ${fallback}. Your saved choice is retained until you reset it.`;
+      ? t("v1msg.models.savedEffortUnavailableFor", { model: runs.label })
+      : t("v1msg.models.savedEffortUnavailable");
+  return t("v1msg.models.unavailableSummary", { reason, fallback });
 }
 
 function AgentChoice({
@@ -539,6 +562,7 @@ function AgentChoice({
   pick(next: RunPick): void;
   thumb?: Ref<HTMLInputElement>;
 }) {
+  useLanguage();
   const [feedback, setFeedback] = useState("");
   if (choice.loading)
     return (
@@ -561,7 +585,7 @@ function AgentChoice({
               />
             </span>
             <div className={styles.statusCopy}>
-              <ShimmerText>Loading model and effort…</ShimmerText>
+              <ShimmerText>{t("v1msg.models.loading")}</ShimmerText>
             </div>
           </div>
         </div>
@@ -596,8 +620,8 @@ function AgentChoice({
             disabled={disabled}
             aria-label={
               chatScoped
-                ? `Model for ${choice.name} in this chat`
-                : `Model for ${choice.name}'s next run`
+                ? t("v1msg.models.modelForChat", { name: choice.name })
+                : t("v1msg.models.modelForNextRun", { name: choice.name })
             }
             render={
               <Button variant="subtle" size="sm">
@@ -655,10 +679,10 @@ function AgentChoice({
           {choice.failed ? (
             <div className={styles.status}>
               <span className={styles.statusCopy} role="alert">
-                Model and effort could not be loaded.
+                {t("v1msg.models.failed")}
               </span>
               <Button size="sm" disabled={disabled} onClick={retry}>
-                Retry
+                {t("messageActions.retry")}
               </Button>
             </div>
           ) : runs.efforts.length > 0 ? (
@@ -690,8 +714,8 @@ function AgentChoice({
                 ) : (
                   <span>
                     {runs.id
-                      ? `${runs.label} · No thinking options`
-                      : "Model unavailable"}
+                      ? t("v1msg.models.noThinking", { model: runs.label })
+                      : t("v1msg.models.modelUnavailable")}
                   </span>
                 )}
               </div>
@@ -719,6 +743,7 @@ function SessionActions({
   place: SessionPlace;
   onFeedback(message: string): void;
 }) {
+  useLanguage();
   const agents = useContext(AgentsContext);
   const state = useSessionState(agents, [pubkey], place);
   const [started, setStarted] = useState<object>();
@@ -741,25 +766,30 @@ function SessionActions({
         setStarted({});
       } else {
         onFeedback(
-          action === "compact" ? "Session compacted" : "Interrupt requested",
+          action === "compact"
+            ? t("v1msg.session.compacted")
+            : t("v1msg.session.interruptRequested"),
         );
       }
     } catch (error) {
       onFeedback(
-        error instanceof Error ? error.message : "Session action failed",
+        error instanceof Error ? error.message : t("v1msg.session.failed"),
       );
     }
   };
   return (
-    <fieldset className={styles.actions} aria-label={`${name}'s session`}>
+    <fieldset
+      className={styles.actions}
+      aria-label={t("v1msg.session.label", { name })}
+    >
       <span className="sr-only" role="status">
-        {started ? "New session started" : ""}
+        {started ? t("v1msg.session.started") : ""}
       </span>
       {(
         [
-          ["compact", "Compact session", FoldIcon],
-          ["new", "Start a new session", ArrowCounterClockwiseIcon],
-          ["interrupt", "Interrupt", StopIcon],
+          ["compact", t("v1msg.session.compact"), FoldIcon],
+          ["new", t("v1msg.session.new"), ArrowCounterClockwiseIcon],
+          ["interrupt", t("v1msg.session.interrupt"), StopIcon],
         ] as const
       ).map(([action, label, Icon]) => {
         const enabled =
@@ -768,21 +798,23 @@ function SessionActions({
             : state === "idle";
         const title =
           state === "unavailable"
-            ? `${label}: session controls unavailable. Check the agent's connection and the app running it.`
+            ? t("v1msg.session.unavailable", { label })
             : state === "compacting"
               ? action === "interrupt"
-                ? "Interrupt compaction"
-                : "Compacting session. Wait for it to finish, or interrupt it."
+                ? t("v1msg.session.interruptCompaction")
+                : t("v1msg.session.compacting")
               : enabled
                 ? label
                 : action === "interrupt"
-                  ? "Nothing to interrupt. The session is idle."
-                  : `Wait for the active turn to finish before ${action === "compact" ? "compacting" : "starting a new session"}.`;
+                  ? t("v1msg.session.idle")
+                  : action === "compact"
+                    ? t("v1msg.session.waitCompact")
+                    : t("v1msg.session.waitNew");
         const succeeded = action === "new" && !!started;
         return (
           <Tooltip
             key={action}
-            content={succeeded ? "New session started" : title}
+            content={succeeded ? t("v1msg.session.started") : title}
             {...(succeeded && !hintDismissed ? { open: true } : {})}
             onOpenChange={(open) => {
               if (!open && succeeded) setHintDismissed(true);

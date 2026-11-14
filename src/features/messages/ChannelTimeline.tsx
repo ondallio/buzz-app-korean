@@ -1,4 +1,5 @@
 // biome-ignore-all lint/a11y/noNoninteractiveTabindex: The history region must support keyboard scrolling.
+import { t, useLanguage } from "../../shared/i18n";
 import { AgentConnectionSetup } from "../agents/AgentConnectionSetup";
 import { TypingIndicator, useLiveConversationAgents } from "./TypingIndicator";
 import { ActivityGroupPreview } from "./ActivityGroupPreview";
@@ -275,6 +276,7 @@ function Timeline({
   chatPresentation = false,
   startsThreads = true,
 }: ChannelTimelineProps) {
+  useLanguage();
   useMessageSelectionCopy();
   const shownIntro =
     !window.hasMore && !window.historyLimited ? intro : undefined;
@@ -2043,7 +2045,7 @@ function Timeline({
         }
       }}
       tabIndex={0}
-      aria-label="Channel message history"
+      aria-label={t("v1msg.timeline.history")}
       onScroll={(event) => {
         // React may receive this event before Virtua updates its handle metrics.
         const element = event.currentTarget;
@@ -2072,9 +2074,9 @@ function Timeline({
         {shownIntro}
         {edgeError && <span role="alert">{edgeError}</span>}
         {window.historyLimited ? (
-          <span>History window limit reached</span>
+          <span>{t("v1msg.timeline.historyLimit")}</span>
         ) : window.hasMore && queries.channels.cachedOnly ? (
-          <span>You can load older messages once Buzz reconnects.</span>
+          <span>{t("v1msg.timeline.olderOffline")}</span>
         ) : window.hasMore && (historyControl === "button" || window.error) ? (
           <Button
             type="button"
@@ -2087,13 +2089,13 @@ function Timeline({
             }}
           >
             {window.loadingOlder
-              ? "Loading older…"
+              ? t("v1msg.timeline.loadingOlder")
               : window.error
-                ? "Retry older messages"
-                : "Load older messages"}
+                ? t("v1msg.timeline.retryOlder")
+                : t("v1msg.timeline.loadOlder")}
           </Button>
         ) : window.loadingOlder ? (
-          <span role="status">Loading older…</span>
+          <span role="status">{t("v1msg.timeline.loadingOlder")}</span>
         ) : null}
       </div>
       <JumpToLatestButton
@@ -2256,10 +2258,10 @@ function Timeline({
                   >
                     <hr
                       className="sr-only select-none"
-                      aria-label="New messages"
+                      aria-label={t("v1msg.timeline.newMessages")}
                     />
                     <span className="select-none" aria-hidden="true">
-                      New messages
+                      {t("v1msg.timeline.newMessages")}
                     </span>
                   </div>
                 )}
@@ -2320,11 +2322,11 @@ function Timeline({
           <div className={styles.emptyConversation}>
             <EmptyState
               icon={<ChatCircleIcon />}
-              title="No messages yet."
+              title={t("v1msg.timeline.empty")}
               description={
                 queries.channels.get?.(channelId)?.readOnly
                   ? undefined
-                  : "Start the conversation below."
+                  : t("draftsSent.preview.startConversation")
               }
             />
           </div>

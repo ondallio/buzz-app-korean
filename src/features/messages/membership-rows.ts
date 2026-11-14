@@ -1,3 +1,4 @@
+import { messageTemplate, t, type TranslationKey } from "../../shared/i18n";
 import type {
   ChannelMessage,
   MembershipChange,
@@ -119,13 +120,31 @@ export function membershipDescription(
     text:
       id === viewer
         ? subject
-          ? "You"
-          : "you"
+          ? t("v1msg.membership.youSubject")
+          : t("v1msg.membership.you")
         : (resolveName?.(id, profiles.get(id)?.name ?? id.slice(0, 10)) ??
           profiles.get(id)?.name ??
           id.slice(0, 10)),
   });
   const plain = (text: string): MembershipPart => ({ text });
+  // One whole translated sentence; named people stay their own parts.
+  const sentence = (
+    template: TranslationKey,
+    values: Readonly<
+      Record<string, MembershipPart | readonly MembershipPart[]>
+    >,
+  ): MembershipPart[] =>
+    messageTemplate(template)
+      .split(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g)
+      .flatMap((part, index) => {
+        if (index % 2 === 0) return part ? [plain(part)] : [];
+        const value = values[part];
+        return value === undefined
+          ? []
+          : Array.isArray(value)
+            ? value
+            : [value];
+      });
   const list = (items: readonly MembershipPart[]) => {
     let next = 0;
     return new Intl.ListFormat(undefined, { type: "conjunction" })
@@ -145,10 +164,8 @@ export function membershipDescription(
       changes.some((change) => change.actor !== first.actor))
   ) {
     const parts: MembershipPart[] = [];
-    for (const [type, label] of [
-      ["member_joined", "added"],
-      ["member_removed", "removed"],
-    ] as const) {
+    for (const type of ["member_joined", "member_removed"] as const) {
+      const added = type === "member_joined";
       const people = [
         ...new Set(
           changes
@@ -159,27 +176,58 @@ export function membershipDescription(
       const person = people[0];
       if (!person) continue;
       if (parts.length) parts.push(plain(" · "));
-      parts.push(name(person, true));
+      const subject = name(person, true);
       if (people.length > 1) {
-        parts.push(plain(" and "), {
-          text: `${people.length - 1} ${people.length === 2 ? "other" : "others"}`,
+        const others: MembershipPart = {
+          text:
+            people.length === 2
+              ? t("v1msg.membership.oneOther")
+              : t("v1msg.membership.others", { count: people.length - 1 }),
           preview: {
-            label: `People who were ${label}`,
+            label: added
+              ? t("v1msg.membership.previewAdded")
+              : t("v1msg.membership.previewRemoved"),
             members: people.map((id) => ({ id, name: name(id, true).text })),
           },
-        });
+        };
+        parts.push(
+          ...sentence(
+            added
+              ? "v1msg.membership.manyAdded"
+              : "v1msg.membership.manyRemoved",
+            { person: subject, others },
+          ),
+        );
+      } else {
+        const you = person === viewer;
+        parts.push(
+          ...sentence(
+            added
+              ? you
+                ? "v1msg.membership.youAdded"
+                : "v1msg.membership.oneAdded"
+              : you
+                ? "v1msg.membership.youRemoved"
+                : "v1msg.membership.oneRemoved",
+            { person: subject },
+          ),
+        );
       }
-      parts.push(
-        plain(
-          ` ${people.length > 1 || person === viewer ? "were" : "was"} ${label}`,
-        ),
-      );
     }
     const text = parts.map((part) => part.text).join("");
     const detail = changes.map((change) => {
-      const subject = name(change.target, true).text;
-      const action = change.type === "member_removed" ? "removed" : "added";
-      return `${subject} ${change.target === viewer ? "were" : "was"} ${action} by ${name(change.actor).text}`;
+      const values = {
+        person: name(change.target, true).text,
+        actor: name(change.actor).text,
+      };
+      const you = change.target === viewer;
+      return change.type === "member_removed"
+        ? you
+          ? t("v1msg.membership.youRemovedBy", values)
+          : t("v1msg.membership.oneRemovedBy", values)
+        : you
+          ? t("v1msg.membership.youAddedByDetail", values)
+          : t("v1msg.membership.oneAddedByDetail", values);
     });
     return {
       targets,
@@ -191,25 +239,40 @@ export function membershipDescription(
   const lead = name(first.target, true);
   const others = targets.slice(1, 3);
   const rest = list(others.map((id) => name(id)));
-  const alongWith = (separator = "") =>
-    rest.length ? [plain(`${separator} along with `), ...rest] : [];
+  const you = first.target === viewer;
+  const along = rest.length > 0;
   let parts: MembershipPart[];
   if (first.type === "member_removed") {
-    parts = [
-      lead,
-      plain(` ${first.target === viewer ? "were" : "was"} removed by `),
-      name(first.actor),
-      ...alongWith(","),
-    ];
+    parts = sentence(
+      along
+        ? you
+          ? "v1msg.membership.youRemovedByAlong"
+          : "v1msg.membership.oneRemovedByAlong"
+        : you
+          ? "v1msg.membership.youRemovedBy"
+          : "v1msg.membership.oneRemovedBy",
+      { person: lead, actor: name(first.actor), rest },
+    );
   } else {
     const sameAdder = changes.every(({ actor }) => actor === first.actor);
-    const action = sameAdder
-      ? [
-          plain(` ${first.target === viewer ? "were added" : "added"} by `),
-          name(first.actor),
-        ]
-      : [plain(` ${first.target === viewer ? "were" : "was"} added`)];
-    parts = [lead, ...action, ...alongWith(sameAdder ? "," : "")];
+    parts = sentence(
+      sameAdder
+        ? along
+          ? you
+            ? "v1msg.membership.youAddedByAlong"
+            : "v1msg.membership.oneAddedByAlong"
+          : you
+            ? "v1msg.membership.youAddedBy"
+            : "v1msg.membership.oneAddedBy"
+        : along
+          ? you
+            ? "v1msg.membership.youAddedAlong"
+            : "v1msg.membership.oneAddedAlong"
+          : you
+            ? "v1msg.membership.youAdded"
+            : "v1msg.membership.oneAdded",
+      { person: lead, actor: name(first.actor), rest },
+    );
   }
   return {
     targets,

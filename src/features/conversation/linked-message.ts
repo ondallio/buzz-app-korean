@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { useEffect, useSyncExternalStore } from "react";
 import { useChannelIdentityNames } from "../identity-names/react";
 import type { ChannelMessage } from "../relay/contracts";
@@ -220,8 +221,14 @@ export function useLinkedMessageByline(
   }, [session, id, profileGeneration]);
   // An author with no name yet keeps the channel presentation, never a key:
   // the names view drops fallback (key-fragment) profile names itself.
-  const name = author?.workflow ? "Workflow" : id ? resolveName(id, "") : "";
-  return channel && name ? `${name} in #${channel}` : undefined;
+  const name = author?.workflow
+    ? t("messageRow.workflow")
+    : id
+      ? resolveName(id, "")
+      : "";
+  return channel && name
+    ? t("v1msg.link.byline", { name, channel })
+    : undefined;
 }
 
 function authorsFor(session: RelaySession) {

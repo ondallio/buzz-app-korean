@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import type { FileCardProps } from "../conversation/contracts";
 import {
   IconButton,
@@ -35,9 +36,9 @@ function mimeLabel(mime: string | undefined): string | undefined {
   if (!mime) return undefined;
   const [type, subtype] = mime.split("/");
   if (!type || !subtype) return undefined;
-  if (subtype === "pdf") return "PDF file";
+  if (subtype === "pdf") return t("mediaViewing.file.type", { type: "PDF" });
   if (!/^[a-z0-9]+$/i.test(subtype)) return undefined;
-  return `${subtype.toUpperCase()} file`;
+  return t("mediaViewing.file.type", { type: subtype.toUpperCase() });
 }
 
 export function FileAttachment({
@@ -47,7 +48,11 @@ export function FileAttachment({
   onPreview,
   typeLabel,
 }: Omit<FileCardProps, "source"> & { source: string | undefined }) {
-  const displayName = attachment.name ?? mimeLabel(attachment.mime) ?? "File";
+  useLanguage();
+  const displayName =
+    attachment.name ??
+    mimeLabel(attachment.mime) ??
+    t("mediaViewing.file.name");
   const nativeSource = source ? isNativeMediaSource(source) : false;
   const proxySource = source ? isProxySource(source) || nativeSource : false;
   const externalSource = !!source && safeOpenUrl(source) && !proxySource;
@@ -65,8 +70,13 @@ export function FileAttachment({
       download?: () => Promise<void>,
     ) => {
       const action = {
-        "aria-label": `${state === "failed" ? "Retry download" : "Download"} ${displayName}`,
-        title: `Download ${displayName}`,
+        "aria-label": t(
+          state === "failed"
+            ? "mediaViewing.file.retry"
+            : "mediaViewing.file.download",
+          { name: displayName },
+        ),
+        title: t("mediaViewing.file.download", { name: displayName }),
         icon:
           state === "failed" ? (
             <ArrowsClockwiseIcon aria-hidden="true" />
@@ -81,7 +91,9 @@ export function FileAttachment({
         <div className={styles.filePreviewAttachment}>
           <div className={styles.filePreviewMain}>
             <NavigationItem
-              aria-label={`Preview ${displayName}`}
+              aria-label={t("messages.attachment.preview", {
+                name: displayName,
+              })}
               icon={
                 <span className={fileIconStyles.slot}>
                   <FileTypeIcon name={attachment.name} mime={attachment.mime} />
@@ -97,14 +109,16 @@ export function FileAttachment({
                   </span>
                   <span className={styles.fileAttachmentMeta}>
                     {state === "pending" ? (
-                      "Downloading…"
+                      t("mediaViewing.download.pending")
                     ) : state === "saved" ? (
-                      "Saved to Downloads"
+                      t("mediaViewing.download.saved")
                     ) : state === "failed" ? (
-                      "Couldn’t download · Retry"
+                      t("mediaViewing.file.retryHint")
                     ) : (
                       <>
-                        {typeLabel ?? mimeLabel(attachment.mime) ?? "File"}
+                        {typeLabel ??
+                          mimeLabel(attachment.mime) ??
+                          t("mediaViewing.file.name")}
                         {attachment.size !== undefined &&
                           ` · ${formatFileSize(attachment.size)}`}
                       </>
@@ -157,18 +171,18 @@ export function FileAttachment({
         <span className={styles.fileAttachmentName}>{displayName}</span>
         <span className={styles.fileAttachmentMeta}>
           {state === "pending"
-            ? "Downloading…"
+            ? t("mediaViewing.download.pending")
             : state === "saved"
-              ? "Saved to Downloads"
+              ? t("mediaViewing.download.saved")
               : state === "failed"
-                ? "Couldn’t download · Retry"
+                ? t("mediaViewing.file.retryHint")
                 : source
                   ? attachment.size
                     ? formatFileSize(attachment.size)
                     : proxySource
-                      ? "Download file"
-                      : "Open file"
-                  : "File unavailable"}
+                      ? t("mediaViewing.file.downloadLabel")
+                      : t("mediaViewing.file.openLabel")
+                  : t("mediaViewing.file.unavailable")}
         </span>
       </span>
       {state === "pending" ? (
@@ -202,7 +216,7 @@ export function FileAttachment({
         href={source}
         target="_blank"
         rel="noreferrer"
-        aria-label={`Open ${displayName}`}
+        aria-label={t("mediaViewing.file.open", { name: displayName })}
         title={displayName}
         onClick={(event) => {
           if (event.metaKey || event.ctrlKey || event.shiftKey) return;
@@ -224,7 +238,12 @@ export function FileAttachment({
           <button
             type="button"
             className={styles.fileAttachment}
-            aria-label={`${state === "failed" ? "Retry download" : "Download"} ${displayName}`}
+            aria-label={t(
+              state === "failed"
+                ? "mediaViewing.file.retry"
+                : "mediaViewing.file.download",
+              { name: displayName },
+            )}
             aria-disabled={state === "pending"}
             aria-busy={state === "pending"}
             title={displayName}
@@ -240,7 +259,7 @@ export function FileAttachment({
       className={styles.fileAttachment}
       href={source}
       download={attachment.name ?? ""}
-      aria-label={`Download ${displayName}`}
+      aria-label={t("mediaViewing.file.download", { name: displayName })}
       title={displayName}
     >
       {content()}
@@ -263,11 +282,11 @@ function NativeFileDownload({
   const { state, download } = useNativeDownload(source, name);
   const announcement =
     state === "pending"
-      ? `Downloading ${displayName}`
+      ? t("mediaViewing.file.downloading", { name: displayName })
       : state === "saved"
-        ? `Saved ${displayName} to Downloads`
+        ? t("mediaViewing.file.saved", { name: displayName })
         : state === "failed"
-          ? `Couldn’t download ${displayName}. Try again.`
+          ? t("mediaViewing.file.failed", { name: displayName })
           : "";
   return (
     <>
@@ -293,7 +312,9 @@ function UnavailableFileAttachment({
       </span>
       <span className={styles.fileAttachmentBody}>
         <span className={styles.fileAttachmentName}>{displayName}</span>
-        <span className={styles.fileAttachmentMeta}>File unavailable</span>
+        <span className={styles.fileAttachmentMeta}>
+          {t("mediaViewing.file.unavailable")}
+        </span>
       </span>
     </span>
   );

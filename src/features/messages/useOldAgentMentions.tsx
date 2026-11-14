@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useRef, useState } from "react";
 import type { Agents } from "../agents/service";
 import type { PortableAgent } from "../agents/native";
@@ -27,6 +28,7 @@ export function useOldAgentMentions(
   agents: Agents | undefined,
   restoreFocus: () => void,
 ) {
+  useLanguage();
   const [pending, setPending] = useState<Pending>();
   const [type, setType] = useState<string>();
   const importing = useRef(false);
@@ -45,8 +47,7 @@ export function useOldAgentMentions(
     const notes: string[] = [];
     const check = () => {
       request.signal.throwIfAborted();
-      if (!request.current())
-        throw new Error("The draft changed. Close this dialog and send again.");
+      if (!request.current()) throw new Error(t("v1msg.draftChanged"));
     };
     try {
       for (const agent of request.found) {
@@ -136,16 +137,20 @@ export function useOldAgentMentions(
         title={
           imported
             ? pending.found.length === 1
-              ? `${pending.found[0]?.name} was imported`
-              : "These agents were imported"
+              ? t("v1msg.oldAgents.importedOne", {
+                  name: pending.found[0]?.name ?? "",
+                })
+              : t("v1msg.oldAgents.importedMany")
             : pending?.found.length === 1
-              ? `Import ${pending.found[0]?.name}?`
-              : "Import these agents?"
+              ? t("v1msg.oldAgents.importOne", {
+                  name: pending.found[0]?.name ?? "",
+                })
+              : t("v1msg.oldAgents.importMany")
         }
         description={
           pending &&
           (imported
-            ? "Send when you're ready. Closing this keeps your draft."
+            ? t("v1msg.oldAgents.sendReady")
             : describe(pending.found, !!chosen?.adopt))
         }
         preventClose={!!pending?.busy}
@@ -164,7 +169,7 @@ export function useOldAgentMentions(
                   pending?.finish(pending.found.map((agent) => agent.pubkey))
                 }
               >
-                Just send
+                {t("v1msg.oldAgents.justSend")}
               </Button>
             )}
             <Button
@@ -174,7 +179,9 @@ export function useOldAgentMentions(
               disabled={!imported && !chosen}
               onClick={() => (imported ? pending.finish([]) : void port())}
             >
-              {imported ? "Send" : "Import and send"}
+              {imported
+                ? t("messageActions.queue.send")
+                : t("v1msg.oldAgents.importAndSend")}
             </Button>
           </>
         }
@@ -182,12 +189,12 @@ export function useOldAgentMentions(
         {types.length > 1 && !imported && (
           <div className="flex">
             <Select
-              label="Import as"
+              label={t("v1msg.oldAgents.importAs")}
               value={chosen?.key ?? ""}
               disabled={!!pending?.busy}
               groups={[
                 {
-                  label: "Agent types",
+                  label: t("v1msg.oldAgents.agentTypes"),
                   options: types.map((item) => ({
                     value: item.key,
                     label: item.title,
@@ -203,8 +210,7 @@ export function useOldAgentMentions(
         ))}
         {pending?.error ? (
           <p role="alert">
-            {pending.error} Your draft is kept. Agents already imported stay
-            imported.
+            {t("v1msg.oldAgents.error", { error: pending.error })}
           </p>
         ) : null}
       </Dialog>
@@ -215,16 +221,11 @@ export function useOldAgentMentions(
 function describe(found: readonly PortableAgent[], adopts: boolean) {
   const one = found.length === 1;
   const names = found.map((agent) => agent.name).join(", ");
-  const kept = one
+  return one
     ? adopts
-      ? "name, avatar, and instructions"
-      : "name and avatar"
+      ? t("v1msg.oldAgents.describeOneAdopt", { names })
+      : t("v1msg.oldAgents.describeOne", { names })
     : adopts
-      ? "names, avatars, and instructions"
-      : "names and avatars";
-  return `${names} ${one ? "is" : "are"} set up in the preview version of Buzz. Are you ready to import ${
-    one ? "it" : "them"
-  } to Buzz 1.0? This will keep ${one ? "its" : "their"} ${kept} and start running ${
-    one ? "it" : "them"
-  } in this app.`;
+      ? t("v1msg.oldAgents.describeManyAdopt", { names })
+      : t("v1msg.oldAgents.describeMany", { names });
 }

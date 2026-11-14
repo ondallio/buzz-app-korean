@@ -1,4 +1,10 @@
 import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
+import { t, useLanguage } from "../../shared/i18n";
+import {
   useCallback,
   useEffect,
   useRef,
@@ -70,6 +76,7 @@ export function DraftPreview({
   onOpen(): void;
   onSaved(restoreFocus: boolean): void;
 }) {
+  useLanguage();
   const region = useRef<HTMLElement>(null);
   const [sent, setSent] = useState<string>();
   const sending = useRef<string | undefined>(undefined);
@@ -127,7 +134,7 @@ export function DraftPreview({
     setCleaned({ revision: viewRevision(session.scope, entry.id) });
   const close = useRef<HTMLButtonElement>(null);
   const back = useRef<HTMLButtonElement>(null);
-  const [copyStatus, setCopyStatus] = useState("");
+  const [copyStatus, setCopyStatus] = useState<DisplayMessage>("");
   const waiting =
     loading ||
     !!channel?.cached ||
@@ -155,20 +162,25 @@ export function DraftPreview({
     try {
       const text = mentionDraft(readView(session.scope, entry.id, "")).text;
       if (!text) {
-        setCopyStatus("This draft has no text to copy.");
+        setCopyStatus(localMessage("draftsSent.preview.copyEmpty"));
         return;
       }
       await writeClipboardText(text);
-      setCopyStatus("Draft text copied.");
+      setCopyStatus(localMessage("draftsSent.preview.copied"));
     } catch {
-      setCopyStatus("Could not copy the text. Try again.");
+      setCopyStatus(localMessage("draftsSent.preview.copyFailed"));
     }
   }
   return (
     <section
       ref={region}
       className={styles.draftPreview}
-      aria-label={`${mode === "draft" ? "Draft for" : "Sent message in"} ${title}`}
+      aria-label={t(
+        mode === "draft"
+          ? "draftsSent.preview.draftRegion"
+          : "draftsSent.preview.sentRegion",
+        { title },
+      )}
       onKeyDown={(event) => {
         if (
           event.key !== "Escape" ||
@@ -189,7 +201,11 @@ export function DraftPreview({
             <IconButton
               ref={back}
               size="sm"
-              aria-label={mode === "draft" ? "Back to drafts" : "Back to sent"}
+              aria-label={t(
+                mode === "draft"
+                  ? "draftsSent.preview.backDraft"
+                  : "draftsSent.preview.backSent",
+              )}
               icon={<ArrowLeftIcon size="1rem" />}
               onClick={onClose}
             />
@@ -197,15 +213,19 @@ export function DraftPreview({
         }
         title={
           <PanelHeaderLabel
-            title={`${title}${entry.threadRootId ? " · Thread" : ""}`}
+            title={
+              entry.threadRootId
+                ? t("draftsSent.places.threadTitle", { title })
+                : title
+            }
           />
         }
         actions={
           <>
             <IconButton
               size="sm"
-              aria-label="Open conversation"
-              title="Open conversation"
+              aria-label={t("draftsSent.preview.open")}
+              title={t("draftsSent.preview.open")}
               icon={<ArrowSquareOutIcon size="1rem" />}
               onClick={onOpen}
               disabled={!channel || channel.cached || channel.pending}
@@ -216,8 +236,8 @@ export function DraftPreview({
                 size="sm"
                 aria-label={
                   mode === "draft"
-                    ? "Close draft preview"
-                    : "Close sent preview"
+                    ? t("draftsSent.preview.closeDraft")
+                    : t("draftsSent.preview.closeSent")
                 }
                 icon={<XIcon size="1rem" />}
                 onClick={onClose}
@@ -227,7 +247,7 @@ export function DraftPreview({
         }
       />
       {waiting ? (
-        <LoadingRegion pending label="Loading conversation…">
+        <LoadingRegion pending label={t("draftsSent.preview.loading")}>
           {null}
         </LoadingRegion>
       ) : channel && (writable || (mode === "sent" && readable)) ? (
@@ -267,18 +287,18 @@ export function DraftPreview({
         <div className={styles.draftUnavailable}>
           <p className="text-body-sm text-subtle">
             {mode === "sent"
-              ? "This conversation is not available for replying right now."
+              ? t("draftsSent.preview.replyUnavailable")
               : channel
-                ? `You can’t post in ${title} anymore. Your draft is still saved.`
-                : "This conversation isn’t available right now. Your draft is still saved."}
+                ? t("draftsSent.preview.postUnavailable", { title })
+                : t("draftsSent.preview.draftUnavailable")}
           </p>
           {mode === "draft" && (
             <Button size="sm" onClick={() => void copy()}>
-              Copy text
+              {t("draftsSent.preview.copy")}
             </Button>
           )}
           <p role="status" className="text-body-sm text-subtle">
-            {copyStatus}
+            {resolveMessage(copyStatus)}
           </p>
         </div>
       )}
@@ -304,6 +324,7 @@ function DraftChannel({
   onSaved(): void;
   onSend(id: string): void;
 }) {
+  useLanguage();
   const { session, channelId } = useConversation();
   const channelWindow = useChannelWindow(session.channels, channelId);
   const [seekError, setSeekError] = useState(false);
@@ -365,7 +386,7 @@ function DraftChannel({
         <div className={styles.draftHistory} data-reading-surface="">
           {seekError && (
             <p role="status" className={styles.sectionCopy}>
-              The selected message could not be found in this conversation.
+              {t("draftsSent.preview.seekFailed")}
             </p>
           )}
           {!!channelWindow.rows.length && (
@@ -378,13 +399,13 @@ function DraftChannel({
           {channelWindow.status === "error" || channelWindow.error ? (
             <div className={styles.draftUnavailable}>
               <p role="alert" className="text-body-sm">
-                {channelWindow.error ?? "Could not load conversation."}
+                {channelWindow.error ?? t("draftsSent.preview.loadFailed")}
               </p>
               <Button
                 size="sm"
                 onClick={() => session.channels.refresh?.(channelId)}
               >
-                Retry conversation
+                {t("draftsSent.preview.retry")}
               </Button>
             </div>
           ) : (
@@ -392,11 +413,11 @@ function DraftChannel({
             (channelWindow.status === "ready" ? (
               <EmptyState
                 icon={<ChatCircleIcon />}
-                title="No messages yet"
-                description="Start the conversation below."
+                title={t("draftsSent.preview.noMessages")}
+                description={t("draftsSent.preview.startConversation")}
               />
             ) : (
-              <LoadingRegion pending label="Loading conversation…">
+              <LoadingRegion pending label={t("draftsSent.preview.loading")}>
                 {null}
               </LoadingRegion>
             ))
@@ -431,7 +452,7 @@ function DraftChannel({
         )}
         {writable && (
           <ConversationComposer
-            label={`Message ${title}`}
+            label={t("draftsSent.preview.composer", { title })}
             autoFocus={autoFocus}
             onDraftSaved={onSaved}
             onSend={(id) => {

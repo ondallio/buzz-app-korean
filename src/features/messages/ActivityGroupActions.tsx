@@ -26,6 +26,9 @@ import {
   useChannelActivitySnapshot,
   type ActivityPresentation,
 } from "./activity-presentation";
+import { t, useLanguage } from "../../shared/i18n";
+import { localMessage } from "../../shared/i18n/deferred-message";
+import { TranslatedMessage } from "../../shared/i18n/Message";
 
 const noSubscribe = () => () => {};
 
@@ -48,6 +51,7 @@ export function ActivityGroupActions({
   open?: ((target: string, origin?: MessageLinkOrigin) => boolean) | undefined;
   canOpen?: ((target: string) => boolean) | undefined;
 }) {
+  useLanguage();
   // Ref cleanup runs before a retired button detaches, while it still owns focus.
   const stopRef = useCallback(
     (node: HTMLButtonElement | null) => {
@@ -126,10 +130,14 @@ export function ActivityGroupActions({
             size="sm"
             variant="subtle"
             aria-label={
-              participants.length > 1 ? `${name} transcript` : "View transcript"
+              participants.length > 1
+                ? t("activityGroup.namedTranscript", { name })
+                : t("messageRow.viewTranscript")
             }
             title={
-              participants.length > 1 ? `${name} transcript` : "View transcript"
+              participants.length > 1
+                ? t("activityGroup.namedTranscript", { name })
+                : t("messageRow.viewTranscript")
             }
             icon={<InfoIcon aria-hidden="true" />}
             onClick={() =>
@@ -159,7 +167,9 @@ export function ActivityGroupActions({
               <Button
                 size="sm"
                 variant="subtle"
-                aria-label={`Retry ${named(entry.agent)}`}
+                aria-label={t("activityGroup.retryName", {
+                  name: named(entry.agent),
+                })}
                 onClick={() => {
                   if (!requestId) return;
                   try {
@@ -171,19 +181,29 @@ export function ActivityGroupActions({
                     returnFocus.current?.focus({ preventScroll: true });
                   } catch (error) {
                     notify(
-                      `Couldn’t retry ${named(entry.agent)}. ${error instanceof Error ? error.message : String(error)}`,
+                      <TranslatedMessage
+                        value={localMessage("activityGroup.retryFailed", {
+                          name: named(entry.agent),
+                          reason:
+                            error instanceof Error
+                              ? error.message
+                              : String(error),
+                        })}
+                      />,
                       "error",
                     );
                   }
                 }}
               >
-                Retry
+                {t("messageActions.retry")}
               </Button>
             )}
             <IconButton
               size="sm"
               variant="ghost"
-              aria-label={`Dismiss error from ${named(entry.agent)}`}
+              aria-label={t("activityGroup.dismissName", {
+                name: named(entry.agent),
+              })}
               icon={<XIcon aria-hidden="true" />}
               onClick={() => {
                 if (requestId)
@@ -205,8 +225,8 @@ export function ActivityGroupActions({
             ref={stopRef}
             size="sm"
             variant="subtle"
-            aria-label={`Stop ${name}`}
-            title={`Stop ${name}`}
+            aria-label={t("messageActions.typing.stop", { name })}
+            title={t("messageActions.typing.stop", { name })}
             icon={<StopIcon aria-hidden="true" />}
             loading={pending.has(control.key)}
             onClick={() => void stop(control, name)}

@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { composerChips, readComposerSnapshot } from "./composer-document";
 import { composerToken, type ComposerToken } from "./composer-token";
 import type { MentionDraft } from "./mention-draft";
@@ -9,10 +10,9 @@ const MAX_BYTES = 16 * 1024;
 
 function checked(value: unknown): readonly ComposerToken[] {
   if (!Array.isArray(value) || !value.length || value.length > 32)
-    throw new Error("Choose between 1 and 32 chips.");
+    throw new Error(t("v1msg.chips.count"));
   const tokens = value.map(composerToken);
-  if (tokens.some((token) => !token))
-    throw new Error("A chip is invalid. Select it again.");
+  if (tokens.some((token) => !token)) throw new Error(t("v1msg.chips.invalid"));
   const keys = new Set(
     tokens.map((token) =>
       JSON.stringify([
@@ -22,8 +22,7 @@ function checked(value: unknown): readonly ComposerToken[] {
       ]),
     ),
   );
-  if (keys.size !== tokens.length)
-    throw new Error("Remove duplicate chips before sending.");
+  if (keys.size !== tokens.length) throw new Error(t("v1msg.chips.duplicate"));
   return tokens as readonly ComposerToken[];
 }
 
@@ -31,7 +30,7 @@ export function messageTokenTags(tokens: readonly ComposerToken[]): string[][] {
   if (!tokens.length) return [];
   const json = JSON.stringify(checked(tokens));
   if (new TextEncoder().encode(json).length > MAX_BYTES)
-    throw new Error("These chips are too large. Remove some before sending.");
+    throw new Error(t("v1msg.chips.tooLarge"));
   return [[MESSAGE_TOKENS_TAG, json]];
 }
 
@@ -73,11 +72,11 @@ export function readMessageTokens(
     typeof tag[1] !== "string" ||
     new TextEncoder().encode(tag[1]).length > MAX_BYTES
   )
-    throw new Error("This message has invalid chips.");
+    throw new Error(t("v1msg.chips.messageInvalid"));
   try {
     return checked(JSON.parse(tag[1]));
   } catch {
-    throw new Error("This message has invalid chips.");
+    throw new Error(t("v1msg.chips.messageInvalid"));
   }
 }
 

@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useProfileGeneration } from "../relay/react";
 import { workflowLabel } from "../relay/workflow-attribution";
 import {
@@ -24,14 +25,28 @@ import { namedChannel, useChannelReference } from "./channel-reference";
 
 /** Why a message link's preview can't be shown. Surfaces that report a failed
  * message link use these words too. */
-export const previewFailures = {
-  withheld:
-    "Private channel. You aren’t a member, it no longer exists, or the link is from another community.",
-  "not-found": "This message isn’t available. It may have been deleted.",
-  unavailable: "Couldn’t load this preview.",
+const previewFailureKeys = {
+  withheld: "v1msg.linkPreview.withheld",
+  "not-found": "v1msg.linkPreview.notFound",
+  unavailable: "v1msg.linkPreview.unavailable",
 } as const;
+export const previewFailures = {
+  get withheld() {
+    return t(previewFailureKeys.withheld);
+  },
+  get "not-found"() {
+    return t(previewFailureKeys["not-found"]);
+  },
+  get unavailable() {
+    return t(previewFailureKeys.unavailable);
+  },
+};
 type FoundChannel = Extract<ChannelReference, { state: "found" }>;
-const loading = <span role="status">Loading message…</span>;
+function Loading() {
+  useLanguage();
+  return <span role="status">{t("v1msg.linkPreview.loading")}</span>;
+}
+const loading = <Loading />;
 
 /** Mounted only while a preview is open. The session owns access, edits and
  * deletion. Like a click, the card looks the channel up before trusting a
@@ -46,6 +61,7 @@ export function BuzzLinkPreview({
   channelId: string;
   messageId: string;
 }) {
+  useLanguage();
   const reference = useChannelReference(session.channels, channelId);
   const listLoading = useSyncExternalStore(
     session.channels.subscribeList,
@@ -109,6 +125,7 @@ function PreviewContent({
   /** A channel lookup is on the way, so a refused read may yet succeed. */
   looking: boolean;
 }) {
+  useLanguage();
   const snapshot = useSyncExternalStore(
     view.subscribe,
     view.snapshot,
@@ -166,8 +183,8 @@ function PreviewContent({
               channel.participants,
             ),
           ),
-        ).join(", ") || "Notes to self"
-      : (channel?.name ?? "Channel unavailable");
+        ).join(", ") || t("draftsSent.places.self")
+      : (channel?.name ?? t("v1msg.linkPreview.channelUnavailable"));
   const ChannelIcon =
     channel?.hidden || channel?.channelType === "dm"
       ? LockIcon
@@ -209,7 +226,9 @@ function PreviewContent({
       </span>
       <span className={styles.message}>
         {messagePreviewText(message.content) ||
-          (message.attachments.length ? "Attachment" : "Empty message")}
+          (message.attachments.length
+            ? t("draftsSent.places.attachment")
+            : t("v1msg.linkPreview.empty"))}
       </span>
     </>
   );
@@ -224,11 +243,12 @@ function PreviewFailure({
   reason: keyof typeof previewFailures;
   channel?: FoundChannel | undefined;
 }) {
+  useLanguage();
   return (
     <>
       {channel && <ChannelByline channel={channel} />}
       <span role="status">{previewFailures[reason]}</span>
-      <span className={styles.hint}>Open link</span>
+      <span className={styles.hint}>{t("v1msg.link.open")}</span>
     </>
   );
 }
@@ -248,13 +268,18 @@ export function ChannelLinkPreview({ channel }: { channel: FoundChannel }) {
 }
 
 function ChannelByline({ channel }: { channel: FoundChannel }) {
+  useLanguage();
   const Icon = channelIcon(channel.private ? { private: true } : undefined);
   const details = [
-    channel.private ? "Private channel" : "Public channel",
-    channel.archived ? "Archived" : "",
-    channel.joined ? "Joined" : "Not joined",
+    channel.private
+      ? t("search.privateChannelLabel")
+      : t("search.publicChannelLabel"),
+    channel.archived ? t("mentionPicker.archived") : "",
+    channel.joined ? t("search.joined") : t("v1msg.linkPreview.notJoined"),
     channel.members
-      ? `${channel.members} ${channel.members === 1 ? "member" : "members"}`
+      ? channel.members === 1
+        ? t("v1msg.linkPreview.oneMember")
+        : t("v1msg.linkPreview.members", { count: channel.members })
       : "",
   ].filter(Boolean);
   return (

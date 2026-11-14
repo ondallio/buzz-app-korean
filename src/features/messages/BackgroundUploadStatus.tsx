@@ -1,6 +1,8 @@
 import { useId, useLayoutEffect, useRef } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 import { ToastNotice } from "../../shared/design-system/ui/Toast";
+import { t, useLanguage } from "../../shared/i18n";
+import { resolveMessage } from "../../shared/i18n/deferred-message";
 import type { ComposerSession } from "./composer-session";
 import {
   cancelBackgroundUpload,
@@ -8,6 +10,27 @@ import {
   useBackgroundUploads,
 } from "./background-upload";
 import styles from "./Messages.module.css";
+
+const phaseKeys = {
+  "Preparing upload": {
+    single: "messageNotices.upload.preparing",
+    more: "messageNotices.upload.preparingMore",
+    thread: "messageNotices.upload.preparingThread",
+    threadMore: "messageNotices.upload.preparingThreadMore",
+  },
+  Uploading: {
+    single: "messageNotices.upload.uploading",
+    more: "messageNotices.upload.uploadingMore",
+    thread: "messageNotices.upload.uploadingThread",
+    threadMore: "messageNotices.upload.uploadingThreadMore",
+  },
+  "Finishing upload": {
+    single: "messageNotices.upload.finishing",
+    more: "messageNotices.upload.finishingMore",
+    thread: "messageNotices.upload.finishingThread",
+    threadMore: "messageNotices.upload.finishingThreadMore",
+  },
+} as const;
 
 /** Desktop's composer upload pill and failure toasts, for this session's sends. */
 export function BackgroundUploadStatus({
@@ -24,7 +47,9 @@ export function BackgroundUploadStatus({
   /** The hosting composer's link handler opens a notice's conversation. */
   onOpenLink?: ((target: string) => boolean) | undefined;
 }) {
+  useLanguage();
   const uploads = useBackgroundUploads(session);
+  const keys = phaseKeys[uploads.phase];
   const focusedCancel = useRef(false);
   const phase = useId();
   useLayoutEffect(() => {
@@ -46,8 +71,14 @@ export function BackgroundUploadStatus({
           {/* The text takes the spare width, so the bar and Cancel stay put
               as it changes. */}
           <span id={phase} role="status" className="min-w-0 flex-1 truncate">
-            {`${uploads.phase} to ${uploads.destination.name}`}
-            {uploads.others > 0 && ` and ${uploads.others} more`}
+            {uploads.others > 0
+              ? t(uploads.destination.thread ? keys.threadMore : keys.more, {
+                  name: uploads.destination.name,
+                  count: uploads.others,
+                })
+              : t(uploads.destination.thread ? keys.thread : keys.single, {
+                  name: uploads.destination.name,
+                })}
           </span>
           {/* Desktop's bar: measured bytes, or an indeterminate sweep while
               the host reports none. It never shows a number. */}
@@ -91,13 +122,18 @@ export function BackgroundUploadStatus({
             }}
             size="sm"
             variant="ghost"
-            aria-label={`Cancel upload to ${uploads.destination.name}`}
+            aria-label={t(
+              uploads.destination.thread
+                ? "messageNotices.upload.cancelThreadLabel"
+                : "messageNotices.upload.cancelLabel",
+              { name: uploads.destination.name },
+            )}
             // Pressing Cancel can disable it; focus stays for the handoff above.
             disabled={!uploads.cancellable}
             focusableWhenDisabled
             onClick={() => cancelBackgroundUpload(session)}
           >
-            Cancel
+            {t("messageNotices.cancel")}
           </Button>
         </div>
       )}
@@ -107,13 +143,15 @@ export function BackgroundUploadStatus({
         return (
           <ToastNotice
             key={notice.id}
-            title={notice.title}
-            {...(notice.description && { description: notice.description })}
+            title={resolveMessage(notice.title)}
+            {...(notice.description && {
+              description: resolveMessage(notice.description),
+            })}
             {...(!notice.retry && { onDismiss: dismiss })}
           >
             {notice.retry && (
               <Button type="button" onClick={notice.retry}>
-                Retry failed send recovery
+                {t("messageNotices.recovery.retry")}
               </Button>
             )}
             {onOpenLink && link && link !== here && (
@@ -124,7 +162,12 @@ export function BackgroundUploadStatus({
                   if (onOpenLink(link) && !notice.retry) dismiss();
                 }}
               >
-                {`Open ${notice.destination.name}`}
+                {t(
+                  notice.destination.thread
+                    ? "messageNotices.openThread"
+                    : "messageNotices.open",
+                  { name: notice.destination.name },
+                )}
               </Button>
             )}
           </ToastNotice>

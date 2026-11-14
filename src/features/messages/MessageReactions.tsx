@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useConversationPresentation } from "../conversation/ConversationPresentation";
 import {
   type CSSProperties,
@@ -87,7 +88,7 @@ function useReactionAction({ row, session, disabled }: Props) {
       setError(
         reason instanceof Error
           ? reason.message
-          : "Could not update reaction. Try again.",
+          : t("v1msg.reactions.updateFailed"),
       );
       return false;
     }
@@ -179,6 +180,7 @@ function ReactionPreviewContent({
   overflowing: boolean;
   onOverflow(overflowing: boolean): void;
 }) {
+  useLanguage();
   const previewAuthors = useMemo(() => {
     return session.viewer && authorIds.includes(session.viewer)
       ? [session.viewer, ...authorIds.filter((id) => id !== session.viewer)]
@@ -195,7 +197,7 @@ function ReactionPreviewContent({
   );
   const users = previewAuthors.map((authorId) =>
     authorId === session.viewer
-      ? "You"
+      ? t("draftsSent.places.you")
       : (loadedReactors.get(authorId)?.name ??
         profiles?.get(authorId)?.name ??
         authorId.slice(0, 10)),
@@ -258,7 +260,7 @@ function ReactionPreviewContent({
       <section
         ref={observePeople}
         className={styles.reactionPreviewNames}
-        aria-label="Everyone who reacted"
+        aria-label={t("v1msg.reactions.everyone")}
         tabIndex={overflowing ? 0 : undefined}
       >
         <div>
@@ -304,6 +306,7 @@ function ReactionEmoji({
   previewOpen: boolean;
   onPreviewChange(open: boolean): void;
 }) {
+  useLanguage();
   const [name, setName] = useState(reaction.content);
   // A retained focus must not reopen the preview over delivery recovery controls.
   // Fresh pointer or keyboard entry can reveal it again.
@@ -328,7 +331,7 @@ function ReactionEmoji({
   const authorId = authorIds[0] ?? "";
   const user =
     authorId === session.viewer
-      ? "You"
+      ? t("draftsSent.places.you")
       : (loadedLabel.get(authorId)?.name ??
         profiles?.get(authorId)?.name ??
         authorId.slice(0, 10));
@@ -356,7 +359,7 @@ function ReactionEmoji({
         sticky
         {...(overflowing && {
           actionRef: peopleList,
-          "aria-label": `People who reacted with ${name}`,
+          "aria-label": t("v1msg.reactions.peopleWith", { name }),
         })}
         className={[
           styles.reactionPreview,
@@ -373,7 +376,17 @@ function ReactionEmoji({
             shape={grouped ? "capsule" : "icon"}
             data-reaction={reaction.content}
             data-reaction-url={reaction.emoji?.url}
-            aria-label={`${reaction.content}: ${grouped ? `${authorIds.length} people` : user}`}
+            aria-label={
+              grouped
+                ? t("v1msg.reactions.countLabel", {
+                    reaction: reaction.content,
+                    count: String(authorIds.length),
+                  })
+                : t("v1msg.reactions.userLabel", {
+                    reaction: reaction.content,
+                    user,
+                  })
+            }
             aria-pressed={mine}
             // Not disabled: hover, focus and Tab into the preview stay
             // available, and keys reach ancestors. onClick rejects activation.
@@ -438,6 +451,7 @@ export function MessageReactions(
     profiles?: ReadonlyMap<string, Profile>;
   },
 ) {
+  useLanguage();
   const active = useConversationPresentation();
   const { row, session, scope, tools } = props;
   const action = useReactionAction(props);
@@ -477,7 +491,7 @@ export function MessageReactions(
       data-testid="reaction-row"
       data-populated={(active && reactions.length > 0) || undefined}
       role="group"
-      aria-label="Reactions"
+      aria-label={t("inbox.reactions")}
       onMouseEnter={() => setPointerInRow(true)}
       onMouseLeave={() => {
         setPointerInRow(false);

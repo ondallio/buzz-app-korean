@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import type { IdentityNameView } from "../identity-names/service";
 import { useIdentityNames } from "../identity-names/react";
 import {
@@ -41,6 +42,7 @@ export const MembershipRow = memo(function MembershipRow({
   onOpenLink?: ((url: string) => boolean) | undefined;
   canOpenLink?: ((target: string) => boolean) | undefined;
 }) {
+  useLanguage();
   const globalName = useIdentityNames(names);
   const resolveName = scopedName ?? globalName;
   const { targets, parts, title } = membershipDescription(
@@ -134,8 +136,8 @@ export const MembershipRow = memo(function MembershipRow({
                 className={`${referenceStyles.link} ${styles.membershipName}`}
                 aria-label={
                   part.id === viewer
-                    ? "View your profile"
-                    : `View ${part.text} profile`
+                    ? t("v1msg.profile.viewOwn")
+                    : t("messageRow.viewProfile", { name: part.text })
                 }
                 onClick={(event) => {
                   // WebKit skips focusing buttons on pointer click, so the

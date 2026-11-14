@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useRef, useState } from "react";
 import type { ComposerSession } from "./composer-session";
 import { canAddMembers } from "../channel-members/members";
@@ -36,6 +37,7 @@ export function useBringAgents(
   channelId: string,
   restoreFocus: () => void,
 ) {
+  useLanguage();
   const [pending, setPending] = useState<Pending>();
   const working = useRef(false);
   const safeAction = useRef<HTMLButtonElement>(null);
@@ -47,7 +49,7 @@ export function useBringAgents(
   const here =
     (pending &&
       communityHost(splitPartition(session.scope)?.communityOrigin ?? "")) ??
-    "this community";
+    t("v1msg.bring.thisCommunity");
   async function bring() {
     if (!pending || !agents || working.current) return;
     working.current = true;
@@ -55,8 +57,7 @@ export function useBringAgents(
     const { joined, added, notes } = request.progress;
     const check = () => {
       request.signal.throwIfAborted();
-      if (!request.current())
-        throw new Error("The draft changed. Close this dialog and send again.");
+      if (!request.current()) throw new Error(t("v1msg.draftChanged"));
     };
     setPending({ ...request, busy: true });
     try {
@@ -140,8 +141,19 @@ export function useBringAgents(
         title={
           pending &&
           (pending.reviewed
-            ? `${named(pending.agents)} ${many ? "are" : "is"} in ${here}`
-            : `Bring ${named(pending.agents)} into ${here}?`)
+            ? many
+              ? t("v1msg.bring.inPlaceMany", {
+                  names: named(pending.agents),
+                  place: here,
+                })
+              : t("v1msg.bring.inPlaceOne", {
+                  name: named(pending.agents),
+                  place: here,
+                })
+            : t("v1msg.bring.title", {
+                names: named(pending.agents),
+                place: here,
+              }))
         }
         description={
           pending && describe(pending.agents, canAdd, !!pending.reviewed)
@@ -162,7 +174,9 @@ export function useBringAgents(
               disabled={pending?.busy}
               onClick={() => pending?.finish(null)}
             >
-              {pending?.reviewed ? "Don't send" : "Don't bring"}
+              {pending?.reviewed
+                ? t("v1msg.bring.dontSend")
+                : t("v1msg.bring.dontBring")}
             </Button>
             <Button
               type="button"
@@ -176,10 +190,10 @@ export function useBringAgents(
               }
             >
               {pending?.reviewed
-                ? "Send"
+                ? t("messageActions.queue.send")
                 : many
-                  ? "Bring them here"
-                  : "Bring it here"}
+                  ? t("v1msg.bring.confirmMany")
+                  : t("v1msg.bring.confirmOne")}
             </Button>
           </>
         }
@@ -189,9 +203,19 @@ export function useBringAgents(
         ) : null}
         {pending?.error ? (
           <p role="alert">
-            {pending.error} Your draft is kept.
+            {t("v1msg.bring.errorKept", { error: pending.error })}
             {brought.length
-              ? ` ${named(brought)} ${brought.length > 1 ? "are" : "is"} now in ${here}.`
+              ? ` ${
+                  brought.length > 1
+                    ? t("v1msg.bring.nowInMany", {
+                        names: named(brought),
+                        place: here,
+                      })
+                    : t("v1msg.bring.nowInOne", {
+                        name: named(brought),
+                        place: here,
+                      })
+                }`
               : ""}
           </p>
         ) : null}
@@ -207,21 +231,24 @@ function describe(
 ) {
   const many = agents.length > 1;
   if (reviewed)
-    return `${many ? "They are" : "It is"} now in this community. Send your message, or keep your draft.`;
+    return many ? t("v1msg.bring.reviewedMany") : t("v1msg.bring.reviewedOne");
   const other = [
     ...new Set(
       agents.map(
-        (agent) => communityHost(agent.relay) ?? "its other community",
+        (agent) =>
+          communityHost(agent.relay) ?? t("v1msg.bring.otherCommunity"),
       ),
     ),
   ].join(", ");
-  return `${
-    many
-      ? `They are in ${other}. Bringing them here adds the same agents. ${sameAgent(true)}`
-      : `${agents[0]?.name} is in ${other}. Bringing it here adds the same agent. ${sameAgent()}`
-  }${
-    canAdd
-      ? ""
-      : ` You cannot add people to this channel, so ${many ? "they" : "it"} will not be added to it.`
+  const intro = many
+    ? t("v1msg.bring.describeMany", { place: other, details: sameAgent(true) })
+    : t("v1msg.bring.describeOne", {
+        name: agents[0]?.name ?? "",
+        place: other,
+        details: sameAgent(),
+      });
+  if (canAdd) return intro;
+  return `${intro} ${
+    many ? t("v1msg.bring.cannotAddMany") : t("v1msg.bring.cannotAddOne")
   }`;
 }

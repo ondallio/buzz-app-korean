@@ -1,3 +1,9 @@
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
+import { t, useLanguage } from "../../shared/i18n";
 import { useId, useRef, useState, type RefObject } from "react";
 import { Dialog, type DialogProps } from "../../shared/design-system/ui/Dialog";
 import { Button } from "../../shared/design-system/ui/Button";
@@ -19,27 +25,26 @@ export function ComposerLinkDialog({
   disabled: boolean;
   close(): void;
 }) {
+  useLanguage();
   const formId = useId();
   const textInput = useRef<HTMLInputElement>(null);
   const urlInput = useRef<HTMLInputElement>(null);
   const [text, setText] = useState(edit.text);
   const [url, setUrl] = useState(edit.href);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const save = () => {
     if (disabled) return;
     const href = composerLinkUrl(url);
     if (!href) {
-      setError("Use an HTTP(S) URL or a valid buzz:// link.");
+      setError(localMessage("messages.link.invalidUrl"));
       return;
     }
     if (/[\r\n]/.test(text)) {
-      setError("Link text must stay on one line.");
+      setError(localMessage("messages.link.oneLine"));
       return;
     }
     if (!edit.save(text, href)) {
-      setError(
-        "The draft changed or this link exceeds the message limit. Close and try again.",
-      );
+      setError(localMessage("messages.link.draftChanged"));
       return;
     }
     close();
@@ -52,7 +57,7 @@ export function ComposerLinkDialog({
       onOpenChange={(open) => {
         if (!open) close();
       }}
-      title={edit.existing ? "Edit link" : "Add link"}
+      title={edit.existing ? t("messages.link.edit") : t("messages.link.add")}
       initialFocus={edit.text ? urlInput : textInput}
       finalFocus={finalFocus}
       actions={
@@ -62,20 +67,20 @@ export function ComposerLinkDialog({
               disabled={disabled}
               onClick={() => {
                 if (edit.remove()) close();
-                else setError("The draft changed. Close and try again.");
+                else setError(localMessage("messages.link.removeChanged"));
               }}
             >
-              Remove link
+              {t("messages.link.remove")}
             </Button>
           )}
-          <Button onClick={close}>Cancel</Button>
+          <Button onClick={close}>{t("messages.cancel")}</Button>
           <Button
             variant="prominent"
             type="submit"
             form={formId}
             disabled={disabled || !url.trim()}
           >
-            Save
+            {t("messages.save")}
           </Button>
         </>
       }
@@ -89,7 +94,7 @@ export function ComposerLinkDialog({
           save();
         }}
       >
-        <Field label="Text">
+        <Field label={t("messages.link.text")}>
           <Input
             ref={textInput}
             value={text}
@@ -98,7 +103,10 @@ export function ComposerLinkDialog({
             autoComplete="off"
           />
         </Field>
-        <Field label="URL" error={error || undefined}>
+        <Field
+          label={t("messages.link.url")}
+          error={resolveMessage(error) || undefined}
+        >
           <Input
             ref={urlInput}
             value={url}

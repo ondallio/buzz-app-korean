@@ -1,3 +1,5 @@
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
 import { requestWork, isSettledWork } from "../agents/request-work";
 import { ActivityDisclosure } from "./ActivityDisclosure";
 import { ActivityOutcome } from "./ActivityOutcome";
@@ -267,6 +269,7 @@ function MessageRowContent({
   onOpenMediaReview,
   agentPubkeys,
 }: MessageContentProps) {
+  useLanguage();
   const [avatarFocused, setAvatarFocused] = useState(false);
   // Compact is a flat list: everyone's rows start at the left, with no own surface.
   const flat = useMessageDensity() === "compact";
@@ -331,22 +334,32 @@ function MessageRowContent({
     (messageTimestamps === "hide-solo" && !solo);
   const unreadLabel =
     threadUnread?.manual === "local-only"
-      ? "Thread marked unread on this device only"
+      ? t("messageRow.unreadLocal")
       : threadUnread?.manual === "remote"
-        ? "Thread marked unread"
+        ? t("messageRow.unreadRemote")
         : (threadUnread?.observedCount ?? 0) > 0
-          ? `Observed unread replies${threadUnread?.freshness === "stale" ? "; may be out of date" : ""}. Not an exact total.`
+          ? t(
+              threadUnread?.freshness === "stale"
+                ? "messageRow.unreadStale"
+                : "messageRow.unreadObserved",
+            )
           : undefined;
   const workingLabel = threadAgents.length
-    ? `${threadAgents
-        .map(({ pubkey, name }) => resolveName(pubkey, name))
-        .join(", ")} ${threadWaiting ? "waiting" : "working"}`
+    ? t(threadWaiting ? "messageRow.namesWaiting" : "messageRow.namesWorking", {
+        names: threadAgents
+          .map(({ pubkey, name }) => resolveName(pubkey, name))
+          .join(", "),
+      })
     : undefined;
   const firstThreadAgent = threadAgents[0];
   const threadWorkingLabel =
     threadAgents.length === 1 && firstThreadAgent
-      ? `${resolveName(firstThreadAgent.pubkey, firstThreadAgent.name)} is ${threadWaiting ? "waiting" : "working"}`
-      : `${threadAgents.length} agents are ${threadWaiting ? "waiting" : "working"}`;
+      ? t(threadWaiting ? "messageRow.oneWaiting" : "messageRow.oneWorking", {
+          name: resolveName(firstThreadAgent.pubkey, firstThreadAgent.name),
+        })
+      : t(threadWaiting ? "messageRow.manyWaiting" : "messageRow.manyWorking", {
+          count: threadAgents.length,
+        });
   const name = resolveName(
     row.authorId,
     profile?.name ?? row.authorId.slice(0, 10),
@@ -393,7 +406,7 @@ function MessageRowContent({
       <MenuIcon>
         <ListBulletsIcon />
       </MenuIcon>
-      View activity
+      {t("messageRow.viewActivity")}
     </MenuItem>
   );
   const avatarShape =
@@ -407,6 +420,16 @@ function MessageRowContent({
     row.authorId,
   );
   const agentAuthor = !row.workflowOwnerId && avatarShape === "squircle";
+  const presenceLabel =
+    presence === "unknown"
+      ? ""
+      : t(
+          presence === "online"
+            ? "shell.profile.targetOnline"
+            : presence === "away"
+              ? "shell.profile.targetAway"
+              : "shell.profile.targetOffline",
+        );
   const owner = useProfileOwner(
     session,
     agentAuthor && !stackPrevious ? row.authorId : undefined,
@@ -417,7 +440,9 @@ function MessageRowContent({
     owner.id !== viewer &&
     owner.profile &&
     !owner.profile.nameIsFallback
-      ? `${resolveName(owner.id, owner.profile.name)}’s agent`
+      ? t("messageRow.ownerAgent", {
+          name: resolveName(owner.id, owner.profile.name),
+        })
       : undefined;
   const presenceId = useId();
   const shown = shownRow ?? row;
@@ -541,7 +566,7 @@ function MessageRowContent({
         <MenuIcon>
           <FlagIcon />
         </MenuIcon>
-        Report
+        {t("messageActions.report.menu")}
       </MenuItem>
     </>
   );
@@ -674,7 +699,9 @@ function MessageRowContent({
   }
   const body = row.diff ? (
     <div>
-      <p className="text-label-sm">{row.diff.filePath || "Diff"}</p>
+      <p className="text-label-sm">
+        {row.diff.filePath || t("messageRow.diffTitle")}
+      </p>
       {row.diff.description && (
         <p className="text-body-sm">{row.diff.description}</p>
       )}
@@ -684,14 +711,12 @@ function MessageRowContent({
         // biome-ignore lint/a11y/noNoninteractiveTabindex: The raw scroll owner must support keyboard scrolling.
         tabIndex={0}
         role="region"
-        aria-label="Raw diff"
+        aria-label={t("messageRow.rawDiff")}
       >
-        {row.content || "No diff content"}
+        {row.content || t("messageRow.emptyDiff")}
       </pre>
       {row.diff.truncated && (
-        <p className="text-body-sm">
-          Diff truncated. View the full diff at the source repository.
-        </p>
+        <p className="text-body-sm">{t("messageRow.truncatedDiff")}</p>
       )}
     </div>
   ) : (
@@ -722,7 +747,7 @@ function MessageRowContent({
   const avatar = row.workflowOwnerId ? (
     <span className={styles.nestedAvatar}>
       <Avatar
-        alt="Workflow"
+        alt={t("messageRow.workflow")}
         fallback="Workflow"
         fallbackContent={<LightningIcon size={16} />}
         shape="squircle"
@@ -746,7 +771,7 @@ function MessageRowContent({
         <IconButton
           size="sm"
           shape="round"
-          aria-label={`View ${name} profile`}
+          aria-label={t("messageRow.viewProfile", { name })}
           aria-describedby={presence !== "unknown" ? presenceId : undefined}
           icon={
             <>
@@ -760,7 +785,7 @@ function MessageRowContent({
               />
               {presence !== "unknown" && (
                 <span className="sr-only select-none" id={presenceId}>
-                  Presence: {presence}
+                  {t(`channelsMenus.row.presence.${presence}`)}
                 </span>
               )}
             </>
@@ -769,16 +794,26 @@ function MessageRowContent({
       }
     />
   ) : (
-    <span className={styles.nestedAvatar}>
+    <span
+      className={styles.nestedAvatar}
+      role="img"
+      aria-hidden={presence === "unknown" || undefined}
+      aria-label={
+        presence === "unknown"
+          ? undefined
+          : avatarShape === "squircle"
+            ? t("messageRow.agentPresence", {
+                presence: presenceLabel,
+              })
+            : t("messageRow.avatarPresence", {
+                name,
+                presence: presenceLabel,
+              })
+      }
+    >
       <Avatar
         src={picture}
-        alt={
-          presence === "unknown"
-            ? ""
-            : avatarShape === "squircle"
-              ? "Agent"
-              : `${name} avatar`
-        }
+        alt=""
         fallback={name}
         size={avatarSize}
         shape={avatarShape}
@@ -931,7 +966,7 @@ function MessageRowContent({
         <ToastNotice
           tone="success"
           timeout={5000}
-          title="Report submitted to community moderators"
+          title={t("messageActions.report.sent")}
           onDismiss={() => setReporting(undefined)}
         />
       )}
@@ -945,7 +980,14 @@ function MessageRowContent({
       (agent) => !activity?.participants.includes(agent.pubkey),
     );
     const remainingWorkingLabel = remainingThreadAgents.length
-      ? `${remainingThreadAgents.map(({ pubkey, name }) => resolveName(pubkey, name)).join(", ")} ${threadWaiting ? "waiting" : "working"}`
+      ? t(
+          threadWaiting ? "messageRow.namesWaiting" : "messageRow.namesWorking",
+          {
+            names: remainingThreadAgents
+              .map(({ pubkey, name }) => resolveName(pubkey, name))
+              .join(", "),
+          },
+        )
       : undefined;
     return (
       ((row.replyCount > 0 ||
@@ -971,17 +1013,30 @@ function MessageRowContent({
             type="button"
             aria-label={
               row.replyCount > 0
-                ? `View thread: ${row.replyCount} ${row.replyCount === 1 ? "reply" : "replies"}${unreadLabel ? `. ${unreadLabel}` : ""}${workingLabel ? `. ${workingLabel}` : ""}${activity ? `. ${activity.label}` : ""}${threadDraft ? ". Draft reply" : ""}`
-                : `View thread: ${[
-                    ...(activity
-                      ? [remainingWorkingLabel, activity.label]
-                      : threadAgents.length > 0
-                        ? [threadWorkingLabel]
-                        : []),
-                    threadDraft && "Draft reply",
-                  ]
-                    .filter(Boolean)
-                    .join(". ")}`
+                ? [
+                    t(
+                      row.replyCount === 1
+                        ? "messageRow.viewOneReply"
+                        : "messageRow.viewManyReplies",
+                      { count: row.replyCount },
+                    ),
+                    ...(unreadLabel ? [unreadLabel] : []),
+                    ...(workingLabel ? [workingLabel] : []),
+                    ...(activity ? [activity.label] : []),
+                    ...(threadDraft ? [t("messages.reply.draftReply")] : []),
+                  ].join(". ")
+                : t("messageRow.viewSummary", {
+                    summary: [
+                      ...(activity
+                        ? [remainingWorkingLabel, activity.label]
+                        : threadAgents.length > 0
+                          ? [threadWorkingLabel]
+                          : []),
+                      threadDraft && t("messages.reply.draftReply"),
+                    ]
+                      .filter(Boolean)
+                      .join(". "),
+                  })
             }
             onClick={(event) => {
               event.currentTarget.focus();
@@ -1253,7 +1308,7 @@ function MessageRowContent({
                           openProfileTranscript(transcriptView, openLink);
                       }}
                     >
-                      View activity
+                      {t("messageRow.viewActivity")}
                     </button>
                   </span>
                 )}
@@ -1273,19 +1328,24 @@ function MessageRowContent({
             </div>
             {row.sentFromThread && (
               <div className={styles.sentFromThread}>
-                Sent from{" "}
-                <MessageLink
-                  url={`buzz://message?${new URLSearchParams({ channel: row.channelId, id: row.sentFromThread.rootId, thread: row.sentFromThread.rootId })}`}
-                  registry={extensions?.links}
-                  session={session}
-                  scope={scope}
-                  onOpenLink={openLink}
-                  label={
-                    row.sentFromThread.excerpt
-                      ? `Thread — ${row.sentFromThread.excerpt}`
-                      : "Thread"
-                  }
-                />
+                {rich("messageRow.sentFrom", {
+                  thread: (
+                    <MessageLink
+                      url={`buzz://message?${new URLSearchParams({ channel: row.channelId, id: row.sentFromThread.rootId, thread: row.sentFromThread.rootId })}`}
+                      registry={extensions?.links}
+                      session={session}
+                      scope={scope}
+                      onOpenLink={openLink}
+                      label={
+                        row.sentFromThread.excerpt
+                          ? t("messageRow.threadExcerpt", {
+                              excerpt: row.sentFromThread.excerpt,
+                            })
+                          : t("messages.thread.title")
+                      }
+                    />
+                  ),
+                })}
               </div>
             )}
             <MessageTimestampHint
@@ -1338,7 +1398,7 @@ function MessageRowContent({
                         <Button
                           variant="subtle"
                           size="inline"
-                          title="Open video"
+                          title={t("messageMedia.openVideo")}
                           type="button"
                           onClick={() => onMediaTime(timeReply.anchor.seconds)}
                         >
@@ -1402,9 +1462,6 @@ function MessageRowContent({
                     const imageOnly = group.every(
                       (item) => item.kind === "image",
                     );
-                    const mediaLabel = imageOnly
-                      ? "images"
-                      : "photos and videos";
                     const files = group[0]?.kind === "file";
                     // Only collapse when the host can open the complete gallery.
                     const collapsed =
@@ -1510,10 +1567,18 @@ function MessageRowContent({
                             keepMounted={keepRowMounted}
                             label={
                               collapsed && index === 3
-                                ? `View all ${group.length} ${mediaLabel}, starting at ${imageOnly ? "image" : "item"} 4`
+                                ? t(
+                                    imageOnly
+                                      ? "messageMedia.allImages"
+                                      : "messageMedia.allMixed",
+                                    { count: group.length },
+                                  )
                                 : group.length > 1
-                                  ? `Open image ${index + 1} of ${group.length}`
-                                  : "Open image attachment"
+                                  ? t("messageMedia.imageIndex", {
+                                      index: index + 1,
+                                      count: group.length,
+                                    })
+                                  : t("attachmentMedia.imageOpenAttachment")
                             }
                             {...(onOpenMediaReview
                               ? {
@@ -1560,8 +1625,13 @@ function MessageRowContent({
                           }
                           label={
                             collapsed && index === 3
-                              ? `View all ${group.length} ${mediaLabel}, starting at item 4`
-                              : `Open video ${index + 1} of ${group.length}`
+                              ? t("messageMedia.allMixed", {
+                                  count: group.length,
+                                })
+                              : t("messageMedia.videoIndex", {
+                                  index: index + 1,
+                                  count: group.length,
+                                })
                           }
                           mode={mediaMode}
                           {...(attachment.kind === "video" &&
@@ -1602,7 +1672,14 @@ function MessageRowContent({
                           className={`${styles.imageList} ${group.length >= 4 ? styles.imageGrid : ""}`}
                           data-image-grid={group.length >= 4 || undefined}
                           role="group"
-                          aria-label={`${group.length} ${imageOnly ? (group.length === 1 ? "image" : "images") : "photos and videos"}`}
+                          aria-label={t(
+                            imageOnly
+                              ? group.length === 1
+                                ? "messageMedia.singleImage"
+                                : "messageMedia.images"
+                              : "messageMedia.mixed",
+                            { count: group.length },
+                          )}
                         >
                           {items}
                         </div>
@@ -1733,6 +1810,7 @@ export const MessageRow = memo(function AudienceMessageRow(
 });
 
 function AgentsMessageRow(props: MessageRowProps & { failure?: boolean }) {
+  useLanguage();
   const {
     row,
     session,
@@ -1847,7 +1925,10 @@ function AgentsMessageRow(props: MessageRowProps & { failure?: boolean }) {
               expanded={open}
               onToggle={() => setOpen((value) => !value)}
               trigger={trigger}
-              label={`${open ? "Collapse" : "Show"} activity history: ${author.name}: Couldn’t finish`}
+              label={t(
+                open ? "messageRow.collapseFailure" : "messageRow.showFailure",
+                { name: author.name },
+              )}
               summary={<ActivityOutcome state="error" />}
               expandedSummary={<ActivityOutcome state="error" />}
               actions={
@@ -1857,7 +1938,7 @@ function AgentsMessageRow(props: MessageRowProps & { failure?: boolean }) {
                   <IconButton
                     size="sm"
                     variant="subtle"
-                    aria-label="View transcript"
+                    aria-label={t("messageRow.viewTranscript")}
                     icon={<InfoIcon aria-hidden="true" />}
                     onClick={() => {
                       const target = profileActivityViewTarget(author.pubkey);
@@ -1919,7 +2000,25 @@ function AgentsMessageRow(props: MessageRowProps & { failure?: boolean }) {
                 ref={trigger}
                 data-buzz-ui=""
                 className={styles.audienceLine}
-                aria-label={`${author.name}${to.length ? ` to ${to.map((who) => who.name).join(", ")}` : ""}: ${preview}${row.edited ? " (edited)" : ""}`}
+                aria-label={
+                  to.length
+                    ? t(
+                        row.edited
+                          ? "messageRow.audienceToEdited"
+                          : "messageRow.audienceTo",
+                        {
+                          author: author.name,
+                          recipients: to.map((who) => who.name).join(", "),
+                          preview,
+                        },
+                      )
+                    : t(
+                        row.edited
+                          ? "messageRow.audienceEdited"
+                          : "messageRow.audience",
+                        { author: author.name, preview },
+                      )
+                }
               >
                 {!bubble && avatar(author)}
                 {!open && (
@@ -1931,7 +2030,7 @@ function AgentsMessageRow(props: MessageRowProps & { failure?: boolean }) {
                   />
                 )}
                 {active && <TypingDots size="message" />}
-                {open && bubble && "Collapse"}
+                {open && bubble && t("messageRow.collapse")}
                 {!open && (
                   <span className={styles.audiencePreviewText}>
                     <ShimmerText active={active}>{visiblePreview}</ShimmerText>

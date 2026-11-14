@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import {
   useLayoutEffect,
   useRef,
@@ -116,7 +117,7 @@ function OwnedTool({
       insertResource: (resource) =>
         active()
           ? current.current.insertResource(resource)
-          : "The message can't be edited right now",
+          : t("messages.composer.editNotReady"),
       focus: () => {
         if (active()) current.current.focus();
       },

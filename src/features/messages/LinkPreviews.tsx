@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { resolveMatch, type Contribution } from "../../plugins/contributions";
 import {
@@ -29,6 +30,7 @@ export function LinkPreviews({
   registry: ContributionReader<LinkPreviewRenderer> | undefined;
   onOpenLink(url: string): boolean;
 }) {
+  useLanguage();
   const renderers = useSyncExternalStore(
     registry?.subscribe ?? noSubscribe,
     registry?.snapshot ?? noSnapshot,
@@ -80,8 +82,10 @@ export function LinkPreviews({
           onClick={() => setOpen((value) => !value)}
         >
           {open
-            ? "Show fewer previews"
-            : `Show ${hidden} more ${hidden === 1 ? "preview" : "previews"}`}
+            ? t("v1msg.linkPreviews.fewer")
+            : hidden === 1
+              ? t("v1msg.linkPreviews.moreOne")
+              : t("v1msg.linkPreviews.more", { count: hidden })}
         </Button>
       )}
     </div>

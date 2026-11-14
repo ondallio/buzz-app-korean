@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useChannelIdentityNames } from "../identity-names/react";
 import { useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { AtIcon, RobotIcon } from "../../shared/design-system/icons/index";
@@ -202,6 +203,7 @@ export function ReferenceText({
   channelId?: string | undefined;
   interactive?: boolean;
 }) {
+  useLanguage();
   const resolveName = useChannelIdentityNames(session, channelId);
   const references = messageReferences(
     text,
@@ -242,7 +244,14 @@ export function ReferenceText({
           className={styles.link}
           data-mention-kind={reference.kind}
           data-mention-self={reference.id === session?.viewer ? "" : undefined}
-          title={`${reference.kind === "agent" ? "Agent" : "Person"}: ${label}\n${reference.id}`}
+          title={t("v1msg.reference.title", {
+            kind:
+              reference.kind === "agent"
+                ? t("chips.agent.kind")
+                : t("chips.person.kind"),
+            label,
+            id: reference.id,
+          })}
         >
           <MentionLabel agent={reference.kind === "agent"} label={label} />
         </span>
