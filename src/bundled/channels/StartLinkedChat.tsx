@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { ChatCircleIcon } from "../../shared/design-system/icons";
 import { useState } from "react";
 import type {
@@ -49,6 +50,7 @@ export function StartLinkedChat({
   channelId: string;
   message?: ChannelMessage;
 }) {
+  useLanguage();
   const [busy, setBusy] = useState(false);
   const notify = useToastNotification();
   async function start() {
@@ -63,7 +65,7 @@ export function StartLinkedChat({
         ? messageCopyLink(message, session.scope)
         : `buzz://channel/${encodeURIComponent(channelId)}`;
       if (!link || (message && message.channelId !== channelId))
-        throw new Error("This source is unavailable. Reopen it and try again.");
+        throw new Error(t("v1shell.linkedChat.sourceUnavailable"));
       const source: LinkedChat = { channelId, link };
       const id = await linkedDraftId(source);
       if (!current()) {
@@ -71,16 +73,14 @@ export function StartLinkedChat({
         return;
       }
       if (!writeView(session.scope, linkedDraftKey(id), source))
-        throw new Error(
-          "Your new chat draft couldn’t be saved. Nothing was created.",
-        );
+        throw new Error(t("v1shell.linkedChat.draftFailed"));
       const opening = navigation.open(
         soloDraftTarget(session.scope, { linked: id }),
       );
       owned = navigation.snapshot().attempt.id;
       const result = await opening;
       if (result.status === "failed")
-        throw new Error("The Solo chat couldn’t open. Try again.");
+        throw new Error(t("v1shell.linkedChat.openFailed"));
     } catch (error) {
       if (current())
         notify(error instanceof Error ? error.message : String(error), "error");
@@ -95,7 +95,7 @@ export function StartLinkedChat({
       <MenuIcon>
         <ChatCircleIcon size={16} aria-hidden="true" />
       </MenuIcon>
-      Start Solo chat
+      {t("v1shell.linkedChat.start")}
     </MenuItem>
   );
 }

@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { Button } from "../../shared/design-system/ui/Button";
 import { isWorkflowOperation } from "../../features/workflows/protocol";
 import { useState, useSyncExternalStore } from "react";
@@ -12,8 +13,8 @@ import { isBatchAddition } from "../../features/channel-members/members";
 function additionLabel(tags: readonly (readonly string[])[]) {
   const people = tags.filter(([tag]) => tag === "p");
   return people.length > 1
-    ? `Add ${people.length} people`
-    : `Add agent ${people[0]?.[1]?.slice(0, 12) ?? ""}`;
+    ? t("v1shell.outbox.addPeople", { count: people.length })
+    : t("v1shell.outbox.addAgent", { id: people[0]?.[1]?.slice(0, 12) ?? "" });
 }
 
 /** Delivery belongs to the session, including messages from other pages or a previous launch. */
@@ -26,6 +27,7 @@ export function OutboxStatus({
   profiling: RelayProfiler;
   memberAdditions: Pick<RelaySession["memberAdditions"], "add">;
 }) {
+  useLanguage();
   const operations = useSyncExternalStore(
     outbox.subscribe,
     outbox.snapshot,
@@ -35,8 +37,10 @@ export function OutboxStatus({
 
   return (
     <details>
-      <summary>Outbox · {operations.length} items</summary>
-      <p>Removing an item from the outbox does not delete a sent message.</p>
+      <summary>
+        {t("v1shell.outbox.summary", { count: operations.length })}
+      </summary>
+      <p>{t("v1shell.outbox.removeNote")}</p>
       <ul
         style={{
           maxHeight: "10rem",
@@ -51,15 +55,17 @@ export function OutboxStatus({
                 ? additionLabel(item.event.tags)
                 : item.event.content.slice(0, 100)}{" "}
               ·{" "}
-              {
-                {
-                  sending: "Sending",
-                  accepted: "Sent",
-                  unknown: "Unconfirmed",
-                  failed: "Not sent",
-                  seen: "Sent",
-                }[item.delivery]
-              }
+              {t(
+                (
+                  {
+                    sending: "v1shell.outbox.sending",
+                    accepted: "v1shell.outbox.sent",
+                    unknown: "v1shell.outbox.unconfirmed",
+                    failed: "v1shell.outbox.notSent",
+                    seen: "v1shell.outbox.sent",
+                  } as const
+                )[item.delivery],
+              )}
             </span>{" "}
             {!isWorkflowOperation(item.event) &&
               !item.guarded &&
@@ -84,9 +90,7 @@ export function OutboxStatus({
                             tag === "p" && value ? [value] : [],
                         );
                         if (!channelId || !pubkeys.length)
-                          throw new Error(
-                            "Reopen Members to check this addition.",
-                          );
+                          throw new Error(t("v1shell.outbox.reopenMembers"));
                         // A stale explicit role must never overwrite a newer
                         // admission, so each person is checked again. A guest
                         // addition is retried as one, so it never sends a
@@ -116,15 +120,12 @@ export function OutboxStatus({
                     }
                   }}
                 >
-                  Retry
+                  {t("channelForms.retry")}
                 </Button>
               )}{" "}
             {item.guarded &&
               (item.delivery === "failed" || item.delivery === "unknown") && (
-                <span>
-                  Retry from the channel or agent profile after checking
-                  membership.
-                </span>
+                <span>{t("v1shell.outbox.guarded")}</span>
               )}{" "}
             {item.delivery !== "sending" && (
               <Button
@@ -147,7 +148,7 @@ export function OutboxStatus({
                   }
                 }}
               >
-                Remove from outbox
+                {t("v1shell.outbox.remove")}
               </Button>
             )}
           </li>

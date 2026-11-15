@@ -13,6 +13,7 @@ import { PanelHeader } from "../../shared/design-system/ui/PanelHeader";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
 import { ArrowLeftIcon, XIcon } from "../../shared/design-system/icons";
 import styles from "./Panels.module.css";
+import { t, useLanguage } from "../../shared/i18n";
 
 const Host = createContext<{
   element: HTMLDivElement | null;
@@ -93,6 +94,7 @@ function InlinePanelSubview({
   onBack(): void;
   children: ReactNode;
 }) {
+  useLanguage();
   const host = useContext(Host);
   const cover = host?.cover;
   const element = host?.element;
@@ -129,7 +131,7 @@ function InlinePanelSubview({
           host && (
             <IconButton
               size="toolbar"
-              aria-label={`Close ${title.toLowerCase()} panel`}
+              aria-label={t("panels.close", { label: title.toLowerCase() })}
               onClick={host.close}
               icon={<XIcon size={18} aria-hidden="true" />}
             />

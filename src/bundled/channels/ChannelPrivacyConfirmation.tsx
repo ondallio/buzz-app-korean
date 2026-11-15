@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { Checkbox } from "../../shared/design-system/ui/Checkbox";
 import { readView, writeView } from "../../shared/view-state";
@@ -21,8 +22,8 @@ export function rememberPrivacyConfirmation(scope: string) {
 
 export function privacyConsequence(visibility: Visibility) {
   return visibility === "private"
-    ? "Only channel members will have access."
-    : "Everyone in this community will be able to view this channel’s full history.";
+    ? t("channelsMenus.privacy.private")
+    : t("channelsMenus.privacy.public");
 }
 
 export function ChannelPrivacyConfirmation({
@@ -36,6 +37,7 @@ export function ChannelPrivacyConfirmation({
   checked: boolean;
   onCheckedChange(checked: boolean): void;
 }) {
+  useLanguage();
   return (
     <div style={{ display: "grid", gap: "var(--space-4)" }}>
       <BaseDialog.Description>
@@ -43,7 +45,7 @@ export function ChannelPrivacyConfirmation({
       </BaseDialog.Description>
       {!hidePreference && (
         <Checkbox
-          label="Don’t show me this again"
+          label={t("channelsMenus.privacy.dontShow")}
           checked={checked}
           onCheckedChange={onCheckedChange}
         />

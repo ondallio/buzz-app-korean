@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   createContext,
   useContext,
@@ -54,6 +55,7 @@ export function RegionChatList() {
 
 /** One shared workspace surface. A source supplies its tasks and selection. */
 export function RegionWorkspace(props: SoloWorkspaceProps) {
+  useLanguage();
   const parts = useContext(WorkspaceCompositionContext);
   const workspace = parts?.workspaces.find(
     (item) => item.id === (props.id ?? ""),
@@ -66,7 +68,10 @@ export function RegionWorkspace(props: SoloWorkspaceProps) {
   const title = props.id ? workspace.name : "Unfiled";
   const disclosure = (
     <SoloDisclosure
-      label={`${workspace.open ? "Hide" : "Show"} tasks and chats in ${title}`}
+      label={t(
+        workspace.open ? "v1shell.solo.hideTasks" : "v1shell.solo.showTasks",
+        { name: title },
+      )}
       summary={props.id ? "" : title}
       expanded={workspace.open}
       controls={`workspace-${workspace.id || "unfiled"}`}
@@ -99,15 +104,17 @@ export function RegionWorkspace(props: SoloWorkspaceProps) {
             <IconButton
               size="compact"
               data-solo-workspace-new-task=""
-              aria-label={`New task in ${title}`}
-              title="New task"
+              aria-label={t("v1shell.nav.newTaskIn", { name: title })}
+              title={t("v1shell.nav.newTask")}
               icon={<PencilSimpleIcon size={15} />}
               onClick={props.onNewTask}
             />
           ),
           props.onNewTask && (
             // Also in the menu, where it is never hidden.
-            <MenuItem onClick={props.onNewTask}>New task</MenuItem>
+            <MenuItem onClick={props.onNewTask}>
+              {t("v1shell.nav.newTask")}
+            </MenuItem>
           ),
         )}
       </NavigationCard>

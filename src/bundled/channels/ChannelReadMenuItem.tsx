@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import type { UnreadCapability } from "../../features/relay/unread";
 import {
@@ -24,6 +25,7 @@ export function ChannelReadMenuItem({
   /** Menus without a pending state close at once and report failures elsewhere. */
   closeOnClick?: boolean;
 }) {
+  useLanguage();
   const target = useMemo(
     () => ({ kind: "channel" as const, channelId }),
     [channelId],
@@ -40,7 +42,7 @@ export function ChannelReadMenuItem({
     <MenuItem
       closeOnClick={closeOnClick}
       disabled={pending}
-      title={hasUnread ? undefined : "Mark unread on this device only"}
+      title={hasUnread ? undefined : t("channelsMenus.read.localHint")}
       onClick={() =>
         void run(() =>
           hasUnread
@@ -56,7 +58,9 @@ export function ChannelReadMenuItem({
           <EnvelopeIcon size={14} />
         )}
       </MenuIcon>
-      {hasUnread ? "Mark as read" : "Mark as unread"}
+      {hasUnread
+        ? t("channelsMenus.read.read")
+        : t("channelsMenus.read.unread")}
     </MenuItem>
   );
 }

@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { Service, type Context } from "@deepseek-ai/cordis";
 import { createContributions } from "../../plugins/contributions";
 import {
@@ -668,5 +669,7 @@ export function prepareSoloMove(session: RelaySession, channelId: string) {
     .regions.find((region) =>
       region.channels.some((channel) => channel.id === channelId),
     );
-  return region ? `This chat is managed by ${region.title}.` : undefined;
+  return region
+    ? t("v1shell.solo.managedBy", { name: region.title })
+    : undefined;
 }

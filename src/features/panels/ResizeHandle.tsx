@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useCallback,
   useLayoutEffect,
@@ -30,6 +31,7 @@ export function ResizeHandle({
   target?: RefObject<HTMLElement | null>;
   property?: string;
 }) {
+  useLanguage();
   const handle = useRef<HTMLHRElement>(null);
   const [renderedWidth, setRenderedWidth] = useState(width);
   const drag = useRef<{
@@ -132,7 +134,7 @@ export function ResizeHandle({
       aria-valuemax={max}
       aria-valuenow={Math.round(renderedWidth)}
       tabIndex={0}
-      data-tooltip="Drag to resize · Double-click to reset"
+      data-tooltip={t("v1shell.panels.resizeTooltip")}
       onDoubleClick={reset}
       onKeyDown={(event) => {
         const step = event.shiftKey ? 48 : 16;

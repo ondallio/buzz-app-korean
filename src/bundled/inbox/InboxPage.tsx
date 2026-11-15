@@ -1,3 +1,12 @@
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  localMessage,
+  localError,
+  errorMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
+import { TranslatedMessage } from "../../shared/i18n/Message";
 import {
   type ReactNode,
   useCallback,
@@ -193,11 +202,12 @@ export function InboxPage({
   /** The host tab workspace, `conversation.ui.Tabs`, while a plugin provides it. */
   tabs?: InboxPageTabs | undefined;
 }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const { viewer, scope } = connection;
   return (
     <div className="h-full min-h-0">
-      <FullPageSurface aria-label="Activity">
+      <FullPageSurface aria-label={t("inbox.activity")}>
         {connection.status === "ready" &&
         viewer &&
         scope?.endsWith(`:${viewer}`) ? (
@@ -217,7 +227,7 @@ export function InboxPage({
             <PanelHeader
               title={
                 <PanelHeaderLabel
-                  title="Activity"
+                  title={t("inbox.activity")}
                   icon={<BellIcon size="1rem" />}
                 />
               }
@@ -225,15 +235,16 @@ export function InboxPage({
             <div className={styles.notice} role="status">
               <p className="text-body text-subtle">
                 {connection.status === "connecting"
-                  ? "Connecting to your activity…"
+                  ? t("inbox.connecting")
                   : connection.denied
                     ? // Its notice, on every page, offers what fixes it.
                       communityRefusalTitle(connection.refusal)
-                    : (connection.error ??
-                      "Choose a community to see your activity.")}
+                    : (connection.error ?? t("inbox.chooseCommunity"))}
               </p>
               {connection.status === "error" && !connection.denied && (
-                <Button onClick={relay.tryAgain}>Retry connection</Button>
+                <Button onClick={relay.tryAgain}>
+                  {t("inbox.retryConnection")}
+                </Button>
               )}
             </div>
           </div>
@@ -255,6 +266,7 @@ const never = () => false;
 
 /** The conversation list is Inbox's first tab; conversations open beside it. */
 export function InboxView({ tabs: Tabs, ...props }: InboxViewProps) {
+  useLanguage();
   const list = (
     open: (target: PageTabTarget) => boolean,
     close: (target: PageTabTarget) => boolean,
@@ -267,7 +279,7 @@ export function InboxView({ tabs: Tabs, ...props }: InboxViewProps) {
       id="inbox"
       session={props.session}
       scope={props.session.scope}
-      label="Activity"
+      label={t("inbox.activity")}
       icon={<BellIcon size="1rem" />}
       // Opening reveals a conversation; reading is earned as it is seen.
       visits={false}
@@ -290,6 +302,7 @@ function InboxList({
   close(target: PageTabTarget): boolean;
   isOpen(target: PageTabTarget): boolean;
 }) {
+  useLanguage();
   const previewId = useId();
   const list = useChannelList(session.channels);
   const inbox = useSyncExternalStore(
@@ -405,7 +418,7 @@ function InboxList({
 
   const [pending, setPending] = useState(false);
   const [refreshAfterRoster, setRefreshAfterRoster] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<DisplayMessage>();
   /** `unread` is the row's read state when its menu opened, which fixes the
    * menu's one read action for as long as it stays open. */
   const [menu, setMenu] = useState<{
@@ -708,10 +721,7 @@ function InboxList({
     failedMutation.current = undefined;
     let succeeded = false;
     try {
-      if (valid && !valid())
-        throw new Error(
-          "This action expired. Close and reopen the conversation.",
-        );
+      if (valid && !valid()) throw localError("inbox.actionExpired");
       await work();
       succeeded = true;
       if (active.current) setError(undefined);
@@ -720,8 +730,8 @@ function InboxList({
         if (valid?.()) failedMutation.current = { work, valid, onSuccess };
         setError(
           cause instanceof Error
-            ? cause.message
-            : "That action failed. Try again.",
+            ? errorMessage(cause)
+            : localMessage("inbox.actionFailed"),
         );
         onFailure?.();
       }
@@ -798,10 +808,14 @@ function InboxList({
         if (held != null && listOwnsFocus())
           focusRow.current = leaves ? held : item.id;
         if (!leaves) return;
-        notify("Marked as read", "success", {
-          label: "Undo",
-          onClick: () => undoRead(item),
-        });
+        notify(
+          <TranslatedMessage value={localMessage("inbox.markedRead")} />,
+          "success",
+          {
+            label: <TranslatedMessage value={localMessage("inbox.undo")} />,
+            onClick: () => undoRead(item),
+          },
+        );
       },
       () => {
         if (held != null && listOwnsFocus()) focusRow.current = item.id;
@@ -815,7 +829,10 @@ function InboxList({
       try {
         await session.unread.markUnreadLocal(item.target);
       } catch {
-        notify("Couldn't mark unread", "error");
+        notify(
+          <TranslatedMessage value={localMessage("inbox.undoFailed")} />,
+          "error",
+        );
       }
     })();
   }
@@ -891,10 +908,7 @@ function InboxList({
           // Close/Escape retires undispatched steps, not the admitted save.
           // Its genuine storage/access rejection still propagates through run.
           if (intentRevision.current !== intent) return;
-          if (!valid())
-            throw new Error(
-              "This action expired. Close and reopen the conversation.",
-            );
+          if (!valid()) throw localError("inbox.actionExpired");
           const step = remaining[0];
           if (!step) break;
           await session.unread.markThrough(step.target, step.messageId);
@@ -972,7 +986,7 @@ function InboxList({
                 className={`${styles.refreshStatus} text-caption text-subtle`}
                 role="status"
               >
-                Checking recent activity…
+                {t("inbox.checking")}
               </span>
             )}
           </div>
@@ -984,9 +998,9 @@ function InboxList({
     <div data-buzz-ui="" className={styles.page}>
       {failure && (
         <div className={styles.notice} role="alert">
-          <p className="text-body">{failure}</p>
+          <p className="text-body">{resolveMessage(failure)}</p>
           <Button ref={retryButton} size="sm" loading={pending} onClick={retry}>
-            Retry activity
+            {t("inbox.retryActivity")}
           </Button>
         </div>
       )}
@@ -1013,7 +1027,7 @@ function InboxList({
             {inbox.freshness === "stale" && !failure && (
               <div className={styles.notice} role="status">
                 <span className="text-body text-subtle">
-                  Showing retained activity.
+                  {t("inbox.retained")}
                 </span>
                 <Button
                   size="sm"
@@ -1021,7 +1035,7 @@ function InboxList({
                   loading={pending}
                   onClick={() => refresh()}
                 >
-                  Refresh
+                  {t("inbox.refresh")}
                 </Button>
               </div>
             )}
@@ -1030,7 +1044,7 @@ function InboxList({
               !failure && (
                 <div className={styles.notice} role="status">
                   <span className="text-body text-subtle">
-                    Check recent activity.
+                    {t("inbox.checkRecent")}
                   </span>
                   <Button
                     size="sm"
@@ -1038,7 +1052,7 @@ function InboxList({
                     loading={pending}
                     onClick={() => refresh()}
                   >
-                    Refresh
+                    {t("inbox.refresh")}
                   </Button>
                 </div>
               )}
@@ -1051,19 +1065,19 @@ function InboxList({
                     icon={caughtUp ? <CheckIcon /> : <BellIcon />}
                     title={
                       activity === "reactions" && senderFilter === "everyone"
-                        ? "No reactions yet."
+                        ? t("inbox.noReactions")
                         : caughtUp
-                          ? "All caught up"
+                          ? t("inbox.allCaughtUp")
                           : unreadOnly
-                            ? "No unread activity in this view"
-                            : "No recent activity in this view"
+                            ? t("inbox.noUnreadInView")
+                            : t("inbox.noRecentInView")
                     }
                     description={
                       activity === "reactions"
-                        ? "When someone reacts to your messages, you’ll see it here."
+                        ? t("inbox.reactionHelp")
                         : caughtUp
-                          ? "New replies, mentions and DMs show up here."
-                          : "Mentions, direct messages, and replies in threads you participate in appear here."
+                          ? t("inbox.caughtUpHelp")
+                          : t("inbox.activityHelp")
                     }
                     action={
                       filtered ? (
@@ -1083,7 +1097,9 @@ function InboxList({
                             focusToolbar();
                           }}
                         >
-                          {caughtUp ? "Show all" : "Clear filters"}
+                          {caughtUp
+                            ? t("inbox.showAll")
+                            : t("inbox.clearFilters")}
                         </Button>
                       ) : undefined
                     }
@@ -1093,7 +1109,7 @@ function InboxList({
             <ul
               ref={listRef}
               className={styles.list}
-              aria-label="Activity"
+              aria-label={t("inbox.activity")}
               aria-busy={pending}
             >
               {rows.map((row) => {
@@ -1254,8 +1270,11 @@ function InboxList({
                               size="sm"
                               variant="ghost"
                               disabled={pending}
-                              aria-label={`Mark as read ${sender} in ${context}`}
-                              title="Mark as read"
+                              aria-label={t("inbox.markReadNamed", {
+                                sender,
+                                context,
+                              })}
+                              title={t("inbox.markRead")}
                               onClick={() => markRead(item)}
                               icon={<CheckIcon size={16} aria-hidden="true" />}
                             />
@@ -1264,7 +1283,10 @@ function InboxList({
                       </ContextMenuTrigger>
                       <MenuPopup
                         size="compact"
-                        aria-label={`Actions for ${sender} in ${context}`}
+                        aria-label={t("inbox.actionsNamed", {
+                          sender,
+                          context,
+                        })}
                         anchor={menu?.id === item.id ? menu.anchor : undefined}
                       >
                         {/* One action, for the row's read state when the menu
@@ -1280,7 +1302,9 @@ function InboxList({
                             menuUnread ? markRead(item) : mutate(item, true)
                           }
                         >
-                          {menuUnread ? "Mark as read" : "Mark unread"}
+                          {menuUnread
+                            ? t("inbox.markRead")
+                            : t("inbox.markUnread")}
                         </MenuItem>
                       </MenuPopup>
                     </ContextMenuRoot>

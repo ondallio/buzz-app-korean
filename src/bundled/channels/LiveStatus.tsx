@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   type FocusEvent,
   useEffect,
@@ -29,6 +30,7 @@ export function LiveStatus({
   /** A retry control that had focus went away; move focus on. */
   onRecovered?: (() => void) | undefined;
 }) {
+  useLanguage();
   const { recovering: retrying, shown } = useRecovery(
     diagnostics ? undefined : recovery,
   );
@@ -79,13 +81,13 @@ export function LiveStatus({
     actionable.some((route) => route.status === "limited") ||
     incompleteRoster;
   const reason = error?.includes("rate-limited: quota exceeded")
-    ? "A relay request was rate-limited; recovery needs attention."
+    ? t("v1shell.live.rateLimited")
     : (error ??
       (incompleteRoster
-        ? "Some channels are missing from the current roster."
+        ? t("v1shell.live.rosterMissing")
         : ["error", "deferred"].includes(snapshot.roster.state)
-          ? "Channel list needs refreshing."
-          : "Live updates are unavailable."));
+          ? t("v1shell.live.rosterRefresh")
+          : t("v1shell.live.unavailable")));
   const settled = liveRecoveryStatus(snapshot) === "settled";
   // Startup, bounded automatic quota recovery and recovery before its notice
   // delay do not need user attention.
@@ -155,17 +157,22 @@ export function LiveStatus({
     return (
       <>
         <p>
-          Live updates:{" "}
-          {issue
-            ? reason
-            : recovering.length
-              ? "recovering automatically after rate limiting; awaiting confirmation"
-              : connecting
-                ? "connecting"
-                : "stream established"}
+          {t("v1shell.live.diagnostics", {
+            status: issue
+              ? reason
+              : recovering.length
+                ? t("v1shell.live.recovering")
+                : connecting
+                  ? t("v1shell.live.connecting")
+                  : t("v1shell.live.established"),
+          })}
         </p>
         {(error || recovering[0]?.error) && (
-          <p>Last rejection: {error ?? recovering[0]?.error}</p>
+          <p>
+            {t("v1shell.live.lastRejection", {
+              error: error ?? recovering[0]?.error ?? "",
+            })}
+          </p>
         )}
       </>
     );
@@ -174,15 +181,18 @@ export function LiveStatus({
   return (
     <section
       role="status"
-      aria-label="Live updates limited"
+      aria-label={t("v1shell.live.limited")}
       className={styles.recovery}
       {...track}
     >
       <div className={styles.message}>
-        <p className="text-label-sm text-warning">Live updates limited</p>
+        <p className="text-label-sm text-warning">
+          {t("v1shell.live.limited")}
+        </p>
         <p className="text-body-sm text-subtle">
-          {issue ? reason : held?.reason} Only currently accessible messages
-          remain readable.
+          {t("v1shell.live.limitedDetail", {
+            reason: (issue ? reason : held?.reason) ?? "",
+          })}
         </p>
       </div>
       {manual && (
@@ -192,7 +202,7 @@ export function LiveStatus({
           // The notice and this control stay until the attempt succeeds.
           onClick={() => live.retry()}
         >
-          Retry live updates
+          {t("v1shell.live.retry")}
         </Button>
       )}
     </section>

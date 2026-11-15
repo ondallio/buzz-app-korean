@@ -10,6 +10,7 @@
  */
 
 import { clockHourCycle, clockPreference } from "./clock-preference";
+import { formattingLocale, t } from "./i18n";
 
 let defaultsChecked = false;
 let formats:
@@ -30,14 +31,16 @@ let formats:
 function dateFormats() {
   const hourCycle = clockHourCycle();
   const { seconds } = clockPreference();
+  const locale = formattingLocale();
   if (
     defaultsChecked &&
     formats &&
+    formats.locale === locale &&
     formats.hourCycle === hourCycle &&
     formats.seconds === seconds
   )
     return formats;
-  const { locale, timeZone } = new Intl.DateTimeFormat().resolvedOptions();
+  const { timeZone } = new Intl.DateTimeFormat().resolvedOptions();
   if (
     formats?.locale !== locale ||
     formats.timeZone !== timeZone ||
@@ -45,7 +48,7 @@ function dateFormats() {
     formats.seconds !== seconds
   ) {
     const format = (options: Intl.DateTimeFormatOptions) =>
-      new Intl.DateTimeFormat(undefined, options);
+      new Intl.DateTimeFormat(locale, options);
     const clock = hourCycle ? { hourCycle } : {};
     formats = {
       locale,
@@ -133,8 +136,8 @@ export function formatDayGroupLabel(
   const now = new Date(nowSeconds * 1_000);
   const dayDiff = calendarDaysBetween(now, date);
   const f = dateFormats();
-  if (dayDiff === 0) return "Today";
-  if (dayDiff === 1) return "Yesterday";
+  if (dayDiff === 0) return t("date.today");
+  if (dayDiff === 1) return t("date.yesterday");
   // Bounded below too: a future timestamp (clock skew) must not get a weekday
   // that reads as the recent past.
   if (dayDiff > 1 && dayDiff < WEEKDAY_BAND_DAYS) return f.weekday.format(date);
@@ -175,13 +178,13 @@ export function formatItemTimestamp(
   if (dayDiff === 0) return time;
   const dayLabel =
     dayDiff === 1
-      ? "Yesterday"
+      ? t("date.yesterday")
       : dayDiff > 1 && dayDiff < WEEKDAY_BAND_DAYS
         ? f.weekday.format(date)
         : date.getFullYear() === now.getFullYear()
           ? f.shortWeekdayMonthDay.format(date)
           : f.shortMonthDayYear.format(date);
-  return withTime ? `${dayLabel} at ${time}` : dayLabel;
+  return withTime ? t("date.withTime", { day: dayLabel, time }) : dayLabel;
 }
 
 /** The complete date and time, such as a timestamp's hover text:

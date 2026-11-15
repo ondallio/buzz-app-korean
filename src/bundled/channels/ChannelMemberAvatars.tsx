@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useProfileGeneration } from "../../features/relay/react";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useHeaderChannel } from "../../features/relay/listed-channel";
@@ -20,6 +21,7 @@ export function ChannelMemberAvatars({
   session: RelaySession;
   channelId: string;
 }) {
+  useLanguage();
   const profiles = useSyncExternalStore(
     session.profiles.subscribe,
     session.profiles.snapshot,
@@ -101,7 +103,7 @@ export function ChannelMemberAvatars({
                 profiles.get(id)?.name ??
                   agents.get(id)?.name ??
                   formatPublicKey(id) ??
-                  "Member",
+                  t("channelForms.avatar.member"),
               ),
               src: avatarMedia(
                 profiles.get(id)?.picture ?? agents.get(id)?.avatar,

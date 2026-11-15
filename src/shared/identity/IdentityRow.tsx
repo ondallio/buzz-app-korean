@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../i18n";
 import { npubEncode } from "nostr-tools/nip19";
 import { useId, useRef, useState } from "react";
 import { CopyIcon } from "../design-system/icons";
@@ -25,6 +26,7 @@ export function IdentityRow({
   keyLabel?: string | undefined;
   detail?: string | undefined;
 }) {
+  useLanguage();
   const previewId = useId();
   const descriptionId = useId();
   const [open, setOpen] = useState(false);
@@ -47,7 +49,7 @@ export function IdentityRow({
         label={<span className="block truncate text-body-sm">{name}</span>}
         description={
           <span className="block truncate text-caption">
-            {isAgent ? "Agent · " : ""}
+            {isAgent ? `${t("agentsDetails.agent")} · ` : ""}
             {keyLabel}
             {detail ? ` · ${detail}` : ""}
           </span>
@@ -58,8 +60,7 @@ export function IdentityRow({
   return (
     <>
       <span id={descriptionId} className="sr-only">
-        Identity preview opens on focus. When open, press Tab to reach Copy
-        npub, or Escape to dismiss the preview.
+        {t("v1shell.identity.previewHelp")}
       </span>
       <PreviewCard
         id={previewId}
@@ -68,12 +69,12 @@ export function IdentityRow({
         side="top"
         anchor={anchor}
         actionRef={copyButton}
-        aria-label={`${name} identity`}
+        aria-label={t("v1shell.identity.label", { name })}
         trigger={
           <button
             type="button"
             className="flex min-w-0 flex-1 text-left"
-            aria-label={`Preview ${name} identity`}
+            aria-label={t("v1shell.identity.preview", { name })}
             aria-haspopup="dialog"
             aria-expanded={open}
             aria-controls={open ? previewId : undefined}
@@ -96,7 +97,7 @@ export function IdentityRow({
           <div className="min-w-0">
             <div className="text-label wrap-anywhere">{name}</div>
             <div className="text-body-sm text-subtle">
-              {isAgent ? "Agent" : "Person"}
+              {isAgent ? t("agentsDetails.agent") : t("chips.person.kind")}
               {detail ? ` · ${detail}` : ""}
             </div>
           </div>
@@ -109,18 +110,14 @@ export function IdentityRow({
             ref={copyButton}
             size="xs"
             variant="ghost"
-            aria-label="Copy npub"
+            aria-label={t("v1shell.identity.copy")}
             icon={<CopyIcon size={16} aria-hidden="true" />}
             onClick={() => {
               void Promise.resolve()
                 .then(() => writeClipboardText(npub))
                 .then(
-                  () => notify("Copied npub", "success"),
-                  () =>
-                    notify(
-                      "Couldn’t copy npub. Select the text to copy it.",
-                      "error",
-                    ),
+                  () => notify(t("v1shell.identity.copied"), "success"),
+                  () => notify(t("v1shell.identity.copyFailed"), "error"),
                 );
             }}
           />

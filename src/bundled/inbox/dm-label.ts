@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { formatPublicKey } from "../../shared/identity/public-key";
 import { sortParticipantNames } from "../../features/identity-names/participant-order";
 
@@ -10,16 +11,18 @@ export function dmLabel(
     fallback: string,
     candidates?: readonly string[],
   ) => string,
-  missing = "Notes to self",
+  missing = t("inbox.notesSelf"),
 ) {
   if (!participants) return missing;
-  if (!participants.length) return "Notes to self";
+  if (!participants.length) return t("inbox.notesSelf");
   // Sort every name before bounding, so the shown three match other surfaces.
   const names = sortParticipantNames(
     participants.map((key) =>
       resolve(
         key,
-        profiles.get(key)?.name ?? formatPublicKey(key) ?? "Unknown person",
+        profiles.get(key)?.name ??
+          formatPublicKey(key) ??
+          t("v1shell.inbox.unknownPerson"),
         participants,
       ),
     ),

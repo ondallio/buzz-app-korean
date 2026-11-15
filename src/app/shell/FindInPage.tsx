@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useCallback,
   useEffect,
@@ -127,6 +128,7 @@ export function FindInPage({
 }: {
   shortcuts?: Pick<ShortcutsService, "registerHost"> | undefined;
 }) {
+  useLanguage();
   const [root, setRoot] = useState<Element | null>(null);
   const [query, setQuery] = useState("");
   // The count names the query it was taken for: "No results" waits for a search.
@@ -272,13 +274,13 @@ export function FindInPage({
     !query.trim() || !count.query
       ? ""
       : count.total
-        ? `${count.active + 1} of ${total}`
-        : "No results";
+        ? t("v1shell.find.count", { current: count.active + 1, total })
+        : t("v1shell.find.noResults");
   const step = (by: number) => show(active.current + by, true);
   return createPortal(
     <search
       ref={bar}
-      aria-label="Find on screen"
+      aria-label={t("v1shell.find.title")}
       className={styles.bar}
       popover={POPOVER}
       onKeyDown={(event) => {
@@ -301,8 +303,8 @@ export function FindInPage({
       <div className={styles.field}>
         <SearchField
           variant="capsule"
-          label="Find on screen"
-          placeholder="Find on screen"
+          label={t("v1shell.find.title")}
+          placeholder={t("v1shell.find.title")}
           value={query}
           onValueChange={setQuery}
           inputRef={input}
@@ -314,19 +316,19 @@ export function FindInPage({
         />
       </div>
       <IconButton
-        aria-label="Previous match"
+        aria-label={t("v1shell.find.previous")}
         icon={<CaretUpIcon size={16} aria-hidden="true" />}
         disabled={!count.total}
         onClick={() => step(-1)}
       />
       <IconButton
-        aria-label="Next match"
+        aria-label={t("v1shell.find.next")}
         icon={<CaretDownIcon size={16} aria-hidden="true" />}
         disabled={!count.total}
         onClick={() => step(1)}
       />
       <IconButton
-        aria-label="Close find on screen"
+        aria-label={t("v1shell.find.close")}
         icon={<XIcon size={16} aria-hidden="true" />}
         onClick={close}
       />

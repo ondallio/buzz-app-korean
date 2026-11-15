@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useContext, useLayoutEffect, useSyncExternalStore } from "react";
 import { channelIcon } from "../../features/channels/channel-icon";
 import { usePublicChannelSearch } from "../../features/channels/usePublicChannelSearch";
@@ -71,6 +72,7 @@ export function ChannelCompletion({
   query,
   publish,
 }: ComposerCompletionProps) {
+  const language = useLanguage();
   const needle = query.query.toLowerCase();
   // A new chat's workspaces come first; choosing one leaves no link.
   const preferences = useContext(WorkspaceCompletion)?.preferences;
@@ -83,6 +85,7 @@ export function ChannelCompletion({
   const search = usePublicChannelSearch(session, needle, listReady);
   const { loading: searching, found: discovered, partial, error } = search;
   const retrySearch = search.retry;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a language change republishes the translated status text.
   useLayoutEffect(() => {
     let withdraw: (() => void) | false | undefined;
     const update = () => {
@@ -157,8 +160,8 @@ export function ChannelCompletion({
           (char) => `%${char.charCodeAt(0).toString(16)}`,
         );
         const detail = [
-          channel.private ? "Private channel" : "",
-          member ? "" : "Not joined",
+          channel.private ? t("search.privateChannelLabel") : "",
+          member ? "" : t("v1shell.completion.notJoined"),
           duplicate ? channel.id : "",
         ]
           .filter(Boolean)
@@ -184,18 +187,18 @@ export function ChannelCompletion({
         };
       };
       const status = list.error
-        ? "Could not refresh channels."
+        ? t("v1shell.completion.refreshFailed")
         : !shown.length && settling
-          ? "Loading channels…"
+          ? t("search.loadingChannels")
           : searching
-            ? "Searching open channels…"
+            ? t("v1shell.completion.searching")
             : error
-              ? "Could not search open channels."
+              ? t("v1shell.completion.searchFailed")
               : mine.length + others.length > room
-                ? "Keep typing to narrow the list."
+                ? t("v1shell.completion.keepTyping")
                 : // Prose stays silent: the note joins rows already shown.
                   partial && shown.length && !others.length
-                  ? "Only the newest open channels were searched."
+                  ? t("search.channelsPartial")
                   : undefined;
       const retry = list.error
         ? session.channels.refreshList &&
@@ -209,7 +212,7 @@ export function ChannelCompletion({
             ({ section }): CompletionSuggestion => ({
               id: `workspace:${section.id}`,
               label: section.name,
-              detail: "Workspace",
+              detail: t("channelsMenus.solo.workspace"),
               preview: <Cube3dSphereIcon size={22} />,
               edit: workspaceEdit(section.id),
               canSelect: () =>
@@ -243,6 +246,7 @@ export function ChannelCompletion({
     partial,
     error,
     retrySearch,
+    language,
   ]);
   return null;
 }

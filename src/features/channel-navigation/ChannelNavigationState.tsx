@@ -1,3 +1,8 @@
+import { useLanguage, t } from "../../shared/i18n";
+import {
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import {
   ChannelLifecycleDialog,
   lifecycleNoun,
@@ -153,9 +158,10 @@ export function ChannelNavigationProvider({
   const soloNeighbors = useRef<((channelId: string) => string[]) | undefined>(
     undefined,
   );
+  useLanguage();
   const [failure, setFailure] = useState<{
     session: RelaySession;
-    title: string;
+    title: DisplayMessage;
     message: string;
   }>();
   const activityThread = useRef<ActivityThread | undefined>(undefined);
@@ -262,7 +268,7 @@ export function ChannelNavigationProvider({
                     trigger
                       ?.closest("[data-panel-workspace]")
                       ?.querySelector<HTMLElement>(
-                        'button[aria-label="Close Channel settings tab"]',
+                        'button[data-tab-close="settings"]',
                       ) ??
                     trigger
                       ?.closest("aside")
@@ -338,8 +344,13 @@ export function ChannelNavigationProvider({
         .map((intent) => (
           <ToastNotice
             key={intent.channelId}
-            title={`Couldn’t ${intent.muted ? "mute" : "unmute"} ${intent.name}`}
-            description={intent.error ?? "Please try again."}
+            title={t(
+              intent.muted
+                ? "v1shell.nav.muteFailed"
+                : "v1shell.nav.unmuteFailed",
+              { name: intent.name },
+            )}
+            description={intent.error ?? t("v1shell.nav.pleaseRetry")}
             tone="warning"
           >
             <Button
@@ -351,7 +362,7 @@ export function ChannelNavigationProvider({
                 muteRecovery.current?.focus(intent.channelId);
               }}
             >
-              Retry
+              {t("channelForms.retry")}
             </Button>
             <Button
               type="button"
@@ -361,7 +372,7 @@ export function ChannelNavigationProvider({
                 muteRecovery.current?.focus(intent.channelId);
               }}
             >
-              Dismiss
+              {t("settingsHost.dismiss")}
             </Button>
           </ToastNotice>
         ))}
@@ -418,7 +429,7 @@ export function ChannelNavigationProvider({
         )}
       {failure?.session === connection.session && (
         <ToastNotice
-          title={failure.title}
+          title={resolveMessage(failure.title)}
           description={failure.message}
           onDismiss={() => setFailure(undefined)}
         />

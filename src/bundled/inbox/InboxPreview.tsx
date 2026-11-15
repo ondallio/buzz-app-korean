@@ -1,3 +1,4 @@
+import { t, useLanguage, formattingLocale } from "../../shared/i18n";
 import { reactionRows } from "./reaction-rows";
 import {
   useCallback,
@@ -49,11 +50,14 @@ const unreadOnlyKey = "inbox:preview-unread-only";
 // as the channel activity preview does, with a date after a week.
 const shortAge = (createdAt: number, now = Date.now()) => {
   const seconds = Math.max(0, Math.floor(now / 1000) - createdAt);
-  if (seconds < 60) return "now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
-  return new Date(createdAt * 1000).toLocaleDateString("en-US", {
+  if (seconds < 60) return t("inbox.compactNow");
+  if (seconds < 3600)
+    return t("inbox.compactMinutes", { count: Math.floor(seconds / 60) });
+  if (seconds < 86400)
+    return t("inbox.compactHours", { count: Math.floor(seconds / 3600) });
+  if (seconds < 604800)
+    return t("inbox.compactDays", { count: Math.floor(seconds / 86400) });
+  return new Date(createdAt * 1000).toLocaleDateString(formattingLocale(), {
     month: "short",
     day: "numeric",
   });
@@ -65,6 +69,7 @@ export function InboxPreview({
   navigator,
   close,
 }: PagePreviewProps & { relay: RelayData; navigator: Navigation }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const { viewer, scope } = connection;
   if (connection.status === "ready" && viewer && scope?.endsWith(`:${viewer}`))
@@ -84,16 +89,16 @@ export function InboxPreview({
     <Card navigator={navigator} close={close}>
       <p className={`text-body text-subtle ${styles.notice}`} role="status">
         {connection.status === "connecting"
-          ? "Connecting to your activity…"
+          ? t("inbox.connecting")
           : connection.denied
             ? // Its notice, on every page, offers what fixes it.
               communityRefusalTitle(connection.refusal)
-            : (connection.error ?? "Choose a community to see your activity.")}
+            : (connection.error ?? t("inbox.chooseCommunity"))}
       </p>
       {connection.status === "error" && !connection.denied && (
         <div className={styles.notice}>
           <Button size="sm" onClick={relay.tryAgain}>
-            Retry connection
+            {t("inbox.retryConnection")}
           </Button>
         </div>
       )}
@@ -111,6 +116,7 @@ function InboxPreviewCard({
   scope: NavigationScope;
   navigator: Navigation;
 }) {
+  useLanguage();
   const list = useChannelList(session.channels);
   const inbox = useSyncExternalStore(
     session.unread.subscribeInbox,
@@ -270,16 +276,22 @@ function InboxPreviewCard({
     else if (item.thread) threads++;
   }
   const kinds = [
-    mentions && `${mentions} ${mentions === 1 ? "mention" : "mentions"}`,
-    threads && `${threads} ${threads === 1 ? "thread" : "threads"}`,
-    dms && `${dms} ${dms === 1 ? "DM" : "DMs"}`,
+    mentions &&
+      t(mentions === 1 ? "inbox.mentionOne" : "inbox.mentionMany", {
+        count: mentions,
+      }),
+    threads &&
+      t(threads === 1 ? "inbox.threadOne" : "inbox.threadMany", {
+        count: threads,
+      }),
+    dms && t(dms === 1 ? "inbox.dmOne" : "inbox.dmMany", { count: dms }),
   ].filter(Boolean);
   const summary = loading
-    ? "Checking recent activity…"
+    ? t("inbox.checking")
     : unread.length
-      ? [`${unread.length} unread`, ...kinds].join(" · ")
+      ? [t("inbox.unreadCount", { count: unread.length }), ...kinds].join(" · ")
       : checked
-        ? "Nothing unread"
+        ? t("inbox.nothingUnread")
         : undefined;
   const open = (row: (typeof rows)[number]) => {
     const item =
@@ -313,12 +325,12 @@ function InboxPreviewCard({
         <div className={styles.notice} role="alert">
           <p className="text-body">{failure}</p>
           <Button ref={retryButton} size="sm" onClick={() => void retry()}>
-            Retry activity
+            {t("inbox.retryActivity")}
           </Button>
         </div>
       )}
       {rows.length ? (
-        <ul className={styles.list} aria-label="Recent activity">
+        <ul className={styles.list} aria-label={t("inbox.recentActivity")}>
           {rows.map((row) => {
             const item = row.item;
             return (
@@ -370,8 +382,8 @@ function InboxPreviewCard({
               frame="none"
               level={4}
               icon={<ChecksIcon />}
-              title="You're all caught up"
-              description="No unread mentions, direct messages, or thread replies."
+              title={t("inbox.youreCaughtUp")}
+              description={t("inbox.unreadEmptyHelp")}
               action={
                 recent.length || reactions.items.length ? (
                   <Button
@@ -379,7 +391,7 @@ function InboxPreviewCard({
                     variant="ghost"
                     onClick={() => setUnreadOnly(false)}
                   >
-                    Show recent activity
+                    {t("inbox.showRecent")}
                   </Button>
                 ) : undefined
               }
@@ -389,8 +401,8 @@ function InboxPreviewCard({
               frame="none"
               level={4}
               icon={<ChecksIcon />}
-              title="No recent activity"
-              description="Mentions, direct messages, thread replies, and reactions to your messages appear here."
+              title={t("inbox.noRecent")}
+              description={t("inbox.recentHelp")}
             />
           )}
         </div>
@@ -416,12 +428,15 @@ function Card({
   unreadOnlyRef?: RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
+  useLanguage();
   const switchId = useId();
   return (
     <div className={styles.card}>
       <header className={styles.header}>
         <div className={styles.headerCopy}>
-          <h2 className={`text-label ${styles.title}`}>Activity</h2>
+          <h2 className={`text-label ${styles.title}`}>
+            {t("inbox.activity")}
+          </h2>
           <p
             className={`text-caption text-subtle ${styles.summary}`}
             role="status"
@@ -433,7 +448,7 @@ function Card({
           <Switch
             ref={unreadOnlyRef}
             id={switchId}
-            aria-label="Unread only"
+            aria-label={t("inbox.unreadOnly")}
             checked={!!unreadOnly}
             onCheckedChange={onUnreadOnlyChange}
             disabled={!onUnreadOnlyChange}
@@ -442,14 +457,14 @@ function Card({
             htmlFor={switchId}
             className={`text-caption ${onUnreadOnlyChange ? "text-subtle" : "text-disabled"}`}
           >
-            Unread only
+            {t("inbox.unreadOnly")}
           </label>
         </div>
       </header>
       <div className={styles.body}>{children}</div>
       <footer className={styles.footer}>
         <NavigationItem
-          label="Open Activity"
+          label={t("inbox.openActivity")}
           trailing={<ArrowRightIcon size="1rem" aria-hidden="true" />}
           onClick={() => {
             close();

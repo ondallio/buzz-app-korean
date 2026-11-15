@@ -49,6 +49,26 @@ do not infer approval from an existing inconsistent screen.
 
 ## Compose the whole surface
 
+Hosts can supply the generic dialog close name through `DialogLabelsProvider`.
+Explicit `closeLabel` props still take precedence. The provider changes text only;
+Base UI continues to own dismissal, focus restoration and keyboard behavior.
+Toast hosts similarly supply region/dismiss labels on `ToastProvider`; completed
+toast titles and actions can contain live React text without recreating a toast.
+
+`ComboboxLabelsProvider` supplies the popup search name and placeholder. The host
+owns the copy; standalone controls retain the English default. Changing the label
+does not change the query, selected value, filtering, focus or popup lifetime.
+
+`ChipLabelsProvider` supplies complete accessible names and kind labels for inline
+chips. The host owns translated phrases; scoped faces, authored names, addresses,
+loading state and preview actions keep their existing owners. Outside the provider,
+shared specimens and consumers retain the English labels.
+
+`TabsLabelsProvider` supplies complete tab close, menu and rename phrases. A tab's
+explicit `closeLabel` overrides the shared phrase. Use the close control's stable
+`data-tab-close` value for a focus handoff; translated accessible names are not
+control identifiers.
+
 Use these recipes before the detailed visual reference below. They describe
 structure and ownership, not new plugin APIs. Examples demonstrate the named
 pattern only; the [adoption review](../../../docs/design-system-adoption.md#composition-review)
@@ -181,6 +201,8 @@ help, status, warnings, and section-specific explanations with their content.
 Ordinary flow Dialogs use sticky header and footer bars over the scrolling body.
 Their full backgrounds combine a surface-color gradient and progressive blur;
 labels and actions remain sharp. Reduced transparency uses an opaque surface.
+Their title/action band stays opaque; only the bottom padding gutter fades.
+Compact headers without that gutter stay opaque across their full height.
 `ScrollEdgeMaterial` owns this treatment, shared with the agent Save footer.
 Only the sticky footer's gradient gutter passes pointer input to the body.
 Its content row owns pointer input and horizontal overflow, including text,
@@ -1092,6 +1114,8 @@ Field groups label, input, help and error using Base UI. Input and Textarea
 carry the shared field appearance. RadioGroup is for one choice, Checkbox for an
 independent choice and Switch for an immediate on/off setting. Use the native
 form semantics exposed by those Base UI primitives rather than duplicating them.
+`FieldLabelsProvider` supplies the optional suffix; standalone fields default to
+English "Optional". The host owns localized copy; validation remains with Base UI.
 
 `FieldButton appearance="masked"` centers larger, spaced, subtle placeholder dots that
 cannot be selected. It opens the field’s action menu. The feature owns masking;

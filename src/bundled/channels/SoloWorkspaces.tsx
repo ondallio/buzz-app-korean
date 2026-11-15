@@ -1,3 +1,8 @@
+import { useLanguage, t } from "../../shared/i18n";
+import {
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { FadingLabel } from "./FadingLabel";
 import { ChannelSidebarRows } from "../../features/channel-navigation/ChannelSidebarRows";
 import { createPortal } from "react-dom";
@@ -205,7 +210,11 @@ export function SoloWorkspaces({
     setRenaming(undefined);
   const [deleting, setDeleting] = useState<string>();
   const [projectError, setProjectError] = useState("");
-  const [readError, setReadError] = useState<{ id: string; message: string }>();
+  useLanguage();
+  const [readError, setReadError] = useState<{
+    id: string;
+    message: DisplayMessage;
+  }>();
   const [animate, setAnimate] = useState(false);
   const [rowFocus, setRowFocus] = useState<string>();
   useLayoutEffect(() => {
@@ -531,7 +540,7 @@ export function SoloWorkspaces({
           <>
             {actions}
             <MenuItem onClick={() => setSettingsFor(project)}>
-              Workspace settings
+              {t("v1shell.workspace.settings")}
             </MenuItem>
             <MenuItem
               tone="danger"
@@ -550,13 +559,13 @@ export function SoloWorkspaces({
                     setProjectError(
                       error instanceof Error
                         ? error.message
-                        : "Workspace could not be deleted. Try again.",
+                        : t("v1shell.workspace.deleteFailed"),
                     );
                   })
                   .finally(() => setDeleting(undefined));
               }}
             >
-              Delete workspace
+              {t("v1shell.workspace.delete")}
             </MenuItem>
           </>
         }
@@ -572,8 +581,10 @@ export function SoloWorkspaces({
                   (onNew && (!compose || !project.id) && (
                     <IconButton
                       size="compact"
-                      aria-label={`New chat in ${project.name}`}
-                      title="New chat"
+                      aria-label={t("v1shell.workspace.newChatIn", {
+                        name: project.name,
+                      })}
+                      title={t("shell.new.chat")}
                       icon={<PlusIcon size={15} strokeWidth={2.5} />}
                       onClick={() => onNew(project.id || undefined)}
                     />
@@ -603,7 +614,7 @@ export function SoloWorkspaces({
             <ChatActionsMenu
               key={draft.id}
               id={`new-chat-draft:${draft.id}`}
-              title="New chat"
+              title={t("shell.new.chat")}
               className={styles.organizedRow}
               content={null}
               enabled={false}
@@ -667,8 +678,10 @@ export function SoloWorkspaces({
               <NavigationItem
                 variant="text"
                 data-solo-show-more-expand=""
-                label="Show more"
-                aria-label={`Show more chats in ${project.name}`}
+                label={t("channelForms.members.showMore")}
+                aria-label={t("v1shell.workspace.showMoreIn", {
+                  name: project.name,
+                })}
                 icon={
                   <span className={styles.conversationIcon} aria-hidden="true">
                     <CaretDownIcon size={16} />
@@ -683,8 +696,10 @@ export function SoloWorkspaces({
               <NavigationItem
                 variant="text"
                 data-solo-show-more-fold=""
-                label="Show less"
-                aria-label={`Show fewer chats in ${project.name}`}
+                label={t("v1shell.workspace.showLess")}
+                aria-label={t("v1shell.workspace.showFewerIn", {
+                  name: project.name,
+                })}
                 onClick={() => expand(project.id, 0)}
               />
             )}
@@ -696,9 +711,11 @@ export function SoloWorkspaces({
           (onNew ? (
             <NavigationItem
               variant="row"
-              label="New chat"
-              aria-label={`New chat in ${project.name}`}
-              title={`New chat in ${project.name}`}
+              label={t("shell.new.chat")}
+              aria-label={t("v1shell.workspace.newChatIn", {
+                name: project.name,
+              })}
+              title={t("v1shell.workspace.newChatIn", { name: project.name })}
               icon={
                 <span className={styles.conversationIcon}>
                   <PlusIcon size={16} strokeWidth={2.5} />
@@ -707,7 +724,7 @@ export function SoloWorkspaces({
               onClick={() => onNew(project.id)}
             />
           ) : (
-            <p className={styles.listMessage}>No chats in this workspace.</p>
+            <p className={styles.listMessage}>{t("v1shell.workspace.empty")}</p>
           ))}
       </>
     );
@@ -772,14 +789,14 @@ export function SoloWorkspaces({
     <>
       {(snapshot.status === "idle" || snapshot.status === "loading") && (
         <p role="status" className={styles.listMessage}>
-          Loading workspaces…
+          {t("v1shell.workspace.loading")}
         </p>
       )}
       {snapshot.status === "error" && (
         <div role="alert" className={styles.listMessage}>
-          <p>{snapshot.error ?? "Workspaces couldn’t load."}</p>
+          <p>{snapshot.error ?? t("v1shell.workspace.loadFailed")}</p>
           <Button onClick={() => void preferences.refresh()}>
-            Retry workspaces
+            {t("v1shell.workspace.retry")}
           </Button>
         </div>
       )}
@@ -790,7 +807,7 @@ export function SoloWorkspaces({
       )}
       {readError && (
         <p role="alert" className={styles.listMessage}>
-          {readError.message}
+          {resolveMessage(readError.message)}
         </p>
       )}
       <ChannelSidebarDnd
@@ -876,7 +893,7 @@ export function SoloWorkspaces({
       )}
       {moves.some((move) => move.pending) && (
         <p role="status" className={styles.listMessage}>
-          Saving workspace…
+          {t("v1shell.workspace.saving")}
         </p>
       )}
       {moves
@@ -891,12 +908,12 @@ export function SoloWorkspaces({
                 void preferences.retryMove(move.channelId).catch(() => {})
               }
             >
-              Retry move
+              {t("channelsMenus.solo.retryMove")}
             </Button>
             <Button
               onClick={() => preferences.dismissMoveError(move.channelId)}
             >
-              Dismiss
+              {t("settingsHost.dismiss")}
             </Button>
           </div>
         ))}
@@ -976,7 +993,7 @@ type ChatEntryActions = {
   settings(id: string): void;
   rename(id: string): boolean;
   lifecycle(channel: ChannelSummary, action: ChannelLifecycleAction): void;
-  readResult(id: string, error?: string): void;
+  readResult(id: string, error?: DisplayMessage): void;
 };
 
 /** One listed chat. The roster changes often; a row renders again only when
@@ -1183,13 +1200,13 @@ export function ChatActionsMenu({
             }
             variant="bare"
             size="compact"
-            aria-label={`Actions for ${title}`}
+            aria-label={t("channelPages.members.actions", { name: title })}
             icon={<DotsThreeIcon size={15} strokeWidth={2.5} />}
           />
         )}
       />
       <MenuPopup
-        aria-label={`Actions for ${title}`}
+        aria-label={t("channelPages.members.actions", { name: title })}
         align="end"
         finalFocus={restoreFocus}
       >
@@ -1230,7 +1247,7 @@ export function ChatActionsMenu({
         )}
       </ContextMenuTrigger>
       <MenuPopup
-        aria-label={`Actions for ${title}`}
+        aria-label={t("channelPages.members.actions", { name: title })}
         anchor={anchor}
         finalFocus={restoreFocus}
       >

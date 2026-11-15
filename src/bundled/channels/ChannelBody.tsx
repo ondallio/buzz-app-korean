@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { memo, type ReactNode, useEffect, useId, useLayoutEffect } from "react";
 import {
   ConversationTimeline,
@@ -40,6 +41,7 @@ export const ChannelBody = memo(function ChannelBody({
     | ((messageId: string, threadRootId: string, intent?: "reply") => void)
     | undefined;
 }) {
+  useLanguage();
   // The owner's Solo chat is a chat-style timeline that loads history on scroll.
   const {
     session: queries,
@@ -105,7 +107,7 @@ export const ChannelBody = memo(function ChannelBody({
           type="button"
           onClick={() => queries.channels.ensure(channelId)}
         >
-          Retry messages
+          {t("search.retryMessages")}
         </Button>
       </div>
     );
@@ -116,7 +118,7 @@ export const ChannelBody = memo(function ChannelBody({
         role="status"
         data-buzz-launch-pending={!cached ? "required" : undefined}
       >
-        Loading messages…
+        {t("directMessage.loadingHistory")}
       </div>
     );
   return (
