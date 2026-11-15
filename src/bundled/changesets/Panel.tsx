@@ -14,15 +14,17 @@ import { parsePatch } from "../diffs/parse";
 import type { ChangedFile } from "./git";
 import { parseTarget } from "./target";
 import type { Turns } from "./turns";
-import { Counts, plural, totals } from "./Counts";
+import { Counts, filesChanged, totals } from "./Counts";
 import styles from "./Changesets.module.css";
 import { useLoaded } from "./useLoaded";
+import { t, useLanguage } from "../../shared/i18n";
 
 /** A recorded turn's checkout: its files, one diff at a time. */
 export function ChangesetPanel({
   target,
   turns,
 }: Pick<PanelProps, "target"> & { turns: Turns }) {
+  useLanguage();
   const link = useMemo(() => parseTarget(target), [target]);
   const found = link && turns.find(link.turn, link.checkout);
   const [chosen, setChosen] = useState(link?.file);
@@ -49,8 +51,7 @@ export function ChangesetPanel({
     () => (patch.value === undefined ? undefined : parsePatch(patch.value)),
     [patch.value],
   );
-  if (!link || !found)
-    return <p role="alert">This changeset was recorded in another Buzz.</p>;
+  if (!link || !found) return <p role="alert">{t("v1wf.cs.otherBuzz")}</p>;
   const pending = listed.error === undefined && !files;
   const step = (by: number) => files && setChosen(files[index + by]?.path);
   return (
@@ -61,23 +62,22 @@ export function ChangesetPanel({
         subtitle={
           files ? (
             <>
-              {plural(files.length, "file")} changed{" "}
-              <Counts {...totals(files)} />
+              {filesChanged(files.length)} <Counts {...totals(files)} />
             </>
           ) : undefined
         }
       />
       <LoadingRegion
         pending={pending}
-        label="Reading the changes…"
+        label={t("v1wf.cs.reading")}
         statusVisibility="screen-reader"
         feedback={
           listed.error !== undefined ? (
             <div role="alert">
-              <p>Couldn't read this changeset. {listed.error}</p>
+              <p>{t("v1wf.cs.readFailed", { error: listed.error })}</p>
               {listed.retry && (
                 <Button size="sm" variant="ghost" onClick={listed.retry}>
-                  Try again
+                  {t("v1wf.cs.tryAgain")}
                 </Button>
               )}
             </div>
@@ -89,13 +89,13 @@ export function ChangesetPanel({
             {files.length > 1 && (
               <div className={styles.picker}>
                 <Select
-                  label="File"
+                  label={t("v1wf.cs.file")}
                   variant="compact"
                   value={file.path}
                   onValueChange={setChosen}
                   groups={[
                     {
-                      label: "Changed files",
+                      label: t("v1wf.cs.changedFiles"),
                       options: files.map((each) => ({
                         value: each.path,
                         label: each.path,
@@ -104,13 +104,13 @@ export function ChangesetPanel({
                   ]}
                 />
                 <IconButton
-                  aria-label="Previous file"
+                  aria-label={t("v1wf.cs.previous")}
                   icon={<CaretLeftIcon size={16} aria-hidden="true" />}
                   disabled={index === 0}
                   onClick={() => step(-1)}
                 />
                 <IconButton
-                  aria-label="Next file"
+                  aria-label={t("v1wf.cs.next")}
                   icon={<CaretRightIcon size={16} aria-hidden="true" />}
                   disabled={index === files.length - 1}
                   onClick={() => step(1)}
@@ -139,20 +139,24 @@ function FileDiff({
   parsed: ReturnType<typeof parsePatch>;
 }) {
   if (file.binary)
-    return <p className="text-body-sm">Binary file: no text diff to show.</p>;
+    return <p className="text-body-sm">{t("v1wf.cs.binaryFile")}</p>;
   if (patch.error !== undefined)
     return (
       <div role="alert">
         <p className="text-body-sm">{patch.error}</p>
         {patch.retry && (
           <Button size="sm" variant="ghost" onClick={patch.retry}>
-            Try again
+            {t("v1wf.cs.tryAgain")}
           </Button>
         )}
       </div>
     );
   if (patch.value === undefined)
-    return <p className="text-body-sm">Reading {file.path}…</p>;
+    return (
+      <p className="text-body-sm">
+        {t("v1wf.cs.readingFile", { path: file.path })}
+      </p>
+    );
   return (
     <DiffViewer content={patch.value} files={parsed} filePath={file.path} />
   );

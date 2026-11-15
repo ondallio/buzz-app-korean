@@ -4,6 +4,7 @@ import { VoiceCapture } from "./VoiceCapture";
 import { VoiceNoteCard } from "./VoiceNoteCard";
 import { isVoiceNoteAttachment } from "./audio";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
+import { t } from "../../shared/i18n";
 
 export const inject = ["conversation"];
 export const apply: PluginModule["apply"] = (ctx) => {
@@ -16,8 +17,8 @@ export const apply: PluginModule["apply"] = (ctx) => {
         <IconButton
           type="button"
           size="sm"
-          aria-label="Record voice note"
-          title="Record voice note"
+          aria-label={t("v1wf.voice.record")}
+          title={t("v1wf.voice.record")}
           disabled={disabled}
           onClick={() =>
             capture(({ accept, cancel }) => (

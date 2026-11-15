@@ -1,3 +1,5 @@
+import { t, useLanguage, type TranslationKey } from "../../shared/i18n";
+import { en } from "../../shared/i18n/catalogs/workflow-fields";
 import { useState } from "react";
 import { TrashIcon } from "../../shared/design-system/icons";
 import { Field } from "../../shared/design-system/ui/Field";
@@ -20,16 +22,36 @@ import {
 } from "./workflowConditionExpression";
 import type { TriggerConfig } from "./workflowFormTypes";
 
-const LABELS: Record<ConditionOperator, string> = {
-  contains: "Contains",
-  not_contains: "Does not contain",
-  starts_with: "Starts with",
-  ends_with: "Ends with",
-  equals: "Equals",
-  not_equals: "Does not equal",
-  is_not_empty: "Is not empty",
-  is_empty: "Is empty",
+const LABELS = {
+  contains: "workflowFields.operator.contains",
+  not_contains: "workflowFields.operator.not_contains",
+  starts_with: "workflowFields.operator.starts_with",
+  ends_with: "workflowFields.operator.ends_with",
+  equals: "workflowFields.operator.equals",
+  not_equals: "workflowFields.operator.not_equals",
+  is_not_empty: "workflowFields.operator.is_not_empty",
+  is_empty: "workflowFields.operator.is_empty",
+} as const satisfies Record<ConditionOperator, TranslationKey>;
+
+const FIELD_LABELS: Readonly<
+  Record<string, Extract<keyof typeof en, `workflowFields.field.${string}`>>
+> = {
+  trigger_author: "workflowFields.field.author",
+  trigger_emoji: "workflowFields.field.reaction",
+  trigger_message_id: "workflowFields.field.message",
 };
+const VALIDATION_KEYS = [
+  "workflowFields.valueRequired",
+  "workflowFields.pubkeyRequired",
+  "workflowFields.eventIdRequired",
+] as const;
+
+function displayedConditionError(row: ParsedConditionExpression) {
+  const error = conditionRowError(row);
+  // Only this finite validator's own output has app-owned display provenance.
+  const key = VALIDATION_KEYS.find((key) => en[key] === error);
+  return key ? t(key) : error;
+}
 
 /** Incomplete Basic rows stay local; only an explicit edit may replace an expression. */
 export function WorkflowConditions({
@@ -41,6 +63,7 @@ export function WorkflowConditions({
   disabled: boolean;
   onChange: (patch: Partial<TriggerConfig>) => void;
 }) {
+  useLanguage();
   const expression = trigger.filter ?? "";
   const parsed = parseConditionExpressions(expression, trigger.on);
   const [mode, setMode] = useState<"basic" | "advanced">(() =>
@@ -49,7 +72,22 @@ export function WorkflowConditions({
   const [replace, setReplace] = useState(false);
   const [modeError, setModeError] = useState(false);
   const rows = trigger.conditionRows ?? parsed ?? [];
-  const fields = conditionFieldsForTrigger(trigger.on);
+  const fields = conditionFieldsForTrigger(trigger.on).map((field) => {
+    const key = FIELD_LABELS[field.value];
+    return {
+      ...field,
+      label:
+        field.value === "trigger_text"
+          ? t(
+              trigger.on === "diff_posted"
+                ? "workflowFields.field.diffText"
+                : "workflowFields.field.messageText",
+            )
+          : key
+            ? t(key)
+            : field.label,
+    };
+  });
   const update = (next: ParsedConditionExpression[]) => {
     if (disabled) return;
     const filter = buildConditionExpressions(next);
@@ -59,11 +97,11 @@ export function WorkflowConditions({
     <div className="workflow-options">
       <Tabs
         variant="panel"
-        label="Condition mode"
+        label={t("workflowFields.conditionMode")}
         value={mode}
         items={[
-          { value: "basic", label: "Basic" },
-          { value: "advanced", label: "Advanced" },
+          { value: "basic", label: t("workflowFields.basic") },
+          { value: "advanced", label: t("workflowFields.advanced") },
         ]}
         onValueChange={(next) => {
           if (next === "advanced" && rows.some(conditionRowError)) {
@@ -77,13 +115,13 @@ export function WorkflowConditions({
       />
       {modeError && rows.some(conditionRowError) && (
         <p role="alert" className="text-danger">
-          Complete or remove the invalid condition before switching to Advanced.
+          {t("workflowFields.completeCondition")}
         </p>
       )}
       {mode === "advanced" ? (
         <Field
-          label="Trigger condition (optional)"
-          description="An evalexpr expression; leave empty to match every event of this type."
+          label={t("workflowFields.triggerCondition")}
+          description={t("workflowFields.expressionHelp")}
         >
           <Textarea
             variant="code"
@@ -102,8 +140,8 @@ export function WorkflowConditions({
         <>
           <p className="text-body-sm text-subtle">
             {rows.length
-              ? "All conditions must match."
-              : "Runs for every matching event. Add a condition to narrow it down."}
+              ? t("workflowFields.allConditions")
+              : t("workflowFields.matchingEvents")}
           </p>
           {rows.map((row, index) => (
             <div className="workflow-condition" key={row.field}>
@@ -112,14 +150,22 @@ export function WorkflowConditions({
                   {fields.find((field) => field.value === row.field)?.label}
                 </span>
                 <IconButton
-                  aria-label={`Remove ${fields.find((field) => field.value === row.field)?.label} condition`}
+                  aria-label={t("workflowFields.removeCondition", {
+                    field: String(
+                      fields.find((field) => field.value === row.field)?.label,
+                    ),
+                  })}
                   icon={<TrashIcon size={16} aria-hidden="true" />}
                   disabled={disabled}
                   onClick={() => update(rows.filter((_, i) => i !== index))}
                 />
               </div>
               <Select
-                label={`${fields.find((field) => field.value === row.field)?.label} comparison`}
+                label={t("workflowFields.comparison", {
+                  field: String(
+                    fields.find((field) => field.value === row.field)?.label,
+                  ),
+                })}
                 variant="field"
                 disabled={disabled}
                 value={row.operator}
@@ -127,7 +173,7 @@ export function WorkflowConditions({
                   {
                     label: "",
                     options: conditionOperatorsForField(row.field).map(
-                      (value) => ({ value, label: LABELS[value] }),
+                      (value) => ({ value, label: t(LABELS[value]) }),
                     ),
                   },
                 ]}
@@ -143,8 +189,8 @@ export function WorkflowConditions({
               />
               {conditionOperatorNeedsValue(row.operator) && (
                 <Field
-                  label="Value"
-                  error={conditionRowError(row) ?? undefined}
+                  label={t("workflowFields.value")}
+                  error={displayedConditionError(row) ?? undefined}
                 >
                   <Input
                     value={row.value}
@@ -165,7 +211,7 @@ export function WorkflowConditions({
             (field) => !rows.some((row) => row.field === field.value),
           ) && (
             <Select
-              label="Add condition"
+              label={t("workflowFields.addCondition")}
               variant="field"
               disabled={disabled}
               value=""
@@ -194,9 +240,10 @@ export function WorkflowConditions({
       )}
       {replace && (
         <ConfirmAction
-          title="Replace with basic filters?"
-          description="This expression cannot be represented by Basic conditions. Replacing it clears the expression; cancel to keep it unchanged."
-          action="Replace with basic filters"
+          title={t("workflowFields.replaceTitle")}
+          cancel={t("workflowsList.keepEditing")}
+          description={t("workflowFields.replaceDescription")}
+          action={t("workflowFields.replaceAction")}
           onCancel={() => setReplace(false)}
           onConfirm={() => {
             update([]);

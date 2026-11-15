@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { t, useLanguage } from "../../shared/i18n";
 import { Input } from "../../shared/design-system/ui/Input";
 import {
   CRON_FIELD_DEFINITIONS,
@@ -11,6 +12,13 @@ import {
 } from "./cronExpression";
 
 const LAST_FIELD = CRON_FIELD_DEFINITIONS.length - 1;
+const FIELD_LABELS = {
+  Minute: "workflowForm.cron.minute",
+  Hour: "workflowForm.cron.hour",
+  Day: "workflowForm.cron.day",
+  Month: "workflowForm.cron.month",
+  Weekday: "workflowForm.cron.weekday",
+} as const;
 
 /**
  * Five boxes for one five-field cron expression. Space, Backspace on an empty
@@ -26,6 +34,7 @@ export function CronExpressionInput({
   onChange: (value: string) => void;
   value: string;
 }) {
+  useLanguage();
   const id = useId();
   const [fields, setFields] = useState<CronFields>(() =>
     cronFieldsFromExpression(value),
@@ -64,7 +73,7 @@ export function CronExpressionInput({
 
   return (
     <fieldset className="workflow-cron">
-      <legend className="buzz-field-label">Cron expression</legend>
+      <legend className="buzz-field-label">{t("workflowForm.cron")}</legend>
       <div className="workflow-cron-fields">
         {CRON_FIELD_DEFINITIONS.map((definition, index) => {
           const fieldId = `${id}-${definition.label.toLowerCase()}`;
@@ -79,7 +88,7 @@ export function CronExpressionInput({
                     : "text-body-sm text-secondary"
                 }
               >
-                {definition.label}
+                {t(FIELD_LABELS[definition.label])}
               </label>
               <Input
                 id={fieldId}
@@ -157,8 +166,7 @@ export function CronExpressionInput({
             : "text-body-sm text-secondary"
         }
       >
-        {firstError ??
-          "UTC · Paste all 5 fields, or use wildcards, lists, ranges, and steps."}
+        {firstError ?? t("workflowForm.cronHelp")}
       </p>
     </fieldset>
   );

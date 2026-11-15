@@ -10,10 +10,11 @@ import {
   MenuGroupLabel,
   MenuSeparator,
 } from "../../shared/design-system/ui/Menu";
+import { t, useLanguage } from "../../shared/i18n";
 
 export function AttentionStatus({
   name,
-  heading = "Attention",
+  heading,
   active,
   pending,
   onChange,
@@ -22,7 +23,7 @@ export function AttentionStatus({
   returnFocus,
   popupRef,
   deleteConfirms = false,
-  label = `Attention status for ${name}`,
+  label,
 }: {
   name: string;
   heading?: string;
@@ -36,6 +37,8 @@ export function AttentionStatus({
   pending: boolean;
   onChange(active: boolean): void;
 }) {
+  useLanguage();
+  const menuLabel = label ?? t("v1wf.watch.statusFor", { name });
   return (
     <MenuRoot>
       <MenuTrigger
@@ -44,7 +47,7 @@ export function AttentionStatus({
             ref={triggerRef}
             variant="subtle"
             size="xs"
-            aria-label={label}
+            aria-label={menuLabel}
           >
             <CircleIcon
               data-accent={active ? "citrus" : undefined}
@@ -59,7 +62,7 @@ export function AttentionStatus({
                   : "var(--text-subtle)",
               }}
             />
-            {active ? "Active" : "Paused"}
+            {active ? t("v1wf.watch.active") : t("v1wf.watch.paused")}
           </Button>
         }
       />
@@ -72,16 +75,18 @@ export function AttentionStatus({
         }
         size="compact"
         align="end"
-        aria-label={label}
+        aria-label={menuLabel}
       >
         <MenuGroup>
-          <MenuGroupLabel>{heading}</MenuGroupLabel>
+          <MenuGroupLabel>
+            {heading ?? t("v1wf.watch.attention")}
+          </MenuGroupLabel>
           <MenuItem
             disabled={pending}
             closeOnClick={false}
             onClick={() => onChange(!active)}
           >
-            {active ? "Pause" : "Resume"}
+            {active ? t("v1wf.watch.pause") : t("v1wf.watch.resume")}
           </MenuItem>
           {onDelete && <MenuSeparator />}
           {onDelete && (
@@ -91,7 +96,7 @@ export function AttentionStatus({
               closeOnClick={deleteConfirms}
               onClick={onDelete}
             >
-              Delete
+              {t("v1wf.watch.delete")}
             </MenuItem>
           )}
         </MenuGroup>

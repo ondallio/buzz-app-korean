@@ -6,8 +6,10 @@ import { useVoiceNoteRecorder } from "./useVoiceNoteRecorder";
 import { VoiceNoteRecorder } from "./VoiceNoteRecorder";
 import { VOICE_NOTE_MAX_DURATION_SECONDS } from "./audio";
 import styles from "./VoiceNotes.module.css";
+import { t, useLanguage } from "../../shared/i18n";
 
 export function VoiceCapture({ accept, cancel }: ComposerCaptureProps) {
+  useLanguage();
   const recorder = useVoiceNoteRecorder();
   const current = useRef({ accept, cancel });
   current.current = { accept, cancel };
@@ -51,11 +53,10 @@ export function VoiceCapture({ accept, cancel }: ComposerCaptureProps) {
     return (
       <div className={styles.recorder}>
         <span role="alert" className={styles.error}>
-          {recorder.error ??
-            "Could not attach this voice note. Close and try again."}
+          {recorder.error ?? t("v1wf.voice.attachFailed")}
         </span>
         <button ref={close} type="button" onClick={cancel}>
-          Close
+          {t("v1wf.voice.close")}
         </button>
       </div>
     );
@@ -77,8 +78,8 @@ export function VoiceCapture({ accept, cancel }: ComposerCaptureProps) {
         variant="subtle"
         size="sm"
         disabled={!recording}
-        aria-label="Stop recording"
-        title="Stop recording"
+        aria-label={t("v1wf.voice.stop")}
+        title={t("v1wf.voice.stop")}
         onClick={() => void finish()}
         icon={<Square size={16} fill="currentColor" aria-hidden="true" />}
       />

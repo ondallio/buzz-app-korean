@@ -3,6 +3,7 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmStrikethrough } from "micromark-extension-gfm-strikethrough";
 import { gfmStrikethroughFromMarkdown } from "mdast-util-gfm-strikethrough";
 import { profileKey, profileTarget } from "../../features/profiles/target";
+import { t } from "../../shared/i18n";
 
 export type Assignee = { pubkey: string; name: string };
 export type Status = "todo" | "doing" | "done";
@@ -29,10 +30,7 @@ export function readTodos(content: string) {
       node.children[0]?.type === "text" &&
       node.children[0].value === "Todos",
   );
-  if (headings.length > 1)
-    throw new Error(
-      "Canvas has more than one Todos section. Keep one ## Todos heading in Canvas before editing here.",
-    );
+  if (headings.length > 1) throw new Error(t("v1wf.todo.err.multipleSections"));
   const heading = headings[0];
   const start = heading?.position?.end.offset;
   const following = heading ? nodes.slice(nodes.indexOf(heading) + 1) : [];
@@ -128,14 +126,14 @@ export function readTodos(content: string) {
 
 export function setStatus(content: string, offset: number, status: Status) {
   if (!readTodos(content).items.some((item) => item.offset === offset))
-    throw new Error("This todo changed. Reload the Canvas before editing it.");
+    throw new Error(t("v1wf.todo.err.changed"));
   return content.slice(0, offset) + marks[status] + content.slice(offset + 1);
 }
 
 export function addTodo(content: string, label: string) {
   const text = label.trim();
   if (!text || /[\r\n]/.test(text))
-    throw new Error("Use a single line for your todo.");
+    throw new Error(t("v1wf.todo.err.singleLine"));
   const { start, items } = readTodos(content);
   const newline = content.includes("\r\n") ? "\r\n" : "\n";
   const line = `- [ ] ${text}`;
@@ -144,9 +142,7 @@ export function addTodo(content: string, label: string) {
       ? `${content}${content ? newline + newline : ""}## Todos${newline}${newline}${line}${newline}`
       : `${content.slice(0, start)}${newline}${newline}${line}${newline}${content.slice(start)}`;
   if (readTodos(next).items.length !== items.length + 1)
-    throw new Error(
-      "Could not add a todo safely. Check Canvas for unfinished Markdown blocks.",
-    );
+    throw new Error(t("v1wf.todo.err.addUnsafe"));
   return next;
 }
 
@@ -158,10 +154,9 @@ export function assignTodo(
 ) {
   const { items } = readTodos(content);
   const item = items.find((item) => item.offset === offset);
-  if (!item)
-    throw new Error("This todo changed. Reload the Canvas before editing it.");
+  if (!item) throw new Error(t("v1wf.todo.err.changed"));
   const target = assignee && profileTarget(assignee.pubkey);
-  if (assignee && !target) throw new Error("Choose a valid Buzz user.");
+  if (assignee && !target) throw new Error(t("v1wf.todo.err.invalidUser"));
   const name =
     assignee?.name.replace(/\s+/g, " ").trim() || assignee?.pubkey || "";
   const escaped = name.replace(/[\\`*_{}[\]()#+\-.!<>|&]/g, "\\$&");
@@ -175,9 +170,7 @@ export function assignTodo(
     edited?.label !== item.label ||
     edited?.assignee?.pubkey !== assignee?.pubkey.toLowerCase()
   )
-    throw new Error(
-      "Could not assign safely. Check this todo’s Markdown in Canvas.",
-    );
+    throw new Error(t("v1wf.todo.err.assignUnsafe"));
   return next;
 }
 

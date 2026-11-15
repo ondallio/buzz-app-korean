@@ -22,6 +22,7 @@ import {
   waveformPeaks,
 } from "./audio";
 import styles from "./VoiceNotes.module.css";
+import { t, useLanguage } from "../../shared/i18n";
 
 const BAR_KEYS = Array.from({ length: 64 }, (_, index) => `bar-${index}`);
 type Props = {
@@ -61,6 +62,7 @@ function Player({
   downloadSource: string;
   unavailable: boolean;
 }) {
+  useLanguage();
   const audio = useRef<HTMLAudioElement>(null);
   const active = useConversationPresentation();
   useEffect(() => {
@@ -179,7 +181,7 @@ function Player({
   }
   return (
     <fieldset className={styles.card}>
-      <legend className="sr-only">Voice note</legend>
+      <legend className="sr-only">{t("v1wf.voice.legend")}</legend>
       <span className={styles.play}>
         <IconButton
           type="button"
@@ -189,12 +191,12 @@ function Player({
           style={{ width: "100%", height: "100%", borderRadius: "inherit" }}
           aria-label={
             error
-              ? "Retry voice note"
+              ? t("v1wf.voice.retry")
               : loading
-                ? "Cancel loading voice note"
+                ? t("v1wf.voice.cancelLoading")
                 : playing
-                  ? "Pause voice note"
-                  : "Play voice note"
+                  ? t("v1wf.voice.pause")
+                  : t("v1wf.voice.play")
           }
           onClick={() => void toggle()}
           icon={
@@ -231,13 +233,16 @@ function Player({
           <input
             className={styles.seek}
             type="range"
-            aria-label="Seek voice note"
+            aria-label={t("v1wf.voice.seek")}
             min={0}
             max={duration || 1}
             step={0.01}
             value={Math.min(time, duration || 1)}
             disabled={!duration || !metadataReady}
-            aria-valuetext={`${formatVoiceNoteDuration(time)} of ${formatVoiceNoteDuration(duration)}`}
+            aria-valuetext={t("v1wf.voice.position", {
+              time: formatVoiceNoteDuration(time),
+              duration: formatVoiceNoteDuration(duration),
+            })}
             onChange={(event) => {
               const element = audio.current;
               if (!element || element.readyState === 0) return;
@@ -260,7 +265,10 @@ function Player({
             size="xs"
             style={{ width: "100%" }}
             type="button"
-            aria-label={`Playback speed ${rate} times; change to ${nextVoiceNotePlaybackRate(rate)} times`}
+            aria-label={t("v1wf.voice.speed", {
+              rate,
+              next: nextVoiceNotePlaybackRate(rate),
+            })}
             onClick={() => {
               const next = nextVoiceNotePlaybackRate(rate);
               if (audio.current)
@@ -275,8 +283,8 @@ function Player({
       {(error || unavailable) && (
         <span className={styles.error} role="alert">
           {unavailable
-            ? "Audio unavailable"
-            : "Audio unavailable. Retry playback."}
+            ? t("v1wf.voice.unavailable")
+            : t("v1wf.voice.unavailableRetry")}
         </span>
       )}
       {downloadName !== undefined && !onRemove && (
@@ -297,7 +305,7 @@ function Player({
             shape="round"
             variant="media"
             type="button"
-            aria-label="Remove voice note"
+            aria-label={t("v1wf.voice.remove")}
             onClick={onRemove}
             icon={<X size={16} aria-hidden="true" />}
           />

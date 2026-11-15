@@ -6,9 +6,11 @@ import { IconButton } from "../../shared/design-system/ui/IconButton";
 import { useToastNotification } from "../../shared/design-system/ui/Toast";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { writeClipboardText } from "../../shared/clipboard";
+import { t, useLanguage } from "../../shared/i18n";
 
 /** Opens a complex diagram at full size, with its source a click away. */
 export function MermaidExpand({ code }: { code: string }) {
+  useLanguage();
   const [open, setOpen] = useState(false);
   const [copying, setCopying] = useState(false);
   const notify = useToastNotification();
@@ -18,17 +20,17 @@ export function MermaidExpand({ code }: { code: string }) {
       <IconButton
         hint="familiar"
         ref={expand}
-        aria-label="Expand diagram"
-        title="Expand diagram"
+        aria-label={t("v1wf.mermaid.expand")}
+        title={t("v1wf.mermaid.expand")}
         icon={<ArrowsOutIcon />}
         onClick={() => setOpen(true)}
       />
       <Dialog
         open={open}
         onOpenChange={setOpen}
-        title="Mermaid diagram"
+        title={t("v1wf.mermaid.title")}
         size="expanded"
-        closeLabel="Close diagram"
+        closeLabel={t("v1wf.mermaid.close")}
         finalFocus={expand}
         leadingActions={
           <Button
@@ -38,14 +40,14 @@ export function MermaidExpand({ code }: { code: string }) {
               void Promise.resolve()
                 .then(() => writeClipboardText(code))
                 .then(
-                  () => notify("Copied code to clipboard", "success"),
-                  () => notify("Failed to copy code", "error"),
+                  () => notify(t("v1wf.mermaid.copied"), "success"),
+                  () => notify(t("v1wf.mermaid.copyFailed"), "error"),
                 )
                 .finally(() => setCopying(false));
             }}
           >
             <CopyIcon size={16} aria-hidden="true" />
-            Copy code
+            {t("v1wf.mermaid.copy")}
           </Button>
         }
       >

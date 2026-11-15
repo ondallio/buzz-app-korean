@@ -12,9 +12,11 @@ import type { RelaySession } from "../../features/relay/session";
 import { useChannelList } from "../../features/relay/react";
 import { ownSolo } from "../../features/solo/labels";
 import { writeLink, type SoloPulls } from "./solo-pull";
-import { describePull, pullTone, stateIcons } from "./pull-state-view";
+import { pullTone, stateIcons } from "./pull-state-view";
+import { displayPull, displayPullLauncher } from "./pull-state-display";
 import styles from "./GitHub.module.css";
 import { useOpenGitHubLinksInBuzz } from "./link-preference";
+import { t, useLanguage } from "../../shared/i18n";
 
 /** A Solo chat's linked pull request in place of its chat icon. */
 export function SoloPullIcon({
@@ -22,13 +24,14 @@ export function SoloPullIcon({
   channelId,
   fallback,
 }: Pick<ChatIconProps, "channelId" | "fallback"> & { pulls: SoloPulls }) {
+  useLanguage();
   const pull = useSoloPull(pulls, channelId);
   if (!pull) return fallback;
   const Icon = stateIcons[pull.state?.state ?? "open"];
   return (
     <span className={styles.soloPull} data-tone={pullTone(pull)}>
       <Icon size={16} aria-hidden="true" />
-      <span className="sr-only">{describePull(pull)}: </span>
+      <span className="sr-only">{displayPull(pull)}: </span>
     </span>
   );
 }
@@ -74,10 +77,11 @@ export function SessionPullLauncher({
   open(target: string): boolean;
   canOpen(target: string): boolean;
 }) {
+  useLanguage();
   const inBuzz = useOpenGitHubLinksInBuzz();
   const pull = useSoloPull(pulls, channelId);
   if (!pull) return null;
-  const label = `Open linked ${describePull(pull).toLowerCase()}`;
+  const label = displayPullLauncher(pull);
   const Icon = stateIcons[pull.state?.state ?? "open"];
   return (
     <IconButton
@@ -149,6 +153,7 @@ function SessionPullLink({
   channelId: string;
   url: string;
 }) {
+  useLanguage();
   const list = useChannelList(session.channels);
   const linked = useSoloPull(pulls, channelId)?.url === url;
   const [busy, setBusy] = useState(false);
@@ -171,15 +176,17 @@ function SessionPullLink({
     <div className={styles.soloLink}>
       <span className={styles.pullActionNote}>
         {linked
-          ? "Shown in the sidebar for this chat."
-          : "Show this pull request’s state in the sidebar for this chat."}
+          ? t("githubPullLinks.solo.shown")
+          : t("githubPullLinks.solo.show")}
       </span>
       <Button
         size="sm"
         loading={busy}
         onClick={() => void change(linked ? null : url)}
       >
-        {linked ? "Unlink" : "Link to this chat"}
+        {linked
+          ? t("githubPullLinks.solo.unlinkShort")
+          : t("githubPullLinks.solo.link")}
       </Button>
       {error && (
         <p role="alert" className={styles.pullActionError}>
@@ -199,6 +206,7 @@ export function SoloPullMenu({
   pulls: SoloPulls;
   channelId: string;
 }) {
+  useLanguage();
   const pull = useSoloPull(pulls, channelId);
   const list = useChannelList(session.channels);
   const [busy, setBusy] = useState(false);
@@ -216,7 +224,7 @@ export function SoloPullMenu({
       disabled={busy || !session.configArtifactWriter || !session.snapshotRead}
       title={
         !session.configArtifactWriter || !session.snapshotRead
-          ? "Unlinking needs a native desktop relay connection."
+          ? t("githubPullLinks.solo.nativeRequired")
           : undefined
       }
       closeOnClick={false}
@@ -226,12 +234,12 @@ export function SoloPullMenu({
         try {
           await writeLink(session, channelId, null);
           pulls.linked(channelId, null);
-          notify("Pull request unlinked", "success");
+          notify(t("githubPullLinks.solo.unlinked"), "success");
         } catch (error) {
           notify(
             error instanceof Error
               ? error.message
-              : "Couldn’t unlink pull request. Try again.",
+              : t("githubPullLinks.solo.unlinkFailed"),
             "error",
           );
         } finally {
@@ -242,7 +250,9 @@ export function SoloPullMenu({
       <MenuIcon>
         <LinkBreakIcon size={16} />
       </MenuIcon>
-      {busy ? "Unlinking pull request…" : "Unlink pull request"}
+      {busy
+        ? t("githubPullLinks.solo.unlinking")
+        : t("githubPullLinks.solo.unlink")}
     </MenuItem>
   );
 }

@@ -1,3 +1,10 @@
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  errorMessage,
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { useEffect, useState } from "react";
 import type {
   WorkflowDefinitions,
@@ -24,9 +31,10 @@ export function WorkflowDeletionNotices({
   onCheck: (channelIds: readonly string[]) => void;
   onDismiss: (operation: WorkflowOperation) => Promise<void>;
 }) {
+  useLanguage();
   const [acknowledge, setAcknowledge] = useState<WorkflowOperation>();
   const [working, setWorking] = useState(false);
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<DisplayMessage>();
   const dismiss = async () => {
     if (!acknowledge || working) return;
     setWorking(true);
@@ -37,8 +45,8 @@ export function WorkflowDeletionNotices({
     } catch (cause) {
       setError(
         cause instanceof Error
-          ? cause.message
-          : "Couldn't dismiss this notice. Try again.",
+          ? errorMessage(cause)
+          : localMessage("workflowsList.dismissError"),
       );
     } finally {
       setWorking(false);
@@ -86,8 +94,8 @@ export function WorkflowDeletionNotices({
             return (
               <ToastNotice
                 key={operation.eventId}
-                title="Deleting workflow…"
-                description="Waiting for deletion confirmation."
+                title={t("workflowsList.deletingWorkflow")}
+                description={t("workflowsList.waitingDeletion")}
                 tone="info"
               />
             );
@@ -106,13 +114,17 @@ export function WorkflowDeletionNotices({
               key={operation.eventId}
               title={
                 rejected
-                  ? `Couldn't delete ${name || "workflow"}`
-                  : `Couldn't confirm deletion${name ? ` of ${name}` : ""}`
+                  ? name
+                    ? t("workflowsList.deleteNamed", { name })
+                    : t("workflowsList.deleteUnnamed")
+                  : name
+                    ? t("workflowsList.deletionNamed", { name })
+                    : t("workflowsList.deletionUnnamed")
               }
               description={
                 rejected
-                  ? "Check the workflow and try again from its menu."
-                  : "Check saved configuration before deleting again. Work already running may continue."
+                  ? t("workflowsList.rejectedDeleteHelp")
+                  : t("workflowsList.unknownDeleteHelp")
               }
             >
               <Button
@@ -121,8 +133,8 @@ export function WorkflowDeletionNotices({
                 onClick={() => onCheck([operation.workflow.channelId])}
               >
                 {snapshot.status === "loading"
-                  ? "Checking deletion…"
-                  : "Check saved configuration"}
+                  ? t("workflowsList.checkingDeletion")
+                  : t("workflowsList.checkSaved")}
               </Button>
               <Button
                 size="compact"
@@ -132,11 +144,11 @@ export function WorkflowDeletionNotices({
                   setAcknowledge(operation);
                 }}
               >
-                Dismiss notice
+                {t("workflowsList.dismissNotice")}
               </Button>
               {operation.error && (
                 <details>
-                  <summary>Delivery details</summary>
+                  <summary>{t("workflowsList.deliveryDetails")}</summary>
                   {operation.error}
                 </details>
               )}
@@ -148,11 +160,16 @@ export function WorkflowDeletionNotices({
         acknowledgeSnapshot.status !== "idle" &&
         acknowledgeSnapshot.status !== "unavailable" && (
           <ConfirmAction
-            title="Dismiss this notice?"
+            title={t("workflowsList.dismissTitle")}
             pending={working}
-            error={error ?? null}
-            description="Dismissing this notice unlocks the workflow. It does not confirm, cancel, or repeat deletion. Check saved configuration before deleting again."
-            action={working ? "Dismissing…" : "Dismiss notice and continue"}
+            cancel={t("workflowsList.keepEditing")}
+            error={resolveMessage(error) ?? null}
+            description={t("workflowsList.dismissHelp")}
+            action={
+              working
+                ? t("workflowsList.dismissing")
+                : t("workflowsList.dismissContinue")
+            }
             onConfirm={() => void dismiss()}
             onCancel={() => {
               if (!working) setAcknowledge(undefined);

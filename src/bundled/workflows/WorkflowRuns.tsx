@@ -11,6 +11,7 @@ import {
 } from "../../shared/datetime";
 import { useClockFormat } from "../../shared/clock-preference";
 import { Button } from "../../shared/design-system/ui/Button";
+import { t, useLanguage } from "../../shared/i18n";
 import { useWorkflowView } from "./useWorkflowView";
 
 export function WorkflowRuns({
@@ -22,13 +23,10 @@ export function WorkflowRuns({
   workflow: WorkflowDefinition;
   heading?: boolean;
 }) {
+  useLanguage();
   const [cursor, setCursor] = useState<WorkflowRunCursor | undefined>();
   if (!capability.availability.history)
-    return (
-      <p className="text-secondary">
-        Run history is unavailable from this host.
-      </p>
-    );
+    return <p className="text-secondary">{t("workflowsList.hostHistory")}</p>;
   return (
     <RunPage
       key={cursor ? `${cursor.before}:${cursor.beforeId}` : "first"}
@@ -54,49 +52,46 @@ function RunPage({
   heading: boolean;
 }) {
   useClockFormat();
+  useLanguage();
   const { snapshot, refresh } = useWorkflowView(
     useCallback(
       () => capability.runs(workflow, cursor),
       [capability, workflow, cursor],
     ),
   );
-  if (!snapshot) return <p role="status">Reading runs…</p>;
+  if (!snapshot) return <p role="status">{t("workflowsList.readingRuns")}</p>;
   return (
-    <section aria-label="Workflow runs" className="workflow-runs">
+    <section aria-label={t("workflowsList.runsAria")} className="workflow-runs">
       <div className="workflow-toolbar">
-        {heading && <h3 className="text-heading">Runs</h3>}
+        {heading && <h3 className="text-heading">{t("workflowsList.runs")}</h3>}
         <Button
           disabled={snapshot.status === "loading"}
           onClick={() => void refresh()}
         >
-          Refresh runs
+          {t("workflowsList.refreshRuns")}
         </Button>
       </div>
       {snapshot.status === "loading" && !snapshot.data.runs.length && (
-        <p role="status">Reading runs…</p>
+        <p role="status">{t("workflowsList.readingRuns")}</p>
       )}
       {snapshot.status === "unavailable" && (
-        <p role="status">
-          Run history is unavailable. This does not mean the workflow was
-          deleted.
-        </p>
+        <p role="status">{t("workflowsList.historyUnavailable")}</p>
       )}
       {snapshot.status === "idle" && (
-        <p role="status">History cleared. Refresh to read it again.</p>
+        <p role="status">{t("workflowsList.historyCleared")}</p>
       )}
       {snapshot.status === "error" && (
         <p role="alert" className="text-danger">
-          {snapshot.error ??
-            "Run history could not be read. Retry with Refresh runs."}
+          {snapshot.error ?? t("workflowsList.historyError")}
         </p>
       )}
       {snapshot.status === "ready" && !snapshot.data.runs.length && (
-        <p>No runs returned on this page.</p>
+        <p>{t("workflowsList.noRuns")}</p>
       )}
       {snapshot.data.runs.map((run) => (
         <article key={run.id} className="workflow-step">
           <p className="text-body">
-            <strong>{run.status.replaceAll("_", " ")}</strong> ·{" "}
+            <strong>{t(`workflowsList.status.${run.status}`)}</strong> ·{" "}
             <time
               dateTime={new Date(run.createdAt * 1000).toISOString()}
               title={formatFullTimestamp(run.createdAt)}
@@ -105,7 +100,7 @@ function RunPage({
             </time>
           </p>
           <p className="text-body-sm text-secondary">
-            Current step: {run.currentStep}
+            {t("workflowsList.currentStep", { step: run.currentStep })}
           </p>
           {(run.errorCode || run.errorMessage) && (
             <p className="text-danger">
@@ -113,8 +108,10 @@ function RunPage({
             </p>
           )}
           <details>
-            <summary>Run details and trace</summary>
-            <p className="text-mono-sm workflow-key">Run ID: {run.id}</p>
+            <summary>{t("workflowsList.runTrace")}</summary>
+            <p className="text-mono-sm workflow-key">
+              {t("workflowsList.runId", { id: run.id })}
+            </p>
             <pre className="text-mono workflow-trace">
               {JSON.stringify(run.trace, null, 2)}
             </pre>
@@ -123,7 +120,9 @@ function RunPage({
       ))}
       <div className="workflow-toolbar">
         {cursor && (
-          <Button onClick={() => onPage(undefined)}>Newest runs</Button>
+          <Button onClick={() => onPage(undefined)}>
+            {t("workflowsList.newestRuns")}
+          </Button>
         )}
         {snapshot.status === "ready" && snapshot.data.next && (
           <Button
@@ -131,7 +130,7 @@ function RunPage({
               if (snapshot.data.next) onPage(snapshot.data.next);
             }}
           >
-            Older runs
+            {t("workflowsList.olderRuns")}
           </Button>
         )}
       </div>

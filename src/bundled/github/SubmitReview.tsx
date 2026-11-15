@@ -15,11 +15,12 @@ import { readable } from "./object";
 import { changePull, type PullChecklist, type ReviewEvent } from "./pull";
 import type { PanelMemory, ReviewDraft } from "./panel-memory";
 import styles from "./GitHub.module.css";
+import { t, useLanguage } from "../../shared/i18n";
 
-const decisions: readonly (readonly [ReviewEvent, string, string])[] = [
-  ["COMMENT", "Comment", "Share feedback without approving"],
-  ["APPROVE", "Approve", "Approve merging these changes"],
-  ["REQUEST_CHANGES", "Request changes", "Ask for changes before merging"],
+const decisions: readonly ReviewEvent[] = [
+  "COMMENT",
+  "APPROVE",
+  "REQUEST_CHANGES",
 ];
 
 /** A review is worth keeping once it has text; a decision alone is a click
@@ -45,6 +46,7 @@ export function SubmitReview({
   refresh(): Promise<void>;
   memory: PanelMemory;
 }) {
+  useLanguage();
   const [open, setOpen] = useState(false);
   const remembered = memory.get(url).review;
   // The head the draft is written against. As with the merge confirmation, a
@@ -100,7 +102,7 @@ export function SubmitReview({
         setOpen(false);
         setEvent("COMMENT");
         setBody("");
-        notify("Review submitted", "success");
+        notify(t("v1wf.gh.reviewSubmitted"), "success");
       }
     } catch (failure) {
       // Back for the next panel, unless another panel has started a draft
@@ -142,7 +144,7 @@ export function SubmitReview({
       <PopoverTrigger
         render={
           <Button size="sm">
-            Submit review
+            {t("v1wf.gh.submitReview")}
             <CaretDownIcon size="1rem" />
           </Button>
         }
@@ -150,7 +152,7 @@ export function SubmitReview({
       <PopoverPopup
         align="end"
         size="wide"
-        aria-label="Submit review"
+        aria-label={t("v1wf.gh.submitReview")}
         initialFocus={comment}
       >
         <form
@@ -160,28 +162,30 @@ export function SubmitReview({
             void submit();
           }}
         >
-          <Field label="Review decision" nativeLabel={false}>
+          <Field label={t("v1wf.gh.reviewDecision")} nativeLabel={false}>
             <RadioGroup<ReviewEvent>
               name="review-decision"
               value={event}
               disabled={busy}
               onValueChange={(next) => edit({ event: next })}
             >
-              {decisions.map(([value, label, description]) => (
+              {decisions.map((value) => (
                 <Radio
                   key={value}
                   value={value}
-                  label={label}
-                  description={description}
+                  label={t(`v1wf.gh.decision.${value}`)}
+                  description={t(`v1wf.gh.decision.${value}.description`)}
                 />
               ))}
             </RadioGroup>
           </Field>
           <Field
-            label="Review comment"
+            label={t("v1wf.gh.reviewComment")}
             optional={event === "APPROVE"}
             description={
-              event === "APPROVE" ? undefined : "Required unless you approve."
+              event === "APPROVE"
+                ? undefined
+                : t("v1wf.gh.requiredUnlessApprove")
             }
           >
             <Textarea
@@ -195,20 +199,18 @@ export function SubmitReview({
           </Field>
           {pushed ? (
             <div className={styles.reviewNotice}>
-              <p role="status">
-                New commits were pushed after you started this review.
-              </p>
+              <p role="status">{t("v1wf.gh.newCommitsPushed")}</p>
               <Button
                 size="sm"
                 disabled={busy}
                 onClick={() => edit({ head: pull.head })}
               >
-                Use latest commit
+                {t("v1wf.gh.useLatestCommit")}
               </Button>
             </div>
           ) : (
             (pull.state === "merged" || pull.state === "closed") && (
-              <p role="status">This pull request {pull.state}.</p>
+              <p role="status">{t(`v1wf.gh.pullNow.${pull.state}`)}</p>
             )
           )}
           {error && (
@@ -218,7 +220,7 @@ export function SubmitReview({
           )}
           <div className={styles.reviewActions}>
             <Button disabled={busy} onClick={() => setOpen(false)}>
-              Cancel
+              {t("v1wf.gh.cancel")}
             </Button>
             <Button
               variant="prominent"
@@ -227,7 +229,7 @@ export function SubmitReview({
               disabled={!ready || pushed}
               focusableWhenDisabled
             >
-              Submit review
+              {t("v1wf.gh.submitReview")}
             </Button>
           </div>
         </form>

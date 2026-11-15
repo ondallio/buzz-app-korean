@@ -1,5 +1,6 @@
 import { ReadError, transientStatus } from "../../features/relay/errors";
 import type { GitHubReference } from "./references";
+import { t } from "../../shared/i18n";
 
 export type Branch = { label: string; url?: string | undefined };
 
@@ -71,9 +72,7 @@ type ResponseData = {
  * lifts, by its `x-ratelimit-reset` header, or an hour on without one. */
 export class GitHubRateLimited extends Error {
   constructor(readonly resetAt: number) {
-    super(
-      "GitHub’s public API limit was reached. Try again later or open it on GitHub.",
-    );
+    super(t("v1wf.gh.rateLimited"));
   }
 }
 
@@ -115,15 +114,15 @@ export async function loadGitHubDetails(
   );
   if (!response.ok) {
     if (response.status === 404)
-      throw new Error(
-        "This is private or unavailable. Sign in to the gh CLI to see private repositories, or open it on GitHub.",
-      );
+      throw new Error(t("v1wf.gh.privateOrUnavailable"));
     if (response.status === 403 || response.status === 429)
       throw new GitHubRateLimited(
         Number(response.headers.get("x-ratelimit-reset")) * 1000 ||
           Date.now() + 60 * 60_000,
       );
-    const message = `GitHub couldn’t load this object (${response.status}).`;
+    const message = t("v1wf.gh.loadFailedStatus", {
+      status: String(response.status),
+    });
     // `loadGitHubObject` retries server failures quietly.
     throw transientStatus(response.status)
       ? new ReadError("unavailable", message, response.status)

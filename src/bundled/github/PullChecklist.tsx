@@ -27,12 +27,14 @@ import type { GitHubCli } from "./gh";
 import { readable } from "./object";
 import {
   changePull,
-  mergeLabels,
+  mergeLabel,
   type MergeMethod,
   type PullAction,
   type PullChecklist as Checklist,
 } from "./pull";
 import styles from "./GitHub.module.css";
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
 
 type Tone = "success" | "failure" | "pending" | "neutral";
 const toneIcons = {
@@ -75,7 +77,10 @@ function Row({
 
 const names = (people: readonly string[]) =>
   people.length > 3
-    ? `${people.slice(0, 2).join(", ")} and ${people.length - 2} more`
+    ? t("v1wf.gh.namesMore", {
+        names: people.slice(0, 2).join(", "),
+        count: people.length - 2,
+      })
     : people.join(", ");
 
 function ChecksRow({
@@ -104,21 +109,21 @@ function ChecksRow({
           ? "pending"
           : "neutral";
   const parts = [
-    running && `${running} running`,
-    passed && `${passed} passed`,
-    count("skipped") && `${count("skipped")} skipped`,
+    running && t("v1wf.gh.checksRunning", { count: running }),
+    passed && t("v1wf.gh.checksPassed", { count: passed }),
+    count("skipped") && t("v1wf.gh.checksSkipped", { count: count("skipped") }),
   ].filter(Boolean);
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
   return (
     <Row
       tone={tone}
-      label="Checks"
+      label={t("v1wf.gh.checks")}
       action={action}
       details={
         expanded && failing.length > 0 ? (
           <div id={detailsId} className={styles.checklistDetails}>
-            <ul aria-label="Failed checks">
+            <ul aria-label={t("v1wf.gh.failedChecks")}>
               {failing.map((check) => (
                 <li key={check.key}>
                   {check.url ? (
@@ -143,16 +148,16 @@ function ChecksRow({
               target="_blank"
               rel="noreferrer"
             >
-              View all checks
+              {t("v1wf.gh.viewAllChecks")}
             </a>
           </div>
         ) : undefined
       }
     >
       {checks.state === "unavailable" && !failing.length ? (
-        "Couldn’t read every check"
+        t("v1wf.gh.checksPartial")
       ) : !checks.checks?.length ? (
-        "No checks"
+        t("v1wf.gh.noChecks")
       ) : failing.length ? (
         <Button
           variant="plain"
@@ -161,7 +166,10 @@ function ChecksRow({
           aria-controls={expanded ? detailsId : undefined}
           onClick={() => setExpanded(!expanded)}
         >
-          {[`${failing.length} failed`, ...parts].join(" · ")}
+          {[
+            t("v1wf.gh.checksFailed", { count: failing.length }),
+            ...parts,
+          ].join(" · ")}
           {expanded ? (
             <CaretDownIcon size={14} />
           ) : (
@@ -169,7 +177,13 @@ function ChecksRow({
           )}
         </Button>
       ) : !running && passed ? (
-        `All ${passed} passed${count("skipped") ? ` · ${count("skipped")} skipped` : ""}`
+        [
+          t("v1wf.gh.checksAllPassed", { count: passed }),
+          count("skipped") &&
+            t("v1wf.gh.checksSkipped", { count: count("skipped") }),
+        ]
+          .filter(Boolean)
+          .join(" · ")
       ) : (
         parts.join(" · ")
       )}
@@ -180,31 +194,33 @@ function ChecksRow({
 function ReviewRow({ review }: { review: Checklist["review"] }) {
   if (review.decision === "CHANGES_REQUESTED")
     return (
-      <Row tone="failure" label="Review">
-        Changes requested by {names(review.changes)}
+      <Row tone="failure" label={t("v1wf.gh.review")}>
+        {t("v1wf.gh.changesRequestedBy", { names: names(review.changes) })}
       </Row>
     );
   // GitHub's decision comes first: an approval can still leave a required
   // review (a code owner, or a second approver) outstanding.
   if (review.decision === "REVIEW_REQUIRED")
     return (
-      <Row tone="pending" label="Review">
-        Required
-        {!!review.approved.length && ` · approved by ${names(review.approved)}`}
-        {!!review.waiting.length && ` · waiting on ${names(review.waiting)}`}
+      <Row tone="pending" label={t("v1wf.gh.review")}>
+        {t("v1wf.gh.reviewRequired")}
+        {!!review.approved.length &&
+          ` · ${t("v1wf.gh.approvedByLower", { names: names(review.approved) })}`}
+        {!!review.waiting.length &&
+          ` · ${t("v1wf.gh.waitingOnLower", { names: names(review.waiting) })}`}
       </Row>
     );
   if (review.decision === "APPROVED" || review.approved.length)
     return (
-      <Row tone="success" label="Review">
-        Approved by {names(review.approved)}
+      <Row tone="success" label={t("v1wf.gh.review")}>
+        {t("v1wf.gh.approvedBy", { names: names(review.approved) })}
       </Row>
     );
   return (
-    <Row tone="neutral" label="Review">
+    <Row tone="neutral" label={t("v1wf.gh.review")}>
       {review.waiting.length
-        ? `Waiting on ${names(review.waiting)}`
-        : "Not required"}
+        ? t("v1wf.gh.waitingOn", { names: names(review.waiting) })
+        : t("v1wf.gh.reviewNotRequired")}
     </Row>
   );
 }
@@ -212,33 +228,35 @@ function ReviewRow({ review }: { review: Checklist["review"] }) {
 function MergeRow({ pull, action }: { pull: Checklist; action?: ReactNode }) {
   const base = <span className={styles.branchLabel}>{pull.base}</span>;
   const [tone, text]: [Tone, ReactNode] = (() => {
-    if (pull.queued) return ["pending", <>Queued for merge into {base}</>];
+    if (pull.queued) return ["pending", rich("v1wf.gh.queuedInto", { base })];
     switch (pull.merge) {
       case "CLEAN":
       case "HAS_HOOKS":
-        return ["success", <>Ready to merge into {base}</>];
+        return ["success", rich("v1wf.gh.readyInto", { base })];
       case "UNSTABLE":
-        return ["success", <>Can merge into {base}; optional checks failed</>];
+        return ["success", rich("v1wf.gh.canMergeOptionalFailed", { base })];
       case "BLOCKED":
         return [
           "pending",
           <>
-            Blocked by {base}’s rules
-            {pull.canBypass && !pull.queueRequired && " · you can bypass them"}
+            {rich("v1wf.gh.blockedByRules", { base })}
+            {pull.canBypass &&
+              !pull.queueRequired &&
+              ` · ${t("v1wf.gh.canBypass")}`}
           </>,
         ];
       case "BEHIND":
-        return ["pending", <>Behind {base}</>];
+        return ["pending", rich("v1wf.gh.behind", { base })];
       case "DIRTY":
-        return ["failure", <>Conflicts with {base}</>];
+        return ["failure", rich("v1wf.gh.conflicts", { base })];
       case "DRAFT":
-        return ["neutral", "Draft, so it can’t merge yet"];
+        return ["neutral", t("v1wf.gh.draftCantMerge")];
       default:
-        return ["neutral", "GitHub is still checking"];
+        return ["neutral", t("v1wf.gh.stillChecking")];
     }
   })();
   return (
-    <Row tone={tone} label="Merge" action={action}>
+    <Row tone={tone} label={t("v1wf.gh.mergeLabel")} action={action}>
       {text}
     </Row>
   );
@@ -349,7 +367,7 @@ function Actions({
     ...(merge.now
       ? others.map((method) => (
           <MenuItem key={method} onClick={() => confirm(method)}>
-            {mergeLabels[method]}
+            {mergeLabel(method)}
           </MenuItem>
         ))
       : []),
@@ -361,7 +379,7 @@ function Actions({
               void run({ type: "auto-merge", method: pull.method })
             }
           >
-            Merge automatically when ready
+            {t("v1wf.gh.autoMergeWhenReady")}
           </MenuItem>,
         ]
       : []),
@@ -369,7 +387,7 @@ function Actions({
       ? [
           ...(merge.now || canAutoMerge ? [<MenuSeparator key="split" />] : []),
           <MenuItem key="draft" onClick={() => void run({ type: "draft" })}>
-            Convert to draft
+            {t("v1wf.gh.convertToDraft")}
           </MenuItem>,
         ]
       : []),
@@ -385,16 +403,19 @@ function Actions({
             disabled={!!busy}
             onClick={() => void run({ type: "ready" })}
           >
-            Ready for review
+            {t("v1wf.gh.readyForReview")}
           </Button>
         )}
         {pull.queued ? (
-          <span className={styles.pullActionNote}>Queued for merge</span>
+          <span className={styles.pullActionNote}>
+            {t("v1wf.gh.queuedForMerge")}
+          </span>
         ) : pull.autoMerge ? (
           <>
             <span className={styles.pullActionNote}>
-              Merges automatically when ready
-              {pull.autoMerge.by && ` · set by ${pull.autoMerge.by}`}
+              {t("v1wf.gh.mergesWhenReady")}
+              {pull.autoMerge.by &&
+                ` · ${t("v1wf.gh.setBy", { name: pull.autoMerge.by })}`}
             </span>
             {pull.canDisableAutoMerge && (
               <Button
@@ -403,7 +424,7 @@ function Actions({
                 disabled={!!busy}
                 onClick={() => void run({ type: "cancel-auto-merge" })}
               >
-                Cancel
+                {t("v1wf.gh.cancel")}
               </Button>
             )}
           </>
@@ -414,7 +435,9 @@ function Actions({
             disabled={!!busy}
             onClick={() => confirm(pull.method)}
           >
-            {pull.queueRequired ? "Queue for merge" : mergeLabels[pull.method]}
+            {pull.queueRequired
+              ? t("v1wf.gh.queueForMerge")
+              : mergeLabel(pull.method)}
           </Button>
         ) : (
           canAutoMerge && (
@@ -427,7 +450,7 @@ function Actions({
                 void run({ type: "auto-merge", method: pull.method })
               }
             >
-              Merge when ready
+              {t("v1wf.gh.mergeWhenReady")}
             </Button>
           )
         )}
@@ -438,7 +461,7 @@ function Actions({
             disabled={!!busy}
             onClick={() => void run({ type: "update-branch" })}
           >
-            Update branch
+            {t("v1wf.gh.updateBranch")}
           </Button>
         )}
         {!!menu.length && (
@@ -446,7 +469,7 @@ function Actions({
             <MenuTrigger
               render={
                 <IconButton
-                  aria-label="More pull request actions"
+                  aria-label={t("v1wf.gh.moreActions")}
                   size="sm"
                   icon={<DotsThreeIcon />}
                   disabled={!!busy}
@@ -464,13 +487,18 @@ function Actions({
       )}
       {confirming && (
         <AlertDialog
-          title={`${confirming.queue ? "Queue for merge" : mergeLabels[confirming.method]} #${number}?`}
+          title={t("v1wf.gh.confirmTitle", {
+            action: confirming.queue
+              ? t("v1wf.gh.queueForMerge")
+              : mergeLabel(confirming.method),
+            number,
+          })}
           description={
             confirming.queue
-              ? `${title}, into ${pull.base} at the commit shown here. GitHub will merge it through the queue once the required checks pass.`
+              ? t("v1wf.gh.confirmQueue", { title, base: pull.base })
               : confirming.bypass
-                ? `${title}. This bypasses ${pull.base}’s branch rules, which haven’t all passed.`
-                : `${title}, into ${pull.base} at the commit shown here.`
+                ? t("v1wf.gh.confirmBypass", { title, base: pull.base })
+                : t("v1wf.gh.confirmMerge", { title, base: pull.base })
           }
           pending={busy === "merge" || busy === "enqueue"}
           onClose={() => {
@@ -486,7 +514,7 @@ function Actions({
                   setError(undefined);
                 }}
               >
-                Cancel
+                {t("v1wf.gh.cancel")}
               </Button>
               <Button
                 variant={confirming.bypass ? "attention" : "prominent"}
@@ -500,7 +528,9 @@ function Actions({
                   )
                 }
               >
-                {confirming.queue ? "Queue for merge" : "Merge"}
+                {confirming.queue
+                  ? t("v1wf.gh.queueForMerge")
+                  : t("v1wf.gh.mergeLabel")}
               </Button>
             </>
           }
@@ -533,30 +563,35 @@ export function PullChecklist({
   refresh(): Promise<void>;
   resolveAction?: ((action: "failures" | "conflicts") => ReactNode) | undefined;
 }) {
+  useLanguage();
   if (checklist.state === "merged" || checklist.state === "closed")
     return (
-      <ul className={styles.checklist} aria-label="Pull request state">
+      <ul className={styles.checklist} aria-label={t("v1wf.gh.pullState")}>
         {checklist.state === "merged" ? (
           <li className={styles.checklistRow} data-tone="merged">
             <GitMergeIcon size={16} aria-hidden="true" />
             <span className={styles.checklistValue}>
-              Merged into{" "}
-              <span className={styles.branchLabel}>{checklist.base}</span>
-              {details.mergedBy && ` by ${details.mergedBy}`}
+              {rich("v1wf.gh.mergedInto", {
+                base: (
+                  <span className={styles.branchLabel}>{checklist.base}</span>
+                ),
+              })}
+              {details.mergedBy &&
+                ` ${t("v1wf.gh.byName", { name: details.mergedBy })}`}
               {details.mergedAt &&
                 ` ${relativeTimestamp(Date.parse(details.mergedAt) / 1000)}`}
             </span>
           </li>
         ) : (
-          <Row tone="neutral" label="Closed">
-            Without merging
+          <Row tone="neutral" label={t("v1wf.gh.closed")}>
+            {t("v1wf.gh.withoutMerging")}
           </Row>
         )}
       </ul>
     );
   return (
     <>
-      <ul className={styles.checklist} aria-label="Pull request checklist">
+      <ul className={styles.checklist} aria-label={t("v1wf.gh.pullChecklist")}>
         <ChecksRow
           checks={checklist.checks}
           url={url}
@@ -576,7 +611,7 @@ export function PullChecklist({
               ? "pending"
               : "success"
           }
-          label="Threads"
+          label={t("v1wf.gh.threads")}
         >
           {checklist.unresolved || checklist.moreThreads ? (
             <a
@@ -586,11 +621,13 @@ export function PullChecklist({
               rel="noreferrer"
             >
               {checklist.moreThreads
-                ? `${checklist.unresolved} unresolved in the latest 100`
-                : `${checklist.unresolved} unresolved`}
+                ? t("v1wf.gh.unresolvedLatest", {
+                    count: checklist.unresolved,
+                  })
+                : t("v1wf.gh.unresolved", { count: checklist.unresolved })}
             </a>
           ) : (
-            "None unresolved"
+            t("v1wf.gh.noneUnresolved")
           )}
         </Row>
         <MergeRow
@@ -624,13 +661,14 @@ export function PublicChecklist({
   sha: string | undefined;
   checks: CheckSummary | undefined;
 }) {
+  useLanguage();
   return (
-    <ul className={styles.checklist} aria-label="Pull request checklist">
+    <ul className={styles.checklist} aria-label={t("v1wf.gh.pullChecklist")}>
       {checks ? (
         <ChecksRow checks={checks} url={url} />
       ) : (
-        <Row tone="neutral" label="Checks">
-          {sha ? "Loading…" : "Unavailable"}
+        <Row tone="neutral" label={t("v1wf.gh.checks")}>
+          {sha ? t("v1wf.gh.loading") : t("v1wf.gh.unavailable")}
         </Row>
       )}
     </ul>

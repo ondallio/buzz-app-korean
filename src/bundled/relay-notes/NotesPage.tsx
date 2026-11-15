@@ -76,6 +76,7 @@ import type { NavigationScope } from "../../features/navigation/targets";
 import { notesRoute, notesTarget, type NotesRoute } from "./routes";
 import type { Panels, RegisteredPanel } from "../../features/panels/service";
 import { profileTarget } from "../../features/profiles/target";
+import { t, useLanguage } from "../../shared/i18n";
 const noSubscribe = () => () => {};
 const noPanels: readonly RegisteredPanel[] = [];
 const emptyPanels = () => noPanels;
@@ -97,13 +98,14 @@ function NotesPanel({
   refreshRef?: Ref<HTMLButtonElement>;
   loading?: boolean;
 }) {
+  useLanguage();
   return (
-    <Panel aria-label="Shared notes">
+    <Panel aria-label={t("v1wf.notes.title")}>
       <div className={styles.page}>
         <PanelHeader
           title={
             <PanelHeaderLabel
-              title="Shared notes"
+              title={t("v1wf.notes.title")}
               icon={<NoteIcon size="1rem" />}
             >
               <PopoverRoot>
@@ -113,28 +115,18 @@ function NotesPanel({
                       size="sm"
                       variant="ghost"
                       icon={<InfoIcon size="1rem" aria-hidden="true" />}
-                      aria-label="About shared notes"
-                      title="About shared notes"
+                      aria-label={t("v1wf.notes.about")}
+                      title={t("v1wf.notes.about")}
                     />
                   }
                 />
                 <PopoverPopup>
-                  <PopoverTitle>About shared notes</PopoverTitle>
+                  <PopoverTitle>{t("v1wf.notes.about")}</PopoverTitle>
                   <PopoverDescription
                     render={<div className={styles.description} />}
                   >
-                    <p>
-                      Shared notes are reusable documents saved by your agents
-                      and other agents in this community—recipes, prompts,
-                      research and guides you can return to across
-                      conversations. Ask the agent who saved a note to update
-                      it, or ask your agent to save its own copy.
-                    </p>
-                    <p>
-                      Anyone with access to this community’s relay can read
-                      shared notes. Don’t include secrets or private
-                      information.
-                    </p>
+                    <p>{t("v1wf.notes.aboutBody1")}</p>
+                    <p>{t("v1wf.notes.aboutBody2")}</p>
                   </PopoverDescription>
                 </PopoverPopup>
               </PopoverRoot>
@@ -145,7 +137,7 @@ function NotesPanel({
               <>
                 {loading && (
                   <span role="status" className="text-caption text-subtle">
-                    Reading notes…
+                    {t("v1wf.notes.reading")}
                   </span>
                 )}
                 <IconButton
@@ -153,8 +145,8 @@ function NotesPanel({
                   ref={refreshRef}
                   size="sm"
                   variant="ghost"
-                  aria-label="Refresh notes"
-                  title="Refresh notes"
+                  aria-label={t("v1wf.notes.refresh")}
+                  title={t("v1wf.notes.refresh")}
                   icon={<ArrowsClockwiseIcon size="1rem" />}
                   onClick={refresh}
                 />
@@ -175,6 +167,7 @@ export function NotesPage({
   panels,
   codeBlocks,
 }: { relay: RelayData } & NotesNavigation) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const request = useMemo(
     () => navigation?.forSession(relay, connection),
@@ -219,13 +212,15 @@ export function NotesPage({
     <NotesPanel>
       <p role="status">
         {connection.status === "connecting"
-          ? "Connecting to your community…"
-          : "Connect to a community to read notes."}
+          ? t("v1wf.notes.connecting")
+          : t("v1wf.notes.connect")}
       </p>
       {connection.status === "error" && (
         <>
           <p role="alert">{connection.error}</p>
-          <Button onClick={() => relay.tryAgain()}>Retry connection</Button>
+          <Button onClick={() => relay.tryAgain()}>
+            {t("v1wf.notes.retryConnection")}
+          </Button>
         </>
       )}
     </NotesPanel>
@@ -312,6 +307,7 @@ function NoteCollection({
   inventoryError: string | undefined;
   refreshAgents(): void;
 }) {
+  useLanguage();
   const [request, setRequest] = useState({ version: 0, more: false });
   const pages = useRef({ owned: emptyNotePage(), shared: emptyNotePage() });
   const sharedAgents = useRef(new Map<string, Profile>());
@@ -464,11 +460,11 @@ function NoteCollection({
           partial: !pages.current.owned.done || !pages.current.shared.done,
           error:
             ownResult.status === "rejected"
-              ? "Couldn’t read notes. Try again."
+              ? t("v1wf.notes.readFailed")
               : undefined,
           sharedError:
             sharedResult.status === "rejected"
-              ? "Other agents’ notes could not be checked. Refresh to try again."
+              ? t("v1wf.notes.sharedFailed")
               : undefined,
         });
         setAuthor((current) =>
@@ -522,13 +518,13 @@ function NoteCollection({
       route?.author &&
       !agents.some((agent) => agent.pubkey === route.author)
     ) {
-      setRouteError("This agent folder is unavailable.");
+      setRouteError(t("v1wf.notes.folderUnavailable"));
       return;
     }
     setAuthor(route?.author ?? "");
     if (route?.profile) {
       if (!agents.some((agent) => agent.pubkey === route.profile)) {
-        setRouteError("This agent profile is unavailable.");
+        setRouteError(t("v1wf.notes.profileUnavailable"));
         return;
       }
       setProfile(route.profile);
@@ -549,9 +545,7 @@ function NoteCollection({
         );
         setSelected(route.note);
       } else {
-        setRouteError(
-          "This note isn’t in the loaded collection. Refresh to check again.",
-        );
+        setRouteError(t("v1wf.notes.noteMissing"));
         return;
       }
     }
@@ -713,8 +707,8 @@ function NoteCollection({
               <IconButton
                 hint="familiar"
                 variant="ghost"
-                aria-label="Back to folders"
-                title="Back to folders"
+                aria-label={t("v1wf.notes.back")}
+                title={t("v1wf.notes.back")}
                 icon={<ArrowLeftIcon size="1rem" aria-hidden="true" />}
                 onClick={() => openFolder("")}
               />
@@ -724,20 +718,21 @@ function NoteCollection({
             </div>
           )}
           {routeError && <p role="alert">{routeError}</p>}
-          {pending && <p role="status">Loading your agents…</p>}
+          {pending && <p role="status">{t("v1wf.notes.loadingAgents")}</p>}
           {!pending && !complete && !inventoryError && (
             <div role="status">
-              <p>
-                Some agents could not be checked. Showing notes from available
-                agents.
-              </p>
-              <Button onClick={refreshAgents}>Retry agents</Button>
+              <p>{t("v1wf.notes.someAgentsFailed")}</p>
+              <Button onClick={refreshAgents}>
+                {t("v1wf.notes.retryAgents")}
+              </Button>
             </div>
           )}
           {inventoryError && (
             <div role="alert">
               <p>{inventoryError}</p>
-              <Button onClick={refreshAgents}>Retry agents</Button>
+              <Button onClick={refreshAgents}>
+                {t("v1wf.notes.retryAgents")}
+              </Button>
             </div>
           )}
           {result.sharedError && (
@@ -755,7 +750,7 @@ function NoteCollection({
                   setRequest((old) => ({ ...old, version: old.version + 1 }))
                 }
               >
-                Retry notes
+                {t("v1wf.notes.retryNotes")}
               </Button>
             </div>
           )}
@@ -767,23 +762,23 @@ function NoteCollection({
             !(author ? visible.length : folders.length) && (
               <EmptyState
                 icon={<NoteIcon size="1.5rem" />}
-                title="No notes yet"
+                title={t("v1wf.notes.none")}
                 description={
                   author
-                    ? "This folder has no notes in the loaded collection. Go back to folders to browse another agent."
-                    : "Ask one of your agents to save a recipe or reference as a shared note, then refresh."
+                    ? t("v1wf.notes.emptyFolder")
+                    : t("v1wf.notes.emptyAll")
                 }
               />
             )}
           {!author ? (
             <section
               className={styles.folderGroups}
-              aria-label="Agent folders"
+              aria-label={t("v1wf.notes.folders")}
               ref={folderGrid}
             >
               {[
-                { owned: true, label: "Your agents" },
-                { owned: false, label: "Other agents" },
+                { owned: true, label: t("v1wf.notes.yourAgents") },
+                { owned: false, label: t("v1wf.notes.otherAgents") },
               ].map((group) => {
                 const items = folders.filter(
                   (agent) => agent.owned === group.owned,
@@ -799,7 +794,9 @@ function NoteCollection({
                           <SurfaceButton
                             key={agent.pubkey}
                             className={styles.folderCard}
-                            aria-label={`Open ${agent.name} folder`}
+                            aria-label={t("v1wf.notes.openFolder", {
+                              name: agent.name,
+                            })}
                             data-agent={agent.pubkey}
                             onClick={() => openFolder(agent.pubkey)}
                           >
@@ -816,10 +813,12 @@ function NoteCollection({
                               {agent.name}
                             </span>
                             <span className="text-caption text-subtle">
-                              {agent.count}{" "}
-                              {agent.count === 1
-                                ? "shared note"
-                                : "shared notes"}
+                              {t(
+                                agent.count === 1
+                                  ? "v1wf.notes.count.one"
+                                  : "v1wf.notes.count.other",
+                                { count: agent.count },
+                              )}
                             </span>
                           </SurfaceButton>
                         ))}
@@ -846,18 +845,18 @@ function NoteCollection({
                   }))
                 }
               >
-                Load older notes
+                {t("v1wf.notes.loadOlder")}
               </Button>
             </div>
           )}
         </NotesPanel>
       </div>
       {readerOpen && (
-        <aside className={styles.side} aria-label="Note reader">
+        <aside className={styles.side} aria-label={t("v1wf.notes.reader")}>
           {split.handle}
-          <Panel aria-label="Note details">
+          <Panel aria-label={t("v1wf.notes.details")}>
             <PanelWorkspace
-              label="Open notes"
+              label={t("v1wf.notes.open")}
               value={active}
               select={(key) => {
                 setSelected(key);
@@ -910,7 +909,11 @@ function NoteCollection({
                   ? [
                       {
                         id: profileKey,
-                        label: `${agents.find((agent) => agent.pubkey === profile)?.name ?? "Agent"} · Profile`,
+                        label: t("v1wf.notes.agentProfile", {
+                          name:
+                            agents.find((agent) => agent.pubkey === profile)
+                              ?.name ?? t("v1wf.notes.agent"),
+                        }),
                         close: closeProfile,
                         content: (
                           <profilePanel.component
@@ -1049,7 +1052,7 @@ function NoteAuthor({
     <Button
       variant="plain"
       size="inline"
-      aria-label={`View ${name} profile`}
+      aria-label={t("v1wf.notes.viewProfile", { name })}
       onClick={open}
     >
       {identity}

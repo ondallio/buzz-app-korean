@@ -9,6 +9,7 @@ import type { BuilderlabPhone } from "../../features/identity/builderlab-account
 import { QrCode, renderQrCode, useQrVariant } from "../../shared/QrCode";
 import { LoadingRegion } from "../../shared/design-system/ui/LoadingRegion";
 import { PairingSettings } from "./PairingSettings";
+import { t, useLanguage } from "../../shared/i18n";
 
 /** The build's mobile app listings (`BUZZ_MOBILE_APP_IOS_URL`,
  * `BUZZ_MOBILE_APP_ANDROID_URL`); a store the build doesn't set is left out. */
@@ -120,10 +121,10 @@ export function MobileSettings({
   // Pairing starts a session as it mounts, so it waits for the answer; the
   // card's heading holds its place meanwhile.
   return (
-    <LoadingRegion pending label="Checking your Builderlab account…">
+    <LoadingRegion pending label={t("v1wf.pair.checkingBuilderlab")}>
       <section aria-labelledby="mobile-app-title" className="min-w-0">
         <h2 id="mobile-app-title" className="mt-0 mb-2 text-label">
-          Mobile app
+          {t("v1wf.pair.mobileApp")}
         </h2>
       </section>
     </LoadingRegion>
@@ -142,13 +143,20 @@ function GetTheApp({
   email: string | null;
   stores: readonly Store[];
 }) {
+  useLanguage();
   return (
     <section aria-labelledby="mobile-app-title" className="min-w-0">
       <h2 id="mobile-app-title" className="mt-0 mb-2 text-label">
-        Get Buzz on your phone
+        {t("v1wf.pair.getOnPhone")}
       </h2>
       <p className="mt-0 mb-6 text-body-sm text-muted">
-        {`Install Buzz on your phone${stores.length ? "" : " from its app store"}, then sign in with Builderlab${email ? ` as ${email}` : ""}.`}
+        {stores.length
+          ? email
+            ? t("v1wf.pair.installAs", { email })
+            : t("v1wf.pair.install")
+          : email
+            ? t("v1wf.pair.installStoreAs", { email })
+            : t("v1wf.pair.installStore")}
       </p>
       {stores.length > 0 && (
         <ul className="m-0 flex list-none flex-wrap gap-6 p-0">
@@ -166,6 +174,7 @@ function GetTheApp({
  * while it renders. Without the native renderer (the browser host) only the
  * link shows. */
 function StoreCode({ store }: { store: Store }) {
+  useLanguage();
   const variant = useQrVariant();
   const key = `${variant}:${store.url}`;
   const [drawn, setDrawn] = useState<{ key: string; svg?: string }>();
@@ -185,7 +194,7 @@ function StoreCode({ store }: { store: Store }) {
       {code?.svg ? (
         <QrCode
           svg={code.svg}
-          alt={`Scan with your phone to get Buzz from ${store.name}`}
+          alt={t("v1wf.pair.storeQrAlt", { store: store.name })}
         />
       ) : (
         !code && (
@@ -201,7 +210,7 @@ function StoreCode({ store }: { store: Store }) {
         target="_blank"
         rel="noreferrer"
       >
-        {`Get it on ${store.name}`}
+        {t("v1wf.pair.getItOn", { store: store.name })}
       </a>
     </li>
   );

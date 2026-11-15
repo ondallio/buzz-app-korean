@@ -3,6 +3,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { imageType } from "../../features/relay/attachment-limits";
 import { prepareAttachment } from "../../features/messages/prepare-attachment";
 import { cleanPng } from "../../features/messages/image-metadata";
+import { t } from "../../shared/i18n";
 
 /** Only upload supported still images. Relay metadata checks reject unsafe containers. */
 export async function feedbackImage(
@@ -10,14 +11,14 @@ export async function feedbackImage(
   signal: AbortSignal,
 ): Promise<File> {
   if (!file.size || file.size > 50 * 1024 * 1024)
-    throw new Error("Feedback image exceeds the supported size.");
+    throw new Error(t("v1wf.feedback.imageTooLarge"));
   const kind = imageType(new Uint8Array(await file.slice(0, 12).arrayBuffer()));
   if (
     !kind ||
     kind !== file.type ||
     (kind === "image/gif" && file.size > 10 * 1024 * 1024)
   )
-    throw new Error("Choose a PNG, JPEG, GIF, or WebP image.");
+    throw new Error(t("v1wf.feedback.imageType"));
   // The message preparation pipeline preserves Buzz snapshot manifests. Feedback
   // must not carry that private editor state into the operator inbox.
   const prepared = await prepareAttachment(file, signal);

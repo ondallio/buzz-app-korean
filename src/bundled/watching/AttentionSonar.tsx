@@ -10,6 +10,7 @@ import { RobotIcon } from "../../shared/design-system/icons";
 import { agentAvatars } from "../../features/agents/avatar-packs";
 import { PackedAgentAvatar } from "../../features/agents/PackedAgentAvatar";
 import "./sonar.css";
+import { t } from "../../shared/i18n";
 
 export const sonarDefaults = {
   size: 160,
@@ -46,6 +47,18 @@ export const SonarSettingsContext = createContext({
   },
   previewPicture: "",
 });
+const sonarKeys = [
+  "v1wf.watch.sonar.0",
+  "v1wf.watch.sonar.1",
+  "v1wf.watch.sonar.2",
+  "v1wf.watch.sonar.3",
+  "v1wf.watch.sonar.4",
+  "v1wf.watch.sonar.5",
+  "v1wf.watch.sonar.6",
+  "v1wf.watch.sonar.7",
+  "v1wf.watch.sonar.8",
+  "v1wf.watch.sonar.9",
+] as const;
 const messages = [
   "Watch for customer feedback",
   "Remind me to follow up tomorrow",
@@ -58,6 +71,19 @@ const messages = [
   "Watch for launch updates",
   "Tell me when this PR is approved",
 ];
+
+const hintKeys: Readonly<Record<string, (typeof sonarKeys)[number]>> =
+  Object.fromEntries(
+    messages.map((message, index) => [
+      message,
+      sonarKeys[index] ?? sonarKeys[0],
+    ]),
+  );
+
+function hintText(message: string) {
+  const key = hintKeys[message];
+  return key ? t(key) : message;
+}
 
 export function AttentionSonar({
   picture,
@@ -248,11 +274,11 @@ function SonarSignal({
       {hintIndex >= 0 && (
         <span className="attention-sonar-hint-anchor">
           <span className="attention-sonar-hint text-caption">
-            {
+            {hintText(
               messageDeck[
                 (signal.round * hintsPerPass + hintIndex) % messageDeck.length
-              ]
-            }
+              ] ?? "",
+            )}
           </span>
         </span>
       )}

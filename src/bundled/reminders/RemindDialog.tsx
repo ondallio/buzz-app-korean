@@ -10,12 +10,14 @@ import { Input } from "../../shared/design-system/ui/Input";
 import { Textarea } from "../../shared/design-system/ui/Textarea";
 import {
   TIME_PRESETS,
+  presetLabel,
   formatDue,
   parseCustomDateTime,
   shiftedFrom,
   todayDateString,
 } from "./model";
 import styles from "./Reminders.module.css";
+import { t, useLanguage } from "../../shared/i18n";
 
 /** "Remind me" for one message: a preset or custom time, plus an optional note. */
 export function RemindDialog({
@@ -27,6 +29,7 @@ export function RemindDialog({
   session: RelaySession;
   close(): void;
 }) {
+  useLanguage();
   const fields = useRef<HTMLDivElement>(null);
   const [when, setWhen] = useState(TIME_PRESETS[0]?.label ?? "custom");
   const [note, setNote] = useState("");
@@ -54,7 +57,7 @@ export function RemindDialog({
       );
       close();
     } catch {
-      setError("The reminder could not be saved. Try again.");
+      setError(t("v1wf.rem.saveFailed"));
       setPending(false);
     }
   };
@@ -71,12 +74,12 @@ export function RemindDialog({
           : (fields.current?.querySelector<HTMLElement>('[role="combobox"]') ??
             null)
       }
-      title="Remind me"
-      description="Choose when to be reminded about this message."
+      title={t("v1wf.rem.remindMe")}
+      description={t("v1wf.rem.dialogDescription")}
       actions={
         <>
           <Button disabled={pending} onClick={close}>
-            Cancel
+            {t("v1wf.rem.cancel")}
           </Button>
           <Button
             variant="prominent"
@@ -87,14 +90,14 @@ export function RemindDialog({
               if (at !== null) void submit(at);
             }}
           >
-            Set reminder
+            {t("v1wf.rem.setReminder")}
           </Button>
         </>
       }
     >
       <div ref={fields} className={styles.form}>
         <Select
-          label="When"
+          label={t("v1wf.rem.when")}
           variant="field"
           value={when}
           disabled={pending}
@@ -105,9 +108,9 @@ export function RemindDialog({
               options: [
                 ...TIME_PRESETS.map((item) => ({
                   value: item.label,
-                  label: item.label,
+                  label: presetLabel(item.label),
                 })),
-                { value: "custom", label: "Custom date & time" },
+                { value: "custom", label: t("v1wf.rem.custom") },
               ],
             },
           ]}
@@ -115,7 +118,7 @@ export function RemindDialog({
         {when === "custom" && (
           <>
             <div className={styles.custom}>
-              <Field label="Reminder date">
+              <Field label={t("v1wf.rem.date")}>
                 <Input
                   type="date"
                   min={todayDateString()}
@@ -124,7 +127,7 @@ export function RemindDialog({
                   onChange={(event) => setDate(event.target.value)}
                 />
               </Field>
-              <Field label="Reminder time">
+              <Field label={t("v1wf.rem.time")}>
                 <Input
                   type="time"
                   value={time}
@@ -135,20 +138,19 @@ export function RemindDialog({
             </div>
             {custom === null && (
               <p role="status" className="text-body-sm text-subtle">
-                Choose a date and time in the future.
+                {t("v1wf.rem.chooseFuture")}
               </p>
             )}
             {custom !== null && shiftedFrom(time, custom) && (
               <p role="status" className="text-body-sm text-subtle">
-                That time is skipped by daylight saving. The reminder will be
-                set for {formatDue(custom)}.
+                {t("v1wf.rem.dstShift", { due: formatDue(custom) })}
               </p>
             )}
           </>
         )}
-        <Field label="Note (optional)">
+        <Field label={t("v1wf.rem.note")}>
           <Textarea
-            placeholder="What do you want to follow up on?"
+            placeholder={t("v1wf.rem.notePlaceholder")}
             rows={2}
             maxLength={4096}
             value={note}

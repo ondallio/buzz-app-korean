@@ -280,6 +280,11 @@ export {
   setLanguage,
 } from "./language";
 import { en as v1MessagesEn, ko as v1MessagesKo } from "./catalogs/v1-messages";
+import {
+  en as v1WorkflowsIntegrationsEn,
+  ko as v1WorkflowsIntegrationsKo,
+} from "./catalogs/v1-workflows-integrations";
+
 export const english = {
   ...coreEn,
   ...appEn,
@@ -362,6 +367,7 @@ export const english = {
   ...channelMenusEn,
   ...v1MessagesEn,
   ...v1AgentsHuddlesEn,
+  ...v1WorkflowsIntegrationsEn,
 } as const;
 export const korean: Partial<Record<keyof typeof english, string>> = {
   ...coreKo,
@@ -445,6 +451,7 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...channelMenusKo,
   ...v1MessagesKo,
   ...v1AgentsHuddlesKo,
+  ...v1WorkflowsIntegrationsKo,
 };
 export type TranslationKey = keyof typeof english;
 type Variables<S extends string> =

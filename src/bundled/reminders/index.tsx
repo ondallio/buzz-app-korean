@@ -18,6 +18,7 @@ import { RemindDialog } from "./RemindDialog";
 import { RemindersPage } from "./RemindersPage";
 import styles from "./Reminders.module.css";
 import { noState, noSubscribe, scopeOf, useReminders } from "./react";
+import { t, useLanguage } from "../../shared/i18n";
 
 export const inject = [
   "pages",
@@ -148,15 +149,15 @@ export const apply: PluginModule["apply"] = (ctx) => {
               target: to,
               title:
                 channel && channel.channelType !== "dm" && channel.name
-                  ? `Reminder due · #${channel.name}`
-                  : "Reminder due",
+                  ? t("v1wf.rem.dueTitleChannel", { channel: channel.name })
+                  : t("v1wf.rem.dueTitle"),
               body:
                 [
                   plainText(reminder.target?.preview ?? "", {
                     storedPreview: true,
                   }),
                   plainText(reminder.note ?? ""),
-                ].find(Boolean) || "A reminder is waiting",
+                ].find(Boolean) || t("v1wf.rem.waiting"),
             });
           // Access refuses the message when the viewer isn't in its channel, so
           // that reminder opens Reminders instead of never alerting. The retry
@@ -234,7 +235,10 @@ export const apply: PluginModule["apply"] = (ctx) => {
     const { state } = useReminders(relay);
     const at = useSyncExternalStore(subscribeClock, readClock, readClock);
     const due = countDue(state.reminders, at);
-    return <CountBadge count={due} label={`${due} due`} />;
+    useLanguage();
+    return (
+      <CountBadge count={due} label={t("v1wf.rem.dueCount", { count: due })} />
+    );
   }
 
   ctx.pages.register({
@@ -269,8 +273,8 @@ export const apply: PluginModule["apply"] = (ctx) => {
       <span
         className={styles.marker}
         role="img"
-        title="Reminder set"
-        aria-label="Reminder set"
+        title={t("v1wf.rem.set")}
+        aria-label={t("v1wf.rem.set")}
       >
         <AlarmIcon size={14} aria-hidden="true" />
       </span>

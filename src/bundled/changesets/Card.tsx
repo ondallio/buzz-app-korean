@@ -5,9 +5,10 @@ import { InlineHeader } from "../../shared/design-system/ui/Header";
 import { NavigationItem } from "../../shared/design-system/ui/NavigationItem";
 import { targetFor } from "./target";
 import type { Turn, TurnCheckout, Turns } from "./turns";
-import { Counts, plural, totals } from "./Counts";
+import { Counts, fileCount, filesChanged, totals } from "./Counts";
 import styles from "./Changesets.module.css";
 import { useLoaded } from "./useLoaded";
+import { t, useLanguage } from "../../shared/i18n";
 
 const FIRST = 8;
 
@@ -61,6 +62,7 @@ function ChangesetCard({
   canOpen(target: string): boolean;
   open(target: string): boolean;
 }) {
+  useLanguage();
   const [all, setAll] = useState(false);
   const {
     value: files,
@@ -81,37 +83,27 @@ function ChangesetCard({
         subtitle={
           files && sum ? (
             <>
-              {plural(files.length, "file")} changed <Counts {...sum} />
+              {filesChanged(files.length)} <Counts {...sum} />
             </>
           ) : (
-            plural(checkout.files ?? 0, "file")
+            fileCount(checkout.files ?? 0)
           )
         }
       />
-      {checkout.late && (
-        <p className={styles.note}>
-          Recording began a moment after the agent started, so its first edits
-          may be missing.
-        </p>
-      )}
-      {checkout.shared && (
-        <p className={styles.note}>
-          Another agent was working here too, so some of this may not be this
-          turn's.
-        </p>
-      )}
+      {checkout.late && <p className={styles.note}>{t("v1wf.cs.late")}</p>}
+      {checkout.shared && <p className={styles.note}>{t("v1wf.cs.shared")}</p>}
       {error && (
         <div role="alert" className={styles.note}>
-          <p>Couldn't read this changeset. {error}</p>
+          <p>{t("v1wf.cs.readFailed", { error })}</p>
           {retry && (
             <Button size="sm" variant="ghost" onClick={retry}>
-              Try again
+              {t("v1wf.cs.tryAgain")}
             </Button>
           )}
         </div>
       )}
       {shown && (
-        <ul className={styles.files} aria-label="Changed files">
+        <ul className={styles.files} aria-label={t("v1wf.cs.changedFiles")}>
           {shown.map((file) => (
             <li key={file.path}>
               <NavigationItem
@@ -120,7 +112,9 @@ function ChangesetCard({
                 title={file.from ? `${file.from} → ${file.path}` : file.path}
                 disabled={!opens}
                 onClick={() => open(targetFor(turn.id, index, file.path))}
-                trailing={file.binary ? "binary" : <Counts {...file} />}
+                trailing={
+                  file.binary ? t("v1wf.cs.binary") : <Counts {...file} />
+                }
               />
             </li>
           ))}
@@ -128,7 +122,9 @@ function ChangesetCard({
       )}
       {files && files.length > FIRST && (
         <Button size="sm" variant="ghost" onClick={() => setAll(!all)}>
-          {all ? "Show fewer" : `Show all ${files.length} files`}
+          {all
+            ? t("v1wf.cs.showFewer")
+            : t("v1wf.cs.showAll", { count: files.length })}
         </Button>
       )}
     </section>

@@ -23,6 +23,7 @@ import { AttentionEmptyState } from "./AttentionEmptyState";
 import { createWatchComponents } from "./WatchRow";
 export { heading, describe } from "./presentation";
 import "./AttentionPage.css";
+import { t, useLanguage } from "../../shared/i18n";
 
 const button = { variant: "ghost" as const, size: "sm" as const };
 /** The watches of an Interest that this app skipped, such as ones over the
@@ -132,12 +133,12 @@ export function createAttentionComponents({
         <div className="attention-actions">
           <AttentionStatus
             name={label}
-            heading="Interest"
+            heading={t("v1wf.watch.interest")}
             triggerRef={trigger}
             popupRef={popup}
             deleteConfirms={hasWatches}
             returnFocus={returnFocus}
-            label={`Interest status for ${label}`}
+            label={t("v1wf.watch.interestStatusFor", { label })}
             active={
               agent.attention[slug]?.value.type === "interest" &&
               agent.attention[slug]?.value.paused !== true
@@ -148,7 +149,7 @@ export function createAttentionComponents({
                 const expected = agent.attention[slug];
                 const value = expected?.value;
                 if (!expected || value?.type !== "interest")
-                  throw new Error("This interest no longer exists.");
+                  throw new Error(t("v1wf.watch.interestGone"));
                 await agents.save(agent.key, {
                   attentionExpected: { [slug]: expected },
                   attention: { [slug]: { ...value, paused: !active } },
@@ -160,8 +161,8 @@ export function createAttentionComponents({
         </div>
         {confirming && (
           <AlertDialog
-            title={`Delete ${label}?`}
-            description="This deletes the interest and all its watches. The agent will stop watching for these triggers. This cannot be undone."
+            title={t("v1wf.watch.deleteNamed", { label })}
+            description={t("v1wf.watch.deleteInterestDescription")}
             pending={action.pending}
             initialFocus={cancel}
             finalFocus={() =>
@@ -177,14 +178,14 @@ export function createAttentionComponents({
                   disabled={action.pending}
                   onClick={() => setConfirming(false)}
                 >
-                  Cancel
+                  {t("v1wf.watch.cancel")}
                 </Button>
                 <Button
                   variant="destructive"
                   loading={action.pending}
                   onClick={() => void remove()}
                 >
-                  Delete
+                  {t("v1wf.watch.delete")}
                 </Button>
               </>
             }
@@ -245,7 +246,7 @@ export function createAttentionComponents({
     const instructions =
       interest?.type === "interest"
         ? interest.instructions
-        : "No instructions saved.";
+        : t("v1wf.watch.noInstructions");
     const firstLine =
       instructions.split("\n").find((line) => line.trim()) || "";
     const label =
@@ -255,7 +256,7 @@ export function createAttentionComponents({
       <SettingsGroup layout="cards">
         <section
           className="attention-interest"
-          aria-label={`Interest ${label}`}
+          aria-label={t("v1wf.watch.interestNamed", { label })}
         >
           <div className="attention-interest-head">
             <h4 className="text-label">{label}</h4>
@@ -276,23 +277,26 @@ export function createAttentionComponents({
           )}
           {subscriptions.length > 0 && (
             <div className="attention-column-headings text-caption text-subtle">
-              <h5 className="text-caption">Triggers</h5>
-              <span>Sources</span>
-              <span>Responds in</span>
-              <span>{"Status"}</span>
+              <h5 className="text-caption">{t("v1wf.watch.triggers")}</h5>
+              <span>{t("v1wf.watch.sources")}</span>
+              <span>{t("v1wf.watch.respondsIn")}</span>
+              <span>{t("v1wf.watch.status")}</span>
             </div>
           )}
           {!subscriptions.length && (
             <h5 className="attention-section-label text-caption text-subtle">
-              Triggers
+              {t("v1wf.watch.triggers")}
             </h5>
           )}
           {!subscriptions.length && (
             <p className="text-body-sm text-subtle">
-              {"No watches yet, so nothing wakes this interest."}
+              {t("v1wf.watch.noWatches")}
             </p>
           )}
-          <ul className="attention-list" aria-label={`${label} watches`}>
+          <ul
+            className="attention-list"
+            aria-label={t("v1wf.watch.watchesOf", { label })}
+          >
             {subscriptions.map((object) => (
               <Subscription
                 key={object.slug}
@@ -308,7 +312,7 @@ export function createAttentionComponents({
             ))}
           </ul>
           <h5 className="attention-section-label text-caption text-subtle">
-            Instructions
+            {t("v1wf.watch.instructions")}
           </h5>
           <Instructions instructions={instructions} />
         </section>
@@ -330,7 +334,8 @@ export function createAttentionComponents({
   }) {
     const action = useAction();
     const find = (id: string) => channels.find((channel) => channel.id === id);
-    const name = (id: string) => find(id)?.name ?? `Channel ${id.slice(0, 8)}`;
+    const name = (id: string) =>
+      find(id)?.name ?? t("v1wf.watch.channelFallback", { id: id.slice(0, 8) });
     const { interests, watches, orphans } = attentionOf(agent.attention);
     const skipped = Object.values(agent.skipped ?? {});
     const empty =
@@ -343,14 +348,14 @@ export function createAttentionComponents({
         <SettingsGroup layout="cards">
           <section
             className="attention-setting"
-            aria-label="Attention settings"
+            aria-label={t("v1wf.watch.settings")}
           >
             {!empty && (
               <AttentionSonar name={agent.name} picture={agent.picture} />
             )}
             <PreferenceRow
-              title="Attention"
-              subtitle={`Let ${agent.name} watch for updates and check in on a schedule. Runs while Buzz is open on this device.`}
+              title={t("v1wf.watch.attention")}
+              subtitle={t("v1wf.watch.settingsSubtitle", { name: agent.name })}
             />
           </section>
         </SettingsGroup>
@@ -370,7 +375,9 @@ export function createAttentionComponents({
                   }),
                 )
               }
-            >{`Remove unreadable ${object.slug}`}</Button>
+            >
+              {t("v1wf.watch.removeUnreadable", { slug: object.slug })}
+            </Button>
           </section>
         ))}
         {interests.map((object) => (
@@ -391,12 +398,13 @@ export function createAttentionComponents({
           />
         ))}
         {orphans.length > 0 && (
-          <section className="attention-interest" aria-label="Stray watches">
-            <h4 className="text-label">{"Stray watches"}</h4>
+          <section
+            className="attention-interest"
+            aria-label={t("v1wf.watch.stray")}
+          >
+            <h4 className="text-label">{t("v1wf.watch.stray")}</h4>
             <p className="text-body-sm text-subtle">
-              {
-                "These saved watches have no matching Interest. Remove them and create watches under an Interest."
-              }
+              {t("v1wf.watch.strayDescription")}
             </p>
             {orphans.map((object) => (
               <div key={object.slug} className="attention-agent-head">
@@ -412,7 +420,9 @@ export function createAttentionComponents({
                       }),
                     )
                   }
-                >{`Delete ${object.slug}`}</Button>
+                >
+                  {t("v1wf.watch.deleteSlug", { slug: object.slug })}
+                </Button>
               </div>
             ))}
           </section>
@@ -432,6 +442,7 @@ export function createAttentionComponents({
     open?: ((target: string) => boolean) | undefined;
     canOpen?: ((target: string) => boolean) | undefined;
   }) {
+    useLanguage();
     const page = React.useRef<HTMLElement>(null);
     const snapshot = React.useSyncExternalStore(
       agents.subscribe,
@@ -469,7 +480,7 @@ export function createAttentionComponents({
       <section
         data-buzz-ui=""
         className="attention-page"
-        aria-label="Attention"
+        aria-label={t("v1wf.watch.attention")}
         ref={page}
         tabIndex={-1}
       >
@@ -481,9 +492,7 @@ export function createAttentionComponents({
               ({ value }) => value.type === "event" && value.classifier,
             ) && (
               <p className="text-body-sm text-secondary">
-                {
-                  "This device can't run message filters, so every message in these channels wakes the agent."
-                }
+                {t("v1wf.watch.noClassifier")}
               </p>
             )}
           {agent && here ? (
@@ -502,12 +511,12 @@ export function createAttentionComponents({
               role={snapshot.status === "loading" ? "status" : undefined}
             >
               {!connection.scope
-                ? "Choose a community to manage this agent's watches."
+                ? t("v1wf.watch.chooseCommunity")
                 : snapshot.status === "loading"
-                  ? "Loading watches…"
+                  ? t("v1wf.watch.loading")
                   : agent
-                    ? "This agent belongs to another community. Switch to it to manage its watches."
-                    : "This agent isn't running on this device."}
+                    ? t("v1wf.watch.otherCommunity")
+                    : t("v1wf.watch.notRunning")}
             </p>
           )}
         </div>

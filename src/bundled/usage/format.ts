@@ -1,4 +1,5 @@
 import type { Total } from "./stats";
+import { t } from "../../shared/i18n";
 
 const compact = new Intl.NumberFormat("en-US", {
   notation: "compact",
@@ -14,15 +15,19 @@ export const cost = (usd: number) =>
   usd > 0 && usd < 0.005 ? "<$0.01" : dollars.format(usd);
 export const percent = (share: number) => `${Math.round(share * 100)}%`;
 /** A count in compact form, e.g. 12.4M, with `noun` pluralized. */
-export function count(value: number, noun?: string) {
+export function count(value: number, noun?: "session" | "agent") {
   const number = compact.format(value);
-  return noun ? `${number} ${noun}${value === 1 ? "" : "s"}` : number;
+  if (!noun) return number;
+  const plural = value === 1 ? "one" : "other";
+  return t(`v1wf.usage.${noun}.${plural}`, { count: number });
 }
 /** A cost total as text: `Unavailable` when unknown, marked when partial. */
 export const costText = (total: Total) =>
   total.value === undefined
-    ? "Unavailable"
-    : `${cost(total.value)}${total.partial ? " · partial" : ""}`;
+    ? t("v1wf.usage.unavailable")
+    : total.partial
+      ? t("v1wf.usage.partialSuffix", { text: cost(total.value) })
+      : cost(total.value);
 /** A total's known value in `format`; `Unavailable` when none was known. */
 export const amount = (total: Total, format: (value: number) => string) =>
-  total.value === undefined ? "Unavailable" : format(total.value);
+  total.value === undefined ? t("v1wf.usage.unavailable") : format(total.value);

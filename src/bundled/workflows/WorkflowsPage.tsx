@@ -1,3 +1,11 @@
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  errorMessage,
+  localError,
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import {
   useCallback,
   useEffect,
@@ -37,6 +45,7 @@ import { usePanelSplit } from "../../features/panels/usePanelSplit";
 import "./workflows.css";
 
 export function WorkflowsPage({ relay }: { relay: RelayData }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   return connection.status === "ready" ? (
     <WorkflowCommunity
@@ -50,13 +59,15 @@ export function WorkflowsPage({ relay }: { relay: RelayData }) {
       <div className="workflow-page-state">
         <p>
           {connection.status === "connecting"
-            ? "Connecting to your community…"
-            : "Connect to a community to browse workflows."}
+            ? t("workflowsList.connecting")
+            : t("workflowsList.connect")}
         </p>
         {connection.status === "error" && (
           <>
             <p role="alert">{connection.error}</p>
-            <Button onClick={() => relay.tryAgain()}>Retry connection</Button>
+            <Button onClick={() => relay.tryAgain()}>
+              {t("workflowsList.retryConnection")}
+            </Button>
           </>
         )}
       </div>
@@ -65,8 +76,9 @@ export function WorkflowsPage({ relay }: { relay: RelayData }) {
 }
 
 function WorkflowsPanel({ children }: { children: ReactNode }) {
+  useLanguage();
   return (
-    <Panel aria-label="Workflows">
+    <Panel aria-label={t("workflowsList.workflows")}>
       <div className="workflows-page text-body">{children}</div>
     </Panel>
   );
@@ -78,6 +90,7 @@ export function WorkflowCommunity({
   session: RelaySession;
   viewer: string;
 }) {
+  useLanguage();
   const capability = session.workflows;
   const channels = useChannelList(session.channels);
   const eligible = channels.channels.filter(
@@ -94,22 +107,39 @@ export function WorkflowCommunity({
   const [saveReadback, setSaveReadback] =
     useState<Pick<WorkflowDefinition, "channelId" | "revision">>();
   const deleting = useRef(false);
-  const [deleteError, setDeleteError] = useState<string>();
+  const [deleteError, setDeleteError] = useState<DisplayMessage>();
   const [createOpen, setCreateOpen] = useState(false);
   const [filter, setFilter] = useState<readonly string[]>([]);
   const split = usePanelSplit(session.scope, "workflows", 448, 320);
-  const [detail, setDetail] = useState<{ key: string; name: string }>();
+  const [detail, setDetail] = useState<{
+    key: string;
+    name: string;
+    unnamed?: boolean;
+  }>();
   const [detailTarget, setDetailTarget] = useState<HTMLElement | null>(null);
   const mainRef = useRef<HTMLDivElement>(null);
-  const selectDetail = useCallback((key: string | undefined, name?: string) => {
-    setDetail((current) =>
-      !key
-        ? undefined
-        : current?.key === key && (name === undefined || current.name === name)
-          ? current
-          : { key, name: name ?? (current?.key === key ? current.name : "") },
-    );
-  }, []);
+  const selectDetail = useCallback(
+    (key: string | undefined, name?: string, unnamed?: boolean) => {
+      setDetail((current) =>
+        !key
+          ? undefined
+          : current?.key === key &&
+              (name === undefined ||
+                (current.name === name && current.unnamed === unnamed))
+            ? current
+            : {
+                key,
+                name: name ?? (current?.key === key ? current.name : ""),
+                ...(unnamed !== undefined
+                  ? { unnamed }
+                  : current?.key === key && current.unnamed !== undefined
+                    ? { unnamed: current.unnamed }
+                    : {}),
+              },
+      );
+    },
+    [],
+  );
   // The landing that reconciles the selection unmounts without channels.
   if (detail && !eligible.length) setDetail(undefined);
   const open = !!detail;
@@ -149,9 +179,7 @@ export function WorkflowCommunity({
       <WorkflowsPanel>
         <WorkflowPageHeader />
         <div className="workflows-body">
-          <p role="status">
-            Workflow operations are unavailable from this host.
-          </p>
+          <p role="status">{t("workflowsList.operationsUnavailable")}</p>
         </div>
       </WorkflowsPanel>
     );
@@ -177,27 +205,23 @@ export function WorkflowCommunity({
       definition,
     );
     if (locked) {
-      setDeleteError(
-        "Another workflow change is still being confirmed. Refresh and try again.",
-      );
+      setDeleteError(localMessage("workflowsList.changePending"));
       openChannel("");
       return;
     }
     deleting.current = true;
     try {
       if (!capability.permissions.canDelete(definition))
-        throw new Error(
-          "You no longer have permission to delete this workflow. Refresh and try again.",
-        );
+        throw localError("workflowsList.permissionLost");
       if (!capability.availability.delete)
-        throw new Error("Workflow deletion is unavailable on this connection.");
+        throw localError("workflowsList.deletionUnavailable");
       capability.delete(definition);
       setDeleteError(undefined);
     } catch (cause) {
       setDeleteError(
         cause instanceof Error
-          ? cause.message
-          : "Try again from the workflow menu.",
+          ? errorMessage(cause)
+          : localMessage("workflowsList.deleteFallback"),
       );
     } finally {
       deleting.current = false;
@@ -222,8 +246,8 @@ export function WorkflowCommunity({
                     hint="familiar"
                     size="sm"
                     variant="ghost"
-                    aria-label="New workflow"
-                    title="New workflow"
+                    aria-label={t("workflowsList.newWorkflow")}
+                    title={t("workflowsList.newWorkflow")}
                     aria-haspopup="dialog"
                     disabled={!beginCreate}
                     icon={<PlusIcon size="1rem" aria-hidden="true" />}
@@ -233,8 +257,8 @@ export function WorkflowCommunity({
                     hint="familiar"
                     size="sm"
                     variant="ghost"
-                    aria-label="Refresh workflows"
-                    title="Refresh workflows"
+                    aria-label={t("workflowsList.refreshWorkflows")}
+                    title={t("workflowsList.refreshWorkflows")}
                     icon={
                       <ArrowsClockwiseIcon size="1rem" aria-hidden="true" />
                     }
@@ -245,25 +269,27 @@ export function WorkflowCommunity({
             />
             <div className="workflows-body">
               {channels.status === "loading" && !eligible.length && (
-                <p role="status">Reading channels…</p>
+                <p role="status">{t("workflowsList.readingChannels")}</p>
               )}
               {channels.status === "error" && (
                 <div className="workflow-page-state">
                   <p role="alert" className="text-danger">
-                    {channels.error ?? "Channels could not be read."}
+                    {channels.error ?? t("workflowsList.channelsError")}
                   </p>
                   <Button onClick={() => session.channels.refreshList?.()}>
-                    Retry channels
+                    {t("workflowsList.retryChannels")}
                   </Button>
                 </div>
               )}
               {channels.status === "ready" && !eligible.length && (
                 <div className="workflow-page-state">
-                  <p>No channels are available in this community.</p>
+                  <p>{t("workflowsList.noChannels")}</p>
                 </div>
               )}
               {channels.coverage === "partial" && (
-                <p className="text-secondary">The channel list is partial.</p>
+                <p className="text-secondary">
+                  {t("workflowsList.partialChannels")}
+                </p>
               )}
               {eligible.length > 0 && (
                 <WorkflowLanding
@@ -291,7 +317,7 @@ export function WorkflowCommunity({
         {detail && (
           <aside className="workflows-side">
             {split.handle}
-            <Panel aria-label="Workflow details">
+            <Panel aria-label={t("workflowsList.details")}>
               <PanelWorkspace
                 focusOnMount={false}
                 adoptSelection={detail.key}
@@ -300,13 +326,19 @@ export function WorkflowCommunity({
                 items={[
                   {
                     id: detail.key,
-                    label: detail.name,
+                    label: detail.unnamed
+                      ? t("workflowsList.unnamed")
+                      : detail.name,
                     icon: <LightningIcon size="1rem" />,
                     content: (
                       <section
                         className="workflow-detail-host"
                         ref={setDetailTarget}
-                        aria-label={`${detail.name} details`}
+                        aria-label={t("workflowsList.detailNamed", {
+                          name: detail.unnamed
+                            ? t("workflowsList.unnamed")
+                            : detail.name,
+                        })}
                         tabIndex={-1}
                       />
                     ),
@@ -320,8 +352,8 @@ export function WorkflowCommunity({
       </div>
       {deleteError && (
         <ToastNotice
-          title="Couldn't start deletion"
-          description={deleteError}
+          title={t("workflowsList.deleteStartError")}
+          description={resolveMessage(deleteError)}
           onDismiss={() => setDeleteError(undefined)}
         />
       )}
@@ -374,11 +406,12 @@ export function WorkflowCommunity({
 }
 
 function WorkflowPageHeader({ actions }: { actions?: ReactNode }) {
+  useLanguage();
   return (
     <PanelHeader
       title={
         <PanelHeaderLabel
-          title="Workflows"
+          title={t("workflowsList.workflows")}
           icon={<LightningIcon size="1rem" />}
         />
       }
