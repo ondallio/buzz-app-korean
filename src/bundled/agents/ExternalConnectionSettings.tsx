@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   type ExternalApps,
@@ -17,6 +18,7 @@ export function ExternalConnectionSettings({
 }: {
   connection: ExternalApps;
 }) {
+  useLanguage();
   const state = useSyncExternalStore(connection.subscribe, connection.snapshot);
   // Takes focus when the Revoke button has gone but the row remains, which
   // happens when the app exits while the confirmation is open.
@@ -61,31 +63,28 @@ export function ExternalConnectionSettings({
     <section ref={section} tabIndex={-1} aria-labelledby="external-apps-title">
       <Header
         id="external-apps-title"
-        title="External apps"
-        subtitle="Apps you authorize can use Buzz through this copy of the app."
+        title={t("v1agent.external.title")}
+        subtitle={t("v1agent.external.subtitle")}
       />
       <SettingsGroup layout="form">
         <p className="m-0 text-body-sm text-secondary">
-          Start setup in the external app. Buzz asks you to select an agent and
-          authorize access. Apps can renew valid approval for another 30 days.
-          Approval expires after 30 days without renewal. Apps can restore valid
-          access after a restart. Keys stay in Buzz. Keep Buzz open.
+          {t("v1agent.external.intro")}
         </p>
         {grant ? (
           <PreferenceRow
             title={grant.client}
             subtitle={
               state.pairing && !fullAgentAccess(state.pairing.approval.scopes)
-                ? "This older approval gives limited access, which no longer works. Update the app and start setup again to approve full agent access."
+                ? t("v1agent.external.limited")
                 : grant.phase === "connected"
-                  ? "Connected"
+                  ? t("v1agent.external.connected")
                   : grant.phase === "waiting"
-                    ? "Authorized. Waiting for the app to connect."
+                    ? t("v1agent.external.waiting")
                     : grant.phase === "starting"
-                      ? "Authorizing…"
+                      ? t("v1agent.external.authorizing")
                       : state.pairing
-                        ? "Approved. The app can restore this connection."
-                        : "Connection ended. Start setup again in the external app."
+                        ? t("v1agent.external.approved")
+                        : t("v1agent.external.ended")
             }
             trailing={
               state.pairing || grant.phase !== "ended" ? (
@@ -102,7 +101,7 @@ export function ExternalConnectionSettings({
                     });
                   }}
                 >
-                  Revoke access
+                  {t("v1agent.external.revoke")}
                 </Button>
               ) : undefined
             }
@@ -115,18 +114,20 @@ export function ExternalConnectionSettings({
             role="status"
             className="m-0 text-body-sm text-secondary"
           >
-            No external app has access.
+            {t("v1agent.external.none")}
           </p>
         )}
         {!confirming && error}
       </SettingsGroup>
       {confirming && (
         <AlertDialog
-          title={`Revoke access for ${confirming.client}?`}
+          title={t("v1agent.external.revokeTitle", {
+            client: confirming.client,
+          })}
           description={
             confirming.live
-              ? "This ends the connection now. The app must ask for access again before it can use Buzz."
-              : "This removes the saved approval. The app must ask for access again before it can use Buzz."
+              ? t("v1agent.external.revokeLive")
+              : t("v1agent.external.revokeSaved")
           }
           pending={revoking}
           initialFocus={cancel}
@@ -143,14 +144,14 @@ export function ExternalConnectionSettings({
                 disabled={revoking}
                 onClick={() => setConfirming(undefined)}
               >
-                Cancel
+                {t("channelForms.cancel")}
               </Button>
               <Button
                 variant="destructive"
                 loading={revoking}
                 onClick={() => void revoke()}
               >
-                Revoke access
+                {t("v1agent.external.revoke")}
               </Button>
             </>
           }

@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   Fragment,
   createContext,
@@ -80,13 +81,17 @@ const ICONS: Record<string, typeof WrenchIcon> = {
   fetch: GlobeIcon,
   think: BulbIcon,
 };
-const STATUS: Record<string, string> = {
-  pending: "Pending",
-  in_progress: "Running",
-  failed: "Failed",
-  terminated: "Terminated",
-  yielded: "Yielded",
-};
+const STATUS = {
+  pending: "v1agent.transcript.toolPending",
+  in_progress: "v1agent.transcript.toolRunning",
+  failed: "v1agent.transcript.toolFailed",
+  terminated: "v1agent.transcript.toolTerminated",
+  yielded: "v1agent.transcript.toolYielded",
+} as const;
+const statusLabel = (status: string) =>
+  Object.hasOwn(STATUS, status)
+    ? t(STATUS[status as keyof typeof STATUS])
+    : undefined;
 const line = (text: string) => text.split("\n").find(Boolean)?.trim() ?? "";
 const time = (at: number) => formatTime(at / 1000);
 /** Zero, non-finite and out-of-range times are unknown: show nothing rather
@@ -124,11 +129,18 @@ function Stamp({ item }: { item: TranscriptItem }) {
   );
 }
 export function duration(ms: number) {
-  if (ms < 60_000) return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`;
+  if (ms < 60_000)
+    return t("v1agent.transcript.seconds", {
+      seconds: (ms / 1000).toFixed(ms < 10_000 ? 1 : 0),
+    });
   const minutes = Math.floor(ms / 60_000);
-  return `${minutes}m ${Math.floor((ms % 60_000) / 1000)}s`;
+  return t("v1agent.transcript.minutesSeconds", {
+    minutes: String(minutes),
+    seconds: String(Math.floor((ms % 60_000) / 1000)),
+  });
 }
-const toolName = (item: ToolItem) => line(item.title) || "tool";
+const toolName = (item: ToolItem) =>
+  line(item.title) || t("v1agent.transcript.tool");
 const ACTIONS: Record<string, string> = {
   execute: "Run",
   read: "Read",
@@ -139,12 +151,25 @@ const ACTIONS: Record<string, string> = {
   fetch: "Fetch",
   think: "Think",
 };
+const ACTION_LABELS = {
+  execute: "v1agent.transcript.actionRun",
+  read: "v1agent.transcript.actionRead",
+  edit: "v1agent.transcript.actionEdit",
+  delete: "v1agent.transcript.actionDelete",
+  move: "v1agent.transcript.actionMove",
+  search: "v1agent.transcript.actionSearch",
+  fetch: "v1agent.transcript.actionFetch",
+  think: "v1agent.transcript.actionThink",
+} as const;
 function toolLabel(item: ToolItem) {
   const title = toolName(item);
   const action = ACTIONS[item.kind];
   if (!action) return { action: title, detail: "" };
   const prefix = new RegExp(`^${action}(?:\\s+|$)`, "i");
-  return { action, detail: title.replace(prefix, "") };
+  const label = Object.hasOwn(ACTION_LABELS, item.kind)
+    ? t(ACTION_LABELS[item.kind as keyof typeof ACTION_LABELS])
+    : action;
+  return { action: label, detail: title.replace(prefix, "") };
 }
 
 /** The first location, unless the adapter's title already names it. */
@@ -209,6 +234,7 @@ export function ActivityTranscript({
   agentKey?: string;
   community?: string | undefined;
 }) {
+  useLanguage();
   const timeline = useFollowLatest(transcript, follow);
   const agents = useContext(AgentsContext);
   const relay = useSyncExternalStore(
@@ -236,7 +262,7 @@ export function ActivityTranscript({
           {before}
           {!transcript.turns.length && (
             <p className="text-body text-secondary">
-              No turns captured for this scope yet.
+              {t("v1agent.transcript.noTurns")}
             </p>
           )}
           {transcript.turns.map((turn) => (
@@ -244,8 +270,8 @@ export function ActivityTranscript({
               {(turn.newSession || turn.continued) && (
                 <p className={`text-body ${styles.session}`}>
                   {turn.newSession
-                    ? "New session"
-                    : "Session continued; earlier turns not shown"}
+                    ? t("v1agent.transcript.newSession")
+                    : t("v1agent.transcript.continued")}
                 </p>
               )}
               <Turn
@@ -276,29 +302,41 @@ function Turn({
   openConversation?: AgentViewProps["openConversation"];
 }) {
   useClockFormat();
+  useLanguage();
   const { channelId, threadRootId } = turn;
   const openPlace =
     openConversation && channelId && threadRootId !== undefined
       ? () => openConversation(channelId, threadRootId ?? undefined)
       : undefined;
-  const status =
+  const outcome =
     turn.error || turn.outcome === "error"
-      ? "Failed"
-      : turn.outcome === "stopped"
-        ? "Stopped"
-        : turn.outcome === "unknown"
-          ? "Status unknown"
-          : turn.outcome === "ended"
-            ? "Completed"
-            : state === "working"
-              ? "Working"
-              : turn.endedAt
-                ? "Completed"
-                : "Status unknown";
-  const tone =
-    status === "Failed"
       ? "failed"
-      : status === "Completed"
+      : turn.outcome === "stopped"
+        ? "stopped"
+        : turn.outcome === "unknown"
+          ? "unknown"
+          : turn.outcome === "ended"
+            ? "completed"
+            : state === "working"
+              ? "working"
+              : turn.endedAt
+                ? "completed"
+                : "unknown";
+  const status = t(
+    outcome === "failed"
+      ? "v1agent.transcript.failed"
+      : outcome === "stopped"
+        ? "v1agent.transcript.stopped"
+        : outcome === "completed"
+          ? "v1agent.transcript.completed"
+          : outcome === "working"
+            ? "v1agent.transcript.working"
+            : "v1agent.transcript.statusUnknown",
+  );
+  const tone =
+    outcome === "failed"
+      ? "failed"
+      : outcome === "completed"
         ? "completed"
         : "unknown";
   const StatusIcon =
@@ -311,7 +349,9 @@ function Turn({
     <article
       className={styles.turn}
       aria-label={
-        known(turn.startedAt) ? `Turn ${time(turn.startedAt)}` : "Turn"
+        known(turn.startedAt)
+          ? t("v1agent.transcript.turnAt", { time: time(turn.startedAt) })
+          : t("v1agent.transcript.turn")
       }
     >
       {state !== "working" && (
@@ -340,17 +380,19 @@ function Turn({
               onClick={openPlace}
             >
               {turn.threadRootId
-                ? `Thread ${turn.threadRootId.slice(0, 8)}`
-                : "Channel"}
+                ? t("v1agent.transcript.thread", {
+                    id: turn.threadRootId.slice(0, 8),
+                  })
+                : t("v1agent.transcript.channel")}
             </button>
           ) : (
-            "Conversation unknown"
+            t("v1agent.transcript.conversationUnknown")
           )}
         </div>
       )}
       {turn.partial && (
         <p className="text-body text-secondary">
-          The start of this turn isn't loaded.
+          {t("v1agent.transcript.partial")}
         </p>
       )}
       {turn.items.map((item) => (
@@ -381,7 +423,7 @@ function WorkingLabel() {
       <span className={`${styles.workingIcon} text-accent`}>
         <TypingDots size="small" />
       </span>
-      <ShimmerText>Working</ShimmerText>
+      <ShimmerText>{t("v1agent.transcript.working")}</ShimmerText>
     </>
   );
 }
@@ -517,9 +559,14 @@ function Item({
   const avatarSource = useContext(AgentAvatarSource);
   switch (item.type) {
     case "system":
-      return <Sections title="System prompt" sections={item.sections} />;
+      return (
+        <Sections
+          title={t("v1agent.transcript.systemPrompt")}
+          sections={item.sections}
+        />
+      );
     case "prompt": {
-      const name = item.author || "Request";
+      const name = item.author || t("v1agent.transcript.request");
       return (
         <Disclosure
           item={item}
@@ -528,18 +575,22 @@ function Item({
           preview={line(item.text)}
         >
           <p className={styles.text}>
-            {item.steer && <em>(steer) </em>}
+            {item.steer && <em>{t("v1agent.transcript.steer")} </em>}
             {item.text}
           </p>
           {item.sections.length > 1 && (
-            <Sections title="Prompt context" sections={item.sections} />
+            <Sections
+              title={t("v1agent.transcript.promptContext")}
+              sections={item.sections}
+            />
           )}
         </Disclosure>
       );
     }
     case "thought": {
       const heading =
-        line(item.text).replace(/^#{1,6}\s+|^\*\*|\*\*$/g, "") || "Thinking";
+        line(item.text).replace(/^#{1,6}\s+|^\*\*|\*\*$/g, "") ||
+        t("v1agent.transcript.thinking");
       const body = item.text
         .trimStart()
         .split("\n")
@@ -549,7 +600,9 @@ function Item({
       return (
         <Disclosure
           item={item}
-          icon={<BulbIcon size={16} aria-label="Thought" />}
+          icon={
+            <BulbIcon size={16} aria-label={t("v1agent.transcript.thought")} />
+          }
           label={<span className={styles.subject}>{heading}</span>}
         >
           {body && <Reply text={body} />}
@@ -595,10 +648,16 @@ function Item({
         <Disclosure
           item={item}
           icon={<ListChecksIcon size={16} aria-hidden="true" />}
-          label={<span className={styles.subject}>Plan</span>}
-          preview={`${item.entries.length} steps`}
+          label={
+            <span className={styles.subject}>
+              {t("v1agent.transcript.plan")}
+            </span>
+          }
+          preview={t("v1agent.transcript.steps", {
+            count: item.entries.length,
+          })}
         >
-          <ul className={styles.plan} aria-label="Plan">
+          <ul className={styles.plan} aria-label={t("v1agent.transcript.plan")}>
             {item.entries.map((entry, index) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: plan entries are positional and carry no row state.
               <li key={index} data-status={entry.status}>
@@ -674,7 +733,12 @@ function Diff({ diff }: { diff: ToolDiff }) {
   return (
     <figure className={styles.diff}>
       <figcaption className="text-body text-secondary">
-        {diff.oldText === undefined ? "New file" : "Changed"} {diff.path}
+        {t(
+          diff.oldText === undefined
+            ? "v1agent.transcript.newFile"
+            : "v1agent.transcript.changedFile",
+          { path: diff.path },
+        )}
       </figcaption>
       <pre className={styles.pre}>
         {removed.map((text, index) => (
@@ -712,7 +776,7 @@ function ToolInput({ text }: { text: string }) {
 
 function Tool({ item, agentName }: { item: ToolItem; agentName: string }) {
   const Icon = ICONS[item.kind] ?? WrenchIcon;
-  const status = STATUS[item.status];
+  const status = statusLabel(item.status);
   const path = toolPath(item);
   const label = toolLabel(item);
   const failedChildren =
@@ -731,8 +795,13 @@ function Tool({ item, agentName }: { item: ToolItem; agentName: string }) {
           {failedChildren > 0 && (
             <span className={styles.error}>
               {" "}
-              · {failedChildren} failed{" "}
-              {failedChildren === 1 ? "call" : "calls"}
+              ·{" "}
+              {t(
+                failedChildren === 1
+                  ? "v1agent.transcript.failedCall"
+                  : "v1agent.transcript.failedCalls",
+                { count: failedChildren },
+              )}
             </span>
           )}
           {path && <span className={`text-body ${styles.path}`}> {path}</span>}
@@ -742,17 +811,20 @@ function Tool({ item, agentName }: { item: ToolItem; agentName: string }) {
         item.permission && (
           <span
             className={`text-body text-secondary ${styles.badge}`}
-            title={`Permission options: ${item.permission.options.join(", ")}`}
+            title={t("v1agent.transcript.permissionOptions", {
+              options: item.permission.options.join(", "),
+            })}
           >
             <ShieldIcon size={14} aria-hidden="true" />
-            {item.permission.outcome ?? "Permission requested"}
+            {item.permission.outcome ??
+              t("v1agent.transcript.permissionRequested")}
           </span>
         )
       }
       footer={
         item.truncated && (
           <p className="text-body text-secondary">
-            Part of this tool call was too large and was elided by the agent.
+            {t("v1agent.transcript.truncated")}
           </p>
         )
       }
@@ -763,7 +835,7 @@ function Tool({ item, agentName }: { item: ToolItem; agentName: string }) {
       {item.input && (
         <section className={styles.codePanel}>
           <h3 className={`text-body text-secondary ${styles.codePanelHeading}`}>
-            Input
+            {t("v1agent.transcript.input")}
           </h3>
           <ToolInput text={item.input} />
         </section>
@@ -775,7 +847,7 @@ function Tool({ item, agentName }: { item: ToolItem; agentName: string }) {
       {item.output && (
         <section className={styles.codePanel}>
           <h3 className={`text-body text-secondary ${styles.codePanelHeading}`}>
-            Output
+            {t("v1agent.transcript.output")}
           </h3>
           <pre className={styles.pre}>{item.output}</pre>
         </section>
@@ -783,7 +855,7 @@ function Tool({ item, agentName }: { item: ToolItem; agentName: string }) {
       {item.children?.length ? (
         <div className={styles.section}>
           <p className="text-body text-secondary">
-            Calls recorded during this script
+            {t("v1agent.transcript.childCalls")}
           </p>
           {item.children.map((child) => (
             <Entry key={child.id} item={child} agentName={agentName} />

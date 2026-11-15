@@ -1,3 +1,5 @@
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
 // Browse: the agents this community's members have shared, each importable
 // as a new agent. The catalog is read a page at a time; an over-budget page is
 // retried smaller.
@@ -88,9 +90,9 @@ export function AgentBrowse({
   relay,
   ...selection
 }: Selection & { relay: RelayData }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
-  if (connection.status !== "ready")
-    return <p>Connect to a community to browse shared agents.</p>;
+  if (connection.status !== "ready") return <p>{t("agentsBrowse.connect")}</p>;
   // A new session (another community) starts over from the first page.
   return (
     <SharedAgentList
@@ -111,6 +113,7 @@ function SharedAgentList({
   session: RelaySession;
   community: string | undefined;
 }) {
+  useLanguage();
   const [events, setEvents] = useState<readonly EventData[]>([]);
   const [cursor, setCursor] = useState<{ until: number; before_id: string }>();
   const [more, setMore] = useState(false);
@@ -181,17 +184,17 @@ function SharedAgentList({
   }, [present, selectedId]);
   return (
     <div className="flex flex-col gap-section-gap">
-      {loading && <p role="status">Loading shared agents…</p>}
+      {loading && <p role="status">{t("agentsBrowse.loadingShared")}</p>}
       {error && (
         <div role="alert">
-          <p>Couldn’t load shared agents.</p>
+          <p>{t("agentsBrowse.loadSharedFailed")}</p>
           <Button onClick={() => setAttempt((value) => value + 1)}>
-            Try again
+            {t("agentsBrowse.tryAgain")}
           </Button>
         </div>
       )}
       {!loading && !error && !agents.length && (
-        <p>No shared agents found in this community yet.</p>
+        <p>{t("agentsBrowse.noShared")}</p>
       )}
       <div ref={grid} className={cardStyles.grid}>
         {agents.map((agent) => (
@@ -223,7 +226,7 @@ function SharedAgentList({
             if (last) setCursor({ until: last.created_at, before_id: last.id });
           }}
         >
-          Load more
+          {t("agentsBrowse.loadMore")}
         </Button>
       )}
     </div>
@@ -234,6 +237,7 @@ export function SharedAgentPanel({
   selection,
   ...importing
 }: Importing & { selection: SharedAgentSelection }) {
+  useLanguage();
   const { agent, session, community } = selection;
   const pack = agentAvatars.find((item) => item.url === agent.picture);
   const picture = useAvatarPreview(
@@ -246,7 +250,7 @@ export function SharedAgentPanel({
     <div className={pageStyles.detailsScroll}>
       <section
         className={`${hero.hero} ${hero.panelHero}`}
-        aria-label={`${agent.name} identity`}
+        aria-label={t("agentsBrowse.identityOf", { name: agent.name })}
       >
         <ProfileBackdrop src={backdrop} />
         <span className={pageStyles.identityPortrait}>
@@ -265,10 +269,10 @@ export function SharedAgentPanel({
         </div>
       </section>
       <section>
-        <InlineHeader title="About" />
+        <InlineHeader title={t("agentsBrowse.about")} />
         <SettingsGroup>
           <PreferenceRow
-            title="Shared by"
+            title={t("agentsBrowse.sharedBy")}
             trailing={
               <Sharer
                 pubkey={agent.owner}
@@ -278,11 +282,11 @@ export function SharedAgentPanel({
             }
           />
           <PreferenceRow
-            title="Model"
+            title={t("agentsBrowse.model")}
             trailing={
               <span className={styles.fact}>
                 <ModelIcon model={agent.model} />
-                {agent.model || "Not given"}
+                {agent.model || t("agentsBrowse.notGiven")}
               </span>
             }
           />
@@ -294,6 +298,7 @@ export function SharedAgentPanel({
 }
 
 function SharedAgentDetails({ agent }: { agent: SharedAgent }) {
+  useLanguage();
   const [expanded, setExpanded] = useState(false);
   const id = useId();
   const long =
@@ -301,14 +306,14 @@ function SharedAgentDetails({ agent }: { agent: SharedAgent }) {
     agent.instructions.split("\n").length > 5;
   return (
     <div className={styles.details}>
-      <InlineHeader title="Instructions" />
+      <InlineHeader title={t("agentsBrowse.instructions")} />
       <section
         id={id}
         className={styles.instructions}
         data-collapsed={long && !expanded ? "" : undefined}
-        aria-label="Instructions"
+        aria-label={t("agentsBrowse.instructions")}
       >
-        {agent.instructions || "No instructions included."}
+        {agent.instructions || t("agentsBrowse.noInstructions")}
       </section>
       {long && (
         <div className={styles.instructionsAction}>
@@ -318,7 +323,7 @@ function SharedAgentDetails({ agent }: { agent: SharedAgent }) {
             aria-controls={id}
             onClick={() => setExpanded(!expanded)}
           >
-            {expanded ? "See less" : "See more"}
+            {expanded ? t("agentsBrowse.seeLess") : t("agentsBrowse.seeMore")}
           </Button>
         </div>
       )}
@@ -372,6 +377,7 @@ function ImportShared({
   variant,
   ...props
 }: Importing & { shared: SharedAgent; variant: "glass" | "subtle" }) {
+  useLanguage();
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   return (
@@ -383,7 +389,7 @@ function ImportShared({
         shape="control"
         onClick={() => setOpen(true)}
       >
-        Import
+        {t("agentsBrowse.import")}
       </Button>
       {open && (
         <SharedImportDialog
@@ -408,6 +414,7 @@ export function SharedAgentCardContent({
   /** Conversation cards offer an action in place of model metadata. */
   action?: ReactNode;
 }) {
+  useLanguage();
   return (
     <>
       <AgentCardBackdrop agent={agent} community={community} />
@@ -420,7 +427,7 @@ export function SharedAgentCardContent({
           <span className={cardStyles.detail}>
             <ModelIcon model={agent.model} />
             <span className={cardStyles.detailText}>
-              {agent.model || "Shared agent"}
+              {agent.model || t("agentsBrowse.sharedAgent")}
             </span>
           </span>
         )}
@@ -462,29 +469,30 @@ export function NoImportTypes({
   agents,
   openSettings,
 }: Pick<Importing, "agents" | "openSettings">) {
+  useLanguage();
   const { snapshot } = useAgents(agents);
   if (snapshot.status === "loading")
     return (
-      <LoadingRegion pending label="Loading agent types…">
+      <LoadingRegion pending label={t("v1agent.import.loadingTypes")}>
         {null}
       </LoadingRegion>
     );
   return (
     <p className="m-0 text-body-sm text-secondary">
-      {snapshot.status === "unavailable" ? (
-        // As the Agents page's own empty state words it.
-        "Agents runs in the desktop app. Open Buzz there to import one."
-      ) : snapshot.status === "error" ? (
-        `Agents could not load. ${snapshot.error ?? "Try again."}`
-      ) : (
-        <>
-          No harness that runs agents on this computer is available. Check{" "}
-          <SettingsSectionLink section="plugins" open={openSettings}>
-            Manage plugins
-          </SettingsSectionLink>
-          .
-        </>
-      )}
+      {snapshot.status === "unavailable"
+        ? // As the Agents page's own empty state words it.
+          t("v1agent.import.desktopOnly")
+        : snapshot.status === "error"
+          ? t("v1agent.import.loadFailed", {
+              reason: snapshot.error ?? t("agentsBrowse.retryFallback"),
+            })
+          : rich("v1agent.import.noHarness", {
+              link: (
+                <SettingsSectionLink section="plugins" open={openSettings}>
+                  {t("agentsBrowse.managePlugins")}
+                </SettingsSectionLink>
+              ),
+            })}
     </p>
   );
 }
@@ -503,6 +511,7 @@ export function SharedImportDialog({
   onClose(): void;
   finalFocus: React.RefObject<HTMLButtonElement | null>;
 }) {
+  useLanguage();
   const { snapshot, types: known } = useAgents(agents);
   const body = useRef<HTMLDivElement>(null);
   const [initial] = useState(() => {
@@ -581,10 +590,10 @@ export function SharedImportDialog({
       title={shared.name}
       description={
         existing
-          ? "You already have this agent."
+          ? t("agentsBrowse.alreadyHave")
           : edited
-            ? "Edited. Changes only affect your copy."
-            : "Import it as is, or edit anything below first. Changes only affect your copy."
+            ? t("agentsBrowse.editedCopy")
+            : t("agentsBrowse.editBeforeImport")
       }
       headerGap="compact"
       footerGap="compact"
@@ -596,7 +605,7 @@ export function SharedImportDialog({
       leadingActions={
         edited && (
           <Button variant="ghost" disabled={pending} onClick={undo}>
-            Undo changes
+            {t("agentsBrowse.undo")}
           </Button>
         )
       }
@@ -604,7 +613,7 @@ export function SharedImportDialog({
         <>
           {!(existing && onOpen) && (
             <Button disabled={pending} onClick={onClose}>
-              Cancel
+              {t("agentsBrowse.cancel")}
             </Button>
           )}
           <Button
@@ -613,7 +622,7 @@ export function SharedImportDialog({
             loading={pending}
             onClick={() => void run()}
           >
-            {existing ? "Import a copy" : "Import"}
+            {existing ? t("agentsBrowse.importCopy") : t("agentsBrowse.import")}
           </Button>
           {existing && onOpen && (
             <Button
@@ -621,7 +630,7 @@ export function SharedImportDialog({
               disabled={pending}
               onClick={() => onOpen(existing)}
             >
-              Open {existing.name}
+              {t("agentsBrowse.openName", { name: existing.name })}
             </Button>
           )}
         </>
@@ -646,13 +655,13 @@ export function SharedImportDialog({
         ) : (
           <SettingsGroup>
             <PreferenceRow
-              title="Harness"
+              title={t("agentsBrowse.harness")}
               trailing={
                 <Select
-                  label="Harness"
+                  label={t("agentsBrowse.harness")}
                   variant="compact"
                   align="end"
-                  placeholder="Choose"
+                  placeholder={t("agentsBrowse.choose")}
                   value={type}
                   disabled={pending}
                   groups={[
@@ -670,7 +679,7 @@ export function SharedImportDialog({
             />
             {Model && (
               <PreferenceRow
-                title="Model"
+                title={t("agentsBrowse.model")}
                 trailing={
                   <Model
                     key={type}

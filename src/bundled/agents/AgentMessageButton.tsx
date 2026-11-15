@@ -1,3 +1,11 @@
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  errorMessage,
+  localError,
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { useEffect, useRef, useState } from "react";
 import { canMessageAgent } from "../../features/agents/choices";
 import type { Navigation } from "../../features/navigation/controller";
@@ -20,10 +28,11 @@ export function AgentMessageButton({
   navigator: Navigation | undefined;
   navigation: PageNavigation | undefined;
 }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const attempt = useRef<AbortController | null>(null);
   const [opening, setOpening] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   // biome-ignore lint/correctness/useExhaustiveDependencies: Changing identity or session retires the outstanding open attempt.
   useEffect(() => {
     setOpening(false);
@@ -78,12 +87,13 @@ export function AgentMessageButton({
           (agent) => canMessageAgent(agent) && agent.pubkey === pubkey,
         )
       )
-        throw new Error(
-          choices.error ??
-            (choices.pending
-              ? "Agent details are still loading. Try again."
-              : "This agent is unavailable in this community. Refresh its details and try again."),
-        );
+        throw choices.error != null
+          ? new Error(choices.error)
+          : localError(
+              choices.pending
+                ? "agentsDetails.loadingDetails"
+                : "agentsDetails.unavailable",
+            );
       const channelId = await connection.session.directMessages.open(
         [pubkey],
         controller.signal,
@@ -106,8 +116,8 @@ export function AgentMessageButton({
       if (!controller.signal.aborted)
         setError(
           reason instanceof Error
-            ? reason.message
-            : "Could not open the conversation. Try again.",
+            ? errorMessage(reason)
+            : localMessage("agentsDetails.openFailed"),
         );
     } finally {
       navigation?.signal.removeEventListener("abort", abort);
@@ -125,18 +135,18 @@ export function AgentMessageButton({
         loading={opening}
         onClick={() => void open()}
       >
-        Message
+        {t("agentsDetails.message")}
       </Button>
       {error && (
         <p role="alert" className="m-0 text-body-sm text-danger">
-          {error}{" "}
+          {resolveMessage(error)}{" "}
           <Button
             size="inline"
             variant="link"
             disabled={!available || opening}
             onClick={() => void open(true)}
           >
-            Retry
+            {t("agentsDetails.retry")}
           </Button>
         </p>
       )}

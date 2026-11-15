@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   DndContext,
   DragOverlay,
@@ -29,6 +30,7 @@ export function AgentInventoryDrag({
   overlay(agent: Agent): ReactNode;
   children(agents: readonly Agent[], dragging: boolean): ReactNode;
 }) {
+  useLanguage();
   const root = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
   const [activeKey, setActiveKey] = useState<string>();
@@ -90,9 +92,12 @@ export function AgentInventoryDrag({
         container: document.body,
         announcements: {
           onDragStart: ({ active }) =>
-            `Picked up ${byKey.get(String(active.id))?.name ?? "agent"}. Escape cancels the move.`,
-          onDragEnd: () => "Agent move ended.",
-          onDragCancel: () => "Agent move cancelled.",
+            t("v1agent.drag.start", {
+              name:
+                byKey.get(String(active.id))?.name ?? t("v1agent.drag.agent"),
+            }),
+          onDragEnd: () => t("v1agent.drag.end"),
+          onDragCancel: () => t("v1agent.drag.cancel"),
           onDragOver: () => undefined,
         },
       }}

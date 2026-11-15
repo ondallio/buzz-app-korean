@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   formatFullTimestamp,
@@ -31,12 +32,14 @@ import {
 } from "./agent-config-history";
 import styles from "./AgentConfigHistory.module.css";
 
-const GAP_TEXT: Record<Gap, string> = {
-  unloaded: "Older revisions aren't loaded yet.",
-  capped: `Older history isn't available from this relay (limit ${HISTORY_LIMIT.toLocaleString("en-US")} revisions).`,
-  failed: "Couldn't load older revisions.",
-  unavailable: "A revision here isn't available (removed or expired).",
-};
+const gapText = (gap: Gap) =>
+  gap === "unloaded"
+    ? t("v1agent.history.unloaded")
+    : gap === "capped"
+      ? t("v1agent.history.capped", { limit: HISTORY_LIMIT })
+      : gap === "failed"
+        ? t("v1agent.history.failed")
+        : t("v1agent.history.unavailable");
 
 /** The text a person edits, for the line diff. */
 function text(expected: Expected, event: RelayEvent) {
@@ -52,7 +55,7 @@ function text(expected: Expected, event: RelayEvent) {
 const message = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 const unconfirmed = (detail: string) =>
-  `Couldn't confirm the revert was saved (${detail}). It may still arrive; check the history before trying again.`;
+  t("v1agent.history.unconfirmed", { detail });
 
 /** What a revert's send came to: accepted, definitely not saved, or maybe. */
 export type RevertOutcome =
@@ -66,7 +69,7 @@ export function AgentConfigHistory({
   read,
   settings,
   onRevert,
-  title = "History",
+  title: titleOverride,
   onHistoryChange,
   selected,
   onSelect,
@@ -89,6 +92,8 @@ export function AgentConfigHistory({
   /** Reports loaded counts without a separate history read. */
   onHistoryChange?: (history: History) => void;
 }) {
+  useLanguage();
+  const title = titleOverride ?? t("v1agent.history.title");
   const [history, setHistory] = useState<History>(
     () => recalledHistory(read, expected, head, version) ?? emptyHistory,
   );
@@ -145,13 +150,13 @@ export function AgentConfigHistory({
     try {
       template = revertTemplate(expected, head, target, settings);
     } catch (error) {
-      return fail(`Not reverted: ${message(error)}`);
+      return fail(t("v1agent.history.notReverted", { reason: message(error) }));
     }
     setReverting(target.id);
     try {
       const delivery = await onRevert(template);
       if (delivery.status === "refused")
-        fail(`Not reverted: ${delivery.message}`);
+        fail(t("v1agent.history.notReverted", { reason: delivery.message }));
       else if (delivery.status === "uncertain")
         fail(unconfirmed(delivery.message));
       else setOpen(undefined);
@@ -165,7 +170,9 @@ export function AgentConfigHistory({
   const gapAction = (gap: Gap) =>
     gap === "unloaded" || gap === "failed" ? (
       <Button size="inline" variant="subtle" loading={loading} onClick={more}>
-        {gap === "failed" ? "Retry" : "Load older"}
+        {gap === "failed"
+          ? t("v1agent.history.retry")
+          : t("v1agent.history.loadOlder")}
       </Button>
     ) : null;
 
@@ -174,26 +181,21 @@ export function AgentConfigHistory({
     if (problem)
       return (
         <p className="text-body-sm">
-          This revision isn't valid config ({problem}), so changes can't be
-          shown.
+          {t("v1agent.history.invalid", { problem })}
         </p>
       );
     if (before && revisionProblem(expected, before, settings))
       return (
-        <p className="text-body-sm">
-          The previous revision isn't valid config, so changes can't be shown.
-        </p>
+        <p className="text-body-sm">{t("v1agent.history.previousInvalid")}</p>
       );
     if (!before && artifactOp(event) !== "create")
       return (
-        <p className="text-body-sm">
-          The previous revision isn't loaded, so changes can't be shown.
-        </p>
+        <p className="text-body-sm">{t("v1agent.history.previousUnloaded")}</p>
       );
     if (expected.type === "buzz.agent.settings") {
       const fields = settingsDiff(before?.content ?? "", event.content);
       return fields.length ? (
-        <ul className={styles.diff} aria-label="Changes">
+        <ul className={styles.diff} aria-label={t("v1agent.history.changes")}>
           {fields.map(({ field, before, after }) => (
             <li key={field}>
               {field}: {JSON.stringify(before) ?? "—"} →{" "}
@@ -202,7 +204,7 @@ export function AgentConfigHistory({
           ))}
         </ul>
       ) : (
-        <p className="text-body-sm">No setting changes.</p>
+        <p className="text-body-sm">{t("v1agent.history.noChanges")}</p>
       );
     }
     return (
@@ -210,7 +212,7 @@ export function AgentConfigHistory({
       <pre
         className={styles.diff}
         role="region"
-        aria-label="Changes"
+        aria-label={t("v1agent.history.changes")}
         // biome-ignore lint/a11y/noNoninteractiveTabindex: The scroll owner must support keyboard panning.
         tabIndex={0}
       >
@@ -261,11 +263,13 @@ export function AgentConfigHistory({
         !history.failed &&
         !loading &&
         history.next > 0 && (
-          <p className="text-body-sm">{title}: No revisions returned.</p>
+          <p className="text-body-sm">
+            {t("v1agent.history.noRevisions", { title })}
+          </p>
         )}
       {!history.revisions.length && history.failed && (
         <div className={styles.gap}>
-          <span className={styles.label}>{GAP_TEXT.failed}</span>
+          <span className={styles.label}>{gapText("failed")}</span>
           {gapAction("failed")}
         </div>
       )}
@@ -273,7 +277,7 @@ export function AgentConfigHistory({
         segment.gap ? (
           <div className={styles.gap} key={segment.revisions[0]?.id}>
             <span className={`text-caption ${styles.label}`}>
-              {title}: {GAP_TEXT[segment.gap]}
+              {title}: {gapText(segment.gap)}
             </span>
             {gapAction(segment.gap)}
           </div>
@@ -286,10 +290,10 @@ export function AgentConfigHistory({
         }}
         title={
           <span className="flex flex-wrap items-center gap-2">
-            <span>{title} version</span>{" "}
+            <span>{t("v1agent.history.versionTitle", { title })}</span>{" "}
             {current && (
               <span className={`${styles.currentBadge} text-label-sm`}>
-                Current
+                {t("v1agent.history.current")}
               </span>
             )}
           </span>
@@ -312,8 +316,8 @@ export function AgentConfigHistory({
               onClick={() => void revert(event)}
             >
               {artifactOp(head) === "delete"
-                ? "Restore this"
-                : "Revert to this"}
+                ? t("v1agent.history.restore")
+                : t("v1agent.history.revert")}
             </Button>
           )
         }
@@ -321,17 +325,15 @@ export function AgentConfigHistory({
         <div className="grid gap-2">
           {event ? (
             deleted ? (
-              <p className="m-0 text-body-sm">
-                This version removed this configuration.
-              </p>
+              <p className="m-0 text-body-sm">{t("v1agent.history.removed")}</p>
             ) : (
               changes(event, segment?.revisions[index + 1])
             )
           ) : (
             <p className="m-0 text-body-sm">
               {loading
-                ? "Loading version…"
-                : "This version isn't in the loaded history."}
+                ? t("v1agent.history.loadingVersion")
+                : t("v1agent.history.notLoaded")}
             </p>
           )}
           {!event &&
@@ -369,6 +371,7 @@ export function AgentConfigVersionRow({
   onSelect(): void;
 }) {
   useClockFormat();
+  useLanguage();
   const operation = artifactOp(event);
   const invalid =
     operation !== "delete" && revisionProblem(expected, event, settings);
@@ -393,22 +396,28 @@ export function AgentConfigVersionRow({
         <span className="flex w-full min-w-0 items-center justify-between gap-3 text-body text-left">
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate">
-              {label ?? "Version"}
-              {operation === "delete" ? " · Deleted" : ""}
-              {operation === "restore" ? " · Restored" : ""}
-              {operation === "move" ? " · Moved" : ""}
+              {label ?? t("v1agent.history.version")}
+              {operation === "delete"
+                ? ` · ${t("v1agent.history.deleted")}`
+                : ""}
+              {operation === "restore"
+                ? ` · ${t("v1agent.history.restored")}`
+                : ""}
+              {operation === "move" ? ` · ${t("v1agent.history.moved")}` : ""}
               {event.id === head?.id && (
                 <>
                   {" "}
-                  <span className="sr-only">· Current</span>
+                  <span className="sr-only">
+                    · {t("v1agent.history.current")}
+                  </span>
                 </>
               )}
-              {invalid ? " · Not valid" : ""}
+              {invalid ? ` · ${t("v1agent.history.notValid")}` : ""}
             </span>
             {event.id === head?.id && (
               <span
                 className={styles.current}
-                title="Current version"
+                title={t("v1agent.history.currentVersion")}
                 aria-hidden="true"
               />
             )}

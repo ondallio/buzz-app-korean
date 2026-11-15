@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Accordion } from "../../shared/design-system/ui/Accordion";
 import styles from "./AgentConfigHistory.module.css";
@@ -41,6 +42,7 @@ export function ConfigHistoryRow({
   history: ConfigHistory;
   presentation?: HistoryPresentation | undefined;
 }) {
+  useLanguage();
   const [localSelection, select] = useState<HistorySelection>();
   const selected = presentation ? presentation.selected : localSelection;
   const setSelected = presentation?.select ?? select;
@@ -81,10 +83,17 @@ export function ConfigHistoryRow({
   const summary = tracks.some(
     (track) => !track || (!track.next && !track.failed),
   )
-    ? "Loading versions…"
+    ? t("v1agent.history.loadingVersions")
     : tracks.some((track) => track?.failed)
-      ? "Version count unavailable"
-      : `${count.toLocaleString()}${tracks.some((track) => !track?.done) ? "+" : ""} ${count === 1 ? "version" : "versions"}`;
+      ? t("v1agent.history.countUnavailable")
+      : t(
+          tracks.some((track) => !track?.done)
+            ? "v1agent.history.versionsMore"
+            : count === 1
+              ? "v1agent.history.versionOne"
+              : "v1agent.history.versions",
+          { count },
+        );
   const revisions = history.sides
     .flatMap((track) => {
       const loaded = counts[track.side];
@@ -112,19 +121,24 @@ export function ConfigHistoryRow({
           value: "Previous versions",
           title: (
             <span className="flex items-center justify-between gap-3 text-body-sm text-left">
-              <span>Previous versions</span>
+              <span>{t("v1agent.history.previous")}</span>
               <span className="text-secondary">{summary}</span>
             </span>
           ),
           content: (
             <div className="grid gap-2">
-              <ol className={styles.list} aria-label="Previous versions">
+              <ol
+                className={styles.list}
+                aria-label={t("v1agent.history.previous")}
+              >
                 {revisions.map(({ track, event }) => (
                   <AgentConfigVersionRow
                     key={`${track.side}/${event.id}`}
                     event={event}
                     label={
-                      track.side === "settings" ? "Settings" : "Instructions"
+                      track.side === "settings"
+                        ? t("agentsBrowse.settings")
+                        : t("agentCreate.instructions")
                     }
                     head={track.head}
                     expected={track.expected}
@@ -142,7 +156,11 @@ export function ConfigHistoryRow({
                   key={`${expected.channel}/${expected.d}`}
                   selected={selected?.side === side ? selected.id : undefined}
                   onSelect={(id) => setSelected(id ? { side, id } : undefined)}
-                  title={side === "settings" ? "Settings" : "Instructions"}
+                  title={
+                    side === "settings"
+                      ? t("agentsBrowse.settings")
+                      : t("agentCreate.instructions")
+                  }
                   expected={expected}
                   head={head}
                   version={version}

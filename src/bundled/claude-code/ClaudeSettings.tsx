@@ -1,3 +1,5 @@
+import { rich } from "../../shared/i18n/rich";
+import { t, useLanguage } from "../../shared/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isApplePlatform } from "../../features/shortcuts/format";
 import { AlertDialog } from "../../shared/design-system/ui/AlertDialog";
@@ -29,6 +31,7 @@ export function ClaudeSettings({
   clearKey(): Promise<void>;
   connection?: ClaudeConnection | undefined;
 }) {
+  useLanguage();
   const [configured, setConfigured] = useState<boolean>();
   const [checking, setChecking] = useState(true);
   const [readError, setReadError] = useState("");
@@ -53,8 +56,8 @@ export function ClaudeSettings({
   const setButton = useRef<HTMLButtonElement>(null);
   const connectForm = useRef<HTMLDivElement>(null);
   const storage = isApplePlatform(navigator.platform)
-    ? "this Mac’s Keychain"
-    : "this device’s secure storage";
+    ? t("v1agent.claudeSettings.keychain")
+    : t("v1agent.claudeSettings.secureStorage");
   const check = useCallback(async () => {
     const current = ++request.current;
     setChecking(true);
@@ -118,7 +121,7 @@ export function ClaudeSettings({
               ?.focus();
         }}
       >
-        Retry
+        {t("v1agent.history.retry")}
       </Button>
     </div>
   ) : undefined;
@@ -133,14 +136,14 @@ export function ClaudeSettings({
         title="Claude"
         subtitle={
           configured === false && !checking && !readError
-            ? "Claude requires an API key to connect to your account."
-            : "Manage Claude’s credentials on this computer."
+            ? t("v1agent.claudeSettings.requiresKey")
+            : t("v1agent.claudeSettings.manage")
         }
       />
       <div className="mt-section-gap grid gap-section-gap">
         <LoadingRegion
           pending={checking}
-          label="Checking for a saved key…"
+          label={t("v1agent.claudeSettings.checking")}
           statusVisibility="screen-reader"
           feedback={
             connectionOpen && configured === false ? undefined : feedback
@@ -149,7 +152,7 @@ export function ClaudeSettings({
           {configured === true ? (
             <SettingsGroup layout="form">
               <SavedApiKey
-                label="Anthropic API key"
+                label={t("claudeAuthUi.apiKey")}
                 labelVisibility="visible"
                 credential={setup.auth}
                 onSaved={() => setup.check()}
@@ -169,10 +172,10 @@ export function ClaudeSettings({
           ) : (
             <SettingsGroup>
               <PreferenceRow
-                title="Anthropic API key"
+                title={t("claudeAuthUi.apiKey")}
                 subtitle={
                   configured === false && !readError
-                    ? "No key saved."
+                    ? t("v1agent.claudeSettings.noKey")
                     : undefined
                 }
                 trailing={
@@ -184,7 +187,7 @@ export function ClaudeSettings({
                       if (active() && !disabled) changeConnection(true);
                     }}
                   >
-                    Set
+                    {t("v1agent.claudeSettings.set")}
                   </Button>
                 }
               />
@@ -206,10 +209,9 @@ export function ClaudeSettings({
             <Dialog
               open={connectionOpen && active()}
               visit
-              title="Connect Claude"
-              description={
-                <>
-                  Create an API key at{" "}
+              title={t("v1agent.claudeSettings.connect")}
+              description={rich("v1agent.claudeSettings.createKey", {
+                link: (
                   <Button
                     variant="link"
                     size="text"
@@ -224,10 +226,9 @@ export function ClaudeSettings({
                     }
                   >
                     console.anthropic.com
-                  </Button>{" "}
-                  and paste it below.
-                </>
-              }
+                  </Button>
+                ),
+              })}
               headerGap="compact"
               preventClose={saving}
               onOpenChange={(open) => !open && changeConnection(false)}
@@ -240,7 +241,7 @@ export function ClaudeSettings({
             >
               <LoadingRegion
                 pending={checking}
-                label="Checking for a saved key…"
+                label={t("v1agent.claudeSettings.checking")}
                 statusVisibility="screen-reader"
                 feedback={feedback}
               >
@@ -252,8 +253,10 @@ export function ClaudeSettings({
       )}
       {confirm && (
         <AlertDialog
-          title="Remove Claude API key?"
-          description={`This removes the key from ${storage}. New local Claude sessions will need a key. A turn already running can finish.`}
+          title={t("v1agent.claudeSettings.removeTitle")}
+          description={t("v1agent.claudeSettings.removeDescription", {
+            storage,
+          })}
           pending={clearing}
           onClose={() => setConfirm(false)}
           finalFocus={() =>
@@ -265,14 +268,14 @@ export function ClaudeSettings({
           actions={
             <>
               <Button disabled={clearing} onClick={() => setConfirm(false)}>
-                Cancel
+                {t("channelForms.cancel")}
               </Button>
               <Button
                 variant="destructive"
                 loading={clearing}
                 onClick={() => void clear()}
               >
-                Remove key
+                {t("v1agent.claudeSettings.removeKey")}
               </Button>
             </>
           }

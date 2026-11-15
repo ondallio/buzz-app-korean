@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   createContext,
   useCallback,
@@ -135,16 +136,17 @@ export function DiscardChanges({
   onKeep(): void;
   onDiscard(): void;
 }) {
+  useLanguage();
   return (
     <AlertDialog
-      title="Discard changes?"
+      title={t("app.discardTitle")}
       description={description}
       onClose={onKeep}
       actions={
         <>
-          <Button onClick={onKeep}>Keep editing</Button>
+          <Button onClick={onKeep}>{t("app.keepEditing")}</Button>
           <Button variant="destructive" onClick={onDiscard}>
-            Discard changes
+            {t("app.discard")}
           </Button>
         </>
       }
@@ -164,6 +166,7 @@ export function AgentSaveButton({
   /** Validation can disable Save while the form still contains unsaved edits. */
   dirty?: boolean;
 }) {
+  useLanguage();
   const footer = useContext(AgentSaveFooter);
   useAgentSaveState(dirty, saving);
   const reducedMotion = useReducedMotion();
@@ -217,7 +220,7 @@ export function AgentSaveButton({
       focusableWhenDisabled
       style={footer?.target ? { width: "100%" } : undefined}
     >
-      {saving ? "Saving…" : "Save"}
+      {saving ? t("profileEditing.saving") : t("agentsDetails.save")}
     </Button>
   );
   return footer?.target

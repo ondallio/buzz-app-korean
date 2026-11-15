@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useEffect,
   useEffectEvent,
@@ -50,6 +51,7 @@ export function AgentTabs(props: {
   canOpenLink?: ((target: string) => boolean) | undefined;
   onDiscard?: () => void;
 }) {
+  useLanguage();
   const split = props.type?.tabs?.some(
     (section) => section.role === "settings" && section.splitSettings,
   );
@@ -61,14 +63,14 @@ export function AgentTabs(props: {
     (section) => section.value === "agent:settings",
   );
   const sections = [
-    ...(identity ? [{ ...identity, label: "Identity" }] : []),
+    ...(identity ? [{ ...identity, label: t("agentsBrowse.identity") }] : []),
     ...supplied.filter((section) => section.value.startsWith("agent:type:")),
     ...supplied.filter((section) => section.value === "agent:memory"),
     ...supplied.filter((section) => section.value === "agent:activity"),
     ...supplied.filter((section) => section.value.startsWith("agent:added:")),
     {
       value: "agent:management",
-      label: "Settings",
+      label: t("agentsBrowse.settings"),
       render: () => props.settingsContent,
     },
   ];
@@ -133,11 +135,14 @@ export function AgentTabs(props: {
         onValueChange={choose}
         items={sections.map(({ value, label }) => ({
           value,
-          label,
+          label:
+            value === "agent:memory" && label === "Memory"
+              ? t("agentsBrowse.memory")
+              : label,
           panelId: panelId(value),
           disabled: draft.saving && value !== selected?.value,
         }))}
-        label={`${props.agent.name} sections`}
+        label={t("agentsBrowse.sections", { name: props.agent.name })}
         variant="panel"
       />
       {settings && settingsSelected && (
@@ -170,7 +175,7 @@ export function AgentTabs(props: {
         ))}
       {pendingTab && (
         <DiscardChanges
-          description="Your unsaved changes will be lost if you switch tabs."
+          description={t("agentsBrowse.discardTabs")}
           onKeep={() => setPendingTab(undefined)}
           onDiscard={() => {
             props.onDiscard?.();

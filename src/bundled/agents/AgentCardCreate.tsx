@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 // Create agent, filled in from a published agent card (`buzz://agent/new`).
 import { useEffect, useState } from "react";
 import {
@@ -34,6 +35,7 @@ export function AgentCardCreate({
   onClose(): void;
   onCreated(agent: Agent): void;
 }) {
+  useLanguage();
   const [loaded, setLoaded] = useState<Loaded>();
   const [attempt, setAttempt] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: attempt retries the same card.
@@ -68,14 +70,14 @@ export function AgentCardCreate({
   return (
     <Dialog
       open
-      title="Agent card"
+      title={t("v1agent.card.title")}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
       actions={
         current && (
           <Button variant="primary" onClick={() => setAttempt((n) => n + 1)}>
-            Try again
+            {t("agentsBrowse.tryAgain")}
           </Button>
         )
       }
@@ -86,7 +88,7 @@ export function AgentCardCreate({
         </p>
       ) : (
         <p role="status" className="m-0 text-body-sm text-secondary">
-          Loading agent card…
+          {t("v1agent.card.loading")}
         </p>
       )}
     </Dialog>

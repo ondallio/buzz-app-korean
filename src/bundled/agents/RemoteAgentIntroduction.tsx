@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 import { EmojiArtwork } from "../../features/profiles/AvatarEditor";
@@ -8,16 +9,16 @@ import styles from "./AgentCreate.module.css";
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const endings = [
-  "So… what are we getting into?",
-  "Got a weird idea? I’m listening.",
-  "Big plans? Tiny question? Hit me.",
-  "What’s our first side quest?",
-  "I’m new here. What should I know?",
-  "Tell me your most ‘hear me out’ idea.",
-  "Your next rabbit hole has a plus-one.",
-  "You bring the half-baked idea. We’ll figure out the rest.",
-  "Go on, I’m all ears. Metaphorically.",
-  "All right. What’s the plot?",
+  "v1agent.remoteIntro.ending1",
+  "v1agent.remoteIntro.ending2",
+  "v1agent.remoteIntro.ending3",
+  "v1agent.remoteIntro.ending4",
+  "v1agent.remoteIntro.ending5",
+  "v1agent.remoteIntro.ending6",
+  "v1agent.remoteIntro.ending7",
+  "v1agent.remoteIntro.ending8",
+  "v1agent.remoteIntro.ending9",
+  "v1agent.remoteIntro.ending10",
 ] as const;
 
 export function RemoteAgentIntroduction({
@@ -31,21 +32,23 @@ export function RemoteAgentIntroduction({
   community?: string | undefined;
   builderlab: boolean;
 }) {
-  const [finish] = useState(
+  useLanguage();
+  const [ending] = useState(
     () => endings[Math.floor(Math.random() * endings.length)] ?? endings[0],
   );
-  const hello = `Hi, I’m ${name}.`;
+  const finish = t(ending);
+  const hello = t("v1agent.remoteIntro.hello", { name });
   const opening = builderlab
-    ? "Since I’m a remote agent hosted by "
-    : "I work on another computer";
+    ? t("v1agent.remoteIntro.hostedBefore")
+    : t("v1agent.remoteIntro.elsewhere");
   const provider = builderlab ? "Builderlab" : "";
-  const ready = builderlab ? ", I’m always ready for you." : ".";
+  const ready = builderlab
+    ? t("v1agent.remoteIntro.hostedAfter")
+    : t("v1agent.remoteIntro.elsewhereEnd");
   const online = builderlab
-    ? "You can chat with me from your phone, even when this computer is off. "
-    : "My availability and file access depend on that computer’s setup.";
-  const files = builderlab
-    ? "I just won’t be able to open files on this computer."
-    : "";
+    ? t("v1agent.remoteIntro.phone")
+    : t("v1agent.remoteIntro.availability");
+  const files = builderlab ? t("v1agent.remoteIntro.files") : "";
   const openingStart = hello.length;
   const providerStart = openingStart + opening.length;
   const readyStart = providerStart + provider.length;
@@ -143,7 +146,7 @@ export function RemoteAgentIntroduction({
       <motion.div
         className={styles.remotePortrait}
         role="img"
-        aria-label={`${name}’s avatar`}
+        aria-label={t("v1agent.remoteIntro.avatar", { name })}
         initial={reducedMotion ? false : { opacity: 0, scale: 0.75 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: reducedMotion ? 0 : 0.28, ease: "easeOut" }}

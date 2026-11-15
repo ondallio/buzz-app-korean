@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 // The New agent card: the avatar, chosen from packs or made custom from an
 // image or an emoji, and the name, with a details area the agent type fills in.
 import { Field } from "../../shared/design-system/ui/Field";
@@ -56,6 +57,7 @@ export function AgentCreateHeader({
   nameError?: { message: string; attempt: number } | undefined;
   initialAvatarPicker?: boolean;
 }) {
+  useLanguage();
   // The header shares AvatarEditor's full-size frame, so it requests the
   // original rather than the thumbnail (see avatar-source.grit).
   const preview = useAvatarPreview(picture ?? "", community);
@@ -153,7 +155,7 @@ export function AgentCreateHeader({
     <LayoutGroup>
       <fieldset
         ref={root}
-        aria-label="Agent avatar"
+        aria-label={t("v1agent.header.avatar")}
         data-avatar-active={view !== "selected" || undefined}
         className={styles.identity}
         data-editing={editing || undefined}
@@ -187,7 +189,7 @@ export function AgentCreateHeader({
                     className={`${styles.artwork} ${styles.uploaded}`}
                     data-avatar-shape="squircle"
                   >
-                    <img src={preview} alt="Agent avatar" />
+                    <img src={preview} alt={t("v1agent.header.avatar")} />
                   </motion.div>
                 ) : (
                   <span className="text-heading">
@@ -203,7 +205,7 @@ export function AgentCreateHeader({
                       setView("collections");
                     }}
                   >
-                    Choose avatar
+                    {t("v1agent.header.chooseAvatar")}
                   </Button>
                 </div>
               </motion.div>
@@ -240,7 +242,7 @@ export function AgentCreateHeader({
                   >
                     <PlusIcon size={48} />
                   </span>
-                  <span>Use custom</span>
+                  <span>{t("v1agent.header.useCustom")}</span>
                 </SurfaceButton>
               </div>
             ) : view === "custom" ? (
@@ -309,7 +311,7 @@ export function AgentCreateHeader({
           aria-hidden={view !== "selected" || (editing && !name.trim())}
         >
           <Field
-            label="Name"
+            label={t("agentCreate.name")}
             labelVisibility="hidden"
             error={nameError?.message}
           >
@@ -318,7 +320,7 @@ export function AgentCreateHeader({
                 ref={nameRef}
                 appearance="title"
                 disabled={disabled}
-                placeholder="Name your agent"
+                placeholder={t("v1agent.header.namePlaceholder")}
                 value={name}
                 onChange={(event) => onChange({ name: event.target.value })}
               />

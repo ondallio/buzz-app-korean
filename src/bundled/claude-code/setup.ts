@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 // Claude on this computer: Buzz's own copy, whether it can run (`auth.tsx`),
 // and keeping that copy on the latest release. Each step runs as a declared
 // process; the copy lives apart from any `claude` the user installed, and
@@ -313,12 +314,12 @@ export class ClaudeSetup {
               ...blocking,
               attentionLabel:
                 status.state === "missing"
-                  ? "Install Claude integration"
+                  ? t("v1agent.claude.installIntegration")
                   : status.state === "outdated"
-                    ? "Update Claude Code"
+                    ? t("v1agent.claude.updateCode")
                     : status.state === "signed-out"
                       ? this.auth.attentionLabel
-                      : "Claude Code needs attention",
+                      : t("v1agent.claude.needsAttention"),
             },
     );
     for (const listener of this.listeners) listener();

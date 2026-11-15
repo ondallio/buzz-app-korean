@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   type ReactNode,
   useCallback,
@@ -311,6 +312,7 @@ export function TranscriptPanel<T extends Transcript>({
   /** Shown above the oldest loaded turn. */
   notes?: (transcript: T) => ReactNode;
 }) {
+  useLanguage();
   const { shown, loading, refresh } = useLiveTranscript({
     read,
     readLatest,
@@ -324,12 +326,12 @@ export function TranscriptPanel<T extends Transcript>({
     <div className={activityStyles.transcript}>
       <div className={activityStyles.transcriptHeader}>
         <InlineHeader
-          title="Transcript"
+          title={t("v1agent.transcriptPanel.title")}
           actions={
             <IconButton
               hint="familiar"
-              aria-label="Refresh transcript"
-              title="Refresh transcript"
+              aria-label={t("v1agent.transcriptPanel.refresh")}
+              title={t("v1agent.transcriptPanel.refresh")}
               onClick={refresh}
               icon={<ArrowsClockwiseIcon size="1rem" aria-hidden="true" />}
             />
@@ -338,7 +340,11 @@ export function TranscriptPanel<T extends Transcript>({
       </div>
       <LoadingRegion
         pending={loading}
-        label={transcript === undefined ? reading : "Refreshing transcript…"}
+        label={
+          transcript === undefined
+            ? reading
+            : t("v1agent.transcriptPanel.refreshing")
+        }
         statusVisibility={
           transcript === undefined ? "visible" : "screen-reader"
         }

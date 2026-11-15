@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useEffect,
   useState,
@@ -27,6 +28,7 @@ export function ExternalAuthorizationDialog({
   communities,
   relay,
 }: ConsentProps & { agents: Agents; relay: RelayData }) {
+  useLanguage();
   const state = useSyncExternalStore(connection.subscribe, connection.snapshot);
   const client = useSyncExternalStore(
     communities.subscribe,
@@ -44,7 +46,7 @@ export function ExternalAuthorizationDialog({
         (!fullAgentAccess(pending.request.scope) ? (
           <ConsentDialog connection={connection} communities={communities}>
             <p role="status" className="m-0 text-body-sm text-secondary">
-              {legacyRequest}
+              {t("v1agent.authorize.legacy")}
             </p>
           </ConsentDialog>
         ) : transport.status === "ready" &&
@@ -61,15 +63,19 @@ export function ExternalAuthorizationDialog({
           <ConsentDialog connection={connection} communities={communities}>
             <p role="status" className="m-0 text-body-sm text-secondary">
               {externalMcpEnabled(client.selected)
-                ? "Select a connected community to authorize this app."
-                : "External apps are not enabled for this community. Select an enabled community."}
+                ? t("v1agent.authorize.selectConnected")
+                : t("v1agent.authorize.notEnabled")}
             </p>
           </ConsentDialog>
         ))}
       {state.error && (
         <ToastNotice
-          title="External app authorization failed"
-          description={state.error}
+          title={t("v1agent.authorize.failed")}
+          description={
+            state.error === legacyRequest
+              ? t("v1agent.authorize.legacy")
+              : state.error
+          }
           onDismiss={connection.clearError}
         />
       )}
@@ -82,6 +88,7 @@ function ConsentDialog({
   actions,
   children,
 }: ConsentProps & { actions?: ReactNode; children: ReactNode }) {
+  useLanguage();
   const state = useSyncExternalStore(connection.subscribe, connection.snapshot);
   const client = useSyncExternalStore(
     communities.subscribe,
@@ -93,14 +100,18 @@ function ConsentDialog({
       variant="outline"
       onClick={() => void connection.deny().catch(() => {})}
     >
-      Deny
+      {t("v1agent.authorize.deny")}
     </Button>
   );
   return (
     <Dialog
       open={!!request}
-      title="Authorize app"
-      description={request ? `${request.client} requests access.` : undefined}
+      title={t("v1agent.authorize.title")}
+      description={
+        request
+          ? t("v1agent.authorize.requests", { client: request.client })
+          : undefined
+      }
       size="compact"
       actions={actions ?? deny}
       onOpenChange={(open) => {
@@ -110,31 +121,28 @@ function ConsentDialog({
       {request && (
         <div className="grid gap-4">
           <p className="m-0 text-body-sm text-secondary">
-            The requesting app supplies its name. Authorize it only if you
-            started setup in that app.
+            {t("v1agent.authorize.nameNote")}
           </p>
           {state.grant && state.grant.phase !== "ended" && (
             <p className="m-0 text-body-sm text-secondary">
-              Authorization replaces access for {state.grant.client}. Switching
-              communities ends that access immediately, even if you then select
-              Deny.
+              {t("v1agent.authorize.replaces", { client: state.grant.client })}
             </p>
           )}
           <Select
-            label="Community"
+            label={t("v1agent.authorize.community")}
             variant="field"
             value={client.selected ?? ""}
-            placeholder="Select a community"
+            placeholder={t("v1agent.authorize.selectCommunity")}
             groups={[
               {
-                label: "Your communities",
+                label: t("v1agent.authorize.yourCommunities"),
                 options: client.memberships.map((membership) => ({
                   value: membership.id,
                   label: membership.name,
                   disabled: !externalMcpEnabled(membership.id),
                   description: externalMcpEnabled(membership.id)
                     ? undefined
-                    : "External apps are not enabled here.",
+                    : t("v1agent.authorize.notEnabledHere"),
                 })),
               },
             ]}
@@ -142,23 +150,14 @@ function ConsentDialog({
           />
           {fullAgentAccess(request.scope) && (
             <p className="m-0 text-body-sm text-secondary">
-              Full access as the selected agent: the app can use every Buzz tool
-              the agent has, including tools plugins add later. It reads, posts
-              and manages channels where the agent can, uses its memory,
-              attention and Git access to its community's repositories, wakes
-              the agent in its conversations, runs the Nexus workers the agent
-              may run, and can change Buzz settings on this device. It can post
-              any file the agent can read on this device, including outside its
-              workspace. It can disable plugins; installing, updating, enabling
-              or removing one needs your confirmation. Keys stay in Buzz.
-              {request.version === 2 &&
-                " The app can renew valid approval for another 30 days. Approval expires after 30 days without renewal. The app can restore this access after either app restarts. You can revoke it in External apps."}
+              {t("v1agent.authorize.fullAccess")}
+              {request.version === 2 && ` ${t("v1agent.authorize.renewal")}`}
             </p>
           )}
           {children}
           {!state.available && (
             <p role="alert" className="m-0 text-body-sm text-danger">
-              Enable Agents in Buzz desktop to authorize external apps.
+              {t("v1agent.authorize.enableAgents")}
             </p>
           )}
         </div>
@@ -172,6 +171,7 @@ function ReadyConsent({
   connection,
   communities,
 }: ConsentProps & { session: RelaySession; agents: Agents }) {
+  useLanguage();
   const choices = useAgentChoices(session, false, true);
   const inventory = useSyncExternalStore(agents.subscribe, agents.snapshot);
   const availability = useSyncExternalStore(agents.subscribe, () =>
@@ -208,7 +208,7 @@ function ReadyConsent({
             variant="outline"
             onClick={() => void connection.deny().catch(() => {})}
           >
-            Deny
+            {t("v1agent.authorize.deny")}
           </Button>
           <Button
             disabled={!chosen || !state.available}
@@ -217,26 +217,26 @@ function ReadyConsent({
                 void connection.approve(chosen.key);
             }}
           >
-            Authorize
+            {t("v1agent.authorize.authorize")}
           </Button>
         </>
       }
     >
       <Select
-        label="Agent"
+        label={t("agentsDetails.agent")}
         variant="field"
-        placeholder="Select an agent"
+        placeholder={t("v1agent.authorize.selectAgent")}
         value={chosen?.key ?? ""}
         groups={[
           {
-            label: "Agents on this device",
+            label: t("v1agent.authorize.agentsHere"),
             options: eligible.map((agent) => ({
               value: agent.key,
               label: agent.name,
               disabled: !available.has(agent.key),
               description: available.has(agent.key)
                 ? undefined
-                : "Unavailable in this copy of Buzz.",
+                : t("v1agent.authorize.unavailableHere"),
             })),
           },
         ]}
@@ -244,14 +244,12 @@ function ReadyConsent({
       />
       {usable.length < eligible.length && (
         <p className="m-0 text-body-sm text-secondary">
-          Enable its runtime plugin, or use the Buzz copy that runs this agent.
-          You can deny this request and start setup there.
+          {t("v1agent.authorize.enableRuntime")}
         </p>
       )}
       {!eligible.length && (
         <p className="m-0 text-body-sm text-secondary">
-          No eligible agent runs here. Start an agent in this community.
-          Protected agents cannot use external connections.
+          {t("v1agent.authorize.noEligible")}
         </p>
       )}
     </ConsentDialog>

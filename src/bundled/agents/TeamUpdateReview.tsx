@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useState, useSyncExternalStore } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Dialog } from "../../shared/design-system/ui/Dialog";
@@ -25,6 +26,7 @@ function TeamUpdateDialog({
   agents: Agents;
   request: TeamUpdateRequest;
 }) {
+  useLanguage();
   const [name, setName] = useState(request.name ?? request.base.name);
   const [instructions, setInstructions] = useState(
     request.instructions ?? request.base.instructions,
@@ -50,8 +52,10 @@ function TeamUpdateDialog({
       onOpenChange={(open) => {
         if (!open && !pending) agents.dismissTeamUpdate(request.id);
       }}
-      title={`Edit ${request.base.name}`}
-      description={`${request.requesterName} proposed these changes. Nothing changes until you save.`}
+      title={t("agentCreate.edit", { name: request.base.name })}
+      description={t("v1agent.team.proposed", {
+        requester: request.requesterName,
+      })}
       height="content"
       chromeSpacing="padded"
       actions={
@@ -61,19 +65,19 @@ function TeamUpdateDialog({
           disabled={!name.trim()}
           onClick={() => void save()}
         >
-          Save
+          {t("agentsDetails.save")}
         </Button>
       }
     >
       <div className="grid gap-4">
-        <Field label="Name">
+        <Field label={t("agentCreate.name")}>
           <Input
             value={name}
             disabled={pending}
             onChange={(event) => setName(event.target.value)}
           />
         </Field>
-        <Field label="Instructions">
+        <Field label={t("agentCreate.instructions")}>
           <Textarea
             rows={8}
             value={instructions}

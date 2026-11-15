@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { PRESET } from "../../features/agents/recommended";
 
 export type Config = {
@@ -44,9 +45,20 @@ export function config(raw: unknown): Config {
     ...(value.preset === PRESET ? { preset: PRESET } : {}),
   };
 }
+const effortKeys = {
+  none: "codexCreate.none",
+  minimal: "codexCreate.minimal",
+  low: "codexCreate.low",
+  medium: "codexCreate.medium",
+  high: "codexCreate.high",
+  xhigh: "codexCreate.extraHigh",
+  max: "codexCreate.maximum",
+  ultra: "codexCreate.ultra",
+} as const;
 export const effortName = (effort: string) =>
-  ({ xhigh: "Extra high", max: "Maximum", ultra: "Ultra" })[effort] ??
-  `${effort.charAt(0).toUpperCase()}${effort.slice(1)}`;
+  Object.hasOwn(effortKeys, effort)
+    ? t(effortKeys[effort as keyof typeof effortKeys])
+    : `${effort.charAt(0).toUpperCase()}${effort.slice(1)}`;
 
 export const absoluteWorkspace = (path: string) =>
   path.trim().startsWith("/") || /^[A-Za-z]:[\\/]/.test(path.trim());

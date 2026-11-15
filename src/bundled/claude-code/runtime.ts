@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { protectionTranscript } from "./protection-transcript";
 import type { PRESET } from "../../features/agents/recommended";
 import { fileStore } from "../../features/agents/state";
@@ -95,8 +96,20 @@ export const effortChoices = (levels: readonly string[]): Effort[] =>
   [...new Set(levels)]
     .filter((id) => id !== "max")
     .map((id) => ({ id, label: effortLabel(id) }));
+const effortKeys = {
+  none: "claudeCreate.none",
+  minimal: "claudeCreate.minimal",
+  low: "claudeCreate.low",
+  medium: "claudeCreate.medium",
+  high: "claudeCreate.high",
+  xhigh: "claudeCreate.extraHigh",
+  max: "claudeCreate.maximum",
+  ultra: "claudeCreate.ultra",
+} as const;
 export const effortLabel = (id: string) =>
-  id === "xhigh" ? "Extra high" : `${id.charAt(0).toUpperCase()}${id.slice(1)}`;
+  Object.hasOwn(effortKeys, id)
+    ? t(effortKeys[id as keyof typeof effortKeys])
+    : `${id.charAt(0).toUpperCase()}${id.slice(1)}`;
 
 /** The effort levels a listed model takes. */
 export const effortLevels = (model: ClaudeModel) =>

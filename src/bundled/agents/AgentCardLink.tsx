@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 // A Builderlab agent card's share link in a message: the card's picture and
 // name in place of the web link, and a hover card that offers Add to Buzz.
 import {
@@ -126,6 +127,7 @@ export function AgentCardLink({
   url: string;
   reads: AgentCardReads;
 }) {
+  useLanguage();
   const id = agentCardLinkId(url) ?? "";
   const live = useContext(LinkInteractiveContext);
   const subscribe = useCallback(
@@ -139,7 +141,9 @@ export function AgentCardLink({
   const preview = useMemo(
     () =>
       card && {
-        label: `${card.name} agent card`,
+        get label() {
+          return t("agentsDetails.cardLabel", { name: card.name });
+        },
         render: (open: (target: string) => boolean) => (
           <AgentCardLinkPreview
             card={card}
@@ -178,6 +182,7 @@ export function AgentCardLink({
 }
 
 function AgentCardLinkPreview({ card, onAdd }: { card: Card; onAdd(): void }) {
+  useLanguage();
   return (
     <div className={styles.preview}>
       <Avatar
@@ -189,10 +194,10 @@ function AgentCardLinkPreview({ card, onAdd }: { card: Card; onAdd(): void }) {
       />
       <span className={styles.identity}>
         <strong className={styles.name}>{card.name}</strong>
-        <span className={styles.kind}>Agent card</span>
+        <span className={styles.kind}>{t("agentsDetails.agentCard")}</span>
       </span>
       <Button variant="primary" size="sm" onClick={onAdd}>
-        Add to Buzz
+        {t("agentsDetails.add")}
       </Button>
     </div>
   );

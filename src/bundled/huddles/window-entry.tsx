@@ -10,14 +10,24 @@ import type { HuddleAction, HuddleView } from "../../features/huddle/window";
 import { HuddleWindowView } from "./HuddleWindowView";
 import { useKeyboardFocusVisibility } from "../../shared/design-system/useKeyboardFocusVisibility";
 import { clearReactDevMeasures } from "../../features/developer/react-dev-timing";
+import { t, translate, useLanguage } from "../../shared/i18n";
+import { initializeHostLanguage } from "../../shared/i18n/host-language";
+import { useLanguageDocument } from "../../shared/i18n/document";
+import { DialogLabelsProvider } from "../../shared/design-system/ui/DialogLabels";
 
 // React dev builds otherwise fill the User Timing buffer without limit.
 if (import.meta.env.DEV) clearReactDevMeasures();
 
 function Companion() {
+  const language = useLanguage();
+  useLanguageDocument();
+  useEffect(() => {
+    document.title = translate(language, "huddleCompanion.title");
+  }, [language]);
   useKeyboardFocusVisibility();
   const [view, setView] = useState<HuddleView>();
-  const [error, setError] = useState<string>();
+  const [problem, setError] = useState<"unavailable" | "actionFailed">();
+  const error = problem ? t(`huddleCompanion.${problem}`) : undefined;
   useEffect(() => {
     let mounted = true;
     const updates = new Channel<HuddleView & { discussionOpen: boolean }>();
@@ -33,8 +43,7 @@ function Companion() {
       }));
     };
     void invoke("huddle_window_watch", { updates }).catch(() => {
-      if (mounted)
-        setError("This Huddle window is unavailable. Reopen it from Buzz.");
+      if (mounted) setError("unavailable");
     });
     return () => {
       mounted = false;
@@ -44,12 +53,21 @@ function Companion() {
     if (!view) return;
     setError(undefined);
     void invoke("huddle_window_action", { id: view.id, action, text }).catch(
-      () => setError("Couldn’t update the call. Try again from Buzz."),
+      () => setError("actionFailed"),
     );
   };
   return view ? (
-    <ToastProvider>
-      <HuddleWindowView view={view} act={act} error={error} />
+    <ToastProvider
+      labels={{ region: t("toast.region"), dismiss: t("toast.dismiss") }}
+    >
+      <DialogLabelsProvider closeLabel={t("dialog.close")}>
+        <HuddleWindowView
+          view={view}
+          act={act}
+          error={error}
+          errorIdentity={problem}
+        />
+      </DialogLabelsProvider>
     </ToastProvider>
   ) : error ? (
     <p role="alert" className="p-6 text-body text-secondary">
@@ -60,11 +78,13 @@ function Companion() {
 const container = document.getElementById("root");
 if (container) {
   container.style.height = "100dvh";
-  createRoot(container).render(
-    <AgentAvatarArtworkProvider>
-      <TooltipProvider>
-        <Companion />
-      </TooltipProvider>
-    </AgentAvatarArtworkProvider>,
-  );
+  void initializeHostLanguage().then(() => {
+    createRoot(container).render(
+      <AgentAvatarArtworkProvider>
+        <TooltipProvider>
+          <Companion />
+        </TooltipProvider>
+      </AgentAvatarArtworkProvider>,
+    );
+  });
 }

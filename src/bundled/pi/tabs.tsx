@@ -1,3 +1,5 @@
+import { rich } from "../../shared/i18n/rich";
+import { t, useLanguage } from "../../shared/i18n";
 // Pi's New agent choices and agent settings. Providers, their keys and their
 // models are Pi's own: listed from it, and keys saved with its login.
 import {
@@ -64,12 +66,12 @@ import {
 } from "./setup";
 import { TURN_LIMIT } from "./transcript";
 
-const SCOPES = [
+const scopes = () => [
   {
     label: "",
     options: [
-      { value: "thread", label: "One conversation per thread" },
-      { value: "channel", label: "One conversation per channel" },
+      { value: "thread", label: t("v1agent.pi.perThread") },
+      { value: "channel", label: t("v1agent.pi.perChannel") },
     ],
   },
 ];
@@ -88,7 +90,11 @@ const providerIcon = (id: string | undefined) => {
 };
 const CONVERSATION_LIMIT = 30;
 const label = ({ channelId, name, root }: Place) =>
-  `${name || channelId.slice(0, 8)} · ${root ? `thread ${root.slice(0, 8)}` : "channel"}`;
+  `${name || channelId.slice(0, 8)} · ${
+    root
+      ? t("v1agent.claudeTabs.threadId", { id: root.slice(0, 8) })
+      : t("v1agent.claudeTabs.channel")
+  }`;
 type Read<T> = (
   | { status: "loading"; value?: T }
   | { status: "ready"; value: T }
@@ -226,6 +232,7 @@ export function createTabs({
     reload(): void;
     rows?: boolean;
   }>) {
+    useLanguage();
     const providers = listing.value;
     const fallback = providers?.defaults.provider;
     const id = value.provider || fallback || "";
@@ -242,7 +249,7 @@ export function createTabs({
     return (
       <>
         <Select
-          label="Provider"
+          label={t("v1agent.goose.provider")}
           variant={rows ? "preference" : "field"}
           value={value.provider}
           leading={providerIcon(id)}
@@ -254,17 +261,20 @@ export function createTabs({
             ? { error: listing.error }
             : unknown
               ? {
-                  error: `${unknown} isn't one of Pi's built-in providers, and no Pi package Buzz loaded adds it. Choose another.`,
+                  error: t("v1agent.pi.unknownProvider", { provider: unknown }),
                 }
               : listing.status === "loading" && !providers
-                ? { description: "Loading Pi's providers…" }
+                ? { description: t("v1agent.pi.loadingProviders") }
                 : !id
                   ? {
-                      description:
-                        "Pi's settings name no provider. Choose one.",
+                      description: t("v1agent.pi.noProvider"),
                     }
                   : rows && provider && !provider.configured
-                    ? { description: `Set up ${provider.name} in Settings.` }
+                    ? {
+                        description: t("v1agent.pi.setUpInSettings", {
+                          provider: provider.name,
+                        }),
+                      }
                     : {})}
           groups={[
             {
@@ -273,14 +283,18 @@ export function createTabs({
                 {
                   value: "",
                   label: fallback
-                    ? `From Pi settings (${named(fallback)})`
-                    : "From Pi settings",
+                    ? t("v1agent.pi.fromSettingsNamed", {
+                        provider: named(fallback) ?? fallback,
+                      })
+                    : t("v1agent.pi.fromSettings"),
                 },
                 ...(providers?.providers ?? []).map((item) => ({
                   value: item.id,
                   label: item.name,
                   leading: providerIcon(item.id),
-                  ...(item.configured ? { description: "Set up" } : {}),
+                  ...(item.configured
+                    ? { description: t("v1agent.pi.isSetUp") }
+                    : {}),
                 })),
               ],
             },
@@ -289,7 +303,7 @@ export function createTabs({
         />
         {listing.status === "error" && (
           <div>
-            <Button onClick={reload}>Try again</Button>
+            <Button onClick={reload}>{t("agentsBrowse.tryAgain")}</Button>
           </div>
         )}
         {!rows && provider && (
@@ -301,13 +315,21 @@ export function createTabs({
           loading={models.status === "loading"}
           value={value.model}
           defaultLabel={
-            modelDefault ? `Pi default (${modelDefault})` : "Pi default"
+            modelDefault
+              ? t("v1agent.pi.defaultNamed", { model: modelDefault })
+              : t("v1agent.pi.default")
           }
           {...(models.status === "error"
-            ? { description: `Could not list models: ${models.error}` }
+            ? {
+                description: t("v1agent.goose.listFailed", {
+                  error: models.error,
+                }),
+              }
             : missing && id && !unknown
               ? {
-                  description: `Pi's settings name no model for ${named(id)}. Choose one.`,
+                  description: t("v1agent.pi.noModel", {
+                    provider: named(id) ?? id,
+                  }),
                 }
               : {})}
           disabled={Boolean(unknown)}
@@ -333,13 +355,14 @@ export function createTabs({
     listing: Read<Providers>;
     reload(): void;
   }>) {
+    useLanguage();
     const id = choice.provider || listing.value?.defaults.provider;
     const provider = listing.value?.providers.find((item) => item.id === id);
     return (
       <>
         {listing.status === "error" && (
           <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={reload}>Try again</Button>
+            <Button onClick={reload}>{t("agentsBrowse.tryAgain")}</Button>
             <p role="alert" className="buzz-field-error m-0">
               {listing.error}
             </p>
@@ -361,6 +384,7 @@ export function createTabs({
     choice,
     disabled,
   }: Readonly<{ choice: Choice; disabled: boolean }>) {
+    useLanguage();
     // A result belongs to the choice it tested.
     const key = `${choice.provider}\u0000${choice.model}`;
     const [result, setResult] = useState<{
@@ -384,7 +408,7 @@ export function createTabs({
             });
           }}
         >
-          Test connection
+          {t("v1agent.goose.testConnection")}
         </Button>
         {tested && tested !== "testing" && (
           <p
@@ -404,6 +428,7 @@ export function createTabs({
     provider,
     onSaved,
   }: Readonly<{ provider: Provider; onSaved(): void }>) {
+    useLanguage();
     const [key, setKey] = useState("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -426,25 +451,34 @@ export function createTabs({
       return (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="m-0 text-body-sm text-subtle">
-            {provider.name} is set up in Pi.
+            {t("v1agent.pi.providerSetUp", { provider: provider.name })}
           </p>
           {provider.key && (
-            <Button onClick={() => setChanging(true)}>Change</Button>
+            <Button onClick={() => setChanging(true)}>
+              {t("v1agent.pi.change")}
+            </Button>
           )}
         </div>
       );
     if (!provider.key)
       return (
         <p className="m-0 text-body-sm">
-          {provider.name} signs in through Pi. Run <code>pi</code>, then{" "}
-          <code>/login</code>, to set it up, then choose it here.
+          {rich("v1agent.pi.signsIn", {
+            provider: provider.name,
+            command: <code>pi</code>,
+            login: <code>/login</code>,
+          })}
         </p>
       );
     return (
       <>
         <Field
-          label="API key"
-          description={`Saved in ~/.pi/agent/auth.json, for every Pi agent and the pi command.${provider.signsIn ? " Or sign in with the pi command's /login." : ""}`}
+          label={t("v1agent.pi.apiKey")}
+          description={t(
+            provider.signsIn
+              ? "v1agent.pi.keySavedOrLogin"
+              : "v1agent.pi.keySaved",
+          )}
         >
           <Input
             type="password"
@@ -463,7 +497,7 @@ export function createTabs({
         </Field>
         <div className="flex flex-wrap items-center gap-3">
           <Button disabled={!key.trim()} loading={saving} onClick={saveKey}>
-            Save to Pi
+            {t("v1agent.pi.saveToPi")}
           </Button>
           {error && (
             <p role="alert" className="buzz-field-error m-0">
@@ -503,6 +537,7 @@ export function createTabs({
     onChange(choice: Choice): void;
     onClose(): void;
   }>) {
+    useLanguage();
     const [draft, setDraft] = useState<Choice>({
       provider: value.provider,
       model: value.model,
@@ -513,18 +548,18 @@ export function createTabs({
         onOpenChange={(open) => {
           if (!open) onClose();
         }}
-        title="Provider and model"
-        description="Pi's own settings are the default. Keys are saved in Pi, for every Pi agent and the pi command."
+        title={t("v1agent.pi.providerAndModel")}
+        description={t("v1agent.pi.chooseDescription")}
         actions={
           <>
-            <Button onClick={onClose}>Cancel</Button>
+            <Button onClick={onClose}>{t("channelForms.cancel")}</Button>
             <Button
               variant="prominent"
               disabled={unusable(draft, listing.value)}
               focusableWhenDisabled
               onClick={() => onChange(draft)}
             >
-              Use
+              {t("v1agent.pi.use")}
             </Button>
           </>
         }
@@ -551,6 +586,7 @@ export function createTabs({
     disabled,
     modelAppearance,
   }: AgentCreateProps<Config>) {
+    useLanguage();
     const current = readConfig(config);
     const [listing, reload] = useRead(
       () => setup.providers(),
@@ -581,17 +617,19 @@ export function createTabs({
     const label = current.model
       ? named(current.model)
       : fallback
-        ? `Pi default (${provider} · ${named(fallback)})`
+        ? t("v1agent.pi.defaultNamed", {
+            model: `${provider} · ${named(fallback)}`,
+          })
         : !providers
-          ? "Pi default"
+          ? t("v1agent.pi.default")
           : id
-            ? "Choose a model"
-            : "Choose a provider";
+            ? t("v1agent.pi.chooseModel")
+            : t("v1agent.goose.chooseProvider");
     const mark = providerIcon(id);
     const error =
       listing.status === "error"
         ? listing.error
-        : unknown && `Pi has no provider ${unknown}`;
+        : unknown && t("v1agent.pi.noSuchProvider", { provider: unknown });
     return (
       <>
         {/* The compact select recipe ellipsizes long model names in cards. */}
@@ -600,7 +638,7 @@ export function createTabs({
             size="sm"
             variant={modelAppearance ?? "outline"}
             disabled={disabled}
-            aria-label={`Model: ${label}`}
+            aria-label={t("v1agent.pi.modelLabel", { model: label })}
             aria-haspopup="dialog"
             onClick={() => setChoosing(true)}
           >
@@ -626,7 +664,7 @@ export function createTabs({
         )}
         {listing.status === "error" && (
           <Button size="sm" disabled={disabled} onClick={reload}>
-            Try again
+            {t("agentsBrowse.tryAgain")}
           </Button>
         )}
         {choosing && (
@@ -664,6 +702,7 @@ export function createTabs({
     place: Place;
     working: boolean;
   }) {
+    useLanguage();
     return (
       <TranscriptPanel
         agent={agent}
@@ -682,13 +721,13 @@ export function createTabs({
         }}
         readKey={`${agent.key}\u0000${place.key}\u0000${place.conversation}`}
         working={working}
-        reading="Reading the Pi conversation…"
-        failed="Could not read the Pi conversation"
+        reading={t("v1agent.pi.reading")}
+        failed={t("v1agent.pi.readFailed")}
         missing={null}
         notes={(transcript) =>
           transcript.more && (
             <p className="m-0 text-body-sm text-subtle">
-              Showing the latest {TURN_LIMIT} turns.
+              {t("v1agent.session.latestTurns", { count: TURN_LIMIT })}
             </p>
           )
         }
@@ -708,6 +747,7 @@ export function createTabs({
     conversation?: AgentViewProps<Config>["conversation"];
     initialTranscript?: AgentViewProps<Config>["initialTranscript"];
   }) {
+    useLanguage();
     const working = useSyncExternalStore(
       (listener) => runtime.subscribe(listener),
       () => runtime.working(agent.key),
@@ -737,17 +777,17 @@ export function createTabs({
       return listing.status === "error" ? (
         <div className="grid gap-2">
           <p role="alert" className="buzz-field-error m-0">
-            Could not list Pi's conversations: {listing.error}
+            {t("v1agent.pi.listFailed", { error: listing.error })}
           </p>
           <div>
             <Button type="button" onClick={reload}>
-              Try again
+              {t("agentsBrowse.tryAgain")}
             </Button>
           </div>
         </div>
       ) : (
         <p role="status" className="m-0 text-body-sm text-subtle">
-          Reading Pi's conversations…
+          {t("v1agent.pi.readingList")}
         </p>
       );
     return (
@@ -772,13 +812,16 @@ export function createTabs({
     working: readonly number[];
   }) {
     useClockFormat();
+    useLanguage();
     const { session: here } = useOpenedSession(
       places,
       conversation,
       async () => undefined,
     );
     const status = (place: Place) =>
-      working.includes(place.conversation) ? "Working" : undefined;
+      working.includes(place.conversation)
+        ? t("v1agent.session.working")
+        : undefined;
     const { open, show, back } = useOpenTranscript(conversation, label);
     const recent = places
       .filter((place) => place.key !== here?.key)
@@ -795,7 +838,7 @@ export function createTabs({
           />
         )}
         <section className={activityStyles.section}>
-          <InlineHeader title="Recent conversations" />
+          <InlineHeader title={t("v1agent.session.recent")} />
           {recent.length ? (
             <SettingsGroup layout="form">
               <ul className={activityStyles.list}>
@@ -811,8 +854,10 @@ export function createTabs({
                         <span className="block text-body-sm text-subtle">
                           {[
                             place.root
-                              ? `Thread ${place.root.slice(0, 8)}`
-                              : "Channel",
+                              ? t("v1agent.transcript.thread", {
+                                  id: place.root.slice(0, 8),
+                                })
+                              : t("v1agent.transcript.channel"),
                             status(place),
                             formatItemTimestamp(place.at / 1000, {
                               withTime: true,
@@ -826,10 +871,12 @@ export function createTabs({
                         type="button"
                         variant="subtle"
                         size="sm"
-                        aria-label={`View transcript: ${label(place)}`}
+                        aria-label={t("v1agent.opened.viewTranscriptNamed", {
+                          name: label(place),
+                        })}
                         onClick={() => show(place)}
                       >
-                        View transcript
+                        {t("messageRow.viewTranscript")}
                       </Button>
                     </div>
                   </li>
@@ -838,14 +885,14 @@ export function createTabs({
             </SettingsGroup>
           ) : (
             <p className="m-0 text-body-sm text-subtle">
-              None. A conversation starts when the agent is mentioned.
+              {t("v1agent.pi.none")}
             </p>
           )}
         </section>
         {open && (
           <PanelSubview
             title={label(open)}
-            backLabel="Back to profile"
+            backLabel={t("v1agent.session.backToProfile")}
             onBack={back}
           >
             <TranscriptView
@@ -867,6 +914,7 @@ export function createTabs({
     settingsSection,
     settingsContent,
   }: AgentViewProps<Config>) {
+    useLanguage();
     const form = useId();
     const saved = readConfig(agent.config);
     const [draft, setDraft] = useState(saved);
@@ -910,14 +958,16 @@ export function createTabs({
     const level = defaults?.thinking ?? DEFAULT_THINKING;
     const resting = effortLabel(levels ? runsAt(levels, level) : level);
     const efforts = [
-      { value: "", label: `${resting} · Default` },
+      { value: "", label: `${resting}${t("claudeCreate.defaultSuffix")}` },
       // A saved level the model doesn't have, or not yet read.
       ...(draft.effort && !levels?.includes(draft.effort)
         ? [
             {
               value: draft.effort,
               label: levels
-                ? `${effortLabel(draft.effort)} (unavailable)`
+                ? t("claudeCreate.unavailableOption", {
+                    effort: effortLabel(draft.effort),
+                  })
                 : effortLabel(draft.effort),
             },
           ]
@@ -961,7 +1011,7 @@ export function createTabs({
                 reload={reload}
               />
               <Select
-                label="Thinking"
+                label={t("claudeCreate.thinking")}
                 variant="preference"
                 value={draft.effort}
                 {...(!draft.effort ? { valueLabel: resting } : {})}
@@ -980,8 +1030,10 @@ export function createTabs({
           <>
             <ProviderSetup choice={draft} listing={listing} reload={reload} />
             <Field
-              label="Workspace"
-              description="The folder Pi works in. Use ~/ for your home folder."
+              label={t("v1agent.settings.workspace")}
+              description={t("v1agent.settings.workspaceHint", {
+                harness: "Pi",
+              })}
             >
               <Input
                 value={draft.workspace}
@@ -989,10 +1041,10 @@ export function createTabs({
               />
             </Field>
             <Select
-              label="Conversations"
+              label={t("v1agent.pi.conversations")}
               variant="preference"
               value={draft.scope}
-              groups={SCOPES}
+              groups={scopes()}
               onValueChange={(value) =>
                 setDraft({
                   ...draft,

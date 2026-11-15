@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useRef, useState } from "react";
 import { useAgentChoices } from "../../features/agents/use-choices";
 import type { AgentChoicesSnapshot } from "../../features/agents/choices";
@@ -17,7 +18,6 @@ import { Button } from "../../shared/design-system/ui/Button";
 type BestieAgent = AgentChoicesSnapshot["selectable"][number];
 
 const made = new Set<(pubkey: string) => void>();
-const AGENT_CHANGING = "An agent is still changing your Bestie. Try again.";
 /** Hears each agent the viewer makes Bestie on this device, once it is
  * saved. A choice synced from elsewhere isn't heard. */
 export function onBestieMade(listener: (pubkey: string) => void) {
@@ -26,8 +26,7 @@ export function onBestieMade(listener: (pubkey: string) => void) {
 }
 
 /** What a remote agent as Bestie can't do, said before it is chosen. */
-export const REMOTE_BESTIE_WARNING =
-  "Some bestie features aren’t available with remote agents.";
+export const remoteBestieWarning = () => t("v1agent.bestie.remoteWarning");
 
 /** Whether an agent runs somewhere other than this device. */
 export const remoteAgent = (place: AgentPlace | undefined) =>
@@ -101,7 +100,7 @@ export function useBestieChoice(
     if (agentChangingBestie(session)) {
       setReplacement(undefined);
       setRemote(undefined);
-      setError(AGENT_CHANGING);
+      setError(t("v1agent.bestie.changing"));
       return;
     }
     const choice = ++latest.current;
@@ -182,7 +181,7 @@ export function useBestieChoice(
           remote={placeOf?.(removing.pubkey) === "elsewhere"}
           remove={() =>
             agentChangingBestie(session)
-              ? Promise.reject(new Error(AGENT_CHANGING))
+              ? Promise.reject(new Error(t("v1agent.bestie.changing")))
               : // A choice changed elsewhere while this dialog was open wins.
                 saved === removing.pubkey
                 ? clearDefaultAgent(session, scope)
@@ -222,11 +221,17 @@ function BestieReplacement({
   onChoose(): void;
   onClose(): void;
 }) {
+  useLanguage();
   const proceed = useRef<HTMLButtonElement>(null);
   return (
     <AlertDialog
-      title={`Make ${bestieName(replacing)} your bestie?`}
-      description={`Your existing chats with ${bestieName(current)} will still be available in your DMs.${remote ? ` ${REMOTE_BESTIE_WARNING}` : ""}`}
+      title={t("v1agent.bestie.replaceTitle", { name: bestieName(replacing) })}
+      description={t(
+        remote
+          ? "v1agent.bestie.replaceDescriptionRemote"
+          : "v1agent.bestie.replaceDescription",
+        { name: bestieName(current) },
+      )}
       initialFocus={proceed}
       pending={pending}
       onClose={onClose}
@@ -234,7 +239,7 @@ function BestieReplacement({
       actions={
         <>
           <Button disabled={pending} onClick={onClose}>
-            Keep {bestieName(current)}
+            {t("v1agent.bestie.keep", { name: bestieName(current) })}
           </Button>
           <Button
             ref={proceed}
@@ -242,7 +247,7 @@ function BestieReplacement({
             loading={pending}
             onClick={onChoose}
           >
-            Switch to {bestieName(replacing)}
+            {t("v1agent.bestie.switch", { name: bestieName(replacing) })}
           </Button>
         </>
       }
@@ -265,11 +270,12 @@ export function RemoteBestieConfirm({
   onConfirm(): void;
   onClose(): void;
 }) {
+  useLanguage();
   const cancel = useRef<HTMLButtonElement>(null);
   return (
     <AlertDialog
-      title={`Use ${name} as your bestie?`}
-      description={REMOTE_BESTIE_WARNING}
+      title={t("v1agent.bestie.useTitle", { name })}
+      description={remoteBestieWarning()}
       initialFocus={cancel}
       pending={pending}
       onClose={onClose}
@@ -277,10 +283,10 @@ export function RemoteBestieConfirm({
       actions={
         <>
           <Button ref={cancel} disabled={pending} onClick={onClose}>
-            Cancel
+            {t("channelForms.cancel")}
           </Button>
           <Button variant="prominent" loading={pending} onClick={onConfirm}>
-            Use as bestie
+            {t("v1agent.bestie.use")}
           </Button>
         </>
       }
@@ -302,13 +308,19 @@ function RemoveBestie({
   remove(): Promise<void>;
   onClose(): void;
 }) {
+  useLanguage();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const keep = useRef<HTMLButtonElement>(null);
   return (
     <AlertDialog
-      title={`Remove ${name} as your Bestie?`}
-      description={`${name} stays in Agents, with your chats in your DMs. Its check-ins stop. Its memory rules and private channels stay; turn them off in its Former Bestie tab${remote ? " on the device it runs on" : ""}.`}
+      title={t("v1agent.bestie.removeTitle", { name })}
+      description={t(
+        remote
+          ? "v1agent.bestie.removeDescriptionRemote"
+          : "v1agent.bestie.removeDescription",
+        { name },
+      )}
       initialFocus={keep}
       pending={pending}
       onClose={onClose}
@@ -316,7 +328,7 @@ function RemoveBestie({
       actions={
         <>
           <Button ref={keep} disabled={pending} onClick={onClose}>
-            Cancel
+            {t("channelForms.cancel")}
           </Button>
           <Button
             variant="prominent"
@@ -334,7 +346,7 @@ function RemoveBestie({
                 .finally(() => setPending(false));
             }}
           >
-            Remove as Bestie
+            {t("v1agent.bestie.remove")}
           </Button>
         </>
       }

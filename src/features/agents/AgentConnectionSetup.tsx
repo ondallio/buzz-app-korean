@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useCallback,
   useContext,
@@ -78,6 +79,7 @@ export function AgentConnectionSetup({
   channel: ChannelSummary | undefined;
   rows?: readonly ChannelMessage[];
 }) {
+  useLanguage();
   const agents = useContext(AgentsContext);
   // Follow roster changes that land without a parent render.
   const roster =
@@ -292,13 +294,13 @@ function Candidate({
       scope={session.scope}
       onDismiss={() => {
         if (!writeView(session.scope, dismissalKey, true))
-          notify("Could not save dismissal. Try again.", "error");
+          notify(t("v1agent.connect.dismissFailed"), "error");
       }}
       onStart={() => setPhase("pending")}
       onFinish={(success, error) => {
         if (error)
           notify(error, "error", {
-            label: "Dismiss",
+            label: t("settingsHost.dismiss"),
             onClick() {},
             timeout: Infinity,
           });
@@ -343,6 +345,7 @@ export function AgentConnectionForm({
   preview?: boolean;
   onSendAgain?: (() => Promise<void>) | undefined;
 }) {
+  useLanguage();
   const { types: installedTypes } = useAgents(agents);
   const types = installedTypes.filter(
     (type) => !type.CreateModel || type.createModelReportsReadiness,
@@ -378,7 +381,7 @@ export function AgentConnectionForm({
   const connect = async () => {
     if (!type || !draft || pending || !configurationReady) return;
     if (preview) {
-      setError("Preview only. No agent was imported.");
+      setError(t("v1agent.connect.previewOnly"));
       return;
     }
     setPending(true);
@@ -417,7 +420,10 @@ export function AgentConnectionForm({
     }
   };
   return (
-    <section aria-label="Agent connection setup" data-agent-connection-setup="">
+    <section
+      aria-label={t("v1agent.connect.section")}
+      data-agent-connection-setup=""
+    >
       <div className={messages.message}>
         <div className={messages.messageBody}>
           <div className="w-full max-w-xl">
@@ -438,7 +444,9 @@ export function AgentConnectionForm({
                       size="sm"
                       variant="ghost"
                       disabled={pending}
-                      aria-label={`Dismiss connection setup for ${candidate.name}`}
+                      aria-label={t("v1agent.connect.dismiss", {
+                        name: candidate.name,
+                      })}
                       icon={<XIcon size={18} aria-hidden="true" />}
                       onClick={onDismiss}
                     />
@@ -447,32 +455,33 @@ export function AgentConnectionForm({
                 <div className="flex flex-col gap-1">
                   <h3 className="m-0 text-label">
                     {done
-                      ? `${candidate.name} connected`
-                      : `Connect ${candidate.name}`}
+                      ? t("v1agent.connect.connected", { name: candidate.name })
+                      : t("v1agent.connect.title", { name: candidate.name })}
                   </h3>
                   <p className="m-0 text-body-sm text-subtle">
                     {preview
-                      ? "Choose a harness to import this agent."
+                      ? t("v1agent.connect.previewHint")
                       : done
                         ? onSendAgain
-                          ? `Send “Please respond to my message above.” to ${candidate.name} in your original message’s thread.`
-                          : "Send a message to continue your conversation."
+                          ? t("v1agent.connect.sendAgainHint", {
+                              name: candidate.name,
+                            })
+                          : t("v1agent.connect.sendHint")
                         : type
-                          ? "Review the settings to import this agent and continue your conversation."
-                          : "Choose a harness to continue."}
-                    {!done &&
-                      " Stop this agent in old Buzz before connecting, so only one app replies."}
+                          ? t("v1agent.connect.reviewHint")
+                          : t("v1agent.connect.chooseHint")}
+                    {!done && ` ${t("v1agent.connect.stopOld")}`}
                   </p>
                 </div>
                 {!done && (
                   <>
                     <div className="flex max-w-full flex-col items-start gap-3">
                       <Select
-                        label="Harness"
+                        label={t("agentCreate.harness")}
                         variant="compact"
                         appearance="inverted"
                         size="sm"
-                        placeholder="Choose harness"
+                        placeholder={t("v1agent.connect.chooseHarness")}
                         value={type?.key ?? ""}
                         disabled={pending}
                         onValueChange={(key) => {
@@ -524,7 +533,9 @@ export function AgentConnectionForm({
                         }
                         onClick={() => void connect()}
                       >
-                        {pending ? "Connecting…" : "Connect"}
+                        {pending
+                          ? t("v1agent.connect.connecting")
+                          : t("v1agent.connect.connect")}
                       </Button>
                     </div>
                   </>
@@ -538,10 +549,10 @@ export function AgentConnectionForm({
                       onClick={() => void sendAgain()}
                     >
                       {sentAgain
-                        ? "Follow-up queued"
+                        ? t("v1agent.connect.queued")
                         : pending
-                          ? "Sending…"
-                          : `Ask ${candidate.name} to respond`}
+                          ? t("v1agent.connect.sending")
+                          : t("v1agent.connect.ask", { name: candidate.name })}
                     </Button>
                   </div>
                 )}
