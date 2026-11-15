@@ -27,13 +27,14 @@ import {
 import { NavigationItem } from "../../shared/design-system/ui/NavigationItem";
 import { Select } from "../../shared/design-system/ui/Select";
 import { Switch } from "../../shared/design-system/ui/Switch";
+import { t, useLanguage, type TranslationKey } from "../../shared/i18n";
+import { displayWorkflowDraftIssue } from "./workflowEditorDisplay";
 import { WorkflowMessageText } from "./WorkflowMessageText";
 import { WorkflowConditions } from "./WorkflowConditions";
 import { WorkflowWebhookFields } from "./WorkflowWebhookFields";
 import { WorkflowScheduleFields } from "./WorkflowScheduleFields";
 import { formWithStep, type WorkflowDraftIssue } from "./editor-model";
 import {
-  ACTION_LABELS,
   isThreadReplyEligibleTrigger,
   isTriggerType,
   nextStepId,
@@ -47,14 +48,28 @@ import { defaultScheduleTrigger } from "./workflowSchedule";
 
 const TRIGGERS: Record<
   TriggerType,
-  { label: string; icon: typeof CalendarIcon }
+  { label: `workflowForm.trigger.${TriggerType}`; icon: typeof CalendarIcon }
 > = {
-  message_posted: { label: "Message posted", icon: ChatCircleIcon },
-  reaction_added: { label: "Reaction added", icon: SmileyIcon },
-  diff_posted: { label: "Diff posted", icon: GitPullRequestIcon },
-  schedule: { label: "Schedule", icon: CalendarIcon },
-  webhook: { label: "Webhook", icon: WebhooksLogoIcon },
+  message_posted: {
+    label: "workflowForm.trigger.message_posted",
+    icon: ChatCircleIcon,
+  },
+  reaction_added: {
+    label: "workflowForm.trigger.reaction_added",
+    icon: SmileyIcon,
+  },
+  diff_posted: {
+    label: "workflowForm.trigger.diff_posted",
+    icon: GitPullRequestIcon,
+  },
+  schedule: { label: "workflowForm.trigger.schedule", icon: CalendarIcon },
+  webhook: { label: "workflowForm.trigger.webhook", icon: WebhooksLogoIcon },
 };
+const ACTION_LABELS = {
+  send_message: "workflowForm.action.send_message",
+  delay: "workflowForm.action.delay",
+  call_webhook: "workflowForm.action.call_webhook",
+} as const satisfies Record<ActionType, TranslationKey>;
 export type WorkflowSelection =
   | { type: "trigger" }
   | { type: "step"; id: string }
@@ -77,6 +92,7 @@ export function WorkflowForm({
   onSelect: (selection: WorkflowSelection) => void;
   overview?: ReactNode;
 }) {
+  useLanguage();
   const id = useId();
   const container = useRef<HTMLDivElement>(null);
   const [narrow, setNarrow] = useState(false);
@@ -147,7 +163,9 @@ export function WorkflowForm({
           render={
             <IconButton
               aria-label={
-                after < 0 ? "Add step" : `Add after Step ${after + 1}`
+                after < 0
+                  ? t("workflowForm.addStep")
+                  : t("workflowForm.addAfter", { step: after + 1 })
               }
               icon={<PlusIcon size={16} aria-hidden="true" />}
               size="sm"
@@ -161,19 +179,19 @@ export function WorkflowForm({
             <MenuIcon>
               <ChatCircleIcon size={14} />
             </MenuIcon>
-            Add Send Message
+            {t("workflowForm.addMessage")}
           </MenuItem>
           <MenuItem onClick={() => addStep(after, "delay")}>
             <MenuIcon>
               <TimerIcon size={14} />
             </MenuIcon>
-            Add Delay
+            {t("workflowForm.addDelay")}
           </MenuItem>
           <MenuItem onClick={() => addStep(after, "call_webhook")}>
             <MenuIcon>
               <WebhooksLogoIcon size={14} />
             </MenuIcon>
-            Add Call Webhook
+            {t("workflowForm.addWebhook")}
           </MenuItem>
         </MenuPopup>
       </MenuRoot>
@@ -195,12 +213,14 @@ export function WorkflowForm({
       <div className="workflow-inspector-heading">
         <div>
           {selectedStep && (
-            <p className="text-caption text-subtle">STEP {stepIndex + 1}</p>
+            <p className="text-caption text-subtle">
+              {t("workflowForm.stepCaption", { step: stepIndex + 1 })}
+            </p>
           )}
           {selectedStep ? (
             <Select
               key="step-action"
-              label="Step action"
+              label={t("workflowForm.stepAction")}
               variant="field"
               disabled={disabled}
               value={selectedStep.action}
@@ -208,7 +228,7 @@ export function WorkflowForm({
                 {
                   label: "",
                   options: Object.entries(ACTION_LABELS).map(
-                    ([value, label]) => ({ value, label }),
+                    ([value, label]) => ({ value, label: t(label) }),
                   ),
                 },
               ]}
@@ -245,7 +265,7 @@ export function WorkflowForm({
           ) : (
             <Select
               key="trigger-type"
-              label="Trigger"
+              label={t("workflowForm.trigger")}
               variant="field"
               disabled={disabled}
               value={state.trigger.on}
@@ -253,7 +273,7 @@ export function WorkflowForm({
                 {
                   label: "",
                   options: Object.entries(TRIGGERS).map(
-                    ([value, { label }]) => ({ value, label }),
+                    ([value, { label }]) => ({ value, label: t(label) }),
                   ),
                 },
               ]}
@@ -278,8 +298,10 @@ export function WorkflowForm({
           {selectedStep && (
             <IconButton
               hint="familiar"
-              aria-label={`Remove step ${stepIndex + 1}`}
-              title="Remove step"
+              aria-label={t("workflowForm.removeStepNumber", {
+                step: stepIndex + 1,
+              })}
+              title={t("workflowForm.removeStep")}
               icon={<TrashIcon size={16} aria-hidden="true" />}
               disabled={disabled}
               onClick={removeStep}
@@ -287,7 +309,7 @@ export function WorkflowForm({
           )}
           {!narrow && (
             <IconButton
-              aria-label="Close inspector"
+              aria-label={t("workflowForm.closeInspector")}
               icon={<XIcon size={16} aria-hidden="true" />}
               onClick={() => onSelect(null)}
             />
@@ -308,7 +330,7 @@ export function WorkflowForm({
         ) : (
           <>
             {state.trigger.on === "reaction_added" && (
-              <Field label="Emoji (optional)">
+              <Field label={t("workflowForm.emoji")}>
                 <Input
                   id={`${id}-emoji`}
                   value={state.trigger.emoji ?? ""}
@@ -326,8 +348,7 @@ export function WorkflowForm({
               />
             ) : state.trigger.on === "webhook" ? (
               <p className="text-body-sm text-subtle">
-                A unique URL is generated after creation. Its address and
-                one-time secret are shown once, after the first save.
+                {t("workflowForm.webhookGenerated")}
               </p>
             ) : (
               <WorkflowConditions
@@ -354,12 +375,14 @@ export function WorkflowForm({
       data-inspector={((inspectorOpen || !!overview) && !narrow) || undefined}
     >
       <div className="workflow-canvas">
-        <ol className="workflow-flow" aria-label="Workflow sequence">
+        <ol className="workflow-flow" aria-label={t("workflowForm.sequence")}>
           <li className="workflow-flow-item">
             <NavigationItem
               ref={triggerNode}
               variant="row"
-              aria-label={`Edit trigger: ${TRIGGERS[state.trigger.on].label}`}
+              aria-label={t("workflowForm.editTrigger", {
+                trigger: t(TRIGGERS[state.trigger.on].label),
+              })}
               aria-current={false}
               aria-pressed={selection?.type === "trigger"}
               selected={selection?.type === "trigger"}
@@ -370,9 +393,11 @@ export function WorkflowForm({
               }
               label={
                 <span className="workflow-node-copy">
-                  <span className="text-caption text-subtle">TRIGGER</span>
+                  <span className="text-caption text-subtle">
+                    {t("workflowForm.triggerCaption")}
+                  </span>
                   <span className="text-label">
-                    {TRIGGERS[state.trigger.on].label}
+                    {t(TRIGGERS[state.trigger.on].label)}
                   </span>
                 </span>
               }
@@ -388,7 +413,10 @@ export function WorkflowForm({
                   else stepNodes.current.delete(step.id);
                 }}
                 variant="row"
-                aria-label={`Edit step ${index + 1}: ${ACTION_LABELS[step.action]}`}
+                aria-label={t("workflowForm.editStep", {
+                  step: index + 1,
+                  action: t(ACTION_LABELS[step.action]),
+                })}
                 aria-current={false}
                 aria-pressed={
                   selection?.type === "step" && selection.id === step.id
@@ -404,16 +432,16 @@ export function WorkflowForm({
                 label={
                   <span className="workflow-node-copy">
                     <span className="text-caption text-subtle">
-                      {ACTION_LABELS[step.action].toUpperCase()}
+                      {t(ACTION_LABELS[step.action]).toUpperCase()}
                     </span>
                     <span className="workflow-node-summary text-label">
                       {step.action === "send_message"
                         ? step.text?.trim()
                           ? `“${step.text}”`
-                          : "Write a message…"
+                          : t("workflowForm.writeMessage")
                         : step.action === "delay"
-                          ? step.duration || "Set a duration…"
-                          : step.url || "Set a URL…"}
+                          ? step.duration || t("workflowForm.setDuration")
+                          : step.url || t("workflowForm.setUrl")}
                     </span>
                   </span>
                 }
@@ -425,7 +453,7 @@ export function WorkflowForm({
         </ol>
         {!state.steps.length && (
           <p className="text-body-sm text-subtle">
-            Add a step to decide what happens next.
+            {t("workflowForm.addStepHelp")}
           </p>
         )}
         {issue &&
@@ -441,7 +469,10 @@ export function WorkflowForm({
                 })
               }
             >
-              Review step {issue.stepIndex + 1}: {issue.message}
+              {t("workflowForm.reviewStep", {
+                step: issue.stepIndex + 1,
+                error: displayWorkflowDraftIssue(issue) ?? "",
+              })}
             </Button>
           )}
       </div>
@@ -452,13 +483,15 @@ export function WorkflowForm({
             if (!open) onSelect(null);
           }}
           title={
-            selectedStep ? `Step ${stepIndex + 1} settings` : "Trigger settings"
+            selectedStep
+              ? t("workflowForm.stepSettings", { step: stepIndex + 1 })
+              : t("workflowForm.triggerSettings")
           }
           placement="right"
           finalFocus={() => inspectorReturnFocus.current}
           motion="none"
           dismissOnOutsideClick
-          closeLabel="Close inspector"
+          closeLabel={t("workflowForm.closeInspector")}
         >
           {inspector}
         </Dialog>
@@ -467,14 +500,19 @@ export function WorkflowForm({
         <aside
           className="workflow-inspector"
           aria-label={
-            selectedStep ? `Step ${stepIndex + 1} settings` : "Trigger settings"
+            selectedStep
+              ? t("workflowForm.stepSettings", { step: stepIndex + 1 })
+              : t("workflowForm.triggerSettings")
           }
         >
           {inspector}
         </aside>
       ) : (
         overview && (
-          <aside className="workflow-inspector" aria-label="Workflow settings">
+          <aside
+            className="workflow-inspector"
+            aria-label={t("workflowForm.settings")}
+          >
             {overview}
           </aside>
         )
@@ -506,6 +544,10 @@ function StepFields({
     issue.field === field
       ? issue.message
       : undefined;
+  const displayedError = (
+    field: "text" | "duration" | "timeout" | "url" | "headers",
+  ) =>
+    error(field) ? (displayWorkflowDraftIssue(issue) ?? undefined) : undefined;
   const update = (patch: Partial<StepFormState>) =>
     onChange(formWithStep(state, step.id, patch));
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -523,14 +565,14 @@ function StepFields({
           step={step}
           disabled={disabled}
           update={update}
-          urlError={error("url")}
-          headersError={error("headers")}
+          urlError={displayedError("url")}
+          headersError={displayedError("headers")}
         />
       ) : step.action === "send_message" ? (
         <Field
-          label="Message text"
-          error={error("text")}
-          description="Messages post to the workflow channel unless a destination is set below."
+          label={t("workflowForm.messageText")}
+          error={displayedError("text")}
+          description={t("workflowForm.messageHelp")}
         >
           <WorkflowMessageText
             id={`${id}-text`}
@@ -541,7 +583,10 @@ function StepFields({
           />
         </Field>
       ) : (
-        <Field label="Delay duration" error={error("duration")}>
+        <Field
+          label={t("workflowForm.delayDuration")}
+          error={displayedError("duration")}
+        >
           <Input
             id={`${id}-duration`}
             value={step.duration ?? ""}
@@ -560,17 +605,28 @@ function StepFields({
             value: "run",
             title: (
               <span className="workflow-disclosure-title">
-                Run controls
+                {t("workflowForm.runControls")}
                 <span className="text-caption text-subtle">
-                  {step.timeoutSecs || step.replyInThread || step.condition
-                    ? [
-                        step.condition && "Conditional",
-                        step.replyInThread && "Thread reply",
-                        step.timeoutSecs,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")
-                    : "Default"}
+                  {step.timeoutSecs
+                    ? t(
+                        step.condition
+                          ? step.replyInThread
+                            ? "workflowForm.summary.all"
+                            : "workflowForm.summary.conditionTimeout"
+                          : step.replyInThread
+                            ? "workflowForm.summary.threadTimeout"
+                            : "workflowForm.summary.timeout",
+                        { timeout: step.timeoutSecs },
+                      )
+                    : t(
+                        step.condition
+                          ? step.replyInThread
+                            ? "workflowForm.summary.both"
+                            : "workflowForm.summary.condition"
+                          : step.replyInThread
+                            ? "workflowForm.summary.thread"
+                            : "workflowForm.summary.default",
+                      )}
                 </span>
               </span>
             ),
@@ -579,7 +635,7 @@ function StepFields({
                 {step.action === "send_message" &&
                   isThreadReplyEligibleTrigger(state.trigger.on) && (
                     <Switch
-                      label="Reply in the triggering thread"
+                      label={t("workflowForm.replyInThread")}
                       checked={step.replyInThread === true}
                       disabled={disabled}
                       onCheckedChange={(replyInThread) =>
@@ -588,8 +644,8 @@ function StepFields({
                     />
                   )}
                 <Field
-                  label="Step condition (optional)"
-                  description="An evalexpr expression evaluated before this step."
+                  label={t("workflowForm.stepCondition")}
+                  description={t("workflowForm.stepConditionHelp")}
                 >
                   <Input
                     value={step.condition ?? ""}
@@ -600,7 +656,10 @@ function StepFields({
                     }
                   />
                 </Field>
-                <Field label="Step timeout (optional)" error={error("timeout")}>
+                <Field
+                  label={t("workflowForm.stepTimeout")}
+                  error={displayedError("timeout")}
+                >
                   <Input
                     id={`${id}-timeout`}
                     value={step.timeoutSecs ?? ""}
@@ -615,7 +674,7 @@ function StepFields({
             value: "details",
             title: (
               <span className="workflow-disclosure-title">
-                Step details
+                {t("workflowForm.stepDetails")}
                 <span className="text-caption text-subtle">
                   {step.name || step.id}
                 </span>
@@ -624,7 +683,7 @@ function StepFields({
             content: (
               <div className="workflow-options">
                 <p className="text-mono-sm text-subtle">{step.id}</p>
-                <Field label="Step name (optional)">
+                <Field label={t("workflowForm.stepName")}>
                   <Input
                     id={`${id}-name`}
                     value={step.name ?? ""}
@@ -633,8 +692,8 @@ function StepFields({
                 </Field>
                 {step.action === "send_message" && (
                   <Field
-                    label="Destination channel UUID (optional)"
-                    description="Blank uses this workflow’s channel. The relay checks destination access."
+                    label={t("workflowForm.destination")}
+                    description={t("workflowForm.destinationHelp")}
                   >
                     <Input
                       id={`${id}-channel`}

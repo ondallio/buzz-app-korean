@@ -8,6 +8,7 @@ import { Select } from "../../shared/design-system/ui/Select";
 import { useToastNotification } from "../../shared/design-system/ui/Toast";
 import type { PullChecklist } from "./pull";
 import styles from "./GitHub.module.css";
+import { t, useLanguage } from "../../shared/i18n";
 
 type Resolution = "failures" | "conflicts";
 export function ResolvePull({
@@ -54,6 +55,7 @@ function SessionResolve({
   pull: PullChecklist;
   action: Resolution;
 }) {
+  useLanguage();
   const list = useChannelList(session.channels);
   const choices = useAgentChoices(session, true, true);
   const channel = list.channels.find((item) => item.id === channelId);
@@ -122,9 +124,7 @@ function SessionResolve({
         !available.some((agent) => agent.pubkey === recipient) ||
         (!selected && (!current.complete || available.length !== 1))
       )
-        throw new Error(
-          "The chat’s agents changed. Choose an agent and try again.",
-        );
+        throw new Error(t("v1wf.gh.agentsChanged"));
       const content = `[Resolve ${action}](${url})`;
       if (rootId && fresh.channelType !== "solo")
         session.messages.reply(channelId, rootId, content, [recipient]);
@@ -135,7 +135,7 @@ function SessionResolve({
         notify(
           error instanceof Error
             ? error.message
-            : "Couldn’t send the request. Try again.",
+            : t("v1wf.gh.sendRequestFailed"),
           "error",
         );
     } finally {
@@ -159,27 +159,27 @@ function SessionResolve({
                   notify(
                     error instanceof Error
                       ? error.message
-                      : "Couldn’t load agents. Try again.",
+                      : t("v1wf.gh.loadAgentsFailed"),
                     "error",
                   ),
                 )
             }
           >
-            Retry agents
+            {t("v1wf.gh.retryAgents")}
           </Button>
         </span>
       )}
       {(agents.length > 1 || (!choices.complete && agents.length > 0)) && (
         <Select
-          label="Agent"
+          label={t("v1wf.gh.agent")}
           variant="inline"
           size="sm"
           value={selected}
-          placeholder="Choose agent"
+          placeholder={t("v1wf.gh.chooseAgent")}
           disabled={busy || sent}
           groups={[
             {
-              label: "Chat agents",
+              label: t("v1wf.gh.chatAgents"),
               options: agents.map((agent) => ({
                 value: agent.pubkey,
                 label: agent.name,
@@ -198,13 +198,13 @@ function SessionResolve({
         title={
           !recipient
             ? choices.pending
-              ? "Loading chat agents…"
-              : "Choose an available agent in this chat"
-            : "Send a resolution request to the selected chat agent"
+              ? t("v1wf.gh.loadingChatAgents")
+              : t("v1wf.gh.chooseAvailableAgent")
+            : t("v1wf.gh.sendResolution")
         }
         onClick={() => void send()}
       >
-        {sent ? "Requested" : `Resolve ${action}`}
+        {sent ? t("v1wf.gh.requested") : t(`v1wf.gh.resolve.${action}`)}
       </Button>
     </span>
   );

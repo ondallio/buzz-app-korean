@@ -9,6 +9,7 @@ import {
   VOICE_NOTE_WAVEFORM_INTERVAL_MS,
 } from "./audio";
 import styles from "./VoiceNotes.module.css";
+import { t, useLanguage } from "../../shared/i18n";
 
 /** Recording strip from the original Buzz composer, using the host palette. */
 export function VoiceNoteRecorder({
@@ -22,6 +23,7 @@ export function VoiceNoteRecorder({
   onCancel(): void;
   status: "requesting" | "recording" | "processing";
 }) {
+  useLanguage();
   const discard = useRef<HTMLButtonElement>(null);
   useLayoutEffect(() => {
     discard.current?.focus();
@@ -60,21 +62,21 @@ export function VoiceNoteRecorder({
   }, [count, levels.length, reducedMotion]);
   const label =
     status === "requesting"
-      ? "Waiting for microphone…"
+      ? t("v1wf.voice.waitingMic")
       : status === "processing"
-        ? "Preparing voice note…"
+        ? t("v1wf.voice.preparing")
         : undefined;
   return (
     <fieldset className={styles.recorder}>
-      <legend className="sr-only">{label ?? "Recording voice note"}</legend>
+      <legend className="sr-only">{label ?? t("v1wf.voice.recording")}</legend>
       <IconButton
         hint="familiar"
         ref={discard}
         type="button"
         variant="subtle"
         size="sm"
-        aria-label="Discard voice note"
-        title="Discard voice note"
+        aria-label={t("v1wf.voice.discard")}
+        title={t("v1wf.voice.discard")}
         onClick={onCancel}
         icon={<X size={16} aria-hidden="true" />}
       />

@@ -29,6 +29,7 @@ import {
 import { buzzLinkKind } from "../../features/navigation/buzz-links";
 import styles from "../../shared/InlineReference.module.css";
 import { channelIconClass } from "../../shared/inline-reference";
+import { t, useLanguage } from "../../shared/i18n";
 
 // Match actual host boundaries, never a service name found in a path or query.
 const serviceHosts = {
@@ -131,6 +132,7 @@ export function LinkLabel({
   /** In place of the service's icon, for a renderer that knows more. */
   icon?: ReactNode;
 }) {
+  useLanguage();
   const contextualLabel = useContext(LinkLabelContext);
   const content = useContext(LinkContentContext);
   const privateChannel = useContext(LinkChannelPrivateContext);
@@ -138,9 +140,9 @@ export function LinkLabel({
   if (!kind) return <>{label}</>;
   if (label === href && contextualLabel) label = contextualLabel;
   if (label === href) {
-    if (kind === "channel") label = "Channel";
-    else if (kind === "message") label = "Message";
-    else if (kind === "thread") label = "Thread";
+    if (kind === "channel") label = t("v1wf.link.channel");
+    else if (kind === "message") label = t("v1wf.link.message");
+    else if (kind === "thread") label = t("v1wf.link.thread");
     else if (kind === "buzz") label = "Buzz";
   }
   // The channel icon already supplies the visual hash.

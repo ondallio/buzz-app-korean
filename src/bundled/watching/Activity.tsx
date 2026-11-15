@@ -31,6 +31,7 @@ import {
   channelIcon,
   type Channel,
 } from "./presentation";
+import { t, useLanguage } from "../../shared/i18n";
 const noProfiles: ProfileQueries = {
   snapshot: () => new Map(),
   subscribe: () => () => {},
@@ -45,7 +46,7 @@ export function createAttentionActivity(navigation: Context["navigation"]) {
     name,
     scope,
     summary,
-    prefix = "Runs in",
+    prefix,
     compact = false,
   }: {
     channel: string;
@@ -58,9 +59,11 @@ export function createAttentionActivity(navigation: Context["navigation"]) {
   }) {
     const text = (
       <span className="attention-destination-label">
-        {prefix}
+        {prefix ?? t("v1wf.watch.runsIn")}
         {h(channelIcon(summary), { size: 16, "aria-hidden": true })}
-        <span className="attention-channel-name">{`${name}${root ? " thread" : ""}`}</span>
+        <span className="attention-channel-name">
+          {root ? t("v1wf.watch.thread", { name }) : name}
+        </span>
       </span>
     );
     const at = scope?.lastIndexOf(":") ?? -1;
@@ -68,7 +71,7 @@ export function createAttentionActivity(navigation: Context["navigation"]) {
       return (
         <span
           className="text-caption text-subtle"
-          title={`Delivers to ${name}`}
+          title={t("v1wf.watch.deliversTo", { name })}
         >
           {text}
         </span>
@@ -247,14 +250,14 @@ export function createAttentionActivity(navigation: Context["navigation"]) {
     const summary =
       (command
         ? heading(entry.text.trim().split("\n")[0] ?? "").text
-        : plainText(entry.text)) || "Recorded event";
+        : plainText(entry.text)) || t("v1wf.watch.recordedEvent");
     return (
       <li className="attention-timeline-event">
         <details open={open}>
           {/* biome-ignore lint/a11y/noStaticElementInteractions: Native summary handles keyboard activation; the click controls lazy mounting. */}
           <summary
             className="attention-activity-row"
-            aria-label={`Open activity: ${summary}`}
+            aria-label={t("v1wf.watch.openActivity", { summary })}
             onClick={(event: React.MouseEvent) => {
               event.preventDefault();
               setOpen(!open);
@@ -310,26 +313,35 @@ export function createAttentionActivity(navigation: Context["navigation"]) {
     command: boolean;
     messages: boolean;
   }) {
+    useLanguage();
     return (
       <details className="attention-watch-activity">
         <summary
           className="attention-disclosure text-body-sm text-subtle"
-          aria-label={`Show activity for ${label}`}
+          aria-label={t("v1wf.watch.showActivityFor", { label })}
         >
           <span className="attention-disclosure-icon">
             <ClockIcon size={16} aria-hidden={true} />
           </span>
-          {"Activity"}
+          {t("v1wf.watch.activity")}
           <span className="attention-detail-preview">
             {history?.events?.length
-              ? `${history.events.length} event${history.events.length === 1 ? "" : "s"}`
+              ? t(
+                  history.events.length === 1
+                    ? "v1wf.watch.event.one"
+                    : "v1wf.watch.event.other",
+                  { count: history.events.length },
+                )
               : history?.output
-                ? "1 event"
-                : "No activity yet"}
+                ? t("v1wf.watch.event.one", { count: 1 })
+                : t("v1wf.watch.noActivity")}
           </span>
           <CaretRightIcon size={16} aria-hidden={true} />
         </summary>
-        <ol className="attention-timeline" aria-label={`Activity for ${label}`}>
+        <ol
+          className="attention-timeline"
+          aria-label={t("v1wf.watch.activityFor", { label })}
+        >
           {(history?.events?.length
             ? [...history.events].reverse()
             : history?.output
@@ -360,7 +372,9 @@ export function createAttentionActivity(navigation: Context["navigation"]) {
           ))}
           {!history?.events?.length && !history?.output && (
             <li>
-              <p className="text-body-sm text-subtle">{"No activity yet"}</p>
+              <p className="text-body-sm text-subtle">
+                {t("v1wf.watch.noActivity")}
+              </p>
             </li>
           )}
         </ol>

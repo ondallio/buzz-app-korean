@@ -1,3 +1,9 @@
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { useEffect, useRef, useState } from "react";
 import {
   PopoverRoot,
@@ -30,9 +36,22 @@ type Item = {
   type: keyof typeof kinds;
   id: string;
   label: string;
+  fallbackLabel: boolean;
   createdAt: number;
   repository: Entity;
 };
+// Capture provenance from the original subject/body decision, never by
+// comparing an authored title with the fallback's English words.
+function resourceLabel(event: Entity["event"], type: Item["type"]) {
+  const label = value(event, "subject") || event.content.split("\n")[0];
+  return { label: label || kinds[type], fallbackLabel: !label };
+}
+function displayedKind(type: Item["type"]) {
+  return t(type === "issue" ? "resourcePicker.issue" : "resourcePicker.pr");
+}
+function displayedLabel(item: Item) {
+  return item.fallbackLabel ? displayedKind(item.type) : item.label;
+}
 type Items =
   | { status: "loading" | "error" }
   | { status: "ready"; items: Item[]; truncated: boolean };
@@ -49,6 +68,7 @@ export function ResourcePicker({
   disabled,
   insertResource,
 }: ComposerToolProps) {
+  const language = useLanguage();
   const [attempt, setAttempt] = useState(0);
   const [home, setHome] = useState<Home>(() => ({
     status: "loading",
@@ -58,7 +78,10 @@ export function ResourcePicker({
   const [opening, setOpening] = useState(0);
   const [search, setSearch] = useState("");
   const [items, setItems] = useState<Items>({ status: "loading" });
-  const [checking, setChecking] = useState<{ id: string; failed?: string }>();
+  const [checking, setChecking] = useState<{
+    id: string;
+    failed?: DisplayMessage;
+  }>();
   const [rejected, setRejected] = useState<string>();
   const validation = useRef<AbortController>(undefined);
   const accepted = useRef(false);
@@ -123,10 +146,7 @@ export function ResourcePicker({
                     {
                       type,
                       id: event.id,
-                      label:
-                        value(event, "subject") ||
-                        event.content.split("\n")[0] ||
-                        kinds[type],
+                      ...resourceLabel(event, type),
                       createdAt: event.created_at,
                       repository,
                     },
@@ -175,10 +195,14 @@ export function ResourcePicker({
   const shown =
     items.status === "ready"
       ? items.items
-          .filter((item) =>
-            `${item.label} ${item.repository.name}`
-              .toLowerCase()
-              .includes(query),
+          .filter(
+            (item) =>
+              `${item.label} ${item.repository.name}`
+                .toLowerCase()
+                .includes(query) ||
+              (language === "ko" &&
+                item.fallbackLabel &&
+                displayedLabel(item).toLowerCase().includes(query)),
           )
           .map((item) => {
             const match = matchName(item.label, query);
@@ -235,13 +259,17 @@ export function ResourcePicker({
           id: item.id,
           failed:
             entityFailure(error) === "not-found"
-              ? `This ${kinds[item.type].toLowerCase()} is no longer available.`
-              : "Could not check this item. Choose it again to retry.",
+              ? localMessage(
+                  item.type === "issue"
+                    ? "resourcePicker.issueUnavailable"
+                    : "resourcePicker.prUnavailable",
+                )
+              : localMessage("resourcePicker.checkFailed"),
         });
       },
     );
   };
-  const label = "Add issue or pull request";
+  const label = t("resourcePicker.add");
   return (
     <PopoverRoot
       open={open && !disabled && !pending}
@@ -258,7 +286,7 @@ export function ResourcePicker({
     >
       {pending && (
         <span role="status" className="sr-only">
-          Loading repositories…
+          {t("resourcePicker.loadingRepositories")}
         </span>
       )}
       <fieldset
@@ -266,7 +294,7 @@ export function ResourcePicker({
         disabled={disabled}
         hidden={!visibleHome}
         className={styles.controls}
-        aria-label="Issue and pull request controls"
+        aria-label={t("resourcePicker.controls")}
       >
         <PopoverTrigger
           disabled={disabled || pending}
@@ -279,10 +307,10 @@ export function ResourcePicker({
               aria-label={label}
               title={
                 pending
-                  ? "Loading repositories…"
+                  ? t("resourcePicker.loadingRepositories")
                   : repositories
                     ? label
-                    : `${label} (unavailable)`
+                    : t("resourcePicker.unavailableTitle")
               }
               data-unavailable={
                 visibleHome?.status === "error" ? "" : undefined
@@ -309,9 +337,9 @@ export function ResourcePicker({
           <div className={styles.content}>
             {!repositories ? (
               <>
-                <p role="status">Could not load this channel’s repositories.</p>
+                <p role="status">{t("resourcePicker.repositoriesFailed")}</p>
                 <Button type="button" onClick={() => setAttempt((n) => n + 1)}>
-                  Retry repositories
+                  {t("resourcePicker.retryRepositories")}
                 </Button>
               </>
             ) : (
@@ -319,7 +347,9 @@ export function ResourcePicker({
                 <SearchField
                   variant="capsule"
                   inputRef={searchInput}
-                  label="Search issues and pull requests"
+                  label={t("resourcePicker.search")}
+                  placeholder={t("resourcePicker.searchPlaceholder")}
+                  clearLabel={t("resourcePicker.clearSearch")}
                   value={search}
                   onValueChange={setSearch}
                   disabled={disabled}
@@ -341,32 +371,31 @@ export function ResourcePicker({
                   }}
                 />
                 {items.status === "loading" && (
-                  <p role="status">Loading issues and pull requests…</p>
+                  <p role="status">{t("resourcePicker.loadingItems")}</p>
                 )}
                 {items.status === "error" && (
                   <>
-                    <p role="alert">Could not load issues and pull requests.</p>
+                    <p role="alert">{t("resourcePicker.itemsFailed")}</p>
                     <Button
                       type="button"
                       onClick={() => setOpening((n) => n + 1)}
                     >
-                      Retry
+                      {t("resourcePicker.retry")}
                     </Button>
                   </>
                 )}
                 {items.status === "ready" && items.truncated && (
-                  <p role="status">
-                    Showing the latest items only. Some issues or pull requests
-                    may be missing.
-                  </p>
+                  <p role="status">{t("resourcePicker.truncated")}</p>
                 )}
                 {checking && !checking.failed && (
                   <p role="status" className="sr-only">
-                    Checking the chosen item…
+                    {t("resourcePicker.checkingItem")}
                   </p>
                 )}
                 {(checking?.failed ?? rejected) && (
-                  <p role="alert">{checking?.failed ?? rejected}</p>
+                  <p role="alert">
+                    {resolveMessage(checking?.failed ?? rejected)}
+                  </p>
                 )}
                 <div
                   className={`${styles.choices} buzz-thin-scrollbar`}
@@ -382,7 +411,11 @@ export function ResourcePicker({
                       {...highlight.rowProps(item.id)}
                       selected={highlight.active === item.id}
                       aria-current={false}
-                      aria-label={`${item.label}, ${kinds[item.type]} in ${item.repository.name}`}
+                      aria-label={t("resourcePicker.row", {
+                        label: displayedLabel(item),
+                        kind: displayedKind(item.type),
+                        repository: item.repository.name,
+                      })}
                       disabled={disabled || busy}
                       onClick={() => choose(item)}
                       label={
@@ -391,9 +424,12 @@ export function ResourcePicker({
                               underlined title on one line. */}
                           <span>
                             <MatchedLabel
-                              label={item.label}
+                              label={displayedLabel(item)}
                               positions={
-                                query && match && match.rank <= 3
+                                query &&
+                                match &&
+                                match.rank <= 3 &&
+                                (!item.fallbackLabel || language === "en")
                                   ? match.positions
                                   : undefined
                               }
@@ -401,8 +437,11 @@ export function ResourcePicker({
                           </span>
                           <small className="text-caption text-subtle">
                             {checking?.id === item.id && !checking.failed
-                              ? "Checking…"
-                              : `${kinds[item.type]} · ${item.repository.name}`}
+                              ? t("resourcePicker.checking")
+                              : t("resourcePicker.caption", {
+                                  kind: displayedKind(item.type),
+                                  repository: item.repository.name,
+                                })}
                           </small>
                         </span>
                       }
@@ -411,13 +450,15 @@ export function ResourcePicker({
                   {items.status === "ready" && !shown.length && (
                     <p>
                       {items.items.length
-                        ? "No matching issues or pull requests."
-                        : "These repositories have no issues or pull requests yet."}
+                        ? t("resourcePicker.noMatches")
+                        : t("resourcePicker.empty")}
                     </p>
                   )}
                   <p role="status" className="sr-only">
                     {highlighted
-                      ? `${highlighted.item.label}. Press Enter to add.`
+                      ? t("resourcePicker.selectionHint", {
+                          label: displayedLabel(highlighted.item),
+                        })
                       : ""}
                   </p>
                 </div>

@@ -7,6 +7,7 @@ import { loadGitHubDetails, type GitHubDetails } from "./data";
 import { GhUnavailable, GitHubError, type GitHubCli } from "./gh";
 import type { PullChecklist } from "./pull";
 import type { GitHubReference } from "./references";
+import { t } from "../../shared/i18n";
 
 export type GitHubObject = Readonly<{
   details: GitHubDetails;
@@ -53,9 +54,7 @@ async function readGitHubObject(
 /** GitHub's reason in words a person can act on. */
 export function readable(error: unknown) {
   if (error instanceof GitHubError && error.type === "NOT_FOUND")
-    return new Error(
-      "GitHub couldn’t find this, or your GitHub account can’t see it.",
-    );
+    return new Error(t("v1wf.gh.notFound"));
   return error instanceof Error ? error : new Error(String(error));
 }
 

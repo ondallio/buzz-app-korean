@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { Header } from "../../shared/design-system/ui/Header";
 import { AuthorSettings } from "./AuthorSettings";
 import type { GitHubCli } from "./gh";
@@ -10,8 +11,9 @@ export function GitHubSettings({
   active(): boolean;
   gh?: GitHubCli | undefined;
 }) {
+  useLanguage();
   return (
-    <section aria-label="GitHub settings">
+    <section aria-label={t("githubSettings.settings")}>
       <Header title="GitHub" />
       <div className="grid grid-cols-1 gap-section-gap">
         <LinkSettings active={active} />

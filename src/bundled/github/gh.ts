@@ -6,6 +6,7 @@
 // `gh` exits non-zero on a GraphQL error, and the answer it still prints is
 // the only place the reason is.
 import type { Host } from "../../features/host/service";
+import { t } from "../../shared/i18n";
 
 /** `gh` cannot be used here: no desktop, not installed, or not signed in. */
 export class GhUnavailable extends Error {}
@@ -111,7 +112,7 @@ export function gitHubCli(host: Pick<Host, "spawn">): GitHubCli | undefined {
 /** The diff is more than the panel shows. */
 export class OutputTooLarge extends Error {
   constructor() {
-    super("This diff is too large to show here.");
+    super(t("v1wf.gh.diffTooLarge"));
   }
 }
 
@@ -160,9 +161,7 @@ export function gitHubDiff(host: Pick<Host, "spawn">): GitHubDiff | undefined {
     // gh refuses to print a response with a raw ESC byte. Its flag to allow
     // one is too new to rely on every installed gh having.
     if (/escape sequences/.test(reason))
-      throw new GitHubError(
-        "This diff contains terminal control characters, so it can’t be shown here.",
-      );
+      throw new GitHubError(t("v1wf.gh.diffControlChars"));
     if (!stdout.trim()) throw new GhUnavailable(reason || "gh did not answer");
     throw new GitHubError(reason || "GitHub did not answer");
   };

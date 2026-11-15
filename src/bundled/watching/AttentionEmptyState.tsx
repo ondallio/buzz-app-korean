@@ -1,5 +1,6 @@
 import { EmptyState } from "../../shared/design-system/ui/EmptyState";
 import { AttentionSonar } from "./AttentionSonar";
+import { t, useLanguage } from "../../shared/i18n";
 
 export function AttentionEmptyState({
   name,
@@ -8,14 +9,15 @@ export function AttentionEmptyState({
   name: string;
   picture?: string | undefined;
 }) {
+  useLanguage();
   return (
-    <section aria-label="Start watching">
+    <section aria-label={t("v1wf.watch.startWatching")}>
       <EmptyState
         icon={
           <AttentionSonar name={name} picture={picture} size="large" hints />
         }
-        title="Attention"
-        description={`Attention lets ${name} watch for messages and updates across Buzz, then act or notify you based on your instructions. Send ${name} a message to get started.`}
+        title={t("v1wf.watch.attention")}
+        description={t("v1wf.watch.emptyDescription", { name })}
       />
     </section>
   );

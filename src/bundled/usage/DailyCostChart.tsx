@@ -6,6 +6,7 @@ import { Tooltip } from "../../shared/design-system/ui/Tooltip";
 import styles from "./Usage.module.css";
 import { costText } from "./format";
 import { type Day, sum, type Total } from "./stats";
+import { t, useLanguage } from "../../shared/i18n";
 
 /** One stacked series: a harness, or Other for several. */
 export type Series = Readonly<{
@@ -50,6 +51,7 @@ export function DailyCostChart({
   days: readonly Day[];
   series: readonly Series[];
 }) {
+  useLanguage();
   const frame = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const [hovered, setHovered] = useState<number>();
@@ -101,7 +103,7 @@ export function DailyCostChart({
   return (
     <div className={styles.chart}>
       {stacked && (
-        <ul className={styles.legend} aria-label="Harnesses">
+        <ul className={styles.legend} aria-label={t("v1wf.usage.harnesses")}>
           {series.map((line) => (
             <li key={line.key}>
               <span
@@ -115,7 +117,12 @@ export function DailyCostChart({
       )}
       <div ref={frame} className={styles.plot} style={{ blockSize: HEIGHT }}>
         {width > 0 && (
-          <svg width={width} height={HEIGHT} role="img" aria-label="Daily cost">
+          <svg
+            width={width}
+            height={HEIGHT}
+            role="img"
+            aria-label={t("v1wf.usage.dailyCost")}
+          >
             {y.ticks(4).map((tick) => (
               <g key={tick}>
                 <line
@@ -212,7 +219,7 @@ export function DailyCostChart({
                       </span>
                     ))}
                   <span className={styles.tipRow}>
-                    {stacked ? "Total" : "Cost"}
+                    {stacked ? t("v1wf.usage.total") : t("v1wf.usage.cost")}
                     <span>{text(dayTotals[index])}</span>
                   </span>
                 </span>
@@ -240,23 +247,25 @@ export function DailyCostChart({
           aria-controls={table}
           onClick={() => setFigures((shown) => !shown)}
         >
-          {figures ? "Hide daily figures" : "Show daily figures"}
+          {figures ? t("v1wf.usage.hideFigures") : t("v1wf.usage.showFigures")}
           <CaretDownIcon aria-hidden="true" />
         </Button>
       </div>
       {/* Screen readers have the table either way. */}
       <table id={table} className={figures ? styles.figures : "sr-only"}>
-        <caption className="sr-only">Daily cost</caption>
+        <caption className="sr-only">{t("v1wf.usage.dailyCost")}</caption>
         <thead>
           <tr>
-            <th scope="col">Day</th>
+            <th scope="col">{t("v1wf.usage.day")}</th>
             {stacked &&
               series.map((line) => (
                 <th key={line.key} scope="col">
                   {line.label}
                 </th>
               ))}
-            <th scope="col">{stacked ? "Total" : "Cost"}</th>
+            <th scope="col">
+              {stacked ? t("v1wf.usage.total") : t("v1wf.usage.cost")}
+            </th>
           </tr>
         </thead>
         <tbody>

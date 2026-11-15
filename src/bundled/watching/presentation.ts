@@ -5,6 +5,7 @@ import {
   HashIcon,
 } from "../../shared/design-system/icons";
 import type { Watch } from "./model";
+import { t } from "../../shared/i18n";
 export const title = (id: string) =>
   id
     .replace(/^interest\//, "")
@@ -42,25 +43,33 @@ export function describe(
     const next = new Date(nextAt * 1000);
     const date = next.toLocaleDateString();
     const day =
-      date === new Date(now * 1000).toLocaleDateString() ? "today" : date;
+      date === new Date(now * 1000).toLocaleDateString()
+        ? t("v1wf.watch.today")
+        : date;
     const time = next.toLocaleTimeString([], {
       hour: "numeric",
       minute: "2-digit",
     });
     const minutes = Math.ceil(Math.abs(nextAt - now) / 60);
-    const relative = nextAt > now ? `in ${minutes}m` : `${minutes}m ago`;
+    const relative =
+      nextAt > now
+        ? t("v1wf.watch.inMinutes", { minutes })
+        : t("v1wf.watch.minutesAgo", { minutes });
     const interval =
       watch.interval_secs % 3600 === 0
         ? `${watch.interval_secs / 3600}h`
         : watch.interval_secs % 60 === 0
           ? `${watch.interval_secs / 60}m`
           : `${watch.interval_secs}s`;
-    const runs =
-      watch.max_occurrences === null ? "" : ` · ${watch.max_occurrences} runs`;
     const schedule =
       watch.max_occurrences === 1
-        ? `Once · ${day} ${time} (${relative})`
-        : `Every ${interval}${runs}`;
+        ? t("v1wf.watch.once", { day, time, relative })
+        : watch.max_occurrences === null
+          ? t("v1wf.watch.every", { interval })
+          : t("v1wf.watch.everyRuns", {
+              interval,
+              runs: watch.max_occurrences,
+            });
     return {
       title: schedule,
       spent:
@@ -73,7 +82,7 @@ export function describe(
       title: watch.name || watch.provider,
     };
   return {
-    title: watch.name || "Messages",
+    title: watch.name || t("v1wf.watch.messages"),
   };
 }
 export type Channel = {

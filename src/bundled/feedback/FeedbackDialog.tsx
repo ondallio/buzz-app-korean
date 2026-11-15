@@ -15,12 +15,9 @@ import { feedbackDiagnostics, feedbackImage } from "./prepare-feedback";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Dialog } from "../../shared/design-system/ui/Dialog";
 import { Textarea } from "../../shared/design-system/ui/Textarea";
+import { t, useLanguage } from "../../shared/i18n";
 
-const categories = [
-  ["bug", "Bug"],
-  ["praise", "Praise"],
-  ["needs-work", "Needs work"],
-] as const;
+const categories = ["bug", "praise", "needs-work"] as const;
 const emptyItems: readonly OutgoingEvent[] = [];
 const emptyEntries = () => emptyItems;
 const noSubscription = () => () => {};
@@ -69,6 +66,7 @@ function FeedbackForConnection({
   connection: RelaySnapshot;
   isCurrent(): boolean;
 }) {
+  useLanguage();
   const active = useRef(false);
   const attempt = useRef(0);
   useEffect(() => {
@@ -110,7 +108,7 @@ function FeedbackForConnection({
           setError(
             reason instanceof Error
               ? reason.message
-              : "Could not load saved feedback.",
+              : t("v1wf.feedback.loadSavedFailed"),
           );
       },
     );
@@ -150,7 +148,9 @@ function FeedbackForConnection({
         currentAttempt === attempt.current
       )
         setError(
-          reason instanceof Error ? reason.message : "Image upload failed.",
+          reason instanceof Error
+            ? reason.message
+            : t("v1wf.feedback.imageUploadFailed"),
         );
     } finally {
       if (uploadController.current === controller)
@@ -223,7 +223,9 @@ function FeedbackForConnection({
         !uploadController.current?.signal.aborted
       )
         setError(
-          reason instanceof Error ? reason.message : "Could not send feedback.",
+          reason instanceof Error
+            ? reason.message
+            : t("v1wf.feedback.sendFailed"),
         );
     } finally {
       if (active.current && currentAttempt === attempt.current) {
@@ -249,7 +251,9 @@ function FeedbackForConnection({
     } catch (reason) {
       if (!active.current || !isCurrent() || epoch !== attempt.current) return;
       setError(
-        reason instanceof Error ? reason.message : "Could not clear feedback.",
+        reason instanceof Error
+          ? reason.message
+          : t("v1wf.feedback.clearFailed"),
       );
     } finally {
       if (active.current && isCurrent() && epoch === attempt.current)
@@ -260,9 +264,7 @@ function FeedbackForConnection({
     if (
       !pending ||
       (pending.delivery !== "failed" && pending.delivery !== "unknown") ||
-      !window.confirm(
-        "Discard this saved feedback locally? It may already have been delivered; discarding will not undo delivery or delete uploaded attachments.",
-      )
+      !window.confirm(t("v1wf.feedback.discardConfirm"))
     )
       return;
     void clearPending();
@@ -274,7 +276,9 @@ function FeedbackForConnection({
       setError("");
     } catch (reason) {
       setError(
-        reason instanceof Error ? reason.message : "Could not retry feedback.",
+        reason instanceof Error
+          ? reason.message
+          : t("v1wf.feedback.retryFailed"),
       );
     }
   }
@@ -295,31 +299,31 @@ function FeedbackForConnection({
         else onOpenChange(next);
       }}
       dismissOnOutsideClick={false}
-      title="Send feedback"
-      description="Feedback text goes to this Buzz deployment's feedback inbox, not a channel. Images and optional diagnostics use ordinary media storage, not inbox-only access; people allowed to read media on this deployment may access them if they have the link. Images upload when selected; diagnostics upload when you send. Removing an attachment or closing this form does not delete uploaded files."
+      title={t("v1wf.feedback.title")}
+      description={t("v1wf.feedback.description")}
       actions={
         <>
-          <Button onClick={close}>Close</Button>
+          <Button onClick={close}>{t("v1wf.feedback.close")}</Button>
           {delivered ? (
             <Button
               variant="prominent"
               disabled={busy}
               onClick={() => void clearPending()}
             >
-              Done
+              {t("v1wf.feedback.done")}
             </Button>
           ) : pending?.delivery === "failed" ||
             pending?.delivery === "unknown" ? (
             <>
               <Button disabled={busy} onClick={discard}>
-                Discard locally
+                {t("v1wf.feedback.discardLocally")}
               </Button>
               <Button
                 variant="prominent"
                 disabled={!available || busy}
                 onClick={retry}
               >
-                Retry same feedback
+                {t("v1wf.feedback.retrySame")}
               </Button>
             </>
           ) : !pending ? (
@@ -328,7 +332,7 @@ function FeedbackForConnection({
               disabled={!available || !message.trim() || busy}
               onClick={() => void submit()}
             >
-              Send feedback
+              {t("v1wf.feedback.title")}
             </Button>
           ) : null}
         </>
@@ -339,19 +343,23 @@ function FeedbackForConnection({
           <p className="mb-4 whitespace-pre-wrap">{pending.event.content}</p>
           <p role="status">
             {delivered
-              ? "Feedback received by the relay."
+              ? t("v1wf.feedback.received")
               : pending.delivery === "unknown"
-                ? "Delivery could not be confirmed. Retry the same feedback; do not submit a duplicate."
+                ? t("v1wf.feedback.unconfirmed")
                 : pending.delivery === "failed"
-                  ? `Feedback was not delivered. ${pending.error ?? "Retry to send."}`
-                  : "Sending feedback…"}
+                  ? t("v1wf.feedback.notDelivered", {
+                      reason: pending.error ?? t("v1wf.feedback.retryToSend"),
+                    })
+                  : t("v1wf.feedback.sending")}
           </p>
         </>
       ) : (
         <>
           <fieldset className="flex flex-wrap gap-2 mb-4">
-            <legend className="sr-only">Feedback category (optional)</legend>
-            {categories.map(([id, label]) => (
+            <legend className="sr-only">
+              {t("v1wf.feedback.categoryLegend")}
+            </legend>
+            {categories.map((id) => (
               <Button
                 key={id}
                 variant={category === id ? "prominent" : "subtle"}
@@ -359,19 +367,19 @@ function FeedbackForConnection({
                 disabled={busy}
                 onClick={() => setCategory(category === id ? null : id)}
               >
-                {label}
+                {t(`v1wf.feedback.category.${id}`)}
               </Button>
             ))}
           </fieldset>
           <label htmlFor="feedback-message" className="text-label-sm">
-            Your feedback
+            {t("v1wf.feedback.yours")}
           </label>
           <Textarea
             id="feedback-message"
             value={message}
             disabled={busy}
             onChange={(event) => setMessage(event.target.value)}
-            placeholder="Tell us what went wrong, or share general feedback."
+            placeholder={t("v1wf.feedback.placeholder")}
           />
           {connection.session.feedbackUpload && (
             <>
@@ -379,7 +387,7 @@ function FeedbackForConnection({
                 htmlFor="feedback-image"
                 className="text-label-sm block mt-4"
               >
-                Attach image (optional)
+                {t("v1wf.feedback.attachImage")}
               </label>
               <input
                 id="feedback-image"
@@ -390,9 +398,9 @@ function FeedbackForConnection({
               />
               {image && (
                 <p>
-                  Image uploaded: {image.name}{" "}
+                  {t("v1wf.feedback.imageUploaded", { name: image.name })}{" "}
                   <Button disabled={busy} onClick={() => setImage(undefined)}>
-                    Remove image
+                    {t("v1wf.feedback.removeImage")}
                   </Button>
                 </p>
               )}
@@ -405,21 +413,14 @@ function FeedbackForConnection({
                     setIncludeDiagnostics(event.target.checked)
                   }
                 />{" "}
-                Attach diagnostics
+                {t("v1wf.feedback.attachDiagnostics")}
               </label>
-              <p>
-                Includes capture time, app version when available, platform,
-                user agent, and language. No application logs.
-              </p>
+              <p>{t("v1wf.feedback.diagnosticsHelp")}</p>
             </>
           )}
         </>
       )}
-      {!available && (
-        <p role="status">
-          Connect to a Buzz deployment to send or retry feedback.
-        </p>
-      )}
+      {!available && <p role="status">{t("v1wf.feedback.connect")}</p>}
       {error && <p role="alert">{error}</p>}
     </Dialog>
   );

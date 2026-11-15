@@ -12,6 +12,7 @@ import styles from "./Chart.module.css";
 import { chartHeight, chartOption, parseChart } from "./spec";
 import { chartTables, type Table } from "./tables";
 import { hostTheme } from "./theme";
+import { t, useLanguage } from "../../shared/i18n";
 
 const SOURCE_PREVIEW = 2000;
 
@@ -58,6 +59,7 @@ export function Chart({
   code: string;
   expanded?: boolean;
 }) {
+  useLanguage();
   const plot = useRef<HTMLDivElement>(null);
   const [failure, setFailure] = useState<{ code: string; message: string }>();
   const parsed = useMemo(() => {
@@ -204,7 +206,9 @@ export function Chart({
           items={[
             {
               value: "rows",
-              title: `View ${rowCount}${more} data rows`,
+              title: more
+                ? t("v1wf.chart.rowsMore", { count: rowCount })
+                : t("v1wf.chart.rows", { count: rowCount }),
               content: tables.map((table, i) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: static snapshot
                 <DataTable key={i} {...table} />

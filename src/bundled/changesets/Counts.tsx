@@ -1,4 +1,5 @@
 import styles from "./Changesets.module.css";
+import { t } from "../../shared/i18n";
 
 export function Counts({
   additions,
@@ -15,8 +16,11 @@ export function Counts({
   );
 }
 
-export const plural = (count: number, noun: string) =>
-  `${count} ${noun}${count === 1 ? "" : "s"}`;
+export const fileCount = (count: number) =>
+  t(count === 1 ? "v1wf.cs.files.one" : "v1wf.cs.files.other", { count });
+
+export const filesChanged = (count: number) =>
+  t(count === 1 ? "v1wf.cs.changed.one" : "v1wf.cs.changed.other", { count });
 
 export const totals = (
   files: readonly { additions: number; deletions: number }[],

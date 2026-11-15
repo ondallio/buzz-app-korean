@@ -1,5 +1,6 @@
 import type { Reminder, RemindersState } from "../../features/relay/reminders";
 import { relativeTimestamp } from "../../shared/relative-timestamp";
+import { t } from "../../shared/i18n";
 
 export const nowSeconds = () => Math.floor(Date.now() / 1000);
 
@@ -104,6 +105,33 @@ function nextDayAt9am(dayOffset: number) {
   return Math.floor(target.getTime() / 1000);
 }
 
+const groupKeys = {
+  Overdue: "v1wf.rem.group.Overdue",
+  Today: "v1wf.rem.group.Today",
+  Upcoming: "v1wf.rem.group.Upcoming",
+  Done: "v1wf.rem.group.Done",
+} as const;
+
+/** A group's heading, by its English label. */
+export const groupLabel = (label: string) =>
+  Object.hasOwn(groupKeys, label)
+    ? t(groupKeys[label as keyof typeof groupKeys])
+    : label;
+
+const presetKeys = {
+  "In 30 minutes": "v1wf.rem.preset.30m",
+  "In 1 hour": "v1wf.rem.preset.1h",
+  "In 3 hours": "v1wf.rem.preset.3h",
+  "Tomorrow at 9am": "v1wf.rem.preset.tomorrow",
+  "Next Monday at 9am": "v1wf.rem.preset.monday",
+} as const;
+
+/** A time preset's label in the display language, by its English label. */
+export const presetLabel = (label: string) =>
+  Object.hasOwn(presetKeys, label)
+    ? t(presetKeys[label as keyof typeof presetKeys])
+    : label;
+
 export type TimePreset = Readonly<{ label: string; at(): number }>;
 export const TIME_PRESETS: readonly TimePreset[] = [
   { label: "In 30 minutes", at: () => nowSeconds() + 30 * 60 },
@@ -154,12 +182,12 @@ const timeOf = (date: Date) =>
 
 /** Slack-style due copy: relative when overdue, otherwise the day and time. */
 export function dueLabel(at: number, now: number) {
-  if (at <= now) return `Overdue · ${relativeTimestamp(at, now)}`;
+  if (at <= now)
+    return t("v1wf.rem.overdueAgo", { time: relativeTimestamp(at, now) });
   return dueDateLabel(at, now);
 }
 
-/** Original scheduled day and time, including dates that are already overdue. */
-export function dueDateLabel(at: number, now: number) {
+function dueDay(at: number, now: number) {
   const due = new Date(at * 1000);
   const today = new Date(now * 1000);
   const days = Math.round(
@@ -167,23 +195,51 @@ export function dueDateLabel(at: number, now: number) {
       new Date(today).setHours(0, 0, 0, 0)) /
       86_400_000,
   );
+  const time = timeOf(due);
+  if (days === 0) return { kind: "today", time } as const;
+  if (days === 1) return { kind: "tomorrow", time } as const;
+  if (days === -1) return { kind: "yesterday", time } as const;
   const day =
-    days === 0
-      ? "Today"
-      : days === 1
-        ? "Tomorrow"
-        : days === -1
-          ? "Yesterday"
-          : days > 1 && days < 7
-            ? due.toLocaleDateString([], { weekday: "long" })
-            : due.toLocaleDateString([], {
-                month: "short",
-                day: "numeric",
-                ...(due.getFullYear() !== today.getFullYear()
-                  ? { year: "numeric" }
-                  : {}),
-              });
-  return `${day} at ${timeOf(due)}`;
+    days > 1 && days < 7
+      ? due.toLocaleDateString([], { weekday: "long" })
+      : due.toLocaleDateString([], {
+          month: "short",
+          day: "numeric",
+          ...(due.getFullYear() !== today.getFullYear()
+            ? { year: "numeric" }
+            : {}),
+        });
+  return { kind: "day", day, time } as const;
+}
+
+/** The short due copy on a reminder's snooze button. */
+export function dueShortLabel(at: number, now: number) {
+  const due = dueDay(at, now);
+  switch (due.kind) {
+    case "today":
+      return t("v1wf.rem.dueToday", { time: due.time });
+    case "tomorrow":
+      return t("v1wf.rem.dueTomorrow", { time: due.time });
+    case "yesterday":
+      return t("v1wf.rem.dueYesterday", { time: due.time });
+    default:
+      return t("v1wf.rem.dueDay", { day: due.day, time: due.time });
+  }
+}
+
+/** Original scheduled day and time, including dates that are already overdue. */
+export function dueDateLabel(at: number, now: number) {
+  const due = dueDay(at, now);
+  switch (due.kind) {
+    case "today":
+      return t("v1wf.rem.todayAt", { time: due.time });
+    case "tomorrow":
+      return t("v1wf.rem.tomorrowAt", { time: due.time });
+    case "yesterday":
+      return t("v1wf.rem.yesterdayAt", { time: due.time });
+    default:
+      return t("v1wf.rem.dayAt", { day: due.day, time: due.time });
+  }
 }
 
 /** Where a snooze preset lands: its time, with a short weekday unless today. */

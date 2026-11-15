@@ -1,7 +1,8 @@
 import { Diff, Hunk, type FileData } from "react-diff-view";
 import "react-diff-view/style/index.css";
-import { diffType, fileLabel, labels } from "./parse";
+import { diffType, fileLabel } from "./parse";
 import styles from "./Diffs.module.css";
+import { t, useLanguage } from "../../shared/i18n";
 
 export function DiffViewer({
   content,
@@ -14,6 +15,7 @@ export function DiffViewer({
   filePath?: string | undefined;
   viewType?: "unified" | "split";
 }) {
+  useLanguage();
   if (!files)
     return (
       // biome-ignore lint/a11y/useSemanticElements: The raw scroll region preserves preformatted text and needs keyboard access.
@@ -22,12 +24,13 @@ export function DiffViewer({
         // biome-ignore lint/a11y/noNoninteractiveTabindex: The scroll owner must support keyboard panning.
         tabIndex={0}
         role="region"
-        aria-label="Raw diff"
+        aria-label={t("v1wf.diff.raw")}
       >
         {content}
       </pre>
     );
-  if (!files.length) return <p className="text-body-sm">No diff content</p>;
+  if (!files.length)
+    return <p className="text-body-sm">{t("v1wf.diff.empty")}</p>;
   return (
     <div className={styles.viewer}>
       {files.map((file) => {
@@ -51,7 +54,7 @@ export function DiffViewer({
             {(files.length > 1 || label !== filePath || type !== "modify") && (
               <header className={styles.fileHeader}>
                 <span className={styles.filename}>{label}</span>
-                <span>{labels[type]}</span>
+                <span>{t(`v1wf.diff.type.${type}`)}</span>
                 <span className={styles.added}>+{additions}</span>
                 <span className={styles.removed}>−{deletions}</span>
               </header>
@@ -75,7 +78,7 @@ export function DiffViewer({
                 }
               </Diff>
             ) : (
-              <p className={styles.notice}>No textual hunks in this diff.</p>
+              <p className={styles.notice}>{t("v1wf.diff.noHunks")}</p>
             )}
           </section>
         );

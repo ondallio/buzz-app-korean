@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { summarizeWaveform, VOICE_NOTE_WAVEFORM_INTERVAL_MS } from "./audio";
 import { encodeVoiceNoteWav } from "./voiceNoteWav";
+import { t } from "../../shared/i18n";
 
 const MIME_CANDIDATES = [
   "audio/webm;codecs=opus",
@@ -71,7 +72,7 @@ export function useVoiceNoteRecorder() {
     if (sessionRef.current) return;
     setError(null);
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-      setError("Voice recording is not available in this environment.");
+      setError(t("v1wf.voice.err.unavailable"));
       return;
     }
 
@@ -128,7 +129,7 @@ export function useVoiceNoteRecorder() {
           session.chunks.reduce((sum, chunk) => sum + chunk.size, 0) >
           32 * 1024 * 1024
         ) {
-          setError("Voice note exceeded the recording limit.");
+          setError(t("v1wf.voice.err.limit"));
           cancel();
         }
       });
@@ -139,7 +140,7 @@ export function useVoiceNoteRecorder() {
           mountedRef.current &&
           sessionRef.current === session
         ) {
-          setError("The voice recording was interrupted. Record it again.");
+          setError(t("v1wf.voice.err.interruptedAgain"));
         }
         void (async () => {
           const actualMime = recorder.mimeType || mimeType || "audio/webm";
@@ -182,7 +183,7 @@ export function useVoiceNoteRecorder() {
                 mountedRef.current &&
                 sessionRef.current === session
               ) {
-                setError("Buzz could not prepare this voice note for upload.");
+                setError(t("v1wf.voice.err.prepare"));
               }
             }
           }
@@ -200,7 +201,7 @@ export function useVoiceNoteRecorder() {
       });
       recorder.addEventListener("error", () => {
         if (mountedRef.current && sessionRef.current === session) {
-          setError("The voice recording was interrupted.");
+          setError(t("v1wf.voice.err.interrupted"));
           cancel();
         }
       });
@@ -243,11 +244,7 @@ export function useVoiceNoteRecorder() {
       const denied =
         cause instanceof DOMException &&
         (cause.name === "NotAllowedError" || cause.name === "SecurityError");
-      setError(
-        denied
-          ? "Allow Buzz to access your microphone to record a voice note."
-          : "Buzz could not start the voice recorder.",
-      );
+      setError(denied ? t("v1wf.voice.err.mic") : t("v1wf.voice.err.start"));
     }
   }, [cancel]);
 

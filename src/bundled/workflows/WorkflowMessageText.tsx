@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   createContext,
   useContext,
@@ -143,6 +144,7 @@ export function WorkflowMessageText({
   value: string;
   onValueChange: (value: string) => void;
 }) {
+  useLanguage();
   const members = useContext(WorkflowMentionMembers);
   const choices = useMemo(() => members.map(mentionChoice), [members]);
   const avatars = useMemo(
@@ -290,13 +292,13 @@ export function WorkflowMessageText({
         anchor={input}
         initialFocus={false}
         finalFocus={false}
-        aria-label="Mention suggestions"
+        aria-label={t("workflowFields.mentionSuggestions")}
       >
         <div
           ref={list}
           id={listId}
           role="listbox"
-          aria-label="Mention suggestions"
+          aria-label={t("workflowFields.mentionSuggestions")}
           className="workflow-mention-list"
         >
           {results.map((choice, index) => (
@@ -335,7 +337,7 @@ export function WorkflowMessageText({
         </div>
         {matches.length > SUGGESTION_LIMIT && (
           <p role="status" className="workflow-mention-status">
-            Narrow your search to see more members.
+            {t("workflowFields.narrowMembers")}
           </p>
         )}
       </PopoverPopup>

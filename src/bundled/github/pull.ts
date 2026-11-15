@@ -9,13 +9,15 @@ import {
 import { branchLink, type GitHubDetails } from "./data";
 import type { GitHubCli } from "./gh";
 import type { GitHubReference } from "./references";
+import { t } from "../../shared/i18n";
 
 export type MergeMethod = "SQUASH" | "MERGE" | "REBASE";
-export const mergeLabels: Record<MergeMethod, string> = {
-  SQUASH: "Squash and merge",
-  MERGE: "Create a merge commit",
-  REBASE: "Rebase and merge",
-};
+const mergeLabelKeys = {
+  SQUASH: "v1wf.gh.merge.SQUASH",
+  MERGE: "v1wf.gh.merge.MERGE",
+  REBASE: "v1wf.gh.merge.REBASE",
+} as const;
+export const mergeLabel = (method: MergeMethod) => t(mergeLabelKeys[method]);
 
 export type PullChecklist = Readonly<{
   /** GitHub's node id, which every change names. */
