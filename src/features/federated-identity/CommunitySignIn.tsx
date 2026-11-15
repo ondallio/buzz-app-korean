@@ -1,3 +1,4 @@
+import { formattingLocale, t, useLanguage } from "../../shared/i18n";
 import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { FederatedIdentity, SessionSnapshot } from "./service";
 import type { Membership } from "../communities/service";
@@ -28,6 +29,20 @@ export function recoveryMessage(code: string) {
   if (code === "reauthentication-required")
     return "Your sign-in has expired. Sign in again to continue.";
   return "Sign-in did not finish. Try again.";
+}
+
+/** Resolves known UI recovery copy without changing the canonical producer API or stored failure code. */
+export function recoveryDisplayMessage(code: string) {
+  if (code === "sign-in-timed-out") return t("settings.recoveryTimeout");
+  if (code === "storage-busy") return t("settings.recoveryBusy");
+  if (code === "storage-corrupt") return t("v1id.recoveryStorageCorrupt");
+  if (code.startsWith("storage-")) return t("settings.recoveryStorage");
+  if (code === "sign-in-canceled") return t("settings.recoveryCanceled");
+  if (code === "sign-in-link-unavailable")
+    return t("v1id.recoveryLinkUnavailable");
+  if (code === "reauthentication-required")
+    return t("settings.recoveryExpired");
+  return t("settings.recoveryOther");
 }
 
 /** Issuer refusals native keeps for the session revision (`refused()` in
@@ -110,6 +125,7 @@ export function CommunitySignIn({
   relay?: string | undefined;
   memberships?: readonly Membership[] | undefined;
 }) {
+  useLanguage();
   if (!identity) return null;
   return (
     <Action
@@ -137,6 +153,7 @@ function Action({
   memberships: readonly Membership[];
   asksAgain: boolean;
 }) {
+  useLanguage();
   const state = useSyncExternalStore(
     identity.subscribe,
     identity.snapshot,
@@ -164,8 +181,8 @@ function Action({
       return (
         <p role="alert" className="text-body-sm text-danger">
           {mismatch
-            ? "This account is linked to a different Buzz identity. Keep this key until you have reviewed the identity link."
-            : "Your account does not have access to this community. Contact its administrator."}
+            ? t("accessDialogs.bindingMismatch")
+            : t("accessDialogs.noCommunityAccess")}
         </p>
       );
     return (
@@ -192,9 +209,9 @@ function Action({
   if (ISSUER_REFUSALS.has(refusal))
     return (
       <p role="alert" className="text-body-sm text-danger">
-        Buzz couldn’t confirm your organization sign-in for this community.{" "}
-        {asksAgain ? "Try again." : "Restart Buzz to try again."} If it keeps
-        happening, contact your administrator.
+        {asksAgain
+          ? t("v1id.issuerRefusalRetry")
+          : t("accessDialogs.issuerRefusal")}
       </p>
     );
   // What remains is a sign-in the community requires.
@@ -202,7 +219,9 @@ function Action({
   return (
     <>
       <p className="text-body-sm">
-        This community requires {serverName(state.authority)} sign-in.
+        {t("accessDialogs.requiresSignIn", {
+          server: serverName(state.authority),
+        })}
       </p>
       <SignInButton identity={identity} state={state} retry={retry} />
     </>
@@ -220,6 +239,7 @@ function SignInButton({
   state: SessionSnapshot;
   retry: () => void;
 }) {
+  useLanguage();
   const [failure, setFailure] = useState("");
   if (!state.authority) return null;
   const server = serverName(state.authority);
@@ -242,12 +262,12 @@ function SignInButton({
         }}
       >
         {state.status === "signing-in"
-          ? "Cancel sign-in"
-          : `Sign in with ${server}`}
+          ? t("accessDialogs.cancelSignIn")
+          : t("accessDialogs.signInWith", { server })}
       </Button>
       {(failure || state.failure) && (
         <p role="alert" className="text-body-sm text-danger">
-          {recoveryMessage(failure || state.failure || "")}
+          {recoveryDisplayMessage(failure || state.failure || "")}
         </p>
       )}
     </>
@@ -268,6 +288,7 @@ function SwitchAffects({
   relay: string | undefined;
   memberships: readonly Membership[];
 }) {
+  useLanguage();
   const self = relay && communityDestination(relay).url;
   const others = useSignInCommunities(
     identity,
@@ -277,12 +298,14 @@ function SwitchAffects({
     ),
   );
   if (others.length === 0) return null;
-  const names = new Intl.ListFormat(undefined, { type: "conjunction" }).format(
-    others,
-  );
+  const names = new Intl.ListFormat(formattingLocale(), {
+    type: "conjunction",
+  }).format(others);
   return (
     <p className="text-body-sm">
-      {`${names} also ${others.length === 1 ? "uses" : "use"} this account. Switching may change your access there.`}
+      {others.length === 1
+        ? t("v1id.switchAffectsOne", { names })
+        : t("v1id.switchAffectsMany", { names })}
     </p>
   );
 }
@@ -302,21 +325,39 @@ function SwitchAccount({
   affects: ReactNode;
   onSwitch: (authority: Authority) => void;
 }) {
+  useLanguage();
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   const server = serverName(authority);
-  const account = state.email ?? "your organization account";
   return (
     <>
       <p role="alert" className="text-body-sm text-danger">
         {mismatch
-          ? `Your ${server} account (signed in as ${account}) is linked to a different Buzz identity. Keep this key until you have reviewed the link at ${new URL(authority.identityOrigin).host}, or switch to another ${server} account.`
-          : `This community didn’t accept your ${server} account (signed in as ${account}).`}
+          ? state.email != null
+            ? t("accessDialogs.mismatchAccount", {
+                server,
+                account: state.email,
+                host: new URL(authority.identityOrigin).host,
+              })
+            : t("accessDialogs.mismatchOrganization", {
+                server,
+                host: new URL(authority.identityOrigin).host,
+              })
+          : state.email != null
+            ? t("accessDialogs.rejectedAccount", {
+                server,
+                account: state.email,
+              })
+            : t("accessDialogs.rejectedOrganization", { server })}
       </p>
       {affects}
-      <Button onClick={() => onSwitch(authority)}>Switch account</Button>
+      <Button onClick={() => onSwitch(authority)}>
+        {t("accessDialogs.switchAccount")}
+      </Button>
       {/* Closes the prompt; the session and the refusal stay as they are. */}
-      <Button onClick={() => setDismissed(true)}>Not now</Button>
+      <Button onClick={() => setDismissed(true)}>
+        {t("accessDialogs.notNow")}
+      </Button>
     </>
   );
 }
@@ -390,6 +431,7 @@ function SwitchProgress({
   onChange: (next: Switching | null) => void;
   retry: () => void;
 }) {
+  useLanguage();
   const server = serverName(authority);
   if (failed) {
     // Canceling is not a failure: the account is signed out, so offer Sign in.
@@ -398,11 +440,14 @@ function SwitchProgress({
       <>
         {canceled ? (
           <p role="status" className="text-body-sm">
-            {recoveryMessage(failure)}
+            {recoveryDisplayMessage(failure)}
           </p>
         ) : (
           <p role="alert" className="text-body-sm text-danger">
-            {`Couldn’t switch your ${server} account. ${recoveryMessage(failure)}`}
+            {t("accessDialogs.switchFailed", {
+              server,
+              recovery: recoveryDisplayMessage(failure),
+            })}
           </p>
         )}
         <Button
@@ -410,7 +455,7 @@ function SwitchProgress({
             onChange(runSwitch(identity, authority, step, onChange, retry))
           }
         >
-          {canceled ? "Sign in" : "Try again"}
+          {t(canceled ? "accessDialogs.signIn" : "accessDialogs.tryAgain")}
         </Button>
       </>
     );
@@ -418,7 +463,7 @@ function SwitchProgress({
   return (
     <>
       <p role="status" className="text-body-sm">
-        {`Switching your ${server} account…`}
+        {t("accessDialogs.switching", { server })}
       </p>
       {state.status === "signing-in" && (
         <Button
@@ -433,7 +478,7 @@ function SwitchProgress({
             )
           }
         >
-          Cancel sign-in
+          {t("accessDialogs.cancelSignIn")}
         </Button>
       )}
     </>
@@ -441,11 +486,11 @@ function SwitchProgress({
 }
 
 const noSubscription = () => () => {};
-const NO_ACCESS = "You don’t have access to this community";
-const SIGN_IN = "Sign in to open this community";
 /** What a page that the refusal left empty says; its notice says what fixes it. */
 export const communityRefusalTitle = (refusal?: CommunityRefusal) =>
-  refusal === "sign-in" ? SIGN_IN : NO_ACCESS;
+  refusal === "sign-in"
+    ? t("accessDialogs.signInTitle")
+    : t("accessDialogs.noAccessTitle");
 
 /** The one report of a community's refusal, in the toast stack on every page.
  * The relay's reason and this device's sign-in for the community decide what
@@ -464,6 +509,7 @@ export function CommunityRefusalNotice({
   relay?: string | undefined;
   memberships?: readonly Membership[] | undefined;
 }) {
+  useLanguage();
   const state = useSyncExternalStore(
     identity?.subscribe ?? noSubscription,
     () => identity?.snapshot(),
@@ -472,17 +518,19 @@ export function CommunityRefusalNotice({
   // As in `Action`: sign-out ends the state that offered the switch.
   const [switching, setSwitching] = useState<Switching | null>(null);
   const authority = state?.authority;
-  const checkAgain = <Button onClick={retry}>Check again</Button>;
+  const checkAgain = (
+    <Button onClick={retry}>{t("accessDialogs.checkAgain")}</Button>
+  );
   if (!identity || !state || !authority)
     return refusal === "sign-in" ? (
       <ToastNotice
-        title="This community needs a sign-in Buzz doesn’t support yet"
-        description="Ask the community’s admin which Buzz version or server to use."
+        title={t("accessDialogs.unsupportedSignIn")}
+        description={t("accessDialogs.askVersion")}
       />
     ) : (
       <ToastNotice
-        title={NO_ACCESS}
-        description="Ask the community’s admin to add you."
+        title={t("accessDialogs.noAccessTitle")}
+        description={t("accessDialogs.askAdmin")}
       >
         {checkAgain}
       </ToastNotice>
@@ -494,8 +542,8 @@ export function CommunityRefusalNotice({
   if (refusal === "access" && !signedIn && !switching)
     return (
       <ToastNotice
-        title={NO_ACCESS}
-        description="Ask the community’s admin to add you."
+        title={t("accessDialogs.noAccessTitle")}
+        description={t("accessDialogs.askAdmin")}
       >
         {checkAgain}
       </ToastNotice>
@@ -529,22 +577,30 @@ export function CommunityRefusalNotice({
           )
         }
       >
-        {refusal === "sign-in" ? "Sign in again" : "Switch account"}
+        {t(
+          refusal === "sign-in"
+            ? "accessDialogs.signInAgain"
+            : "accessDialogs.switchAccount",
+        )}
       </Button>
       {refusal === "access" && checkAgain}
     </>
   );
   return refusal === "sign-in" ? (
     <ToastNotice
-      title={SIGN_IN}
-      description={`This community needs your ${server} sign-in.`}
+      title={t("accessDialogs.signInTitle")}
+      description={t("accessDialogs.needsServer", { server })}
     >
       {action}
     </ToastNotice>
   ) : (
     <ToastNotice
-      title={NO_ACCESS}
-      description={`This community didn’t accept ${state.email ?? `your ${server} account`}.`}
+      title={t("accessDialogs.noAccessTitle")}
+      description={
+        state.email != null
+          ? t("accessDialogs.refusedEmail", { email: state.email })
+          : t("accessDialogs.refusedServer", { server })
+      }
     >
       {action}
     </ToastNotice>

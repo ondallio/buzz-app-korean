@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
 import {
   UserIcon,
@@ -100,6 +101,7 @@ export function ProfilePeek({
   viewer,
   onFocusChange,
 }: ProfilePeekProps) {
+  useLanguage();
   const [open, setOpen] = useState(false);
   const compact = useMessageDensity() === "compact";
   const [hoveredAction, setHoveredAction] = useState<"profile" | "message">();
@@ -162,7 +164,7 @@ export function ProfilePeek({
     enabled: open,
     onOpened(channelId) {
       if (!onOpen(`buzz://channel/${encodeURIComponent(channelId)}`))
-        throw new Error("Could not open the conversation. Try again.");
+        throw new Error(t("v1id.openConversationFailed"));
       setOpen(false);
     },
   });
@@ -239,7 +241,7 @@ export function ProfilePeek({
       }}
       side="right"
       className={styles.card ?? ""}
-      aria-label={`${name} profile preview`}
+      aria-label={t("v1id.profilePreview", { name })}
       actionRef={profileButton}
     >
       <div className={styles.content} {...focusRegion}>
@@ -292,7 +294,7 @@ export function ProfilePeek({
             size="sm"
             shape="round"
             variant="subtle"
-            aria-label="View profile"
+            aria-label={t("v1id.viewProfile")}
             onClick={openProfile}
             icon={
               <span className={styles.actionContent}>

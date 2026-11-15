@@ -270,6 +270,10 @@ import {
   en as v1AgentsHuddlesEn,
   ko as v1AgentsHuddlesKo,
 } from "./catalogs/v1-agents-huddles";
+import {
+  en as v1IdentitySettingsEn,
+  ko as v1IdentitySettingsKo,
+} from "./catalogs/v1-identity-settings";
 import { languagePreference, type Language } from "./language";
 import { formatMessage } from "./messages";
 
@@ -368,6 +372,7 @@ export const english = {
   ...v1MessagesEn,
   ...v1AgentsHuddlesEn,
   ...v1WorkflowsIntegrationsEn,
+  ...v1IdentitySettingsEn,
 } as const;
 export const korean: Partial<Record<keyof typeof english, string>> = {
   ...coreKo,
@@ -452,6 +457,7 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...v1MessagesKo,
   ...v1AgentsHuddlesKo,
   ...v1WorkflowsIntegrationsKo,
+  ...v1IdentitySettingsKo,
 };
 export type TranslationKey = keyof typeof english;
 type Variables<S extends string> =

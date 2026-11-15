@@ -1,3 +1,5 @@
+import { t, useLanguage } from "../shared/i18n";
+import { rich } from "../shared/i18n/rich";
 import {
   useEffect,
   useLayoutEffect,
@@ -45,6 +47,7 @@ export function DecisionsSettings({
   active(): boolean;
   onSection?: ((section: string) => void) | undefined;
 }) {
+  useLanguage();
   const backend = useSyncExternalStore(
     decisions.subscribe,
     decisions.backend,
@@ -140,24 +143,22 @@ export function DecisionsSettings({
     >
       <Header
         id="decisions-settings-title"
-        title="Decisions API"
-        subtitle={
-          <>
-            <strong>Agents</strong>, <strong>plugins</strong> and features like{" "}
-            <strong>Attention</strong> can use this API for quick, inexpensive
-            judgments, such as whether a watched event should wake your agent.
-            Your chosen provider handles these questions and receives the
-            message text sent with them, which may come from private channels.
-          </>
-        }
+        title={t("settingsHost.decisionsTitle")}
+        subtitle={rich("v1id.decisionsSubtitle", {
+          agents: <strong>{t("v1id.decisionsAgents")}</strong>,
+          plugins: <strong>{t("v1id.decisionsPlugins")}</strong>,
+          attention: <strong>{t("v1id.decisionsAttention")}</strong>,
+        })}
       />
       {providers.length === 0 ? (
         <p role="status" className="mt-4 text-body-sm text-secondary">
-          No decision provider is turned on. Turn one on in{" "}
-          <SettingsSectionLink section="plugins" open={onSection}>
-            Manage plugins
-          </SettingsSectionLink>
-          .
+          {rich("settingsHost.noDecisionsProvider", {
+            plugins: (
+              <SettingsSectionLink section="plugins" open={onSection}>
+                {t("settingsHost.managePlugins")}
+              </SettingsSectionLink>
+            ),
+          })}
         </p>
       ) : (
         <div
@@ -166,14 +167,14 @@ export function DecisionsSettings({
         >
           {choosable && !combined && (
             <div className="w-full max-w-md">
-              <InlineHeader title="Decisions API Provider" />
+              <InlineHeader title={t("settingsHost.decisionsProvider")} />
               <Field
-                label="Decisions API Provider"
+                label={t("settingsHost.decisionsProvider")}
                 labelVisibility="hidden"
                 nativeLabel={false}
               >
                 <RadioGroup
-                  aria-label="Decisions API Provider"
+                  aria-label={t("settingsHost.decisionsProvider")}
                   value={shown?.key ?? ""}
                   onValueChange={choose}
                 >
@@ -194,7 +195,7 @@ export function DecisionsSettings({
             <div className="w-full">
               <SettingsGroup>
                 <Select
-                  label="Decision provider"
+                  label={t("v1id.decisionProvider")}
                   leading={
                     shown?.key === builderlab.key ? (
                       <BuilderlabLogoIcon size={20} aria-hidden="true" />
@@ -220,7 +221,7 @@ export function DecisionsSettings({
                       <WarningCircleIcon
                         size={16}
                         className="ml-2 text-danger"
-                        aria-label="Unavailable for this account"
+                        aria-label={t("v1id.unavailableForAccount")}
                       />
                     ) : undefined
                   }
@@ -237,7 +238,7 @@ export function DecisionsSettings({
                           label: "Builderlab",
                           description:
                             builderlabStatus === "needs-setup"
-                              ? "Unavailable for this account"
+                              ? t("v1id.unavailableForAccount")
                               : undefined,
                           leading:
                             builderlabStatus === "needs-setup" ? (
@@ -293,7 +294,7 @@ export function DecisionsSettings({
                       entry={shown}
                       registry={{ snapshot: decisions.providers }}
                       fallback={
-                        <p role="alert">TypeSafe settings are unavailable.</p>
+                        <p role="alert">{t("v1id.typesafeUnavailable")}</p>
                       }
                     >
                       {(entry, owned) => {
@@ -326,12 +327,17 @@ export function DecisionsSettings({
                   registry={{ snapshot: decisions.providers }}
                   fallback={
                     <p role="alert" className="text-body-sm text-secondary">
-                      {shown.label} settings are unavailable. You can turn its
-                      plugin off in{" "}
-                      <SettingsSectionLink section="plugins" open={onSection}>
-                        Manage plugins
-                      </SettingsSectionLink>
-                      .
+                      {rich("settingsHost.providerSettingsUnavailable", {
+                        provider: shown.label,
+                        plugins: (
+                          <SettingsSectionLink
+                            section="plugins"
+                            open={onSection}
+                          >
+                            {t("settingsHost.managePlugins")}
+                          </SettingsSectionLink>
+                        ),
+                      })}
                     </p>
                   }
                 >
@@ -356,8 +362,8 @@ export function DecisionsSettings({
           headerGap="compact"
           title={
             selected.key === ownKey.key
-              ? "Connect TypeSafe"
-              : "Set up Builderlab"
+              ? t("v1id.connectTypesafe")
+              : t("v1id.setUpBuilderlab")
           }
           description={
             selected.key === ownKey.key ? (
@@ -381,7 +387,7 @@ export function DecisionsSettings({
                 and paste it below.
               </>
             ) : (
-              "Complete account setup to use Builderlab for decision requests."
+              t("v1id.completeBuilderlabSetup")
             )
           }
           dismissOnOutsideClick
@@ -403,7 +409,7 @@ export function DecisionsSettings({
             <OwnedContribution
               entry={selected}
               registry={{ snapshot: decisions.providers }}
-              fallback={<p role="alert">TypeSafe settings are unavailable.</p>}
+              fallback={<p role="alert">{t("v1id.typesafeUnavailable")}</p>}
             >
               {(entry, owned) => {
                 const Settings = entry.Settings;

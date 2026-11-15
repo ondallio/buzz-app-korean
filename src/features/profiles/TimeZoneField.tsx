@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useMemo, useState } from "react";
 import { Checkbox } from "../../shared/design-system/ui/Checkbox";
 import { Combobox } from "../../shared/design-system/ui/Combobox";
@@ -56,6 +57,7 @@ export function TimeZoneField({
   byDefault?: boolean;
   disabled?: boolean;
 }) {
+  useLanguage();
   const device = new Intl.DateTimeFormat().resolvedOptions().timeZone;
   const shown = value ?? fallback ?? device;
   const zones = useMemo(
@@ -74,7 +76,7 @@ export function TimeZoneField({
   return (
     <div className="grid gap-2">
       <Checkbox
-        label="Show my local time on my profile"
+        label={t("v1id.showLocalTime")}
         checked={value !== undefined}
         disabled={disabled}
         onCheckedChange={(checked) => onChange(checked ? shown : undefined)}
@@ -102,7 +104,7 @@ export function TimeZoneField({
         }}
       >
         <Combobox.Trigger
-          label="Time zone"
+          label={t("v1id.timeZone")}
           disabled={disabled || value === undefined}
         >
           {zoneLabel(shown)}
@@ -112,7 +114,7 @@ export function TimeZoneField({
           size="compact"
           side="bottom"
           collisionAvoidance={{ side: "none", align: "shift" }}
-          empty="No matching time zones."
+          empty={t("v1id.noTimeZones")}
         >
           <Combobox.List>
             {(zone: string) => (

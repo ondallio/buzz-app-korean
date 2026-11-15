@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { BuilderlabIdentityRow } from "./login/IdentityRow";
 import {
   useLayoutEffect,
@@ -306,7 +307,7 @@ export const apply: PluginModule["apply"] = (ctx) => {
             unavailableReason={
               dev || browserLoginAvailable()
                 ? unavailable
-                : "Open the Buzz desktop app to sign in with Builderlab."
+                : t("builderlabLogin.desktopRequired")
             }
             active={active}
             openIdentity={openIdentity}

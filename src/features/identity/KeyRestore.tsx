@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 import type { Recovery } from "./builderlab-account";
@@ -23,6 +24,7 @@ export function KeyRestore({
   onImport: () => void;
   onInstalled: () => void;
 }) {
+  useLanguage();
   const state = useSyncExternalStore(recovery.subscribe, recovery.snapshot);
   const candidate =
     state?.status === "choosing"
@@ -50,21 +52,21 @@ export function KeyRestore({
   const off = recoveryOff(state);
   const canRetry = !off && (state?.status === "error" || partial);
   const description = off
-    ? "Backup restoration isn’t available for this account. Enter your private key to continue."
+    ? t("identityMore.restoreUnavailable")
     : partial
-      ? "We couldn’t check all your backups. Try again, or enter your private key if you have a copy."
+      ? t("identityMore.restorePartial")
       : state?.status === "choosing" && !candidate
         ? state.candidates.length === 0
-          ? "We couldn’t find a key backup in this Builderlab account. If you have a copy of your private key, you can enter it instead."
-          : "We found backups, but none contains the key linked to your account. Enter your private key to continue."
+          ? t("identityMore.restoreNotFound")
+          : t("identityMore.restoreMismatch")
         : state?.status === "error"
           ? // Native names the cause: canceled, timed out, offline or a retry.
-            `${state.error} Or enter your private key if you have a copy.`
+            t("v1id.restoreErrorHelp", { error: state.error })
           : saving
-            ? "Restoring your key…"
+            ? t("identityMore.restoringKey")
             : canceling
-              ? "Canceling recovery…"
-              : "Restoring your key…";
+              ? t("identityMore.cancelingRecovery")
+              : t("identityMore.restoringKey");
   return (
     <OnboardingScreen
       labelledBy="welcome-title"
@@ -75,11 +77,13 @@ export function KeyRestore({
             tabIndex={-1}
             className="text-heading text-standard"
           >
-            {failed ? "Couldn’t restore your key" : "Restore your key"}
+            {failed
+              ? t("identityMore.restoreKeyFailed")
+              : t("identityMore.restoreKey")}
           </h1>
           {email && (
             <p className="break-words text-body-sm text-subtle">
-              Signed in as {email}
+              {t("identityMore.signedInAs", { email })}
             </p>
           )}
           <p
@@ -90,7 +94,7 @@ export function KeyRestore({
           </p>
           {state?.status === "waiting" && (
             <p className="text-body-sm text-subtle">
-              Complete sign-in in your browser if prompted.
+              {t("identityMore.browserSignIn")}
             </p>
           )}
         </>
@@ -103,23 +107,25 @@ export function KeyRestore({
             variant="prominent"
             onClick={() => void leave(onImport)}
           >
-            Enter my private key
+            {t("identityMore.enterMyPrivateKey")}
           </Button>
           {onLost && (
             <Button size="lg" onClick={() => void leave(onLost)}>
-              I lost my key
+              {t("identityMore.lostKeyAction")}
             </Button>
           )}
           {canRetry && (
             <Button size="lg" variant="ghost" onClick={() => void retry()}>
-              Try again
+              {t("identity.failure.retry")}
             </Button>
           )}
         </>
       )}
       <div data-onboarding-actions="">
         <OnboardingBack
-          aria-label={!failed && !saving ? "Cancel" : "Back"}
+          aria-label={
+            !failed && !saving ? t("identity.cancel") : t("identity.back")
+          }
           disabled={saving || canceling}
           onClick={() => void leave(onBack)}
         />

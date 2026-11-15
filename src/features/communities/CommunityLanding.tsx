@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useState, useSyncExternalStore } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Field } from "../../shared/design-system/ui/Field";
@@ -32,6 +33,7 @@ export function CommunityLanding({
   onJoined(id: string): void;
   onCreate(): void;
 }) {
+  useLanguage();
   const [link, setLink] = useState("");
   const [error, setError] = useState("");
   const [joining, setJoining] = useState<InviteLink>();
@@ -72,15 +74,10 @@ export function CommunityLanding({
               const parsed = parsePastedInvite(link);
               if (parsed) setJoining(parsed);
               else
-                setError(
-                  pastedInviteError(
-                    link,
-                    "Paste an invite link or community URL.",
-                  ),
-                );
+                setError(pastedInviteError(link, t("v1id.pasteInviteOrUrl")));
             }}
           >
-            <Field label="Invite link or community URL" error={error}>
+            <Field label={t("v1id.inviteOrUrl")} error={error}>
               <Input
                 autoFocus
                 value={link}

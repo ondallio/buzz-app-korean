@@ -1,3 +1,5 @@
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { CircleNotchIcon } from "../../shared/design-system/icons/index";
 import { Avatar } from "../../shared/design-system/ui/Avatar";
@@ -26,17 +28,18 @@ type State =
 export type JoinConsent = Readonly<{ adult: boolean; agreed: boolean }>;
 
 /** Classified copy; raw transport errors are never shown. */
-const FAILURES: Record<FindFailure, { message: string; retry: boolean }> = {
-  unreachable: {
-    message: "Could not reach the relay. Check your connection and try again.",
-    retry: true,
-  },
-  "not-buzz": { message: "This address isn’t a Buzz community.", retry: false },
-  "no-community": {
-    message: "No community is set up at this address.",
-    retry: false,
-  },
-};
+const FAILURES: Record<FindFailure, { message: () => string; retry: boolean }> =
+  {
+    unreachable: {
+      message: () => t("v1id.find.unreachable"),
+      retry: true,
+    },
+    "not-buzz": { message: () => t("v1id.find.notBuzz"), retry: false },
+    "no-community": {
+      message: () => t("v1id.find.noCommunity"),
+      retry: false,
+    },
+  };
 
 /**
  * Looks up a community at a canonical secure origin before any identity or
@@ -89,6 +92,7 @@ export function FindCommunity({
       onFound?: never;
     }
 )) {
+  useLanguage();
   const host = new URL(url).host;
   const [state, setState] = useState<State>({ status: "finding" });
   const [adult, setAdult] = useState(false);
@@ -155,11 +159,17 @@ export function FindCommunity({
   if (state.status === "finding" || joining === "auto")
     return (
       <>
-        {heading(joining ? "Joining community" : "Finding community")}
+        {heading(
+          joining ? t("v1id.find.joiningTitle") : t("v1id.find.findingTitle"),
+        )}
         {/* An initial read: its status waits a second, the hostname and Cancel do not. */}
         <LoadingRegion
           pending
-          label={joining ? `Joining ${host}…` : `Looking up ${host}…`}
+          label={
+            joining
+              ? t("v1id.find.joiningHost", { host })
+              : t("v1id.find.lookingUp", { host })
+          }
         >
           <div className="flex flex-col gap-6">
             <p className="m-0 font-mono text-body text-subtle">{host}</p>
@@ -169,7 +179,7 @@ export function FindCommunity({
                 onClick={cancel}
                 disabled={Boolean(joining)}
               >
-                Cancel
+                {t("settings.cancel")}
               </Button>
             </div>
           </div>
@@ -181,16 +191,16 @@ export function FindCommunity({
     const { message, retry } = FAILURES[state.failure];
     return (
       <>
-        {heading("Couldn’t find community")}
+        {heading(t("v1id.find.failedTitle"))}
         <p role="alert" className="text-body text-danger">
-          {message}
+          {message()}
         </p>
         <div
           className="flex gap-3"
           data-onboarding-actions={onboarding ? "" : undefined}
         >
           <Button size={onboarding ? "lg" : "md"} onClick={cancel}>
-            Cancel
+            {t("settings.cancel")}
           </Button>
           {retry && (
             <Button
@@ -198,7 +208,7 @@ export function FindCommunity({
               size={onboarding ? "lg" : "md"}
               onClick={() => setState({ status: "finding" })}
             >
-              Retry
+              {t("communityAdmin.retry")}
             </Button>
           )}
         </div>
@@ -215,7 +225,7 @@ export function FindCommunity({
   const consented = (!needsAge || adult) && (!needsAgreement || agreed);
   return (
     <>
-      {heading("Join Community")}
+      {heading(t("v1id.find.joinTitle"))}
       <div className="flex items-center gap-3 rounded-[var(--radius-row)] bg-surface-inset p-4">
         <Avatar
           alt=""
@@ -236,7 +246,7 @@ export function FindCommunity({
             <Checkbox
               checked={adult}
               onCheckedChange={setAdult}
-              label="I confirm that I am at least 18 years old."
+              label={t("profileEditing.adult")}
             />
           )}
           {needsAgreement && (
@@ -244,21 +254,34 @@ export function FindCommunity({
               checked={agreed}
               onCheckedChange={setAgreed}
               label={
-                <>
-                  I agree to this community’s{" "}
-                  {policy?.terms_markdown && (
-                    <PolicyLink url={url} document="terms">
-                      Terms of Service
-                    </PolicyLink>
-                  )}
-                  {policy?.terms_markdown && policy.privacy_markdown && " and "}
-                  {policy?.privacy_markdown && (
-                    <PolicyLink url={url} document="privacy">
-                      Privacy Notice
-                    </PolicyLink>
-                  )}
-                  .
-                </>
+                policy?.terms_markdown && policy.privacy_markdown
+                  ? rich("profileEditing.consentBoth", {
+                      terms: (
+                        <PolicyLink url={url} document="terms">
+                          {t("profileEditing.terms")}
+                        </PolicyLink>
+                      ),
+                      privacy: (
+                        <PolicyLink url={url} document="privacy">
+                          {t("profileEditing.privacy")}
+                        </PolicyLink>
+                      ),
+                    })
+                  : policy?.terms_markdown
+                    ? rich("profileEditing.consentTerms", {
+                        terms: (
+                          <PolicyLink url={url} document="terms">
+                            {t("profileEditing.terms")}
+                          </PolicyLink>
+                        ),
+                      })
+                    : rich("profileEditing.consentPrivacy", {
+                        privacy: (
+                          <PolicyLink url={url} document="privacy">
+                            {t("profileEditing.privacy")}
+                          </PolicyLink>
+                        ),
+                      })
               }
             />
           )}
@@ -274,7 +297,7 @@ export function FindCommunity({
             aria-hidden="true"
             className="motion-safe:animate-spin"
           />
-          Joining…
+          {t("profileEditing.joining")}
         </p>
       )}
       <div
@@ -286,7 +309,7 @@ export function FindCommunity({
           onClick={cancel}
           disabled={Boolean(joining)}
         >
-          Cancel
+          {t("settings.cancel")}
         </Button>
         <Button
           variant="prominent"
@@ -300,7 +323,7 @@ export function FindCommunity({
             )
           }
         >
-          Join
+          {t("identityMore.join")}
         </Button>
       </div>
     </>

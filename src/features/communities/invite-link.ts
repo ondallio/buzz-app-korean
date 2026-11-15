@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { communityDestination, enteredRelayOrigin } from "./destination";
 
 export type InviteLink = Readonly<{
@@ -99,7 +100,5 @@ function isBareInviteCode(value: string) {
 /** Refusal copy for input `parsePastedInvite` cannot read: a bare invite code
  * asks for its whole link, which also names the community. */
 export function pastedInviteError(input: string, fallback: string) {
-  return isBareInviteCode(input)
-    ? "Paste the whole invite link, not only its code."
-    : fallback;
+  return isBareInviteCode(input) ? t("v1id.pasteWholeInvite") : fallback;
 }

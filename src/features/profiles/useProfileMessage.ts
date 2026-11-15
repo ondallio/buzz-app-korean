@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { canMessageAgent } from "../agents/choices";
 import type { RelaySession } from "../relay/session";
@@ -70,7 +71,7 @@ export function useProfileMessage({
         setError(
           reason instanceof Error
             ? reason.message
-            : "Could not open the conversation. Try again.",
+            : t("v1id.openConversationFailed"),
         );
     } finally {
       if (attempt.current === controller) attempt.current = null;

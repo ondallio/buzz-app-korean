@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../shared/i18n";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { motion, useReducedMotion } from "motion/react";
@@ -31,6 +32,7 @@ const MARKDOWN: Components = {
 };
 
 export function PluginReadme({ text }: { text: string }) {
+  useLanguage();
   const id = useId();
   const content = useRef<HTMLDivElement>(null);
   // Null means no disclosure action yet: apply measurements without animation.
@@ -98,7 +100,9 @@ export function PluginReadme({ text }: { text: string }) {
             aria-controls={id}
             onClick={() => setExpanded(!expanded)}
           >
-            {expanded ? "View less" : "View more"}
+            {expanded
+              ? t("pluginRequests.viewLess")
+              : t("pluginRequests.viewMore")}
           </Button>
         </div>
       )}

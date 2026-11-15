@@ -1,3 +1,8 @@
+import { t, useLanguage } from "../../../shared/i18n";
+import {
+  resolveMessage,
+  type DisplayMessage,
+} from "../../../shared/i18n/deferred-message";
 import {
   useContext,
   useLayoutEffect,
@@ -98,6 +103,7 @@ function AccountSheet({
 export function SettingsErrorSheet({
   active,
   title,
+  titleLabel,
   message,
   action,
   accessRequired = false,
@@ -105,7 +111,9 @@ export function SettingsErrorSheet({
 }: {
   active: boolean;
   title: string;
-  message: string;
+  /** Display copy does not change the canonical error category used as the key. */
+  titleLabel?: string;
+  message: DisplayMessage;
   accessRequired?: boolean;
   announce?: "alert" | "status";
   action: {
@@ -115,6 +123,8 @@ export function SettingsErrorSheet({
     run(): void;
   };
 }) {
+  useLanguage();
+  const displayedMessage = resolveMessage(message);
   const report = useContext(AgentSaveFooter)?.setPanelNotice;
   const run = useRef(action.run);
   run.current = action.run;
@@ -123,9 +133,9 @@ export function SettingsErrorSheet({
     () => (
       <AccountSheet
         key={title}
-        title={title}
+        title={titleLabel ?? title}
         accessRequired={accessRequired}
-        description={<span role={announce}>{message}</span>}
+        description={<span role={announce}>{displayedMessage}</span>}
       >
         <Button
           variant="prominent"
@@ -148,7 +158,16 @@ export function SettingsErrorSheet({
         </Button>
       </AccountSheet>
     ),
-    [title, message, label, disabled, href, accessRequired, announce],
+    [
+      title,
+      titleLabel,
+      displayedMessage,
+      label,
+      disabled,
+      href,
+      accessRequired,
+      announce,
+    ],
   );
   useLayoutEffect(() => {
     if (!report || !active) return;
@@ -172,10 +191,11 @@ export function AccountRecoverySheet({
   active: boolean;
   email?: string | undefined;
   mismatch: boolean;
-  detail?: string | undefined;
+  detail?: DisplayMessage | undefined;
   onSwitchAccount?: () => void;
   openIdentity?: (() => void) | undefined;
 }) {
+  useLanguage();
   return (
     <SettingsErrorSheet
       active={active}
@@ -183,17 +203,22 @@ export function AccountRecoverySheet({
       title={
         mismatch ? "Different account needed" : "Try another Builderlab account"
       }
+      titleLabel={t(
+        mismatch
+          ? "builderlabSettings.differentAccountTitle"
+          : "builderlabSettings.anotherAccountTitle",
+      )}
       message={
         mismatch
           ? email
-            ? `Sign in as ${email} to edit this agent.`
-            : "Sign in with another Builderlab account to edit this agent."
-          : (detail ?? "This account can’t access Builderlab agents.")
+            ? t("builderlabSettings.signInEmail", { email })
+            : t("builderlabSettings.signInOther")
+          : (detail ?? t("builderlabSettings.accessFallback"))
       }
       action={{
         label: brokerBuilderlab()
-          ? "Use another account"
-          : "Identity → Organization sign-in",
+          ? t("builderlabSettings.useAnother")
+          : t("builderlabLogin.organizationLink"),
         disabled: !brokerBuilderlab() && !openIdentity,
         href:
           active && brokerBuilderlab()
