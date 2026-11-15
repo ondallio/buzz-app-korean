@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { useState } from "react";
 import type { Config } from "./runtime";
 
@@ -15,6 +16,15 @@ export const settingLabels: Record<SettingGroup, string> = {
   workspace: "Workspace",
   scope: "Sessions",
 };
+/** `settingLabels` in the viewer's language. */
+export const settingLabel = (group: SettingGroup) =>
+  group === "model"
+    ? t("v1agent.settings.modelAndThinking")
+    : group === "instructions"
+      ? t("agentCreate.instructions")
+      : group === "workspace"
+        ? t("v1agent.settings.workspace")
+        : t("v1agent.settings.sessions");
 const names = Object.keys(groups) as SettingGroup[];
 const same = (a: Config, b: Config, group: SettingGroup) =>
   groups[group].every((key) => a[key] === b[key]);

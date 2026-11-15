@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useLayoutEffect,
   useRef,
@@ -30,6 +31,7 @@ function ActiveAgentAvatar({
   thinkingDescriptionId,
   ...props
 }: AgentAvatarProps) {
+  useLanguage();
   const activity = session?.agentActivity;
   const getThinking = () => {
     const snapshot = activity?.snapshot();
@@ -93,7 +95,7 @@ function ActiveAgentAvatar({
       </span>
       {thinkingDescriptionId && (
         <span className="sr-only" id={thinkingDescriptionId}>
-          {thinking ? "Agent is thinking" : ""}
+          {thinking ? t("v1agent.avatar.thinking") : ""}
         </span>
       )}
     </>

@@ -1,3 +1,6 @@
+import { t, useLanguage } from "../../shared/i18n";
+import { localMessage } from "../../shared/i18n/deferred-message";
+import { TranslatedMessage } from "../../shared/i18n/Message";
 // An agent card sent in a conversation, drawn as the agent's card from the
 // Marketplace, with an explicit Add agent action beneath its name.
 import { useEffect, useRef, useState } from "react";
@@ -63,6 +66,7 @@ export function AgentCardAttachment({
    * absent, nothing offers to. */
   navigator?: Navigation | undefined;
 }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const { types } = useAgents(agents);
   // `undefined` while the card is read; `null` when it holds no agent.
@@ -107,7 +111,8 @@ export function AgentCardAttachment({
       );
     return () => controller.abort();
   }, [source, attempt]);
-  const name = (attachment.name ?? "").replace(CARD, "") || "Agent";
+  const name =
+    (attachment.name ?? "").replace(CARD, "") || t("agentsDetails.agent");
   // Not a card after all: show the picture it is.
   if (shared === null)
     return <img className={styles.picture} src={source} alt={name} />;
@@ -122,7 +127,10 @@ export function AgentCardAttachment({
               ref={trigger}
               variant="prominent"
               size="sm"
-              aria-label={`${failed ? "Try again" : "Add agent"}: ${shared?.name ?? name}`}
+              aria-label={t(
+                failed ? "v1agent.card.retryNamed" : "v1agent.card.addNamed",
+                { name: shared?.name ?? name },
+              )}
               aria-haspopup="dialog"
               disabled={!shared && !failed}
               onClick={() => {
@@ -131,7 +139,7 @@ export function AgentCardAttachment({
                 setAttempt((value) => value + 1);
               }}
             >
-              {failed ? "Couldn’t load. Try again" : "Add agent"}
+              {failed ? t("agentsDetails.loadFailed") : t("v1agent.card.add")}
             </Button>
           }
           community={
@@ -148,9 +156,20 @@ export function AgentCardAttachment({
             setAdding(false);
             const show = opener(agent);
             notify(
-              `Added ${agent.name} to your agents.`,
+              <TranslatedMessage
+                value={localMessage("agentsDetails.added", {
+                  name: agent.name,
+                })}
+              />,
               "success",
-              show && { label: "Open", onClick: show },
+              show && {
+                label: (
+                  <TranslatedMessage
+                    value={localMessage("agentsDetails.open")}
+                  />
+                ),
+                onClick: show,
+              },
             );
           }}
           {...(navigator && {

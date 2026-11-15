@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 // "AI setup": Automatic or Custom, as one Settings row whose
 // Custom rows open in place under it. Create agent and an agent's Identity
 // settings share it. The recommendation names its source when supplied.
@@ -9,9 +10,20 @@ import { Select } from "../../shared/design-system/ui/Select";
 import { SettingsGroupExpand } from "../../shared/design-system/ui/SettingsGroup";
 import { type RecommendedCandidate, recommendedSetup } from "./recommended";
 
+const effortKeys = {
+  none: "codexCreate.none",
+  minimal: "codexCreate.minimal",
+  low: "codexCreate.low",
+  medium: "codexCreate.medium",
+  high: "codexCreate.high",
+  xhigh: "codexCreate.extraHigh",
+  max: "codexCreate.maximum",
+  ultra: "codexCreate.ultra",
+} as const;
+
 const effortLabel = (effort: string) =>
-  effort === "xhigh"
-    ? "Extra high"
+  Object.hasOwn(effortKeys, effort)
+    ? t(effortKeys[effort as keyof typeof effortKeys])
     : `${effort.charAt(0).toUpperCase()}${effort.slice(1)}`;
 
 type Mark = ComponentType<{ size?: number | string }> | undefined;
@@ -65,6 +77,7 @@ export function UsesLine({
   /** The usual pick's harness, when it isn't set up here. */
   skipped?: string | undefined;
 }>) {
+  useLanguage();
   const value = `${candidate.label} · ${effortLabel(candidate.effort)}`;
   return (
     <span>
@@ -81,7 +94,7 @@ export function UsesLine({
         <>
           {" "}
           <span className="mt-1 block text-body-sm">
-            {`Buzz’s usual pick, ${skipped}, isn’t set up on this computer, so this agent uses ${candidate.label}.`}
+            {t("v1agent.ai.skipped", { skipped, model: candidate.label })}
           </span>
         </>
       )}
@@ -92,6 +105,7 @@ export function UsesLine({
 /** "Checking this computer…", held back a second so a quick check doesn't
  * flash it; until then a blank line as tall as the result. */
 export function Checking() {
+  useLanguage();
   const [shown, setShown] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setShown(true), 1000);
@@ -99,7 +113,7 @@ export function Checking() {
   }, []);
   return (
     <span className="buzz-uses-line inline-flex items-center">
-      {shown ? "Checking this computer…" : "\u00a0"}
+      {shown ? t("v1agent.ai.checking") : "\u00a0"}
     </span>
   );
 }
@@ -119,7 +133,7 @@ export function runsOnDetails(
     };
   }
   return {
-    summary: `No recommended model is available, so this uses ${type.title}’s default.`,
+    summary: t("v1agent.ai.noRecommended", { harness: type.title }),
   };
 }
 
@@ -131,7 +145,7 @@ export function AISettings({
   summary,
   action,
   automaticHint,
-  manualHint = "Choose your own settings.",
+  manualHint,
   disabled = false,
   onChange,
   children,
@@ -154,22 +168,23 @@ export function AISettings({
   /** The custom rows, opened in place while Custom is selected. */
   children: ReactNode;
 }>) {
+  useLanguage();
   const { recommendedBy, description: configuredDescription } =
     recommendedSetup();
   const description =
     [
-      recommendedBy && `Recommended by ${recommendedBy}.`,
+      recommendedBy && t("v1agent.ai.recommendedBy", { name: recommendedBy }),
       automaticHint ?? configuredDescription,
     ]
       .filter(Boolean)
-      .join(" ") || "Use recommended settings.";
+      .join(" ") || t("v1agent.ai.useRecommended");
   return (
     <>
       <PreferenceRow
         icon={
           <AISettingsIcon automatic={automatic} harnessIcon={HarnessIcon} />
         }
-        title="AI setup"
+        title={t("v1agent.ai.title")}
         // One lasting live region, announced as it changes (from checking to
         // available); a link or button in `action` stays outside it.
         subtitle={
@@ -177,11 +192,11 @@ export function AISettings({
             {automatic && modelName && (
               <span
                 className="flex min-w-0 items-baseline gap-1"
-                title={`Set to ${modelName} (recommended)`}
+                title={t("v1agent.ai.setToTitle", { model: modelName })}
               >
-                <span className="shrink-0">Set to</span>{" "}
+                <span className="shrink-0">{t("v1agent.ai.setTo")}</span>{" "}
                 <span className="truncate">{modelName}</span>{" "}
-                <span className="shrink-0"> (recommended)</span>
+                <span className="shrink-0">{t("v1agent.ai.recommended")}</span>
               </span>
             )}
             <span
@@ -196,7 +211,7 @@ export function AISettings({
         trailing={(control) => (
           <Select
             describedBy={control["aria-describedby"]}
-            label="AI setup"
+            label={t("v1agent.ai.title")}
             variant="compact"
             align="end"
             value={automatic ? "automatic" : "manual"}
@@ -207,7 +222,7 @@ export function AISettings({
                 options: [
                   {
                     value: "automatic",
-                    label: "Automatic",
+                    label: t("codexCreate.automatic"),
                     description: (
                       <span className="grid gap-1.5 text-caption">
                         {description && (
@@ -224,8 +239,8 @@ export function AISettings({
                   },
                   {
                     value: "manual",
-                    label: "Custom",
-                    description: manualHint,
+                    label: t("v1agent.ai.custom"),
+                    description: manualHint ?? t("v1agent.ai.manualHint"),
                   },
                 ],
               },

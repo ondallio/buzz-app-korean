@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 // Share: send the agent to people or a channel, list it in its community's Marketplace, or
 // export it as a file.
 import { isTauri } from "@tauri-apps/api/core";
@@ -193,7 +194,9 @@ async function shareRecovery(agent: Agent, target: ShareTarget, copy: string) {
 const names = (targets: readonly ShareTarget[]) => {
   const all = targets.map(targetName);
   const last = all.pop() ?? "";
-  return all.length ? `${all.join(", ")} and ${last}` : last;
+  return all.length
+    ? t("v1agent.share.namesJoin", { list: all.join(", "), last })
+    : last;
 };
 
 export function AgentShareDialog({
@@ -210,6 +213,7 @@ export function AgentShareDialog({
   onViewListing?: ((agent: SharedAgent) => void) | undefined;
   onClose(): void;
 }) {
+  useLanguage();
   const notify = useToastNotification();
   // `null` while the catalog is read; `undefined` once read with no head.
   const [head, setHead] = useState<EventData | undefined | null>(null);
@@ -268,7 +272,7 @@ export function AgentShareDialog({
     setPending(via);
     setListing(shared);
     setFailure("");
-    let reason = "Try again.";
+    let reason = t("agentsBrowse.retryFallback");
     let content: string | undefined;
     try {
       // Removing keeps what was shared, so it never depends on the agent
@@ -300,18 +304,24 @@ export function AgentShareDialog({
       const listed = shared ? sharedAgents(next ? [next] : [])[0] : undefined;
       notify(
         shared
-          ? `Published ${agent.name} to the Marketplace.`
-          : `Removed ${agent.name} from the Marketplace.`,
+          ? t("v1agent.share.published", { name: agent.name })
+          : t("v1agent.share.unpublished", { name: agent.name }),
         "success",
         listed && onViewListing
-          ? { label: "View", onClick: () => onViewListing(listed) }
+          ? {
+              label: t("v1agent.common.view"),
+              onClick: () => onViewListing(listed),
+            }
           : undefined,
       );
       return true;
     }
     // The switch keeps what was asked for, so Done tries again.
     setFailure(
-      `Couldn’t ${shared ? "publish" : "remove"} ${agent.name}. ${reason}`,
+      t(shared ? "v1agent.share.publishFailed" : "v1agent.share.removeFailed", {
+        name: agent.name,
+        reason,
+      }),
     );
     return false;
   };
@@ -380,12 +390,29 @@ export function AgentShareDialog({
       if (!snapshot) return;
       const path = await saveFile(snapshot, fileName(agent.name, as));
       notify(
-        `${as === "png" ? "Saved an agent card for" : "Saved"} ${agent.name}${path ? ` to ${path}` : ""}.`,
+        path
+          ? t(
+              as === "png"
+                ? "v1agent.share.savedCardTo"
+                : "v1agent.share.savedTo",
+              { name: agent.name, path },
+            )
+          : t(
+              as === "png" ? "v1agent.share.savedCard" : "v1agent.share.saved",
+              {
+                name: agent.name,
+              },
+            ),
         "success",
       );
       if (as === "png") preview(false);
     } catch (reason) {
-      setError(`Couldn’t export ${agent.name}. ${message(reason)}`);
+      setError(
+        t("v1agent.share.exportFailed", {
+          name: agent.name,
+          reason: message(reason),
+        }),
+      );
     } finally {
       setPending(undefined);
     }
@@ -401,7 +428,7 @@ export function AgentShareDialog({
     const uploads = session.attachments;
     const outbox = session.outbox;
     if (!uploads || !outbox) {
-      setError("This community can’t send agents in messages.");
+      setError(t("v1agent.share.cantSend"));
       return;
     }
     const controller = new AbortController();
@@ -427,7 +454,7 @@ export function AgentShareDialog({
         };
         if (!message) {
           if (target.kind === "person" && !session.directMessages.available)
-            throw new Error("Direct messages aren’t available here.");
+            throw new Error(t("v1agent.share.noDirectMessages"));
           // A person gets it in a direct message; a channel, in the channel.
           const channel =
             target.kind === "channel"
@@ -453,7 +480,7 @@ export function AgentShareDialog({
             channel,
             id: session.messages.send(
               channel,
-              `Here’s a copy of my agent, ${agent.name}. Choose the card to add it to your agents.`,
+              t("v1agent.share.message", { name: agent.name }),
               [],
               [copy.file],
               recovery,
@@ -477,12 +504,24 @@ export function AgentShareDialog({
     setPending(undefined);
     const delivered = targets.filter((target) => !failed.includes(target));
     if (delivered.length)
-      notify(`Sent ${agent.name} to ${names(delivered)}.`, "success");
+      notify(
+        t("v1agent.share.sent", {
+          name: agent.name,
+          targets: names(delivered),
+        }),
+        "success",
+      );
     // What it couldn't reach stays chosen, to try again.
     setTargets(failed);
     if (failed.length)
       setError(
-        `Couldn’t send to ${names(failed)}. ${reasons.size === 1 ? [...reasons][0] : "Try again."}`,
+        t("v1agent.share.sendFailed", {
+          targets: names(failed),
+          reason:
+            reasons.size === 1
+              ? ([...reasons][0] ?? "")
+              : t("agentsBrowse.retryFallback"),
+        }),
       );
     // Send gives way to Done once everyone is reached; focus follows it.
     requestAnimationFrame(() => primary.current?.focus());
@@ -493,11 +532,16 @@ export function AgentShareDialog({
       open
       headerGap="compact"
       footerGap="compact"
-      title={previewing ? `Export ${agent.name}` : `Share ${agent.name}`}
+      title={t(
+        previewing ? "v1agent.share.exportTitle" : "v1agent.share.title",
+        {
+          name: agent.name,
+        },
+      )}
       description={
         previewing
-          ? `Anyone with this card can add ${agent.name}, instructions and settings included. Memories and chats stay with you.`
-          : "Everyone gets their own copy. Later changes won’t sync."
+          ? t("v1agent.share.exportDescription", { name: agent.name })
+          : t("v1agent.share.description")
       }
       // Keep the same frame across steps so entering and leaving the card
       // does not resize the dialog during its crossfade.
@@ -516,8 +560,13 @@ export function AgentShareDialog({
       leadingActions={
         !previewing && (
           <SplitButton
-            aria-label={`Export ${agent.name} as ${format === "png" ? "an agent card" : "a JSON file"}`}
-            menuLabel="Choose an export format"
+            aria-label={t(
+              format === "png"
+                ? "v1agent.share.exportAsCard"
+                : "v1agent.share.exportAsJson",
+              { name: agent.name },
+            )}
+            menuLabel={t("v1agent.share.chooseFormat")}
             loading={pending === "export"}
             disabled={busy || !definition}
             onClick={() =>
@@ -525,10 +574,7 @@ export function AgentShareDialog({
             }
             menu={
               <>
-                <MenuNote>
-                  An agent card is an image that holds the agent’s setup, so
-                  anyone can add it to Buzz.
-                </MenuNote>
+                <MenuNote>{t("v1agent.share.cardNote")}</MenuNote>
                 <MenuRadioGroup
                   value={format}
                   onValueChange={(value: string) =>
@@ -536,16 +582,18 @@ export function AgentShareDialog({
                   }
                 >
                   <MenuRadioItem value="png" closeOnClick>
-                    Agent card
+                    {t("v1agent.card.title")}
                   </MenuRadioItem>
                   <MenuRadioItem value="json" closeOnClick>
-                    JSON file
+                    {t("v1agent.share.jsonFile")}
                   </MenuRadioItem>
                 </MenuRadioGroup>
               </>
             }
           >
-            {format === "png" ? "Export agent card" : "Export JSON"}
+            {format === "png"
+              ? t("v1agent.share.exportCard")
+              : t("v1agent.share.exportJson")}
           </SplitButton>
         )
       }
@@ -557,7 +605,7 @@ export function AgentShareDialog({
               disabled={busy}
               onClick={() => preview(false)}
             >
-              Back
+              {t("agentCreate.back")}
             </Button>
             <Button
               ref={saveButton}
@@ -566,7 +614,7 @@ export function AgentShareDialog({
               disabled={busy || !card || !definition}
               onClick={() => void save("png")}
             >
-              Save card
+              {t("v1agent.share.saveCard")}
             </Button>
           </>
         ) : targets.length ? (
@@ -577,7 +625,7 @@ export function AgentShareDialog({
             disabled={busy || !definition}
             onClick={() => void send()}
           >
-            Send
+            {t("v1agent.common.send")}
           </Button>
         ) : (
           <Button
@@ -587,7 +635,7 @@ export function AgentShareDialog({
             disabled={busy}
             onClick={() => void finish()}
           >
-            Done
+            {t("v1agent.common.done")}
           </Button>
         )
       }
@@ -596,7 +644,7 @@ export function AgentShareDialog({
         <div className={styles.preview}>
           <LoadingRegion
             pending={!card}
-            label="Drawing the card…"
+            label={t("v1agent.share.drawing")}
             feedback={
               // A save can still fail after a card couldn’t be drawn, and an
               // agent can stop being shareable while previewed; say each.
@@ -604,13 +652,15 @@ export function AgentShareDialog({
                 <div className="grid gap-1">
                   {refused && (
                     <p role="alert" className="m-0 text-body-sm text-danger">
-                      {agent.name} can’t be shared. {refused}
+                      {t("v1agent.share.refused", {
+                        name: agent.name,
+                        reason: refused,
+                      })}
                     </p>
                   )}
                   {card === "failed" && (
                     <p role="alert" className="m-0 text-body-sm text-danger">
-                      Couldn’t draw the card. Saving still keeps the agent’s
-                      setup.{" "}
+                      {t("v1agent.share.drawFailed")}{" "}
                       <Button
                         size="sm"
                         onClick={() => {
@@ -619,7 +669,7 @@ export function AgentShareDialog({
                           setCard(undefined);
                         }}
                       >
-                        Try again
+                        {t("agentsBrowse.tryAgain")}
                       </Button>
                     </p>
                   )}
@@ -636,7 +686,7 @@ export function AgentShareDialog({
               portrait={ready ? card.portrait : undefined}
               accentColor={ready ? card.accentColor : undefined}
               src={ready ? card.url : undefined}
-              alt={`${agent.name}’s agent card`}
+              alt={t("v1agent.share.cardAlt", { name: agent.name })}
             />
           </LoadingRegion>
         </div>
@@ -644,7 +694,10 @@ export function AgentShareDialog({
         <div className={styles.layout}>
           {refused && (
             <p role="alert" className="m-0 text-body-sm text-danger">
-              {agent.name} can’t be shared. {refused}
+              {t("v1agent.share.refused", {
+                name: agent.name,
+                reason: refused,
+              })}
             </p>
           )}
           <AgentShareRecipients
@@ -668,20 +721,22 @@ export function AgentShareDialog({
             <SettingsGroup>
               <SwitchPreferenceRow
                 label={
-                  listed ? "Published to Marketplace" : "Publish to Marketplace"
+                  listed
+                    ? t("v1agent.share.publishedSwitch")
+                    : t("v1agent.share.publishSwitch")
                 }
                 description={
                   unread
-                    ? "Couldn’t check the Marketplace."
+                    ? t("v1agent.share.checkFailed")
                     : head === null
-                      ? "Checking the Marketplace…"
+                      ? t("v1agent.share.checking")
                       : listing !== undefined
                         ? listing
-                          ? "Publishing…"
-                          : "Removing…"
+                          ? t("v1agent.share.publishing")
+                          : t("v1agent.share.removing")
                         : stale
-                          ? "Your latest changes aren’t in the Marketplace yet."
-                          : "Anyone in this community can add a copy, instructions included. Memories and chats stay with you."
+                          ? t("v1agent.share.stale")
+                          : t("v1agent.share.publishDescription")
                 }
                 checked={listing ?? wanted ?? listed}
                 disabled={
@@ -700,7 +755,7 @@ export function AgentShareDialog({
             )}
             {unread && (
               <Button size="sm" onClick={() => setUnread(false)}>
-                Try again
+                {t("agentsBrowse.tryAgain")}
               </Button>
             )}
             {stale && (wanted ?? listed) && (
@@ -710,7 +765,7 @@ export function AgentShareDialog({
                 disabled={busy || !definition}
                 onClick={() => void share(true, "update")}
               >
-                Update Marketplace
+                {t("v1agent.share.update")}
               </Button>
             )}
           </div>

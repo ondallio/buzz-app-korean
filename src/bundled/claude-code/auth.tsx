@@ -8,6 +8,8 @@
 // names and shapes when changing it. The optional ClaudeAuth.Settings surface
 // belongs to this authentication method; other implementations may omit it.
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
 import { type ComponentType, type ReactNode, useEffect, useState } from "react";
 import { ClaudeSettings, type ClaudeConnection } from "./ClaudeSettings";
 import { ApiKeyForm } from "../../features/settings/ApiKeyForm";
@@ -81,9 +83,13 @@ export class ClaudeAuth {
   /** Which way this build authenticates. */
   readonly id = "buzz-claude-auth:api-key";
   /** What the agent type's row asks for while Claude cannot run. */
-  readonly attentionLabel = "Add Claude API key";
+  get attentionLabel() {
+    return t("v1agent.claude.addKey");
+  }
   /** Ends "Claude 2.1.0 …" while Claude cannot run. */
-  readonly needs = "needs an Anthropic API key";
+  get needs() {
+    return t("v1agent.claude.needsKey");
+  }
   /** An interactive sign-in setup runs as its step, when there is one. */
   readonly signIn: ((step: Step) => Promise<void>) | undefined = undefined;
   private saved: Promise<boolean> | undefined;
@@ -253,11 +259,14 @@ export function SignIn({
   /** Keep the form owner alive while its navigated presentation is hidden. */
   render?: ((form: ReactNode) => ReactNode) | undefined;
 }) {
+  useLanguage();
   return (
     <div className="grid gap-3">
       {/* Settings puts the introduction in its shared page header. */}
       {variant !== "dialog" && (
-        <p className="m-0 text-body-sm text-secondary">{KEY_ONCE}</p>
+        <p className="m-0 text-body-sm text-secondary">
+          {t("v1agent.claude.keyOnce")}
+        </p>
       )}
       <KeyForm
         setup={setup}
@@ -281,10 +290,11 @@ export function SignedIn({
   setup: ClaudeSetup;
   onSaved?: (() => void) | undefined;
 }) {
+  useLanguage();
   return (
     <div className="grid gap-2">
       <p className="m-0 text-body-sm text-subtle">
-        Claude runs with your Anthropic API key.
+        {t("claudeAuthUi.signedIn")}
       </p>
       <KeyForm setup={setup} replace onSaved={onSaved} />
     </div>
@@ -298,24 +308,22 @@ export function Missing({
 }: {
   openSettings?: (() => void) | undefined;
 }) {
+  useLanguage();
   return (
     <p className="m-0 text-body-sm text-secondary">
-      Claude is missing an API key.{" "}
-      {openSettings ? (
-        <>
-          Head to{" "}
-          <button
-            type="button"
-            className={inlineStyles.link}
-            onClick={openSettings}
-          >
-            Settings
-          </button>{" "}
-          to add one.
-        </>
-      ) : (
-        "Add one in Settings → Claude."
-      )}
+      {openSettings
+        ? rich("claudeAuthUi.missingSettings", {
+            settings: (
+              <button
+                type="button"
+                className={inlineStyles.link}
+                onClick={openSettings}
+              >
+                {t("navigation.settings")}
+              </button>
+            ),
+          })
+        : t("v1agent.claude.missing")}
     </p>
   );
 }
@@ -339,6 +347,7 @@ function KeyForm({
   onSavingChange?: ((saving: boolean) => void) | undefined;
   render?: ((form: ReactNode) => ReactNode) | undefined;
 }) {
+  useLanguage();
   const [key, setKey] = useState("");
   const [saving, setSaving] = useState<AbortController>();
   // Kept until the form closes.
@@ -367,11 +376,11 @@ function KeyForm({
   };
   const form = (
     <ApiKeyForm
-      label={replace ? "Replace API key" : "Anthropic API key"}
+      label={replace ? t("claudeAuthUi.replaceKey") : t("claudeAuthUi.apiKey")}
       description={
         replace
-          ? "Create a key at console.anthropic.com. Buzz keeps it securely on this computer and gives it only to Claude, so commands your Claude agents run can read it."
-          : "Your key will be stored securely on this computer."
+          ? t("claudeAuthUi.replaceDescription")
+          : t("v1agent.claude.keyStored")
       }
       value={key}
       onValueChange={setKey}

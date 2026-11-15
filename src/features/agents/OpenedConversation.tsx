@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 // The session of the conversation an agent's profile was opened from, set
 // apart above the agent's other conversations. Types list their own sessions.
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
@@ -245,13 +246,21 @@ export function OpenedConversation({
   onView(): void;
 }) {
   useClockFormat();
+  useLanguage();
   const id = useId();
   const place = (session ? session.root : conversation.rootId)
     ? "thread"
     : "channel";
   return (
     <section aria-labelledby={id} className={styles.section}>
-      <InlineHeader id={id} title={`This ${place}`} />
+      <InlineHeader
+        id={id}
+        title={
+          place === "thread"
+            ? t("v1agent.opened.thisThread")
+            : t("v1agent.opened.thisChannel")
+        }
+      />
       <SettingsGroup layout="form">
         {/* The detail sits with its row, as in a type's own session lists. */}
         <div className="grid gap-2">
@@ -267,36 +276,44 @@ export function OpenedConversation({
                     {[
                       status,
                       session.at &&
-                        `Last active ${formatItemTimestamp(session.at / 1000, { withTime: true })}`,
+                        t("v1agent.opened.lastActive", {
+                          time: formatItemTimestamp(session.at / 1000, {
+                            withTime: true,
+                          }),
+                        }),
                     ]
                       .filter(Boolean)
-                      .join(" · ") || `${harness} session`}
+                      .join(" · ") || t("v1agent.opened.session", { harness })}
                   </span>
                 </span>
                 <Button
                   variant="subtle"
                   size="sm"
-                  aria-label={`View transcript: ${session.name || session.channelId.slice(0, 8)}`}
+                  aria-label={t("v1agent.opened.viewTranscriptNamed", {
+                    name: session.name || session.channelId.slice(0, 8),
+                  })}
                   onClick={onView}
                 >
-                  View transcript
+                  {t("messageRow.viewTranscript")}
                 </Button>
               </>
             ) : searching ? (
               <span role="status" className="text-body-sm text-subtle">
-                Looking for a {harness} session…
+                {t("v1agent.opened.searching", { harness })}
               </span>
             ) : error ? (
               <span role="alert" className="text-body-sm">
-                Could not look for a {harness} session: {error}
+                {t("v1agent.opened.searchFailed", { harness, error })}
               </span>
             ) : (
               <span className="grid gap-1">
                 <span className="text-label">
-                  No {harness} session here yet
+                  {t("v1agent.opened.none", { harness })}
                 </span>
                 <span className="text-body-sm text-subtle">
-                  One starts when you mention the agent in this {place}.
+                  {place === "thread"
+                    ? t("v1agent.opened.startsThread")
+                    : t("v1agent.opened.startsChannel")}
                 </span>
               </span>
             )}

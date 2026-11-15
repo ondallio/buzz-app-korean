@@ -1,3 +1,9 @@
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  errorMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 // An agent's sections, wherever they are shown (its Build view and its
 // profile panel): the type's tabs, settings, and Memory.
 // Memory is relay-backed for both local and hosted agents. Agents classified
@@ -92,7 +98,20 @@ export function agentSections({
   const tabs = orderedTabs.map(
     ({ id, title, role, reconcilesConfig, component: Component }) => ({
       value: (role ? `agent:${role}` : `agent:type:${id}`) as `agent:${string}`,
-      label: title,
+      label:
+        type &&
+        [
+          "buzz.claude-code/claude-code",
+          "buzz.codex/codex",
+          "buzz.goose/goose",
+          "buzz.pi/pi",
+          "block.builderlab/builderlab",
+        ].includes(type.key) &&
+        id === "activity" &&
+        role === "activity" &&
+        title === "Activity"
+          ? t("agentMemory.activity")
+          : title,
       render: () => (
         <EditorBase
           key={
@@ -153,7 +172,7 @@ export function agentSections({
   )
     tabs.unshift({
       value: "agent:settings",
-      label: "Settings",
+      label: t("agentsBrowse.settings"),
       render: () => (
         <div className="grid gap-4">
           {execution === "remote" && (
@@ -169,7 +188,10 @@ export function agentSections({
     if (!when || shows(when, agent, key))
       tabs.push({
         value: `agent:added:${key}`,
-        label: title,
+        label:
+          key === "buzz.watching/watching" && title === "Attention"
+            ? t("agentMemory.attention")
+            : title,
         render: () => (
           <Component agent={agent} open={openLink} canOpen={canOpenLink} />
         ),
@@ -178,7 +200,7 @@ export function agentSections({
     ...tabs,
     {
       value: "agent:memory",
-      label: "Memory",
+      label: t("agentsBrowse.memory"),
       render: () => (
         <MemoryPanel
           agents={agents}
@@ -203,9 +225,10 @@ function shows(when: (agent: Agent) => boolean, agent: Agent, key: string) {
 }
 
 function HostSettings({ host }: { host: AgentSettingsHost }) {
+  useLanguage();
   const form = useId();
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const save = async () => {
     if (!host.pendingSave) return;
     setSaving(true);
@@ -213,7 +236,7 @@ function HostSettings({ host }: { host: AgentSettingsHost }) {
     try {
       await host.pendingSave();
     } catch (reason) {
-      setError(String(reason instanceof Error ? reason.message : reason));
+      setError(errorMessage(reason));
     } finally {
       setSaving(false);
     }
@@ -230,7 +253,7 @@ function HostSettings({ host }: { host: AgentSettingsHost }) {
       {host.typeControl?.(false)}
       {error && (
         <p role="alert" className="buzz-field-error">
-          {error}
+          {resolveMessage(error)}
         </p>
       )}
       <AgentSaveButton

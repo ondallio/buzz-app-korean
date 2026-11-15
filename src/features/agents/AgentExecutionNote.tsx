@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import type { ReactNode } from "react";
 import { CloudIcon } from "../../shared/design-system/icons";
 import { PreferenceRow } from "../../shared/design-system/ui/PreferenceRow";
@@ -11,17 +12,18 @@ export function AgentExecutionNote({
   runtime?: string;
   description?: ReactNode;
 }) {
+  useLanguage();
   // Keep the cue compact; the composer explains where remote work happens.
   return (
     <div role="note">
       <SettingsGroup>
         <PreferenceRow
           icon={<CloudIcon />}
-          title="Remote agent"
+          title={t("agentSaveUi.remoteAgent")}
           subtitle={
             description ??
             (runtime === "block.builderlab/builderlab"
-              ? "Runs on a Builderlab machine"
+              ? t("agentSaveUi.builderlabMachine")
               : undefined)
           }
         />

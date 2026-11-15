@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import type { Agent, Agents } from "../../features/agents/service";
 import { agentAvatars } from "../../features/agents/avatar-packs";
@@ -25,6 +26,7 @@ export function AgentIdentityDialog({
   finalFocus: RefObject<HTMLButtonElement | null>;
   communities?: CommunityReader | undefined;
 }) {
+  useLanguage();
   const community = useAgentScopeCommunity(agent, agents, communities);
   const [scopeOpen, setScopeOpen] = useState(false);
   useEffect(() => {
@@ -60,7 +62,7 @@ export function AgentIdentityDialog({
   return (
     <Dialog
       open
-      title="Change avatar"
+      title={t("v1agent.identity.changeAvatar")}
       description={
         community ? (
           <AgentCommunityScope
@@ -97,7 +99,7 @@ export function AgentIdentityDialog({
               setError("");
             }}
           >
-            Remove avatar
+            {t("v1agent.identity.removeAvatar")}
           </Button>
         )
       }
@@ -109,7 +111,7 @@ export function AgentIdentityDialog({
           loading={pending}
           disabled={pending || avatarBusy || !changed}
         >
-          Save changes
+          {t("agentCreate.save")}
         </Button>
       }
     >

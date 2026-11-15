@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import type { ReactNode } from "react";
 import { Avatar } from "../../shared/Avatar";
 import { NavigationItem } from "../../shared/design-system/ui/NavigationItem";
@@ -25,6 +26,7 @@ export function AgentActivityRow({
   onOpen?: (() => void) | undefined;
   onOpenActivity?: (() => void) | undefined;
 }) {
+  useLanguage();
   const avatar = (
     <Avatar
       name={name}
@@ -75,8 +77,8 @@ export function AgentActivityRow({
           <IconButton
             size="toolbar"
             icon={<ListBulletsIcon />}
-            aria-label={`View ${name} activity`}
-            title="View activity"
+            aria-label={t("v1agent.activity.viewNamed", { name })}
+            title={t("v1agent.activity.view")}
             onClick={onOpenActivity}
           />
         </span>

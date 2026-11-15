@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 // Owner actions on an agent that every surface showing it offers: the
 // Agents Build view and the profile panel.
 import { useRef, useState, type ReactNode } from "react";
@@ -28,9 +29,7 @@ export const sharedAgentSettings =
 /** What adding the same agent to another community shares and what it keeps
  * there, as every place that adds one says it. */
 export const sameAgent = (many = false) =>
-  many
-    ? `${sharedAgentSettings} A change to them applies in every community. Their pictures and what they pay attention to are their own in each. Memory is kept per community, so anything they saved here before comes back, and so do their conversations here.`
-    : `${sharedAgentSettings} A change to them applies in every community. Its picture and what it pays attention to are its own in each. Memory is kept per community, so anything it saved here before comes back, and so do its conversations here.`;
+  many ? t("v1agent.manage.sameAgents") : t("v1agent.manage.sameAgent");
 
 /** Delete, after a confirmation that says what it does. One that cannot
  * finish keeps the dialog open with what is left; the agent stays listed.
@@ -46,6 +45,7 @@ export function AgentDelete({
   onRemoved(): void;
   trigger?: (open: () => void) => ReactNode;
 }) {
+  useLanguage();
   const cancel = useRef<HTMLButtonElement>(null);
   const [confirming, setConfirming] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -99,7 +99,8 @@ export function AgentDelete({
           variant="ghost"
           onClick={() => setConfirming(true)}
         >
-          <TrashIcon size={14} aria-hidden="true" /> Delete agent
+          <TrashIcon size={14} aria-hidden="true" />{" "}
+          {t("agentsBrowse.deleteAgent")}
         </Button>
       )}
       <Dialog
@@ -107,13 +108,13 @@ export function AgentDelete({
         open={confirming}
         initialFocus={cancel}
         onOpenChange={setConfirming}
-        title={`Delete ${agent.name}?`}
+        title={t("v1agent.manage.deleteTitle", { name: agent.name })}
         description={
           agent.place === "hosted"
-            ? "Its provider deletes it and its key, then it leaves every channel and is archived so it no longer appears in member lists or mention suggestions. It can't be undone."
+            ? t("v1agent.manage.deleteHosted")
             : several
-              ? "It stops in every community it's in. In each one it leaves every channel and is archived so it no longer appears in member lists or mention suggestions, then its key is deleted from this device. It can't be undone."
-              : "It stops, leaves every channel and is archived so it no longer appears in member lists or mention suggestions, then its key is deleted from this device. It can't be undone."
+              ? t("v1agent.manage.deleteSeveral")
+              : t("v1agent.manage.deleteLocal")
         }
         preventClose={removing}
         actions={
@@ -123,14 +124,14 @@ export function AgentDelete({
               onClick={() => setConfirming(false)}
               disabled={removing}
             >
-              Cancel
+              {t("channelForms.cancel")}
             </Button>
             <Button
               variant="destructive"
               loading={removing}
               onClick={() => void remove()}
             >
-              Delete
+              {t("v1agent.manage.delete")}
             </Button>
           </>
         }
@@ -139,7 +140,7 @@ export function AgentDelete({
           <div className="flex flex-col gap-3">
             {several && (
               <ul
-                aria-label="Its communities"
+                aria-label={t("v1agent.manage.communities")}
                 className="m-0 flex list-none flex-col gap-1 p-0"
               >
                 {memberships.map((membership) => (
@@ -150,18 +151,23 @@ export function AgentDelete({
                     <span className="truncate">
                       {hostOf(membership.origin)}
                       {!membership.connected && (
-                        <span className="text-secondary"> · Not connected</span>
+                        <span className="text-secondary">
+                          {" "}
+                          · {t("v1agent.manage.notConnected")}
+                        </span>
                       )}
                     </span>
                     {unreachable.includes(membership) && (
                       <Button
                         size="compact"
                         variant="outline"
-                        aria-label={`Forget it in ${hostOf(membership.origin)}`}
+                        aria-label={t("v1agent.manage.forgetIn", {
+                          community: hostOf(membership.origin),
+                        })}
                         disabled={removing}
                         onClick={() => void forget(membership.key)}
                       >
-                        Forget
+                        {t("v1agent.manage.forget")}
                       </Button>
                     )}
                   </li>
@@ -175,8 +181,7 @@ export function AgentDelete({
             ) : null}
             {unreachable.length > 0 && (
               <p className="m-0 text-body-sm text-secondary">
-                Forget deletes it from this device without reaching that
-                community, so it may stay in its channels there.
+                {t("v1agent.manage.forgetHint")}
               </p>
             )}
             {forgot &&
@@ -184,7 +189,7 @@ export function AgentDelete({
               // A Delete marks every membership; a Remove only its own.
               memberships.every((membership) => membership.deleting) && (
                 <p className="m-0 text-body-sm text-secondary">
-                  Delete again to finish here.
+                  {t("v1agent.manage.deleteAgain")}
                 </p>
               )}
             {!several && unreachable[0] && (
@@ -196,7 +201,7 @@ export function AgentDelete({
                   disabled={removing}
                   onClick={() => void forget(unreachable[0]?.key ?? "")}
                 >
-                  Forget it
+                  {t("v1agent.manage.forgetIt")}
                 </Button>
               </div>
             )}
@@ -221,6 +226,7 @@ export function AgentRemoveHere({
   onRemoved(): void;
   trigger: (open: () => void) => ReactNode;
 }) {
+  useLanguage();
   const cancel = useRef<HTMLButtonElement>(null);
   const [confirming, setConfirming] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -246,8 +252,8 @@ export function AgentRemoveHere({
         open={confirming}
         initialFocus={cancel}
         onOpenChange={setConfirming}
-        title={`Remove ${agent.name} from ${place}?`}
-        description="It stops here, leaves this community's channels and is archived here. It stays in your other communities with the same name, type and settings. Add it here again and its memory and conversations here come back, but what it paid attention to here doesn't."
+        title={t("v1agent.manage.removeTitle", { name: agent.name, place })}
+        description={t("v1agent.manage.removeDescription")}
         preventClose={removing}
         actions={
           <>
@@ -256,14 +262,14 @@ export function AgentRemoveHere({
               onClick={() => setConfirming(false)}
               disabled={removing}
             >
-              Cancel
+              {t("channelForms.cancel")}
             </Button>
             <Button
               variant="destructive"
               loading={removing}
               onClick={() => void leave()}
             >
-              Remove
+              {t("v1agent.manage.remove")}
             </Button>
           </>
         }
@@ -287,6 +293,7 @@ export function AgentArchiveRetry({
   agents: Pick<Agents, "unarchive">;
   agent: Agent;
 }) {
+  useLanguage();
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState("");
   if (!agent.archiveUnchecked && !result) return null;
@@ -296,18 +303,17 @@ export function AgentArchiveRetry({
     try {
       setResult((await agents.unarchive(agent.key)) ?? "");
     } catch (reason) {
-      setResult(`Couldn't check whether it's archived: ${message(reason)}`);
+      setResult(
+        t("v1agent.manage.archiveCheckFailed", { reason: message(reason) }),
+      );
     } finally {
       setChecking(false);
     }
   };
   return (
     <PreferenceRow
-      title="Archive state"
-      subtitle={
-        result ||
-        "Not checked since import, so it may be hidden from member lists and mentions."
-      }
+      title={t("v1agent.manage.archiveState")}
+      subtitle={result || t("v1agent.manage.archiveUnchecked")}
       trailing={
         agent.archiveUnchecked ? (
           <Button
@@ -315,7 +321,7 @@ export function AgentArchiveRetry({
             loading={checking}
             onClick={() => void retry()}
           >
-            Retry
+            {t("v1agent.history.retry")}
           </Button>
         ) : undefined
       }

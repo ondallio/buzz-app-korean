@@ -1,7 +1,6 @@
 import { Field } from "../../shared/design-system/ui/Field";
 import { Textarea } from "../../shared/design-system/ui/Textarea";
-
-const EXAMPLE = "Help me plan my week and prioritize tasks.";
+import { t, useLanguage } from "../../shared/i18n";
 
 export function AgentInstructions({
   value,
@@ -16,14 +15,19 @@ export function AgentInstructions({
   description?: string | undefined;
   creation?: boolean;
 }) {
+  useLanguage();
   return (
-    <Field label="Instructions" description={description} optional={creation}>
+    <Field
+      label={t("agentCreate.instructions")}
+      description={description}
+      optional={creation}
+    >
       <Textarea
         appearance="outlined"
         rows={creation ? 4 : 8}
         value={value}
         disabled={disabled}
-        placeholder={EXAMPLE}
+        placeholder={t("agentCreate.example")}
         onChange={(event) => onChange(event.target.value)}
       />
     </Field>

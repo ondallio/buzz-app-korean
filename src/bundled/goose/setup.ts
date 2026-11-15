@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 // goose's providers, as its own config holds them: the ones it offers, their
 // models, saving a provider's key, and testing that a provider answers. Each
 // call runs a short-lived `goose-acp`; keys go to goose's secret store, never
@@ -190,13 +191,16 @@ export class GooseSetup {
           this.update(
             ready
               ? { readiness: "ready" }
-              : { readiness: "attention", attentionLabel: "Set up Goose" },
+              : {
+                  readiness: "attention",
+                  attentionLabel: t("v1agent.goose.setUp"),
+                },
           );
         },
         () =>
           this.update({
             readiness: "attention",
-            attentionLabel: "Check Goose setup",
+            attentionLabel: t("v1agent.goose.checkSetup"),
           }),
       )
       .finally(() => {
@@ -236,10 +240,7 @@ export class GooseSetup {
               .find((provider) => provider.id === providerId)
               ?.defaultModel.trim();
         }
-        if (!modelId)
-          throw new Error(
-            "Choose a default model with goose configure, then try again.",
-          );
+        if (!modelId) throw new Error(t("v1agent.goose.chooseDefault"));
         await goose.request("_goose/unstable/defaults/save", {
           providerId,
           modelId,
@@ -608,17 +609,17 @@ export class GooseSetup {
           session.send(TEST_PROMPT),
           new Promise<never>((_, reject) =>
             setTimeout(
-              () => reject(new Error("The provider did not answer in time")),
+              () => reject(new Error(t("v1agent.goose.testTimeout"))),
               TEST_TIMEOUT_MS,
             ),
           ),
         ]);
         const reply = settled.text?.trim() ?? "";
         if (/^\W*ok\W*$/i.test(reply))
-          return { ok: true, message: "Connected" };
+          return { ok: true, message: t("v1agent.external.connected") };
         return {
           ok: false,
-          message: reply || settled.error || "The provider sent no reply",
+          message: reply || settled.error || t("v1agent.goose.noReply"),
         };
       } finally {
         await goose.close(session);
@@ -700,11 +701,11 @@ function needs(provider: Omit<Provider, "needs">) {
     .filter((key) => key.required && !key.default)
     .map((key) => `${keyLabel(key.name)} (${key.name})`);
   const step = fields.length
-    ? `Add ${fields.join(", ")} in Edit configuration, or run goose configure.`
+    ? t("v1agent.goose.addFields", { fields: fields.join(", ") })
     : provider.signsIn
-      ? "Run goose configure to sign in."
+      ? t("v1agent.goose.runToSignIn")
       : "";
-  return step && `${provider.name} isn't set up in goose. ${step}`;
+  return step && t("v1agent.goose.notSetUp", { provider: provider.name, step });
 }
 
 /** A failed turn's error as its report in the conversation says it, in

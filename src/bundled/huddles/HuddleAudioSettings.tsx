@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import type { AudioSettingsState } from "../../features/huddle/audio-settings";
 import { GearIcon } from "../../shared/design-system/icons";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
@@ -22,6 +23,7 @@ export function HuddleAudioSettings({
   refresh(): void;
   select(kind: "input" | "output", id: string): void;
 }) {
+  useLanguage();
   return (
     <PopoverRoot
       onOpenChange={(open) => {
@@ -34,8 +36,8 @@ export function HuddleAudioSettings({
             size={compact ? "toolbar" : "large"}
             shape={compact ? "control" : "round"}
             variant={compact || quiet ? "ghost" : "subtle"}
-            aria-label="Audio settings"
-            title="Audio settings"
+            aria-label={t("huddleCall.audioSettings")}
+            title={t("huddleCall.audioSettings")}
             icon={
               <GearIcon
                 size={compact ? 16 : 22}
@@ -47,7 +49,7 @@ export function HuddleAudioSettings({
       />
       <PopoverPopup align="start" size="compact">
         <div className="flex flex-col gap-3">
-          <PopoverTitle>Audio settings</PopoverTitle>
+          <PopoverTitle>{t("huddleCall.audioSettings")}</PopoverTitle>
           {state ? (
             <>
               {(["input", "output"] as const).map((kind) => {
@@ -58,21 +60,25 @@ export function HuddleAudioSettings({
                 return (
                   <Select
                     key={kind}
-                    label={kind === "input" ? "Microphone" : "Speakers"}
+                    label={t(
+                      kind === "input"
+                        ? "huddleCall.microphone"
+                        : "huddleCall.speakers",
+                    )}
                     variant="field"
                     value={selected}
                     readOnly={state.busy}
                     disabled={kind === "output" && !state.outputSupported}
                     description={
                       kind === "output" && !state.outputSupported
-                        ? "Uses your system’s selected speakers."
+                        ? t("huddleCall.systemSpeakers")
                         : undefined
                     }
                     groups={[
                       {
                         label: "",
                         options: [
-                          { value: "", label: "System default" },
+                          { value: "", label: t("huddleCall.systemDefault") },
                           ...devices.map((device) => ({
                             value: device.id,
                             label: device.label,
@@ -81,7 +87,7 @@ export function HuddleAudioSettings({
                             ? [
                                 {
                                   value: selected,
-                                  label: "Unavailable device",
+                                  label: t("huddleCall.unavailableDevice"),
                                   disabled: true,
                                 },
                               ]
@@ -95,7 +101,7 @@ export function HuddleAudioSettings({
               })}
               {state.busy && (
                 <p role="status" className="text-caption text-secondary">
-                  Switching device…
+                  {t("huddleCall.switching")}
                 </p>
               )}
               {state.error && (
@@ -106,7 +112,7 @@ export function HuddleAudioSettings({
             </>
           ) : (
             <p role="status" className="text-body-sm text-secondary">
-              Audio settings aren’t available for this call.
+              {t("huddleCall.audioUnavailable")}
             </p>
           )}
         </div>

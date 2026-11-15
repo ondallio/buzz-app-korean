@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Accordion } from "../../shared/design-system/ui/Accordion";
 import { Button } from "../../shared/design-system/ui/Button";
@@ -12,6 +13,7 @@ import type { Agent, Agents } from "./service";
 /** Asks the owner whether agents that were working when the app last closed
  * or reloaded carry on; nothing resumes until they choose. */
 export function InterruptedNotice({ agents }: { agents: Agents }) {
+  useLanguage();
   const interrupted = useAgentsSnapshot(agents)?.interrupted ?? [];
   if (!interrupted.length) return null;
   const names = new Intl.ListFormat(undefined, { type: "conjunction" }).format(
@@ -21,10 +23,15 @@ export function InterruptedNotice({ agents }: { agents: Agents }) {
     <ToastNotice
       title={
         interrupted.length === 1
-          ? "Resume interrupted agent?"
-          : "Resume interrupted agents?"
+          ? t("v1agent.interrupted.titleOne")
+          : t("v1agent.interrupted.titleMany")
       }
-      description={`${names} ${interrupted.length === 1 ? "was" : "were"} working when Buzz closed or reloaded.`}
+      description={t(
+        interrupted.length === 1
+          ? "v1agent.interrupted.descriptionOne"
+          : "v1agent.interrupted.descriptionMany",
+        { names },
+      )}
       details={<InterruptedDetails agents={agents} interrupted={interrupted} />}
       tone="info"
     >
@@ -34,10 +41,10 @@ export function InterruptedNotice({ agents }: { agents: Agents }) {
         variant="prominent"
         onClick={agents.resumeInterrupted}
       >
-        Resume
+        {t("v1agent.interrupted.resume")}
       </Button>
       <Button type="button" size="sm" onClick={agents.dismissInterrupted}>
-        Don’t resume
+        {t("v1agent.interrupted.dontResume")}
       </Button>
     </ToastNotice>
   );
@@ -101,10 +108,15 @@ function InterruptedDetails({
       items={[
         {
           value: "details",
-          title: `${count} ${count === 1 ? "mention" : "mentions"}`,
+          title: t(
+            count === 1
+              ? "v1agent.interrupted.mention"
+              : "v1agent.interrupted.mentions",
+            { count },
+          ),
           content: (
             <section
-              aria-label="Interrupted conversations"
+              aria-label={t("v1agent.interrupted.conversations")}
               // biome-ignore lint/a11y/noNoninteractiveTabindex: Scroll owner supports keyboard access to the overflowing list.
               tabIndex={0}
               className={`grid max-h-48 gap-3 overflow-y-auto ${styles.conversations}`}
@@ -149,7 +161,8 @@ function conversations(
     { key: string; channel: string; detail: string; count: number }
   >();
   for (const turn of turns) {
-    const channel = turn.channel?.name ?? "Unknown channel";
+    const channel =
+      turn.channel?.name ?? t("v1agent.interrupted.unknownChannel");
     const event =
       events === "failed"
         ? undefined
@@ -157,10 +170,10 @@ function conversations(
     if (!event) {
       const detail =
         events === undefined
-          ? "Checking…"
+          ? t("v1agent.interrupted.checking")
           : events === "failed"
-            ? "Couldn’t load details"
-            : "Details unavailable";
+            ? t("v1agent.interrupted.loadFailed")
+            : t("v1agent.interrupted.unavailable");
       rows.set(turn.id, { key: turn.id, channel, detail, count: 1 });
       continue;
     }
@@ -172,13 +185,21 @@ function conversations(
       rows.set(key, {
         key,
         channel,
-        detail: `${reply ? "Thread" : "In channel"} · “${messagePreview(event.content)}”`,
+        detail: t(
+          reply
+            ? "v1agent.interrupted.inThread"
+            : "v1agent.interrupted.inChannel",
+          { preview: messagePreview(event.content) },
+        ),
         count: 1,
       });
   }
   return [...rows.values()].map(({ key, channel, detail, count }) => ({
     key,
     channel,
-    place: count > 1 ? `${detail} · ${count} mentions` : detail,
+    place:
+      count > 1
+        ? `${detail} · ${t("v1agent.interrupted.mentions", { count })}`
+        : detail,
   }));
 }

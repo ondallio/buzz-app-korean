@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { HuddleAvatarToss } from "./HuddleAvatarToss";
 import { HuddleAvatarMotion } from "./HuddleAvatarMotion";
 import {
@@ -196,6 +197,7 @@ export function HuddleAvatarCloud({
   participants,
   muted,
 }: Pick<HuddleView, "participants" | "muted">) {
+  useLanguage();
   const stage = useRef<HTMLElement>(null);
   const [active, setActive] = useState<ActiveName>();
   const activeKey = active?.key;
@@ -296,7 +298,7 @@ export function HuddleAvatarCloud({
     <section
       ref={stage}
       className={styles.avatarStage}
-      aria-label="Huddle participants"
+      aria-label={t("v1agent.huddle.participants")}
       data-has-peers={hasPeers}
       data-duet={peers.length === 1 || undefined}
       data-centered={centered || undefined}
@@ -352,7 +354,9 @@ export function HuddleAvatarCloud({
         </div>
       )}
       {!participants.length && (
-        <p className="text-body text-secondary">Getting your huddle ready</p>
+        <p className="text-body text-secondary">
+          {t("v1agent.huddle.gettingReady")}
+        </p>
       )}
     </section>
   );

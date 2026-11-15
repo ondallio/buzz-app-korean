@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 // An agent as a card: its portrait large, its name, and one line about it.
 // Pack avatars play their animation; any other picture shows still.
 import type { ComponentProps, ReactNode } from "react";
@@ -94,6 +95,7 @@ export function AgentCard({
   children?: ReactNode;
   menu?: ReactNode;
 }) {
+  useLanguage();
   return (
     <div {...props} className={`${styles.card} ${styles.agentCard}`}>
       <AgentCardBackdrop agent={agent} community={community} />
@@ -153,7 +155,7 @@ export function AgentCard({
                 </>
               )}
             </span>
-            Bestie
+            {t("agentsBrowse.bestie")}
           </span>
         </span>
       )}
@@ -185,6 +187,7 @@ export function TeamCard({
   name: string;
   members: readonly (Portrayed & { community?: string | undefined })[];
 }) {
+  useLanguage();
   return (
     <SurfaceButton {...props} type="button" className={styles.card}>
       <span className={styles.crew} aria-hidden="true">
@@ -198,7 +201,8 @@ export function TeamCard({
       <span className={`${styles.name} text-label`}>{name}</span>
       <span className={styles.detail}>
         <span className={styles.detailText}>
-          {members.map((member) => member.name).join(", ") || "No members"}
+          {members.map((member) => member.name).join(", ") ||
+            t("agentsBrowse.noMembers")}
         </span>
       </span>
     </SurfaceButton>
