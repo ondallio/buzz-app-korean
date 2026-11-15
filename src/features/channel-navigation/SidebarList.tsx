@@ -37,6 +37,7 @@ export function SidebarList({
     <div className={styles.channelListFrame}>
       {navigation ? (
         <nav
+          data-conversation-list=""
           ref={listRef}
           className={styles.channelList}
           data-scroll-fade="scrolled"

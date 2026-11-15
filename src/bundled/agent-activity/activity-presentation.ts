@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import type { ToolItem } from "../../features/agents/activity-transcript";
 const object = (value: unknown): Record<string, unknown> | undefined =>
   value !== null && typeof value === "object" && !Array.isArray(value)
@@ -29,7 +30,7 @@ export function activityPresentation(entry: ToolItem) {
   let title = entry.title,
     target: string | undefined;
   if (name === "buzz-dev-mcp__shell") {
-    title = "Run command";
+    title = t("v1shell.tool.runCommand");
     const line =
       typeof input?.command === "string"
         ? input.command
@@ -49,10 +50,10 @@ export function activityPresentation(entry: ToolItem) {
     target = basename(input?.path);
     title = target
       ? name.endsWith("read_file")
-        ? "Read file"
+        ? t("v1shell.tool.readFile")
         : name.endsWith("str_replace")
-          ? "Edit file"
-          : "View image"
+          ? t("v1shell.tool.editFile")
+          : t("v1shell.tool.viewImage")
       : entry.title;
   }
   // Only unwrap the observed shell wrapper. Missing/malformed fields retain the
@@ -72,10 +73,12 @@ export function activityPresentation(entry: ToolItem) {
           stderr: result.stderr,
           failed: result.exit_code !== 0 || result.timed_out,
           note: [
-            result.exit_code !== 0 ? `Exit code ${result.exit_code}` : "",
-            result.timed_out ? "Command timed out" : "",
+            result.exit_code !== 0
+              ? t("v1shell.tool.exitCode", { code: String(result.exit_code) })
+              : "",
+            result.timed_out ? t("v1shell.tool.timedOut") : "",
             result.stdout_truncated || result.stderr_truncated
-              ? "Output was truncated by the tool"
+              ? t("v1shell.tool.truncated")
               : "",
           ]
             .filter(Boolean)

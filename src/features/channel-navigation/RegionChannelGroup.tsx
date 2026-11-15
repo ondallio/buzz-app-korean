@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   createContext,
   useContext,
@@ -53,6 +54,7 @@ export function RegionChannelGroups({
 }
 
 export function RegionChannelGroup(props: SoloChannelGroupProps) {
+  useLanguage();
   const context = useContext(RegionDestinationContext);
   const channels = useContext(ChannelGroupsContext);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -116,8 +118,10 @@ export function RegionChannelGroup(props: SoloChannelGroupProps) {
                 <IconButton
                   size="compact"
                   data-solo-channel-new-task=""
-                  aria-label={`New task in ${channel.name}`}
-                  title="New task"
+                  aria-label={t("v1shell.nav.newTaskIn", {
+                    name: channel.name,
+                  })}
+                  title={t("v1shell.nav.newTask")}
                   icon={<PencilSimpleIcon size={15} />}
                   onClick={newTask}
                 />
@@ -127,10 +131,16 @@ export function RegionChannelGroup(props: SoloChannelGroupProps) {
                 session={session}
                 trigger={trigger}
                 size="compact"
-                label={`Actions for ${channel.name}`}
+                label={t("channelPages.members.actions", {
+                  name: channel.name,
+                })}
                 openDetails={() => void openDetails()}
                 startChat={
-                  newTask && <MenuItem onClick={newTask}>New task</MenuItem>
+                  newTask && (
+                    <MenuItem onClick={newTask}>
+                      {t("v1shell.nav.newTask")}
+                    </MenuItem>
+                  )
                 }
               />
             </>

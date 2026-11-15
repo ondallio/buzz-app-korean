@@ -1,3 +1,9 @@
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
+import { t, useLanguage } from "../../shared/i18n";
 import { Button } from "../../shared/design-system/ui/Button";
 import {
   useCallback,
@@ -108,6 +114,7 @@ export function UnreadBadge({
   /** Preserve observed evidence for Solo destinations with their own labels. */
   preserveUnread?: boolean;
 }) {
+  useLanguage();
   const {
     snapshot,
     activity,
@@ -132,14 +139,33 @@ export function UnreadBadge({
     threadCount === 0 &&
     labelUnread === "ordinary";
   const unreadLabel = manual
-    ? `Marked unread${snapshot.manual === "local-only" ? " on this device only" : ""}`
-    : `${count} observed unread messages${snapshot.freshness === "stale" ? "; may be out of date" : ""}. Not an exact total.`;
+    ? t(
+        snapshot.manual === "local-only"
+          ? "unreadBadge.manualLocal"
+          : "unreadBadge.manual",
+      )
+    : t(
+        snapshot.freshness === "stale"
+          ? "unreadBadge.observedStale"
+          : "unreadBadge.observed",
+        { count: count ?? String(count) },
+      );
   const mentionCount = activity.mentions?.length ?? 0;
-  const stale = activity.freshness === "stale" ? "; may be out of date" : "";
-  const mentionLabel = `${mentionCount} unread ${mentionCount === 1 ? "mention" : "mentions"}`;
+  const mentionOnlyLabel = t(
+    `unreadBadge.mention.${mentionCount === 1 ? "one" : "many"}.${activity.freshness === "stale" ? "stale" : "observed"}`,
+    { count: mentionCount },
+  );
   // Mentions share the thread dot. Without a thread they have only the
   // aria-hidden priority dot, or none when muted, so name them on their own.
-  const activityLabel = `${mentionCount ? `${mentionLabel}, ` : ""}${threadCount} unread ${threadCount === 1 ? "thread" : "threads"}${stale}`;
+  const activityLabel = mentionCount
+    ? t(
+        `unreadBadge.activity.${mentionCount === 1 ? "oneMention" : "manyMentions"}.${threadCount === 1 ? "oneThread" : "manyThreads"}.${activity.freshness === "stale" ? "stale" : "observed"}`,
+        { mentions: mentionCount, threads: threadCount },
+      )
+    : t(
+        `unreadBadge.thread.${threadCount === 1 ? "one" : "many"}.${activity.freshness === "stale" ? "stale" : "observed"}`,
+        { count: threadCount },
+      );
   return (
     <>
       {label !== undefined && (
@@ -170,7 +196,7 @@ export function UnreadBadge({
         />
       )}
       {mentionCount > 0 && threadCount === 0 && (
-        <span className="sr-only">{`${mentionLabel}${stale}`}</span>
+        <span className="sr-only">{mentionOnlyLabel}</span>
       )}
       {threadCount > 0 &&
         (hideUnreadDots ? (
@@ -195,20 +221,24 @@ export function UnreadOptions({
   session: RelaySession;
   channelId?: string | undefined;
 }) {
+  useLanguage();
   const sync = useSyncExternalStore(
     session.unread.subscribeSync,
     session.unread.sync,
     session.unread.sync,
   );
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<DisplayMessage>();
   const run = (operation: Promise<unknown>) => {
     setError(undefined);
     void operation.catch((cause) =>
       setError(
-        cause instanceof Error ? cause.message : "Read-state operation failed",
+        cause instanceof Error
+          ? cause.message
+          : localMessage("unreadOptions.operationFailed"),
       ),
     );
   };
+  const displayedError = resolveMessage(error);
   return (
     <>
       {channelId && (
@@ -218,7 +248,7 @@ export function UnreadOptions({
             run(session.unread.markUnreadLocal({ kind: "channel", channelId }))
           }
         >
-          Mark unread on this device
+          {t("unreadOptions.markLocal")}
         </Button>
       )}
       {channelId && sync.capability === "frontier-sync" && (
@@ -236,30 +266,29 @@ export function UnreadOptions({
                   last.id,
                 ),
               );
-            else setError("Load a verified message before marking through it.");
+            else setError(localMessage("unreadOptions.loadVerified"));
           }}
         >
-          Mark read through loaded messages
+          {t("unreadOptions.markThrough")}
         </Button>
       )}
-      {error && <p role="alert">{error}</p>}
+      {displayedError && <p role="alert">{displayedError}</p>}
       <details>
-        <summary>Unread status</summary>
+        <summary>{t("unreadOptions.status")}</summary>
+        <p>{t("unreadOptions.guidance")}</p>
         <p>
-          Observed messages only—not exact totals. Manual unread is local to
-          this device. Older read hints can expire; this is not an everlasting
-          read receipt log.
-        </p>
-        <p>
-          Read sync: {sync.capability} · {sync.status}
+          {t("unreadOptions.sync", {
+            capability: sync.capability,
+            status: sync.status,
+          })}
         </p>
         {sync.error && <p role="alert">{sync.error}</p>}
         <Button type="button" onClick={() => run(session.unread.refresh())}>
-          Refresh unread observations
+          {t("unreadOptions.refresh")}
         </Button>
         {sync.capability === "frontier-sync" && (
           <Button type="button" onClick={() => run(session.unread.retrySync())}>
-            Retry read sync
+            {t("unreadOptions.retry")}
           </Button>
         )}
       </details>

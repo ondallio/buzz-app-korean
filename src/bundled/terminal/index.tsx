@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useLayoutEffect } from "react";
 import { TerminalWindowIcon } from "../../shared/design-system/icons/index";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
@@ -62,6 +63,7 @@ export const apply: PluginModule["apply"] = (ctx) => {
     pressed,
     available,
   }: ChannelLauncherProps) {
+    useLanguage();
     const target = JSON.stringify(context);
     useLayoutEffect(() => {
       const current = { toggle: () => toggle(target), available };
@@ -74,8 +76,13 @@ export const apply: PluginModule["apply"] = (ctx) => {
       <IconButton
         size="toolbar"
         icon={<TerminalWindowIcon size={16} aria-hidden="true" />}
-        aria-label="Toggle channel terminal"
-        title={`Terminal (${formatBinding(TOGGLE_BINDING, isApplePlatform(navigator.platform)).text})`}
+        aria-label={t("v1shell.terminal.toggle")}
+        title={t("v1shell.terminal.toggleTitle", {
+          shortcut: formatBinding(
+            TOGGLE_BINDING,
+            isApplePlatform(navigator.platform),
+          ).text,
+        })}
         aria-expanded={pressed}
         onClick={(event) => {
           event.currentTarget.focus();

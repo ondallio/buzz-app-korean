@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   type Ref,
   useCallback,
@@ -62,6 +63,7 @@ export function CanvasHistory({
   retryRef?: Ref<HTMLButtonElement>;
   restore(revision: RelayEvent): Promise<void>;
 }) {
+  useLanguage();
   const [page, setPage] = useState<CanvasHistoryPage>();
   const [selected, setSelected] = useState<RelayEvent>();
   const [loading, setLoading] = useState(false);
@@ -136,8 +138,10 @@ export function CanvasHistory({
           );
         setNotice(
           result.revisions.length
-            ? `${result.revisions.length} revisions loaded.`
-            : "No more revisions.",
+            ? t("v1shell.canvas.revisionsLoaded", {
+                count: result.revisions.length,
+              })
+            : t("v1shell.canvas.noMoreRevisions"),
         );
       } catch (reason) {
         if (current === generation.current) setError(String(reason));
@@ -163,7 +167,7 @@ export function CanvasHistory({
     <>
       {note && <p>{note}</p>}
       <Textarea
-        aria-label="Revision Markdown"
+        aria-label={t("v1shell.canvas.revisionMarkdown")}
         variant="code"
         rows={10}
         readOnly
@@ -181,7 +185,7 @@ export function CanvasHistory({
     try {
       await restore(selected);
       if (current !== generation.current) return;
-      setNotice("Version restored as a new revision.");
+      setNotice(t("v1shell.canvas.restored"));
     } catch (reason) {
       if (current !== generation.current) return;
       setError(reason instanceof Error ? reason.message : String(reason));
@@ -203,7 +207,7 @@ export function CanvasHistory({
       if (current === generation.current)
         setError(
           (previous) =>
-            `${previous ? `${previous} ` : ""}History refresh failed: ${String(reason)}`,
+            `${previous ? `${previous} ` : ""}${t("v1shell.canvas.historyRefreshFailed", { error: String(reason) })}`,
         );
     } finally {
       if (current === generation.current) setLoading(false);
@@ -220,15 +224,19 @@ export function CanvasHistory({
             void load();
           }}
         >
-          Refresh history
+          {t("v1shell.canvas.refreshHistory")}
         </Button>
-        <span role="status">{loading ? "Loading history…" : notice}</span>
+        <span role="status">
+          {loading ? t("v1shell.canvas.loadingHistory") : notice}
+        </span>
       </div>
-      {page && !page.revisions.length && <p>No saved revisions.</p>}
+      {page && !page.revisions.length && (
+        <p>{t("v1shell.canvas.noRevisions")}</p>
+      )}
       {page && page.revisions.length > 0 && (
         <>
           <div ref={rows} className={styles.choices}>
-            <Field label="Saved revisions">
+            <Field label={t("v1shell.canvas.savedRevisions")}>
               <RadioGroup
                 value={selected?.id ?? ""}
                 disabled={busy}
@@ -250,7 +258,9 @@ export function CanvasHistory({
                         >
                           {new Date(event.created_at * 1000).toLocaleString()}
                         </time>
-                        {event.id === head?.id ? " · Current" : ""}
+                        {event.id === head?.id
+                          ? t("v1shell.canvas.currentSuffix")
+                          : ""}
                       </>
                     }
                     description={`${profiles.get(event.pubkey)?.name ?? labels.get(event.pubkey)} · ${event.id.slice(0, 8)}`}
@@ -265,7 +275,7 @@ export function CanvasHistory({
               loading={loading}
               onClick={() => void load(page.next)}
             >
-              Load older
+              {t("v1shell.canvas.loadOlder")}
             </Button>
           )}
         </>
@@ -278,7 +288,7 @@ export function CanvasHistory({
       {selected && (
         <>
           <Checkbox
-            label="Show full content"
+            label={t("v1shell.canvas.showFull")}
             checked={full}
             onCheckedChange={setFull}
           />
@@ -286,16 +296,13 @@ export function CanvasHistory({
             {!loaded ? (
               <LoadingRegion
                 pending={busy}
-                label="Reading the current Canvas…"
+                label={t("v1shell.canvas.readingCurrent")}
                 feedback={
                   headFailed ? (
                     <div className={styles.actions}>
-                      <p role="alert">
-                        The current Canvas could not be read, so this version
-                        cannot be compared with it.
-                      </p>
+                      <p role="alert">{t("v1shell.canvas.readFailed")}</p>
                       <Button ref={retryRef} loading={busy} onClick={retryHead}>
-                        Retry
+                        {t("channelForms.retry")}
                       </Button>
                     </div>
                   ) : undefined
@@ -306,7 +313,7 @@ export function CanvasHistory({
             ) : full ? (
               fullContent()
             ) : selected.id === head?.id || selected.content === headContent ? (
-              <p>Same as current version.</p>
+              <p>{t("v1shell.canvas.sameAsCurrent")}</p>
             ) : (
               <CanvasDiff
                 current={headContent}
@@ -315,11 +322,12 @@ export function CanvasHistory({
               />
             )}
           </div>
-          {!selected.content && <p>This version is empty.</p>}
+          {!selected.content && <p>{t("v1shell.canvas.versionEmpty")}</p>}
           {tooLarge && (
             <p>
-              This version exceeds the {LIVE_CANVAS_LIMIT} Canvas limit and
-              cannot be restored here.
+              {t("v1shell.canvas.tooLarge", {
+                limit: LIVE_CANVAS_LIMIT,
+              })}
             </p>
           )}
           <div className={styles.actions}>
@@ -341,7 +349,7 @@ export function CanvasHistory({
                 setConfirm(true);
               }}
             >
-              Restore this version
+              {t("v1shell.canvas.restoreThis")}
             </Button>
           </div>
         </>
@@ -350,8 +358,8 @@ export function CanvasHistory({
         size="compact"
         open={confirm}
         onOpenChange={setConfirm}
-        title="Restore this version?"
-        description="This publishes the selected version as a new Canvas revision. Existing history is kept."
+        title={t("v1shell.canvas.restoreTitle")}
+        description={t("v1shell.canvas.restoreDescription")}
         initialFocus={proceed}
         finalFocus={() =>
           attempted.current ? refreshButton.current : restoreButton.current
@@ -361,7 +369,7 @@ export function CanvasHistory({
         actions={
           <>
             <Button disabled={busy} onClick={() => setConfirm(false)}>
-              Cancel
+              {t("channelForms.cancel")}
             </Button>
             <Button
               ref={proceed}
@@ -370,17 +378,12 @@ export function CanvasHistory({
               disabled={readOnly}
               onClick={() => void apply()}
             >
-              Restore version
+              {t("v1shell.canvas.restoreVersion")}
             </Button>
           </>
         }
       >
-        {dirty && (
-          <p>
-            Your unsaved draft will be kept separately. Copy any edits you want
-            to keep before reloading the restored Canvas.
-          </p>
-        )}
+        {dirty && <p>{t("v1shell.canvas.draftKeptRestore")}</p>}
       </Dialog>
     </div>
   );

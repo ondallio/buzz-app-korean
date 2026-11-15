@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { Component, type ReactNode } from "react";
 import type { PanelProps, RegisteredPanel } from "./service";
 
@@ -32,7 +33,7 @@ class PanelBoundary extends Component<
   render() {
     return this.state.error ? (
       <div role="alert" className="notice">
-        <h3>This panel couldn’t open</h3>
+        <h3>{t("v1shell.panels.openFailed")}</h3>
         <p>{this.state.error}</p>
       </div>
     ) : (

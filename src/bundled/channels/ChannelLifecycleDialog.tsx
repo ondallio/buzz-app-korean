@@ -1,3 +1,6 @@
+import { t, useLanguage } from "../../shared/i18n";
+import { localMessage } from "../../shared/i18n/deferred-message";
+import { TranslatedMessage } from "../../shared/i18n/Message";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 import type { ChannelLifecycleCapability } from "../../features/relay/channel-lifecycle";
@@ -16,49 +19,23 @@ export const lifecycleNoun = (
   channel: Readonly<{ channelType?: string | undefined }> | undefined,
 ): LifecycleNoun => (channel?.channelType === "solo" ? "chat" : "channel");
 
-const details = {
-  channel: {
-    archive:
-      "Archive this channel for everyone and remove it from the sidebar. Messages are kept. Find it in search and open Settings to unarchive it later.",
-    unarchive:
-      "Unarchive this channel for everyone and return it to the sidebar. Members can send messages again.",
-    delete: "This deletes the channel for everyone. You can’t undo this.",
-    leave:
-      "Leave this channel and remove it from your sidebar. You may need an invitation to rejoin a private channel.",
-  },
-  chat: {
-    archive:
-      "Archive this chat for everyone in it and remove it from the sidebar. Messages are kept. Find it in search to unarchive it later.",
-    unarchive:
-      "Unarchive this chat and return it to the sidebar. Messages can be sent again.",
-    delete: "This deletes the chat for everyone in it. You can’t undo this.",
-    leave:
-      "Leave this chat and remove it from your sidebar. You may need an invitation to rejoin.",
-  },
-} as const;
-
-function copyFor(action: ChannelLifecycleAction, noun: LifecycleNoun) {
-  if (action === "hide")
-    return {
-      pending: "Hiding conversation…",
-      done: "Conversation hidden",
-      title: "Hide conversation",
-      detail:
-        "Hide this conversation from your sidebar only. Messages and membership are kept; other participants are not removed.",
-    };
-  const Noun = noun === "chat" ? "Chat" : "Channel";
-  const verb = {
-    archive: ["Archive", "Archiving", "archived"],
-    unarchive: ["Unarchive", "Unarchiving", "unarchived"],
-    delete: ["Delete", "Deleting", "deleted"],
-    leave: ["Leave", "Leaving", "left"],
-  }[action];
+/** Complete display-message keys; canonical action/noun values stay untranslated. */
+export function lifecycleMessageKeys(
+  action: ChannelLifecycleAction,
+  noun: LifecycleNoun,
+) {
+  const prefix =
+    action === "hide"
+      ? "channelsMenus.lifecycle.hide"
+      : (`channelsMenus.lifecycle.${noun}.${action}` as const);
   return {
-    pending: `${verb[1]} ${noun}…`,
-    done: `${Noun} ${verb[2]}`,
-    title: `${verb[0]} ${noun}`,
-    detail: details[noun][action],
-  };
+    title: `${prefix}.title`,
+    pending: `${prefix}.pending`,
+    success: `${prefix}.success`,
+    failure: `${prefix}.failure`,
+    namedTitle: `${prefix}.namedTitle`,
+    detail: `${prefix}.detail`,
+  } as const;
 }
 
 // Enter confirms unarchive and hide. Archive affects everyone, so it starts on
@@ -67,9 +44,14 @@ const reversible = new Set<ChannelLifecycleAction>(["unarchive", "hide"]);
 
 function wait(milliseconds: number) {
   const seconds = Math.ceil(milliseconds / 1000);
-  if (seconds < 60) return seconds === 1 ? "1 second" : `${seconds} seconds`;
+  if (seconds < 60)
+    return seconds === 1
+      ? t("v1shell.lifecycle.secondOne")
+      : t("v1shell.lifecycle.secondMany", { count: seconds });
   const minutes = Math.ceil(seconds / 60);
-  return minutes === 1 ? "1 minute" : `${minutes} minutes`;
+  return minutes === 1
+    ? t("v1shell.lifecycle.minuteOne")
+    : t("v1shell.lifecycle.minuteMany", { count: minutes });
 }
 
 export function ChannelLifecycleDialog({
@@ -104,6 +86,7 @@ export function ChannelLifecycleDialog({
   /** A starter channel: the relay keeps the flag while archived. */
   autoJoin?: boolean;
 }) {
+  useLanguage();
   const callbacks = useRef({ completed, failed });
   useLayoutEffect(() => {
     callbacks.current = { completed, failed };
@@ -111,12 +94,12 @@ export function ChannelLifecycleDialog({
   const cancel = useRef<HTMLButtonElement>(null);
   const confirm = useRef<HTMLButtonElement>(null);
   const confirms = reversible.has(action);
-  const copy = copyFor(action, noun);
+  const copy = lifecycleMessageKeys(action, noun);
   // The switch is hidden while archived, and Unarchive applies the flag again.
   const description =
     action === "archive" && autoJoin
-      ? `${copy.detail} It’s a starter channel, so new members will be added to it again once it’s unarchived. To stop that, turn off Starter channel for new members in Settings first.`
-      : copy.detail;
+      ? t(`channelsMenus.lifecycle.${noun}.archive.starterDetail`)
+      : t(copy.detail);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   // A paused delete keeps its confirmation, with Retry once the pause ends.
@@ -174,10 +157,20 @@ export function ChannelLifecycleDialog({
       await lifecycle.run(action, channelId, controller.signal);
       if (!controller.signal.aborted) {
         notify(
-          `${copy.done}: ${channelName}`,
+          <TranslatedMessage
+            value={localMessage(copy.success, { name: channelName })}
+          />,
           "success",
           immediate && action === "archive" && undo
-            ? { label: "Undo", onClick: undo, timeout: 3000 }
+            ? {
+                label: (
+                  <TranslatedMessage
+                    value={localMessage("channelsMenus.undo")}
+                  />
+                ),
+                onClick: undo,
+                timeout: 3000,
+              }
             : undefined,
         );
         callbacks.current.completed();
@@ -197,7 +190,7 @@ export function ChannelLifecycleDialog({
       } else if (!controller.signal.aborted) {
         const message = error instanceof Error ? error.message : String(error);
         if (callbacks.current.failed)
-          callbacks.current.failed(`${copy.title} failed`, message);
+          callbacks.current.failed(t(copy.failure), message);
         else setError(message);
       }
     } finally {
@@ -211,7 +204,7 @@ export function ChannelLifecycleDialog({
     <>
       {((busy && slow) || error) && (
         <ToastNotice
-          title={busy ? copy.pending : `${copy.title} failed`}
+          title={busy ? t(copy.pending) : t(copy.failure)}
           description={busy ? channelName : error}
           tone={busy ? "info" : "error"}
           {...(!busy && { onDismiss: close })}
@@ -229,22 +222,25 @@ export function ChannelLifecycleDialog({
         }}
         title={
           action === "delete"
-            ? `Delete ${channelName}?`
-            : `${copy.title}: ${channelName}`
+            ? t("channelsMenus.deleteNamed", { name: channelName })
+            : t(copy.namedTitle, { name: channelName })
         }
         description={
           pausedUntil === undefined
             ? description
-            : `${description} Relay requests ${
-                cooldown
-                  ? `are paused, so nothing was deleted. You can retry in ${wait(cooldown)}.`
-                  : "were paused, so nothing was deleted. You can retry now."
-              }`
+            : cooldown
+              ? t("v1shell.lifecycle.pausedWait", {
+                  description,
+                  wait: wait(cooldown),
+                })
+              : t("v1shell.lifecycle.pausedNow", {
+                  description,
+                })
         }
         actions={
           <>
             <Button ref={cancel} type="button" onClick={close}>
-              Cancel
+              {t("channelsMenus.cancel")}
             </Button>
             <Button
               type="button"
@@ -260,7 +256,9 @@ export function ChannelLifecycleDialog({
               focusableWhenDisabled
               onClick={() => void submit()}
             >
-              {pausedUntil === undefined ? copy.title : "Retry"}
+              {pausedUntil === undefined
+                ? t(copy.title)
+                : t("channelForms.retry")}
             </Button>
           </>
         }

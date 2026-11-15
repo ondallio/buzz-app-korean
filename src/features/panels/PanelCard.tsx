@@ -7,6 +7,7 @@ import {
 } from "../../shared/design-system/ui/PanelHeader";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
 import { XIcon } from "../../shared/design-system/icons/index";
+import { t, useLanguage } from "../../shared/i18n";
 import type { PanelProps, RegisteredPanel } from "./service";
 import { PanelSubviewHost } from "./PanelSubview";
 import { PanelView } from "./PanelView";
@@ -23,6 +24,7 @@ export function PanelCard({
   panel: RegisteredPanel;
   contentKey?: string;
 }) {
+  useLanguage();
   const tabbed = !!usePanelTabHost();
   return (
     <aside
@@ -55,7 +57,7 @@ export function PanelCard({
                 actions={
                   <IconButton
                     size="toolbar"
-                    aria-label={`Close ${panel.title} panel`}
+                    aria-label={t("panels.close", { label: panel.title })}
                     onClick={props.close}
                     icon={<XIcon size={18} aria-hidden="true" />}
                   />

@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { hasEventProof, type EventData } from "./events";
 
 /** Verified ownership attribution. Callers must enforce recipients and permissions.
@@ -27,7 +28,7 @@ export function workflowOwner(
 
 /** Compact surfaces still identify automation, never the owner as the sender. */
 export function workflowLabel(ownerName: string): string {
-  return `Workflow · owned by ${ownerName}`;
+  return t("inbox.workflowCaption", { name: ownerName });
 }
 
 /** Delegated mention provenance. Normal `p` tags can originate in template

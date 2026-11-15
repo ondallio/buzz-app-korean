@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useCallback,
   useEffect,
@@ -50,6 +51,7 @@ export function CanvasEditor({
   /** Plugin code-block renderers for the View tab. */
   codeBlocks?: ContributionReader<CodeBlockRenderer> | undefined;
 }) {
+  useLanguage();
   const panelId = useId();
   // A stable callback keeps the retained View from re-rendering its Markdown.
   const linkOpener = useRef(openLink);
@@ -161,9 +163,7 @@ export function CanvasEditor({
           setBase(event?.id ?? null);
           if (discard) retire(stored);
         } else if ((event?.id ?? null) !== base)
-          setError(
-            "Canvas changed since this draft began. Your draft is kept. Copy any edits you want to keep before reloading the saved Canvas.",
-          );
+          setError(t("v1shell.canvas.changedSinceDraft"));
       } catch (reason) {
         if (generation === operation.current) {
           // Focus stays on the renewed recovery button.
@@ -221,9 +221,7 @@ export function CanvasEditor({
       if (generation !== operation.current) return;
       setHead(event);
       if (dirty) {
-        setError(
-          "Canvas was restored. Your unsaved draft is kept. Copy any edits you want to keep before reloading the saved Canvas.",
-        );
+        setError(t("v1shell.canvas.restoredDraftKept"));
       } else {
         setDraft(event.content);
         setAdopted(event.content);
@@ -292,7 +290,9 @@ export function CanvasEditor({
               else setConfirmReload(true);
             }}
           >
-            {loaded ? "Reload saved Canvas" : "Retry loading"}
+            {loaded
+              ? t("v1shell.canvas.reloadSaved")
+              : t("v1shell.canvas.retryLoading")}
           </Button>
         )}
         <Button
@@ -306,17 +306,17 @@ export function CanvasEditor({
           }
           onClick={() => void save()}
         >
-          Save Canvas
+          {t("v1shell.canvas.save")}
         </Button>
       </>
     ) : undefined;
   const body = (
     <>
       <div className={`${styles.stack} ${panelStyles.views}`}>
-        {readOnly && <p role="status">Canvas is read-only.</p>}
+        {readOnly && <p role="status">{t("v1shell.canvas.readOnly")}</p>}
         <Tabs
           variant="panel"
-          label="Canvas views"
+          label={t("v1shell.canvas.views")}
           value={tab}
           onValueChange={(next) => {
             // History stays mounted while a read or write it started settles.
@@ -324,11 +324,19 @@ export function CanvasEditor({
               setTab(next);
           }}
           items={[
-            { value: "view", label: "View", panelId: `${panelId}-view` },
-            { value: "edit", label: "Edit", panelId: `${panelId}-edit` },
+            {
+              value: "view",
+              label: t("v1shell.canvas.tabView"),
+              panelId: `${panelId}-view`,
+            },
+            {
+              value: "edit",
+              label: t("v1shell.canvas.tabEdit"),
+              panelId: `${panelId}-edit`,
+            },
             {
               value: "history",
-              label: "History",
+              label: t("v1shell.canvas.tabHistory"),
               panelId: `${panelId}-history`,
             },
           ]}
@@ -360,21 +368,15 @@ export function CanvasEditor({
           aria-labelledby={`${panelId}-edit-tab`}
         >
           <div className={styles.stack}>
-            <p className="text-secondary">
-              Shared Markdown for this channel. Saves and restores check the
-              loaded revision on supporting relays.
-            </p>
+            <p className="text-secondary">{t("v1shell.canvas.editHelp")}</p>
             {readOnly && loaded && dirty && (
-              <p role="status">
-                Showing your unsaved local draft. Open History to view saved
-                versions.
-              </p>
+              <p role="status">{t("v1shell.canvas.localDraft")}</p>
             )}
             <Textarea
               ref={editor}
               data-tab-focus
               readOnly={readOnly || busy}
-              aria-label="Canvas Markdown"
+              aria-label={t("v1shell.canvas.markdown")}
               variant="code"
               rows={16}
               value={draft}
@@ -428,11 +430,11 @@ export function CanvasEditor({
         initialFocus={cancelReload}
         // A reload that lands before this closes has removed its button.
         finalFocus={() => recovery.current ?? editor.current}
-        title="Reload saved Canvas?"
+        title={t("v1shell.canvas.reloadTitle")}
         actions={
           <>
             <Button ref={cancelReload} onClick={() => setConfirmReload(false)}>
-              Cancel
+              {t("channelForms.cancel")}
             </Button>
             <Button
               variant="destructive"
@@ -441,19 +443,19 @@ export function CanvasEditor({
                 recover(true);
               }}
             >
-              Discard and reload
+              {t("v1shell.canvas.discardReload")}
             </Button>
           </>
         }
       >
-        Discard your draft and reload the saved Canvas?
+        {t("v1shell.canvas.discardQuestion")}
       </Dialog>
     </>
   );
   return (
     <section
       className={panelStyles.panel}
-      aria-label="Channel Canvas"
+      aria-label={t("v1shell.canvas.channelCanvas")}
       aria-busy={busy}
       onKeyDown={(event) => {
         if (event.key === "Escape" && busy) event.stopPropagation();

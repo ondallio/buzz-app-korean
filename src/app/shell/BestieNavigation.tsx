@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useContext,
   useEffect,
@@ -36,6 +37,7 @@ export function BestieNavigationProvider({
   relay: RelayData;
   children: ReactNode;
 }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const { viewer, scope, session } = connection;
   const enabled =
@@ -110,7 +112,7 @@ export function BestieNavigationProvider({
         !choices.archives.error &&
         !choices.error
       ? {
-          label: "Create an agent",
+          label: t("v1shell.bestie.createAgent"),
           detail: "Bestie",
           placeholder: true,
         }

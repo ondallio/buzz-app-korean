@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   type RefObject,
   useLayoutEffect,
@@ -60,6 +61,7 @@ export function useChannelPanels(
     fallbackFocus?: RefObject<HTMLElement | null> | undefined;
   }>,
 ) {
+  useLanguage();
   const available = useSyncExternalStore(
     panels.subscribe,
     panels.snapshot,
@@ -211,7 +213,7 @@ export function useChannelPanels(
       // Its own landing, like PanelCard's, for focus handed to a floating dock.
       <Panel
         tabIndex={-1}
-        aria-label={`${selected.panel.title} panel`}
+        aria-label={t("v1shell.panels.panel", { name: selected.panel.title })}
         onKeyDown={(event) => {
           // Shift+Escape is Mark all as read, not a dismissal.
           if (event.key === "Escape" && !event.shiftKey) {
@@ -235,7 +237,11 @@ export function useChannelPanels(
         className={styles.channelDrawer}
       >
         {selected && selected.panel.channelPlacement !== "side" && (
-          <section aria-label={`${selected.panel.title} drawer`}>
+          <section
+            aria-label={t("v1shell.panels.drawer", {
+              name: selected.panel.title,
+            })}
+          >
             <PanelView
               panel={selected.panel}
               target={selected.target}

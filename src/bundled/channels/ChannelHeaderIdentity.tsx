@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import type { ComponentProps } from "react";
 import type { ChannelSummary } from "../../features/relay/contracts";
 import type { RelaySession } from "../../features/relay/session";
@@ -11,20 +12,40 @@ type AccessChannel = Pick<
 >;
 
 const soloReadOnlyAccess = Object.freeze({
-  title: "Chat access",
-  label: (name: string) => `Chat access for ${name}`,
+  get title() {
+    return t("channelForms.access.chatTitle");
+  },
+  label: (name: string, detail?: string) =>
+    detail
+      ? t("channelForms.access.chatDetail", { name, detail })
+      : t("channelForms.access.chatName", { name }),
 });
 const soloAccess = Object.freeze({
-  title: "Share access",
-  label: (name: string) => `Share access to ${name}`,
+  get title() {
+    return t("channelForms.access.shareTitle");
+  },
+  label: (name: string, detail?: string) =>
+    detail
+      ? t("channelForms.access.shareDetail", { name, detail })
+      : t("channelForms.access.shareName", { name }),
 });
 const readOnlyAccess = Object.freeze({
-  title: "Channel access",
-  label: (name: string) => `Channel access for ${name}`,
+  get title() {
+    return t("channelForms.access.channelTitle");
+  },
+  label: (name: string, detail?: string) =>
+    detail
+      ? t("channelForms.access.channelDetail", { name, detail })
+      : t("channelForms.access.channelName", { name }),
 });
 const manageAccess = Object.freeze({
-  title: "Manage members",
-  label: (name: string) => `Manage members of ${name}`,
+  get title() {
+    return t("channelForms.access.manageTitle");
+  },
+  label: (name: string, detail?: string) =>
+    detail
+      ? t("channelForms.access.manageDetail", { name, detail })
+      : t("channelForms.access.manageName", { name }),
 });
 
 /** What the viewer can do in a conversation's access dialog: its title, and
@@ -61,10 +82,11 @@ export function ChannelHeaderIdentity({
   /** From `memberAccess`, so the name matches the dialog it opens. */
   access: ReturnType<typeof memberAccess>;
 }) {
+  useLanguage();
   return (
     <SurfaceButton
       {...props}
-      aria-label={`${access.label(name)}${detail ? `, ${detail}` : ""}`}
+      aria-label={access.label(name, detail)}
       title={detail ?? access.title}
       aria-haspopup="dialog"
       className={styles.identity}

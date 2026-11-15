@@ -1,4 +1,5 @@
 import { useRef, useSyncExternalStore } from "react";
+import { t, useLanguage } from "../../shared/i18n";
 import { Header, InlineHeader } from "../../shared/design-system/ui/Header";
 import { SettingsGroup } from "../../shared/design-system/ui/SettingsGroup";
 import { Field } from "../../shared/design-system/ui/Field";
@@ -50,6 +51,7 @@ export function TerminalSettings({
   drafts: ReturnType<typeof createTerminalSettingsDraft>;
   active(): boolean;
 }) {
+  useLanguage();
   const { family, size, error } = useSyncExternalStore(
     font.subscribe,
     font.snapshot,
@@ -81,10 +83,10 @@ export function TerminalSettings({
     <section aria-labelledby="terminal-settings-title">
       <Header
         id="terminal-settings-title"
-        title="Terminal"
-        subtitle="Customize your terminal."
+        title={t("terminalSettings.title")}
+        subtitle={t("terminalSettings.subtitle")}
       />
-      <InlineHeader title="Font" />
+      <InlineHeader title={t("terminalSettings.font")} />
       <SettingsGroup layout="form">
         <form
           noValidate
@@ -98,13 +100,15 @@ export function TerminalSettings({
         >
           <div className="flex flex-col gap-4">
             <Field
-              label="Font family"
-              description="Type an installed font family name. For Nerd Fonts, use a Mono variant for cell alignment."
+              label={t("terminalSettings.family")}
+              description={t("terminalSettings.familyHelp")}
               error={
                 invalid
-                  ? "Enter one font family name, up to 64 characters, without quotes, commas, or CSS syntax. Use default to clear this choice."
+                  ? t("terminalSettings.familyInvalid")
                   : unavailable
-                    ? `Couldn’t load “${parsed}”. Check the font name or install it, then try again.`
+                    ? t("terminalSettings.unavailable", {
+                        font: String(parsed),
+                      })
                     : undefined
               }
             >
@@ -132,21 +136,25 @@ export function TerminalSettings({
                   availability.retry();
                 }}
               >
-                Retry font check
+                {t("terminalSettings.retryCheck")}
               </Button>
             )}
             {family && savedStatus === "unavailable" && (
               <p role="status" className="text-body-sm text-subtle">
-                Couldn’t load your saved font “{family}”. The terminal is using
-                JetBrains Mono.
+                {t("terminalSettings.savedUnavailable", { font: family })}
               </p>
             )}
             <Field
-              label="Font size (px)"
-              description={`Terminal text size, independent of interface text size. Default: ${DEFAULT_FONT_SIZE} px.`}
+              label={t("terminalSettings.size")}
+              description={t("terminalSettings.sizeHelp", {
+                size: DEFAULT_FONT_SIZE,
+              })}
               error={
                 sizeInvalid
-                  ? `Enter a number from ${MIN_FONT_SIZE} to ${MAX_FONT_SIZE}.`
+                  ? t("terminalSettings.sizeInvalid", {
+                      min: MIN_FONT_SIZE,
+                      max: MAX_FONT_SIZE,
+                    })
                   : undefined
               }
             >
@@ -170,7 +178,7 @@ export function TerminalSettings({
                 : "var(--font-system-mono)",
             }}
           >
-            Preview: ABC 0123
+            {t("terminalSettings.preview", { sample: "ABC 0123" })}
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
             <Button
@@ -181,7 +189,7 @@ export function TerminalSettings({
                 drafts.update({ family: null, size: null, blurredValue: null });
               }}
             >
-              Use default
+              {t("terminalSettings.default")}
             </Button>
             <Button
               type="submit"
@@ -192,7 +200,7 @@ export function TerminalSettings({
                 (parsed === family && parsedSize === size)
               }
             >
-              Apply
+              {t("terminalSettings.apply")}
             </Button>
           </div>
         </form>
@@ -201,11 +209,11 @@ export function TerminalSettings({
       {isApplePlatform(navigator.platform) && <OptionMetaSetting />}
       {active() && error && (
         <ToastNotice
-          title="Terminal font preference needs attention"
-          description={error}
+          title={t("terminalSettings.attention")}
+          description={fontPreferenceError(error)}
         >
           <Button type="button" size="sm" onClick={font.retry}>
-            Retry terminal font preference
+            {t("terminalSettings.retryPreference")}
           </Button>
         </ToastNotice>
       )}
@@ -214,32 +222,47 @@ export function TerminalSettings({
 }
 
 function OptionMetaSetting() {
+  useLanguage();
   const checked = optionMetaPreference.usePreference();
   const error = optionMetaPreference.useSaveError();
   return (
     <section className="mt-section-gap">
-      <InlineHeader title="Keyboard" />
+      <InlineHeader title={t("terminalSettings.keyboard")} />
       <SettingsGroup>
         <SwitchPreferenceRow
-          label="Use Option as Meta key"
-          description="Treat the Option key as the Meta key in the terminal."
+          label={t("terminalSettings.optionMeta")}
+          description={t("terminalSettings.optionMetaHelp")}
           checked={checked}
           onCheckedChange={optionMetaPreference.set}
         />
       </SettingsGroup>
       {error && (
         <div role="alert" className="grid gap-3 text-body-sm text-standard">
-          <p className="m-0">{error}</p>
+          <p className="m-0">{t("terminalSettings.optionSaveFailed")}</p>
           <div>
             <Button
               type="button"
               onClick={() => optionMetaPreference.set(checked)}
             >
-              Retry saving
+              {t("terminalSettings.retrySave")}
             </Button>
           </div>
         </div>
       )}
     </section>
   );
+}
+
+// This local snapshot has three fixed failure values, never a caught host message.
+function fontPreferenceError(error: string) {
+  switch (error) {
+    case "Your terminal font could not be restored. The default is active.":
+      return t("terminalSettings.restoreFailed");
+    case "The default terminal font is active, but this reset could not be saved on this device. Your previous font may return after restarting. Try again.":
+      return t("terminalSettings.resetFailed");
+    case "Your terminal font is active, but could not be saved on this device. Try again.":
+      return t("terminalSettings.saveFailed");
+    default:
+      return error;
+  }
 }

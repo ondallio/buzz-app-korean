@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { isTauri } from "@tauri-apps/api/core";
@@ -14,6 +15,7 @@ export function UpdateSettings({
   updates: Updates;
   active: boolean;
 }) {
+  useLanguage();
   const status = useSyncExternalStore(
     updates.subscribe,
     updates.snapshot,
@@ -44,35 +46,45 @@ export function UpdateSettings({
     "installing",
   ].includes(status.state);
   const messages = {
-    idle: "Check if a new version is available.",
-    checking: "Checking for updates…",
-    "up-to-date": "You're on the latest version.",
-    unavailable:
-      "Automatic updates aren't available on this build. Download the latest release manually.",
-    available: "Preparing update…",
-    downloading: "Downloading update…",
-    installing: "Installing update…",
-    ready: "Ready to install. Buzz will restart.",
+    idle: t("settingsHost.updateIdle"),
+    checking: t("settingsHost.updateChecking"),
+    "up-to-date": t("settingsHost.updateLatest"),
+    unavailable: t("settingsHost.updateUnavailable"),
+    available: t("settingsHost.updatePreparing"),
+    downloading: t("settingsHost.updateDownloading"),
+    installing: t("settingsHost.updateInstalling"),
+    ready: t("settingsHost.updateReady"),
     error: "",
   };
   const label =
     status.state === "ready" || status.state === "installing"
-      ? "Update now"
+      ? t("settingsHost.updateNow")
       : status.state === "error"
-        ? "Retry"
+        ? t("settingsHost.retry")
         : status.state === "up-to-date" || status.state === "unavailable"
-          ? "Check again"
-          : "Check for updates";
+          ? t("settingsHost.checkAgain")
+          : t("settingsHost.checkUpdates");
   return (
     <section aria-labelledby="update-settings-title">
-      <Header id="update-settings-title" title="Software updates" />
+      <Header
+        id="update-settings-title"
+        title={t("settingsHost.updatesTitle")}
+      />
       <EmptyState
         icon={<ArrowsClockwiseIcon />}
-        title={version ? `Version ${version}` : "Update status"}
+        title={
+          version
+            ? t("settingsHost.version", { version })
+            : t("settingsHost.updateStatus")
+        }
         description={
           <span role="status">
             {status.state === "error" ? (
-              <span className="error">Update failed: {status.message}</span>
+              <span className="error">
+                {t("settingsHost.updateFailedDetail", {
+                  error: status.message,
+                })}
+              </span>
             ) : (
               messages[status.state]
             )}

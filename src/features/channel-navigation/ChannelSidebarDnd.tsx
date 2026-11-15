@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   DndContext,
   DragOverlay,
@@ -140,6 +141,7 @@ export function ChannelSidebarDnd({
 }
 
 function CreateSectionDropTarget() {
+  useLanguage();
   const { active, measureDroppableContainers } = useDndContext();
   const enabled =
     useContext(Writable) && !!active && !active.data.current?.group;
@@ -194,7 +196,7 @@ function CreateSectionDropTarget() {
           data-drop-target={isOver || undefined}
         >
           <PlusIcon size={24} />
-          <span>Add to new section</span>
+          <span>{t("v1shell.nav.addSection")}</span>
         </div>
       </motion.div>
     </div>

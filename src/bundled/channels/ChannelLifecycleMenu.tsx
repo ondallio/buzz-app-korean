@@ -1,3 +1,5 @@
+import { t, useLanguage } from "../../shared/i18n";
+import { lifecycleMessageKeys } from "./ChannelLifecycleDialog";
 import type { ReactNode } from "react";
 import {
   ArchiveIcon,
@@ -33,6 +35,7 @@ export function ChannelLifecycleMenu({
   noun?: LifecycleNoun;
   render?(items: ReactNode): ReactNode;
 }) {
+  useLanguage();
   const state = useLifecycleOffer(session, channel);
   if (!session.channelLifecycle.available)
     return render(
@@ -42,7 +45,7 @@ export function ChannelLifecycleMenu({
           <MenuIcon>
             <WarningCircleIcon size={14} />
           </MenuIcon>
-          Channel actions unavailable on this connection
+          {t("channelsMenus.lifecycle.unavailable")}
         </MenuItem>
       </>,
     );
@@ -65,7 +68,7 @@ export function ChannelLifecycleMenu({
           <MenuIcon>
             <EyeSlashIcon size={14} />
           </MenuIcon>
-          Hide conversation
+          {t(lifecycleMessageKeys("hide", noun).title)}
         </MenuItem>
       ) : (
         <>
@@ -74,7 +77,7 @@ export function ChannelLifecycleMenu({
               <MenuIcon>
                 <SignOutIcon size={14} />
               </MenuIcon>
-              Leave {noun}
+              {t(lifecycleMessageKeys("leave", noun).title)}
             </MenuItem>
           )}
           {(state.canArchive || state.canUnarchive) && (
@@ -87,7 +90,12 @@ export function ChannelLifecycleMenu({
               <MenuIcon>
                 <ArchiveIcon size={14} />
               </MenuIcon>
-              {state.canUnarchive ? `Unarchive ${noun}` : `Archive ${noun}`}
+              {t(
+                lifecycleMessageKeys(
+                  state.canUnarchive ? "unarchive" : "archive",
+                  noun,
+                ).title,
+              )}
             </MenuItem>
           )}
           {state.canDelete && (
@@ -99,7 +107,7 @@ export function ChannelLifecycleMenu({
               <MenuIcon>
                 <TrashIcon size={14} />
               </MenuIcon>
-              Delete {noun}
+              {t(lifecycleMessageKeys("delete", noun).title)}
             </MenuItem>
           )}
         </>

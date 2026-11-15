@@ -1,3 +1,10 @@
+import { t, useLanguage, formattingLocale } from "../../shared/i18n";
+import {
+  localMessage,
+  errorMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { usePanelTabHost } from "../../features/panels/PanelWorkspace";
 import {
   useEffect,
@@ -72,6 +79,7 @@ export function ChannelSettingsPanel({
 }) {
   const tabbed = !!usePanelTabHost();
   const header = useRef<HTMLDivElement>(null);
+  useLanguage();
   const panelId = useId();
   useEffect(() => {
     if (tabbed) return;
@@ -93,7 +101,7 @@ export function ChannelSettingsPanel({
   ) => (
     <Panel
       as="aside"
-      aria-label="Channel settings"
+      aria-label={t("channelForms.settings.title")}
       aria-busy={loading}
       onKeyDown={(event) => {
         // Shift+Escape is Mark all as read, not a dismissal.
@@ -115,13 +123,14 @@ export function ChannelSettingsPanel({
             title={
               <Tabs
                 variant="navigation"
-                label="Panel tabs"
+                label={t("channelForms.settings.tabs")}
                 value="settings"
                 onValueChange={() => {}}
                 items={[
                   {
                     value: "settings",
-                    label: "Channel settings",
+                    label: t("channelForms.settings.title"),
+                    closeLabel: t("channelForms.settings.closeTab"),
                     icon: <GearIcon size="1rem" />,
                     panelId,
                     onClose: close,
@@ -152,7 +161,7 @@ export function ChannelSettingsPanel({
                     <button
                       type="button"
                       className={styles.settingsTitleAction}
-                      aria-label="Edit channel name"
+                      aria-label={t("channelForms.settings.editName")}
                       disabled={edit.pending}
                       aria-busy={edit.pending}
                       aria-description={channel.name}
@@ -186,11 +195,12 @@ export function ChannelSettingsPanel({
                 {channel.channelType !== "solo" &&
                   channel.channelType !== "dm" && (
                     <SettingsDetail
-                      label="Description"
+                      label={t("channelForms.field.description")}
                       value={
                         channel.description === undefined
-                          ? "Not available"
-                          : channel.description || "No description"
+                          ? t("channelForms.settings.notAvailable")
+                          : channel.description ||
+                            t("channelForms.settings.noDescription")
                       }
                       content={
                         channel.description &&
@@ -208,7 +218,7 @@ export function ChannelSettingsPanel({
                       }
                       valueClassName={styles.settingsDescription}
                       labelOnly
-                      actionLabel="Edit"
+                      actionLabel={t("channelForms.settings.editDescription")}
                       loading={edit?.pending}
                       onOpen={
                         edit
@@ -231,8 +241,11 @@ export function ChannelSettingsPanel({
                   )}
                 {channel.members && (
                   <SettingsDetail
-                    label="Members"
-                    value={String(channel.members.length)}
+                    label={t("channelForms.settings.members")}
+                    actionLabel={t("channelForms.settings.viewMembers")}
+                    value={channel.members.length.toLocaleString(
+                      formattingLocale(),
+                    )}
                     trailingIcon={
                       <CaretRightIcon size={16} aria-hidden="true" />
                     }
@@ -246,7 +259,7 @@ export function ChannelSettingsPanel({
           {editStatus}
           {setupTools}
           <details className={styles.settingsDiagnostics}>
-            <summary>Diagnostics</summary>
+            <summary>{t("channelForms.settings.diagnostics")}</summary>
             <div className={styles.settingsTools}>{children}</div>
           </details>
         </div>
@@ -263,7 +276,7 @@ export function ChannelSettingsPanel({
   ) : (
     renderPanel(
       undefined,
-      editable ? <p>Editing is unavailable on this connection.</p> : undefined,
+      editable ? <p>{t("channelForms.settings.unavailable")}</p> : undefined,
     )
   );
 }
@@ -283,13 +296,17 @@ function AutoJoinSetting({
   lifecycle: ChannelLifecycleCapability;
   membership: CommunityMembership;
 }) {
+  useLanguage();
   const role = useSyncExternalStore(
     membership.subscribe,
     () => membership.snapshot().role,
   );
   useEffect(() => membership.ensure(), [membership]);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<{ enabled: boolean; message: string }>();
+  const [error, setError] = useState<{
+    enabled: boolean;
+    message: DisplayMessage;
+  }>();
   // Once the signed flag shows what a failed toggle wanted, the change is in
   // effect, and "Try again" would flip it back.
   if (error && !!channel.autoJoin === error.enabled) setError(undefined);
@@ -319,15 +336,15 @@ function AutoJoinSetting({
           message:
             // Setting the same value again is idempotent, so retrying is the check.
             error instanceof ChannelLifecycleUnconfirmed
-              ? "Saved, but not confirmed yet. Try again to check."
+              ? localMessage("channelForms.settings.savedUnconfirmed")
               : // A rate limit or a write that never left this device, not a refusal.
                 error instanceof PublishNotSent
-                ? "Not sent. Try again."
+                ? localMessage("channelForms.settings.notSent")
                 : error instanceof PublishRejected
                   ? (error.reason ??
-                    "Only community owners and admins can change this.")
+                    localMessage("channelForms.settings.ownerOnly"))
                   : error instanceof Error
-                    ? error.message
+                    ? errorMessage(error)
                     : String(error),
         });
     } finally {
@@ -343,15 +360,15 @@ function AutoJoinSetting({
       data-disabled={disabled || undefined}
     >
       <dt>
-        <label htmlFor={control}>Starter channel for new members</label>
+        <label htmlFor={control}>{t("channelForms.settings.starter")}</label>
       </dt>
       <dd>
         <span id={description}>
-          New community members are added to this channel automatically.
+          {t("channelForms.settings.starterDescription")}
         </span>
         <Switch
           id={control}
-          aria-label="Starter channel for new members"
+          aria-label={t("channelForms.settings.starter")}
           aria-describedby={error ? `${description} ${alert}` : description}
           checked={!!channel.autoJoin}
           disabled={disabled}
@@ -360,7 +377,7 @@ function AutoJoinSetting({
         />
         {error && (
           <p id={alert} role="alert" className="text-danger">
-            {error.message}
+            {resolveMessage(error.message)}
           </p>
         )}
       </dd>
@@ -458,9 +475,10 @@ function SettingsDetail({
                     : styles.settingsDetailAction
                 }
                 aria-label={
-                  actionLabel
-                    ? `${actionLabel} ${label.toLowerCase()}`
-                    : `View ${label.toLowerCase()}`
+                  actionLabel ??
+                  t("channelForms.settings.view", {
+                    label: label.toLowerCase(),
+                  })
                 }
                 aria-description={labelOnly ? undefined : value}
                 aria-haspopup={hasPopup}
@@ -503,6 +521,7 @@ function SettingsDetail({
 }
 
 function ChannelIdDetail({ id }: { id: string }) {
+  useLanguage();
   const [state, setState] = useState<"idle" | "copying" | "copied" | "failed">(
     "idle",
   );
@@ -520,17 +539,17 @@ function ChannelIdDetail({ id }: { id: string }) {
   }
   return (
     <SettingsDetail
-      label="Channel ID"
+      label={t("channelForms.settings.id")}
       value={id}
       valueClassName={styles.settingsId}
       feedback={
         state === "failed" && (
           <p role="alert" className="text-danger">
-            Couldn’t copy channel ID. Try again.
+            {t("channelForms.settings.copyIdFailed")}
           </p>
         )
       }
-      actionLabel="Copy"
+      actionLabel={t("channelForms.settings.copyId")}
       actionIcon={<CopyIcon size={14} />}
       hasPopup={false}
       disabled={state === "copying"}
@@ -543,7 +562,9 @@ function ChannelIdDetail({ id }: { id: string }) {
             if (!open) setFeedbackOpen(false);
           }}
           disableHoverablePopup
-          content={<span role="status">Channel ID copied</span>}
+          content={
+            <span role="status">{t("channelForms.settings.idCopied")}</span>
+          }
         >
           {action}
         </Tooltip>

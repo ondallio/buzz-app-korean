@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { useProfileGeneration } from "../../features/relay/react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { RelaySession } from "../../features/relay/session";
@@ -231,11 +232,19 @@ export function useSoloShare({
         .list()
         .channels.find((item) => item.id === target);
       notify(
-        `${accessChanged.current ? "Chat changed to View only. " : ""}${shared ? `Shared in ${channelText(shared)}` : "Shared"}`,
+        accessChanged.current
+          ? shared
+            ? t("v1shell.share.viewOnlySharedIn", {
+                channel: channelText(shared),
+              })
+            : t("v1shell.share.viewOnlyShared")
+          : shared
+            ? t("v1shell.share.sharedIn", { channel: channelText(shared) })
+            : t("v1shell.share.shared"),
         "success",
         view && navigationController
           ? {
-              label: "View",
+              label: t("huddleMain.view"),
               onClick: () => {
                 void navigationController.open(view);
               },

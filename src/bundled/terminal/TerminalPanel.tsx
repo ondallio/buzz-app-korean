@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   CaretDownIcon,
   StopIcon,
@@ -35,6 +36,7 @@ function Content({
   close(): void;
   sessions: TerminalSessions;
 }) {
+  useLanguage();
   const version = useSyncExternalStore(
     sessions.subscribe,
     sessions.snapshot,
@@ -102,12 +104,27 @@ function Content({
                   className="text-mono-sm text-secondary font-mono"
                   title={entry.context.threadId}
                 >
-                  Thread {entry.context.threadId.slice(0, 8)}
+                  {t("v1shell.terminal.thread", {
+                    id: entry.context.threadId.slice(0, 8),
+                  })}
                 </span>
               )}
               <span className="text-body-sm text-secondary">
-                {entry?.status ??
-                  (sessions.available ? "ended" : "desktop only")}
+                {t(
+                  entry
+                    ? (
+                        {
+                          starting: "v1shell.terminal.status.starting",
+                          running: "v1shell.terminal.status.running",
+                          exited: "v1shell.terminal.status.exited",
+                          error: "v1shell.terminal.status.error",
+                          ended: "v1shell.terminal.status.ended",
+                        } as const
+                      )[entry.status]
+                    : sessions.available
+                      ? "v1shell.terminal.status.ended"
+                      : "v1shell.terminal.status.desktopOnly",
+                )}
               </span>
             </div>
           </PanelHeaderLabel>
@@ -120,8 +137,8 @@ function Content({
                   size="toolbar"
                   disabled={busy}
                   onClick={() => void end(true)}
-                  aria-label="Restart"
-                  title="Restart terminal"
+                  aria-label={t("v1shell.terminal.restart")}
+                  title={t("v1shell.terminal.restartTitle")}
                   icon={<ArrowsClockwiseIcon size={16} aria-hidden="true" />}
                 />
               ) : (
@@ -130,7 +147,7 @@ function Content({
                   disabled={busy}
                   onClick={() => void end(true)}
                 >
-                  Start session
+                  {t("v1shell.terminal.start")}
                 </Button>
               ))}
             {entry && (
@@ -144,8 +161,8 @@ function Content({
                     hide.current?.focus();
                   void end(false);
                 }}
-                aria-label="End session"
-                title="End session"
+                aria-label={t("v1shell.terminal.end")}
+                title={t("v1shell.terminal.end")}
                 icon={<StopIcon size={16} aria-hidden="true" />}
               />
             )}
@@ -154,8 +171,8 @@ function Content({
               size="toolbar"
               ref={hide}
               onClick={close}
-              aria-label="Hide terminal"
-              title="Hide terminal (Cmd/Ctrl+J)"
+              aria-label={t("v1shell.terminal.hide")}
+              title={t("v1shell.terminal.hideTitle")}
               icon={<CaretDownIcon size={16} aria-hidden="true" />}
             />
           </>
@@ -163,8 +180,7 @@ function Content({
       />
       {!sessions.available ? (
         <p className={`${styles.notice} text-body`}>
-          Open Buzz Desktop to use your local shell. The browser cannot start a
-          terminal on your computer.
+          {t("v1shell.terminal.desktopOnly")}
         </p>
       ) : (
         <>
@@ -178,13 +194,12 @@ function Content({
           )}
           {entry?.status === "starting" && (
             <p className={`${styles.notice} text-body`} role="status">
-              Starting your login shell…
+              {t("v1shell.terminal.starting")}
             </p>
           )}
           {!entry && (
             <p className={`${styles.notice} text-body`}>
-              Session ended. Start a new shell to use this channel’s current
-              context.
+              {t("v1shell.terminal.ended")}
             </p>
           )}
           {/* Escape belongs to the shell while its input has focus. */}

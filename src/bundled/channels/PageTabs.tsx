@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { RelaySession } from "../../features/relay/session";
@@ -80,6 +81,7 @@ export function PageTabs({
   HostProps & {
     workspace?: ConversationWorkspaceProps;
   }) {
+  useLanguage();
   const tabState = useChannelTabState(session, undefined, `page:${id}`);
   const list = useChannelList(session.channels);
   const { channels, profiles } = useChannelLabels(
@@ -411,8 +413,10 @@ export function PageTabs({
       ref={ref}
       data-tab-pane-toggle=""
       size="toolbar"
-      aria-label="Toggle tab pane"
-      title={showingPanel ? "Close tab pane" : "Open tab pane"}
+      aria-label={t("v1shell.tabs.togglePane")}
+      title={
+        showingPanel ? t("v1shell.tabs.closePane") : t("v1shell.tabs.openPane")
+      }
       aria-expanded={showingPanel}
       onClick={onClick}
       icon={<SidebarRightIcon size="1rem" aria-hidden="true" />}
@@ -452,7 +456,7 @@ export function PageTabs({
               main
               tabMenu={tabMenu}
               drag={secondary.drag.main}
-              label={`${label} tabs`}
+              label={t("v1shell.tabs.named", { name: label })}
               focusOnMount={false}
               adoptSelection={closes}
               value={secondary.selectedMain}
@@ -482,8 +486,8 @@ export function PageTabs({
                           <IconButton
                             hint="familiar"
                             size="sm"
-                            aria-label="Conversation actions"
-                            title="Conversation actions"
+                            aria-label={t("v1shell.tabs.conversationActions")}
+                            title={t("v1shell.tabs.conversationActions")}
                             icon={
                               <DotsThreeIcon size="1rem" aria-hidden="true" />
                             }
@@ -543,7 +547,7 @@ export function PageTabs({
                           />
                         ) : (
                           <p role="status" className={styles.empty}>
-                            This conversation is no longer available.
+                            {t("v1shell.tabs.unavailable")}
                           </p>
                         )}
                       </div>

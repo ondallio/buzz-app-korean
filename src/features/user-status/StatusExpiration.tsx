@@ -1,3 +1,6 @@
+import { formattingLocale, languagePreference, t } from "../../shared/i18n";
+import { clockHourCycle, useClockFormat } from "../../shared/clock-preference";
+import { enUS, ko } from "react-day-picker/locale";
 import { Popover } from "@base-ui/react/popover";
 import { useState } from "react";
 import { Calendar } from "../../shared/design-system/ui/Calendar";
@@ -16,7 +19,7 @@ const times = Array.from({ length: 48 }, (_, index) => {
   const minute = index % 2 ? "30" : "00";
   return {
     value: `${hour.toString().padStart(2, "0")}:${minute}`,
-    label: `${hour % 12 || 12}:${minute} ${hour < 12 ? "AM" : "PM"}`,
+    wallTime: new Date(Date.UTC(2000, 0, 1, hour, Number(minute))),
   };
 });
 
@@ -24,7 +27,7 @@ export function StatusExpiration({
   value,
   onChange,
   disabled,
-  label = "Status expiration",
+  label = t("statusFocus.expiration"),
 }: {
   value: Date;
   onChange(value: Date): void;
@@ -32,20 +35,37 @@ export function StatusExpiration({
   /** Names the date and time controls, e.g. "Focus end". */
   label?: string;
 }) {
+  useClockFormat();
+  const cycle = clockHourCycle();
+  const clock = cycle ? { hourCycle: cycle } : {};
+  // Slots are abstract wall-clock choices, so a selected day's DST gap cannot rename them.
+  const format = new Intl.DateTimeFormat(formattingLocale(), {
+    hour: "numeric",
+    minute: "2-digit",
+    ...clock,
+    timeZone: "UTC",
+  });
+  const labels = new Map(
+    times.map((option) => [option.value, format.format(option.wallTime)]),
+  );
   const [calendarOpen, setCalendarOpen] = useState(false);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const time = `${value.getHours().toString().padStart(2, "0")}:${value.getMinutes().toString().padStart(2, "0")}`;
   return (
     <div className={styles.expiration}>
-      <span className="text-label-sm text-subtle">Until</span>
+      <span className="text-label-sm text-subtle">
+        {t("statusFocus.until")}
+      </span>
       <div className={styles.expirationFields}>
         <Popover.Root open={calendarOpen} onOpenChange={setCalendarOpen}>
           <Popover.Trigger
             disabled={disabled}
-            render={<FieldButton aria-label={`${label} date`} />}
+            render={
+              <FieldButton aria-label={t("statusFocus.dateLabel", { label })} />
+            }
           >
-            {value.toLocaleDateString([], {
+            {value.toLocaleDateString(formattingLocale(), {
               month: "short",
               day: "numeric",
               year: "numeric",
@@ -60,9 +80,10 @@ export function StatusExpiration({
             >
               <Popover.Popup
                 className={styles.calendarPopup}
-                aria-label="Choose expiration date"
+                aria-label={t("statusFocus.chooseDate")}
               >
                 <Calendar
+                  locale={languagePreference() === "ko" ? ko : enUS}
                   mode="single"
                   required
                   autoFocus
@@ -88,10 +109,13 @@ export function StatusExpiration({
         <MenuRoot>
           <MenuTrigger
             disabled={disabled}
-            render={<FieldButton aria-label={`${label} time`} />}
+            render={
+              <FieldButton aria-label={t("statusFocus.timeLabel", { label })} />
+            }
           >
-            {times.find((option) => option.value === time)?.label ??
-              value.toLocaleTimeString([], {
+            {labels.get(time) ??
+              value.toLocaleTimeString(formattingLocale(), {
+                ...clock,
                 hour: "numeric",
                 minute: "2-digit",
               })}
@@ -100,7 +124,7 @@ export function StatusExpiration({
             <div className={styles.timeOptions}>
               <MenuRadioGroup
                 value={time}
-                aria-label="Expiration time"
+                aria-label={t("statusFocus.expirationTime")}
                 onValueChange={(timeValue) => {
                   const hour = Number(timeValue.slice(0, 2));
                   const minute = Number(timeValue.slice(3));
@@ -115,7 +139,7 @@ export function StatusExpiration({
                     value={option.value}
                     closeOnClick
                   >
-                    {option.label}
+                    {labels.get(option.value)}
                   </MenuRadioItem>
                 ))}
               </MenuRadioGroup>

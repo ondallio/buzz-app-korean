@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useCallback,
   useEffect,
@@ -73,6 +74,7 @@ export function ConversationTab({
   onDifferentThread,
   parent,
 }: ConversationTabProps) {
+  useLanguage();
   // A saved reply intent belongs to the previous visit, not this restoration;
   // a renamed or merged copy of the tab carries the same request.
   const initial = restored ?? (focusOnMount ? undefined : tab);
@@ -153,7 +155,7 @@ export function ConversationTab({
       <section
         data-attachment-drop-zone=""
         className={styles.conversation}
-        aria-label={`Conversation in ${channel.name}`}
+        aria-label={t("v1shell.tabs.conversationIn", { name: channel.name })}
       >
         <MessageManagementStatus />
         {tab.kind === "thread" ? (

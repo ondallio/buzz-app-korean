@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useEffect,
   useLayoutEffect,
@@ -107,6 +108,7 @@ function PanelSplitHandle({
   min: number;
   primary: { defaultWidth: number; maxRatio: number } | undefined;
 }) {
+  useLanguage();
   const [available, setAvailable] = useState(0);
   useEffect(() => {
     const element = ref.current;
@@ -134,7 +136,7 @@ function PanelSplitHandle({
   }, [ref, available, width, automatic]);
   return (
     <ResizeHandle
-      label="Resize main and secondary panels"
+      label={t("v1shell.panels.resizeSplit")}
       direction={-1}
       target={ref}
       property="--secondary-panel-width"

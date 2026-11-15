@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { Component, type ComponentProps, type ReactNode } from "react";
 import { SidebarFrame } from "./SidebarFrame";
 import { SidebarList } from "./SidebarList";
@@ -17,14 +18,14 @@ export class SidebarBoundary extends Component<
     return this.state.failed ? (
       <div className="shell-sidebar-default">
         <SidebarFrame
-          label="Sidebar"
+          label={t("shell.sidebar.label")}
           header={this.props.header}
           panelId={this.props.panelId}
         >
           <SidebarList>
-            <p role="alert">Conversations couldn’t open.</p>
+            <p role="alert">{t("v1shell.nav.sidebarFailed")}</p>
             <Button onClick={() => this.setState({ failed: false })}>
-              Retry sidebar
+              {t("v1shell.nav.retrySidebar")}
             </Button>
           </SidebarList>
         </SidebarFrame>

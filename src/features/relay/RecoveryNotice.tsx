@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { ToastNotice } from "../../shared/design-system/ui/Toast";
 import { isSignInRefusal, type RelayRecovery } from "./recovery";
@@ -101,8 +102,6 @@ export function useHeadReadPending(
   return useSyncExternalStore(live?.subscribe ?? subscribeNone, read, read);
 }
 
-export const RECOVERY_TITLE = "Buzz is having trouble connecting";
-
 /** The one relay recovery notice, on every page. Recovery retries on its own,
  * so it offers no button. */
 export function RecoveryNotice({
@@ -110,12 +109,13 @@ export function RecoveryNotice({
 }: {
   recovery: RelayRecovery | undefined;
 }) {
+  useLanguage();
   const { shown } = useRecovery(recovery);
   if (!shown) return null;
   return (
     <ToastNotice
-      title={RECOVERY_TITLE}
-      description="Retrying automatically."
+      title={t("v1shell.recovery.title")}
+      description={t("v1shell.recovery.retrying")}
       tone="info"
     />
   );

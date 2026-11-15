@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   createContext,
   useCallback,
@@ -112,7 +113,7 @@ export function PanelWorkspace({
   actions,
   identity,
   main = false,
-  label = "Panel tabs",
+  label: labelProp,
   focusOnMount = true,
   adoptSelection,
   tabMenu,
@@ -145,6 +146,8 @@ export function PanelWorkspace({
   /** A new value adopts the current selection without moving focus. */
   adoptSelection?: unknown;
 }) {
+  useLanguage();
+  const label = labelProp ?? t("channelForms.settings.tabs");
   const prefix = useId();
   const panelId = (id: string) => `${prefix}-${id}`;
   const [titles, setTitles] = useState<Record<string, Identity | undefined>>(

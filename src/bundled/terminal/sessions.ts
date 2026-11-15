@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import type { ChannelPanelContext } from "../../features/panels/service";
 import type { TerminalBridge } from "./bridge";
 import type { TerminalInputSource, TerminalScreen } from "./renderer";
@@ -107,10 +108,7 @@ export function createSessions(
             return;
           const bytes = new TextEncoder().encode(data).length;
           if (pendingBytes + bytes > 1024 * 1024) {
-            fail(
-              entry,
-              "Terminal input is full. End this session and start again.",
-            );
+            fail(entry, t("v1shell.terminal.inputFull"));
             return;
           }
           pendingBytes += bytes;
@@ -202,10 +200,7 @@ export function createSessions(
       // Restoring a panel is not intent to restart an explicitly ended shell.
       if (initial && initialized.has(key)) return;
       if (!bridge.available || !allowed(context)) return;
-      if (sessions.size >= 20)
-        throw new Error(
-          "Twenty terminal sessions are open. End one before opening another.",
-        );
+      if (sessions.size >= 20) throw new Error(t("v1shell.terminal.tooMany"));
       const entry: TerminalSession = {
         context: Object.freeze({ ...context }),
         status: "starting",

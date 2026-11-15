@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useCallback,
   useLayoutEffect,
@@ -159,6 +160,7 @@ function SectionContents({
   move: { up?: () => void; down?: () => void } | undefined;
   onRowsCommitted: (() => void) | undefined;
 }) {
+  useLanguage();
   const subscribe = useCallback(
     (listener: () => void) => entry.rows.subscribe(listener),
     [entry.rows],
@@ -230,7 +232,7 @@ function SectionContents({
       headerNotice={
         actionError && (
           <p className={styles.contributionFeedback} role="alert">
-            This sidebar action couldn’t finish.
+            {t("v1shell.nav.sidebarActionFailed")}
           </p>
         )
       }

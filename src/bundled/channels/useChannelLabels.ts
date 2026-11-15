@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { useIdentityNames } from "../../features/identity-names/react";
 import type { IdentityNameView } from "../../features/identity-names/service";
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
@@ -91,7 +92,7 @@ export function useChannelLabels(
                 ),
               ),
             ).join(", ")
-          : "Notes to self";
+          : t("inbox.notesSelf");
         const result =
           previous?.name === name ? previous.channel : { ...channel, name };
         labelled.current.set(channel, {

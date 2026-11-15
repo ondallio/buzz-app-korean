@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { diffLines } from "diff";
 import { useMemo, type ReactNode } from "react";
 import styles from "./ChannelTemplates.module.css";
@@ -77,10 +78,10 @@ export function CanvasDiff({
     () => canvasDiffRows(current, revision),
     [current, revision],
   );
-  if (!rows) return fallback("Comparison too large; showing full content.");
+  if (!rows) return fallback(t("v1shell.canvas.diffTooLarge"));
   return (
     <section
-      aria-label="Changes from current version"
+      aria-label={t("v1shell.canvas.diffLabel")}
       className={styles.diff}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: The scroll owner must support keyboard panning.
       tabIndex={0}

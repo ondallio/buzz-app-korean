@@ -1,4 +1,4 @@
-import { workflowLabel } from "../relay/workflow-attribution";
+import { t } from "../../shared/i18n";
 import type { ChannelSummary, Profile } from "../relay/contracts";
 import type { IncomingMessage } from "../relay/incoming";
 import { scanMarkdown, visibleHtmlSource } from "../relay/message-content";
@@ -88,14 +88,52 @@ export function messagePreview(
   return plainText(content, options) || "New message";
 }
 
-/** Plugin text gets the same flattening and bounds; missing text keeps the category fallback. */
-export function pluginNotificationText(
-  input: Readonly<{ title?: string; body?: string }>,
+const categoryLabels = {
+  mention: { original: "Mentions", key: "notifications.category.mention" },
+  direct: { original: "Direct messages", key: "notifications.category.direct" },
+  thread: { original: "Thread replies", key: "notifications.category.thread" },
+  agent: {
+    original: "Solo chat completions",
+    key: "notifications.category.agent",
+  },
+  "buzz.reminders/reminders": {
+    original: "Reminders",
+    key: "notifications.category.reminders",
+  },
+} as const;
+
+/** Display-only projection: unknown or customized contribution labels stay unchanged. */
+export function notificationCategoryLabel(
+  category: string,
+  label: string,
+): string {
+  const known = categoryLabels[category as keyof typeof categoryLabels];
+  return known?.original === label ? t(known.key) : label;
+}
+
+/** App-owned fallback only; category identity and external labels are never rewritten. */
+export function defaultNotificationText(
+  category: string,
   label: string,
 ): NotificationText {
   return Object.freeze({
-    title: shortText(input.title ?? "", 128) || "Buzz",
-    body: plainText(input.body ?? "") || `New ${label.toLowerCase()}`,
+    title: "Buzz",
+    body: t("notifications.payload.newCategory", {
+      category: notificationCategoryLabel(category, label).toLowerCase(),
+    }),
+  });
+}
+
+/** Plugin text gets the same flattening and bounds; only missing text uses localized copy. */
+export function pluginNotificationText(
+  input: Readonly<{ title?: string; body?: string }>,
+  label: string,
+  category = "",
+): NotificationText {
+  const fallback = defaultNotificationText(category, label);
+  return Object.freeze({
+    title: shortText(input.title ?? "", 128) || fallback.title,
+    body: plainText(input.body ?? "") || fallback.body,
   });
 }
 
@@ -110,16 +148,49 @@ export function messageNotificationText(
   const name =
     shortText(resolvedName ?? profile?.name ?? "", 64) ||
     (message.workflowOwnerId ?? message.authorId).slice(0, 10);
-  const sender = message.workflowOwnerId ? workflowLabel(name) : name;
+  const dm = channel?.channelType === "dm";
   const destination =
-    channel?.channelType === "dm"
-      ? "a direct message"
-      : `#${shortText(channel?.name ?? "", 64) || message.channelId.slice(0, 8)}`;
-  const title =
-    category === "mention"
-      ? `${sender} mentioned you in ${destination}`
-      : category === "direct"
-        ? `${sender} sent you a direct message`
-        : `${sender} replied in ${destination}`;
-  return Object.freeze({ title, body: messagePreview(message.previewContent) });
+    shortText(channel?.name ?? "", 64) || message.channelId.slice(0, 8);
+  let title: string;
+  if (message.workflowOwnerId) {
+    title =
+      category === "direct"
+        ? t("notifications.payload.workflowDirect", { owner: name })
+        : category === "mention"
+          ? dm
+            ? t("notifications.payload.workflowMentionDm", { owner: name })
+            : t("notifications.payload.workflowMentionChannel", {
+                owner: name,
+                channel: destination,
+              })
+          : dm
+            ? t("notifications.payload.workflowReplyDm", { owner: name })
+            : t("notifications.payload.workflowReplyChannel", {
+                owner: name,
+                channel: destination,
+              });
+  } else {
+    title =
+      category === "direct"
+        ? t("notifications.payload.direct", { sender: name })
+        : category === "mention"
+          ? dm
+            ? t("notifications.payload.mentionDm", { sender: name })
+            : t("notifications.payload.mentionChannel", {
+                sender: name,
+                channel: destination,
+              })
+          : dm
+            ? t("notifications.payload.replyDm", { sender: name })
+            : t("notifications.payload.replyChannel", {
+                sender: name,
+                channel: destination,
+              });
+  }
+  return Object.freeze({
+    title,
+    body:
+      plainText(message.previewContent) ||
+      t("notifications.payload.newMessage"),
+  });
 }

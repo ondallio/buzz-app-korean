@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useSoloRowActivation } from "./useSoloRowActivation";
 import { useIsPresent } from "motion/react";
 import type { ComposeWorkspaces } from "./WorkspaceComposition";
@@ -109,6 +110,7 @@ export function SoloInventory({
     compose: (composition: ComposeWorkspaces) => ReactNode,
   ) => ReactNode;
 }) {
+  useLanguage();
   const list = useChannelList(session.channels);
   const regions = useSoloNavigation(session);
   const pendingClick = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -306,14 +308,16 @@ export function SoloInventory({
   };
   const creationItems = (
     <>
-      {!composing && <MenuItem onClick={() => newChat()}>New chat</MenuItem>}
+      {!composing && (
+        <MenuItem onClick={() => newChat()}>{t("shell.new.chat")}</MenuItem>
+      )}
       <MenuItem
         disabled={!session.soloPreferences.sectionCreationWritable}
         onClick={() => {
           if (current()) setCreatingProject(true);
         }}
       >
-        New workspace
+        {t("shell.new.workspace")}
       </MenuItem>
     </>
   );
@@ -332,9 +336,15 @@ export function SoloInventory({
               ref={trigger}
               size="compact"
               aria-label={
-                composing ? "Workspace actions" : "New chat or workspace"
+                composing
+                  ? t("v1shell.solo.workspaceActions")
+                  : t("v1shell.solo.newChatOrWorkspace")
               }
-              title={composing ? "Workspace actions" : "New chat or workspace"}
+              title={
+                composing
+                  ? t("v1shell.solo.workspaceActions")
+                  : t("v1shell.solo.newChatOrWorkspace")
+              }
               icon={
                 composing ? (
                   <DotsThreeIcon size={15} strokeWidth={2.5} />
@@ -378,7 +388,7 @@ export function SoloInventory({
       {!compose && empty && (
         <NavigationItem
           variant="row"
-          label="New chat"
+          label={t("shell.new.chat")}
           icon={<PlusIcon size={16} />}
           onClick={() => newChat()}
         />
@@ -419,8 +429,8 @@ export function SoloInventory({
             selected,
             content: (
               <NavigationItem
-                label="New chat"
-                aria-description="Unsent draft"
+                label={t("shell.new.chat")}
+                aria-description={t("v1shell.solo.unsentDraft")}
                 selected={selected}
                 icon={
                   <span className={styles.conversationIcon} aria-hidden="true">
@@ -464,7 +474,9 @@ export function SoloInventory({
         onNew={newChat}
         renderChat={renderChat}
       />
-      {list.status === "loading" && <p role="status">Loading conversations…</p>}
+      {list.status === "loading" && (
+        <p role="status">{t("v1shell.solo.loading")}</p>
+      )}
       {list.status === "error" && !rosterRecovers && (
         <p role="alert">{list.error}</p>
       )}
@@ -473,7 +485,11 @@ export function SoloInventory({
   return (
     <nav
       className={styles.sidebarContents}
-      aria-label={`${regions.regions.find((region) => region.source && !region.hidden)?.title ?? "Solo"} conversations`}
+      aria-label={t("v1shell.solo.conversations", {
+        name:
+          regions.regions.find((region) => region.source && !region.hidden)
+            ?.title ?? t("shell.sidebar.solo"),
+      })}
     >
       {renderContents ? (
         renderContents(content(), header, pendingClick, content)

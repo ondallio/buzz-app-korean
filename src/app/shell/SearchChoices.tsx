@@ -1,3 +1,8 @@
+import {
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
+import { t, useLanguage } from "../../shared/i18n";
 import { matchRank } from "../../features/search/match";
 import {
   useLayoutEffect,
@@ -20,6 +25,8 @@ import "./SearchChoices.css";
 export type SearchDestination = {
   content?: ReactNode;
   rank?: number;
+  /** Name-only match rank, including explicit app-owned language aliases. */
+  labelMatchRank?: number;
   key: string;
   label: string;
   detail?: string;
@@ -42,6 +49,8 @@ export type SearchDestination = {
 };
 
 export type SearchGroup = {
+  /** Stable original group identity when its visible label changes language. */
+  id?: string;
   label: string;
   /** Name the group for assistive technology only, when the view's own tab
    * already says what it holds. */
@@ -67,7 +76,7 @@ export type SearchChip = {
   /** The text Backspace restores for editing. */
   edit: string;
   /** The remove button's accessible name. */
-  label: string;
+  label: DisplayMessage;
   title?: string;
 };
 
@@ -130,7 +139,7 @@ export function SearchChoices({
   displayQuery,
   onDisplayQueryChange,
   input,
-  label = "Search Buzz",
+  label,
   scope,
   scopeAction,
   children,
@@ -162,6 +171,7 @@ export function SearchChoices({
    * reading only for the rows someone can see. */
   onRowsShown?: ((keys: readonly string[]) => void) | undefined;
 }) {
+  useLanguage();
   const palette = useRef<HTMLDivElement>(null);
   const resultsViewport = useRef<HTMLDivElement>(null);
   const resultsContent = useRef<HTMLDivElement>(null);
@@ -193,7 +203,7 @@ export function SearchChoices({
   const score = (group: SearchGroup) =>
     group.rank ??
     Math.min(
-      matchRank(group.label, needle) ?? Infinity,
+      matchRank(group.id ?? group.label, needle) ?? Infinity,
       ...group.destinations.map(
         (row) =>
           row.rank ??
@@ -296,7 +306,7 @@ export function SearchChoices({
       root.removeEventListener("buzz:previous-tab", previous);
     };
   }, [switchView]);
-  const resultsLabel = views?.resultsLabel ?? "Search results";
+  const resultsLabel = views?.resultsLabel ?? t("search.results");
   // A group drawn in part says where each row sits in the whole of it.
   const positions = new Map<
     string,
@@ -415,7 +425,7 @@ export function SearchChoices({
             <button
               type="button"
               className="search-palette-scope"
-              aria-label={`Remove ${scope.label} search scope`}
+              aria-label={t("search.removeScope", { scope: scope.label })}
               onClick={scope.onRemove}
             >
               {scope.label} <span aria-hidden="true">×</span>
@@ -425,6 +435,9 @@ export function SearchChoices({
         </div>
       )}
       <SearchField
+        clearLabel={t("search.clear", {
+          label: (label === undefined ? t("search.buzz") : label).toLowerCase(),
+        })}
         variant="palette"
         prefix={
           chips?.length ? (
@@ -434,7 +447,7 @@ export function SearchChoices({
                   key={chip.operand}
                   type="button"
                   className="search-palette-author-chip"
-                  aria-label={chip.label}
+                  aria-label={resolveMessage(chip.label)}
                   title={chip.title}
                   onClick={() => onRemoveChip?.(chip)}
                 >
@@ -451,8 +464,8 @@ export function SearchChoices({
         aria-autocomplete="list"
         aria-haspopup={hasControls ? "grid" : "listbox"}
         {...highlight.fieldProps}
-        label={label}
-        placeholder="Search..."
+        label={label === undefined ? t("search.buzz") : label}
+        placeholder={t("search.placeholder")}
         value={displayQuery ?? query}
         onValueChange={onDisplayQueryChange ?? onQueryChange}
         spellCheck={false}
@@ -548,6 +561,7 @@ export function SearchChoices({
               )
               .map(
                 ({
+                  id,
                   label,
                   hideLabel,
                   destinations,
@@ -557,7 +571,7 @@ export function SearchChoices({
                 }) => (
                   // biome-ignore lint/a11y/useAriaPropsSupportedByRole: Both grid rowgroups and listbox groups are named.
                   <div
-                    key={label}
+                    key={id ?? label}
                     role={hasControls ? "rowgroup" : "group"}
                     aria-label={label}
                     // A status-only group has no rows yet; busy states why.
@@ -754,7 +768,11 @@ export function SearchChoices({
                                       <>
                                         <span className="block truncate text-body-sm">
                                           <MatchedLabel
-                                            label={label}
+                                            label={
+                                              label === undefined
+                                                ? t("search.buzz")
+                                                : label
+                                            }
                                             positions={matches}
                                           />
                                         </span>
@@ -798,7 +816,7 @@ export function SearchChoices({
                               {notice}
                               {!destinations.length && (
                                 <p className="search-palette-group-empty">
-                                  {empty ?? "No matching results."}
+                                  {empty ?? t("search.noResults")}
                                 </p>
                               )}
                             </div>

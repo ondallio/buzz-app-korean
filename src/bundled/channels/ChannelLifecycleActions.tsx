@@ -1,3 +1,5 @@
+import { t, useLanguage } from "../../shared/i18n";
+import { lifecycleMessageKeys } from "./ChannelLifecycleDialog";
 import type { ChannelSummary } from "../../features/relay/contracts";
 import type { ChannelLifecycleAction } from "../../features/relay/channel-lifecycle-protocol";
 import { Button } from "../../shared/design-system/ui/Button";
@@ -21,15 +23,16 @@ export function ChannelLifecycleActions({
   choose(action: ChannelLifecycleAction, trigger: HTMLElement): void;
   noun?: LifecycleNoun;
 }) {
+  useLanguage();
   const permissions = useLifecycleOffer(session, channel);
   if (!session.channelLifecycle.available)
-    return <p>Channel actions unavailable on this connection</p>;
+    return <p>{t("channelsMenus.lifecycle.unavailable")}</p>;
   return (
     <>
       {permissions?.canLeave && (
         <Button onClick={(event) => choose("leave", event.currentTarget)}>
           <SignOutIcon size={16} aria-hidden="true" />
-          Leave {noun}
+          {t(lifecycleMessageKeys("leave", noun).title)}
         </Button>
       )}
       {(permissions?.canArchive || permissions?.canUnarchive) && (
@@ -42,7 +45,12 @@ export function ChannelLifecycleActions({
           }
         >
           <ArchiveIcon size={16} aria-hidden="true" />
-          {permissions.canUnarchive ? "Unarchive" : "Archive"} {noun}
+          {t(
+            lifecycleMessageKeys(
+              permissions.canUnarchive ? "unarchive" : "archive",
+              noun,
+            ).title,
+          )}
         </Button>
       )}
       {permissions?.canDelete && (
@@ -51,7 +59,7 @@ export function ChannelLifecycleActions({
           onClick={(event) => choose("delete", event.currentTarget)}
         >
           <TrashIcon size={16} aria-hidden="true" />
-          Delete {noun}
+          {t(lifecycleMessageKeys("delete", noun).title)}
         </Button>
       )}
     </>

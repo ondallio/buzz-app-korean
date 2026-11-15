@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { createPortal } from "react-dom";
 import { useRef, useState, useSyncExternalStore } from "react";
 import type { Agents } from "../../features/agents/service";
@@ -66,6 +67,7 @@ function ReadyNewMenu({
   open,
   onOpenChange,
 }: Props & { session: RelaySession; available: boolean }) {
+  useLanguage();
   useSyncExternalStore(
     session.soloPreferences.subscribe,
     session.soloPreferences.snapshot,
@@ -96,8 +98,8 @@ function ReadyNewMenu({
           hint="familiar"
           ref={trigger}
           disabled={!available}
-          aria-label="New"
-          title="New"
+          aria-label={t("shell.new.label")}
+          title={t("shell.new.label")}
           variant="inset"
           shape="round"
           size="sm"
@@ -126,7 +128,9 @@ function ReadyNewMenu({
           }
         >
           <MenuGroup>
-            <MenuGroupLabel emphasis="quiet">Solo</MenuGroupLabel>
+            <MenuGroupLabel emphasis="quiet">
+              {t("shell.sidebar.solo")}
+            </MenuGroupLabel>
             {!composing && (
               <MenuItem
                 onClick={() => {
@@ -145,7 +149,7 @@ function ReadyNewMenu({
                   void navigator.open(destination);
                 }}
               >
-                New chat
+                {t("shell.new.chat")}
               </MenuItem>
             )}
             <MenuItem
@@ -154,12 +158,14 @@ function ReadyNewMenu({
                 if (current()) setCreatingProject(true);
               }}
             >
-              New workspace
+              {t("shell.new.workspace")}
             </MenuItem>
           </MenuGroup>
           <MenuSeparator />
           <MenuGroup>
-            <MenuGroupLabel emphasis="quiet">Team</MenuGroupLabel>
+            <MenuGroupLabel emphasis="quiet">
+              {t("shell.sidebar.team")}
+            </MenuGroupLabel>
             <MenuItem
               disabled={!scope}
               onClick={() => {
@@ -174,7 +180,7 @@ function ReadyNewMenu({
                   });
               }}
             >
-              New DM
+              {t("shell.new.directMessage")}
             </MenuItem>
             <MenuItem
               disabled={!session.channelCreation.available}
@@ -182,7 +188,7 @@ function ReadyNewMenu({
                 if (current()) setCreatingChannel(true);
               }}
             >
-              New channel
+              {t("shell.new.channel")}
             </MenuItem>
             <MenuItem
               disabled={!preferences.sectionCreationWritable}
@@ -190,7 +196,7 @@ function ReadyNewMenu({
                 if (current()) setCreatingSection(true);
               }}
             >
-              New section
+              {t("shell.new.section")}
             </MenuItem>
           </MenuGroup>
         </MenuPopup>

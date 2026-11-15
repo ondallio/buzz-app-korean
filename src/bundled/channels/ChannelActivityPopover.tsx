@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { workflowLabel } from "../../features/relay/workflow-attribution";
 import { useIsPresent } from "motion/react";
 import { LightningIcon } from "../../shared/design-system/icons";
@@ -72,6 +73,7 @@ function ActivityRow({
   onOpen(): void;
   read(): Promise<unknown>;
 }) {
+  useLanguage();
   const selection = useMemo(
     () =>
       selectProfiles(session.profiles, [item.workflowOwnerId ?? item.authorId]),
@@ -122,13 +124,18 @@ function ActivityRow({
     >
       <NavigationItem
         type="button"
-        aria-label={`Open unread ${noun} from ${name}: ${preview}`}
+        aria-label={t(
+          noun === "thread"
+            ? "v1shell.activity.openThread"
+            : "v1shell.activity.openMention",
+          { name, preview },
+        )}
         onClick={onOpen}
         icon={
           item.workflowOwnerId ? (
             <WorkflowAvatar
-              alt="Workflow"
-              fallback="Workflow"
+              alt={t("messageRow.workflow")}
+              fallback={t("messageRow.workflow")}
               fallbackContent={<LightningIcon size={20} />}
               shape="squircle"
             />
@@ -157,15 +164,24 @@ function ActivityRow({
         <IconButton
           size="toolbar"
           icon={<EnvelopeOpenIcon />}
-          aria-label={`Mark ${noun} from ${name} as read`}
-          title="Mark as read"
+          aria-label={t(
+            noun === "thread"
+              ? "v1shell.activity.markThread"
+              : "v1shell.activity.markMention",
+            { name },
+          )}
+          title={t("inbox.markRead")}
           loading={pending}
           onClick={() => void markRead()}
         />
       </span>
       {error && (
         <p className={styles.activityReadError} role="alert">
-          Could not mark this {noun} as read. Try again.
+          {t(
+            noun === "thread"
+              ? "v1shell.activity.markThreadFailed"
+              : "v1shell.activity.markMentionFailed",
+          )}
         </p>
       )}
     </div>
@@ -203,6 +219,7 @@ export function ChannelActivityPopover({
   onOpenThread(item: ThreadActivityItem): void;
   onOpenMention(item: MentionActivityItem): void;
 }) {
+  useLanguage();
   const present = useIsPresent();
   const subscribe = useCallback(
     (listener: () => void) =>
@@ -341,35 +358,45 @@ export function ChannelActivityPopover({
         sideOffset={6}
         size="wide"
         padding="list"
-        aria-label={`Activity in ${channelName}`}
+        aria-label={t("v1shell.activity.inChannel", { name: channelName })}
         finalFocus={() => !handoff.current}
       >
         {open && (
           <div className={activityStyles.activityList}>
             {stale && (
-              <p className={styles.activityStale}>May be out of date</p>
+              <p className={styles.activityStale}>
+                {t("v1shell.activity.stale")}
+              </p>
             )}
             {activeAgents.length > 0 && (
-              <section aria-label="Agents working now">
+              <section aria-label={t("messageActions.typing.agentsNow")}>
                 <h2 className={activityStyles.activitySectionLabel}>
-                  Working now
+                  {t("messageActions.typing.workingNow")}
                 </h2>
                 {activeAgents.map((agent, index) => {
                   const profile = agentProfiles?.get(agent);
-                  const name = profile?.name ?? keyLabels.get(agent) ?? "Agent";
+                  const name =
+                    profile?.name ??
+                    keyLabels.get(agent) ??
+                    t("agentsDetails.agent");
                   const { messageId, startedAt, label } = details[index] ?? {};
                   return (
                     <AgentActivityRow
                       key={agent}
                       name={name}
                       picture={avatarMedia(profile?.picture, session.media)}
-                      status={label ?? "Working"}
+                      status={label ?? t("v1shell.activity.working")}
                       meta={
                         startedAt === undefined
                           ? "—"
                           : workingDuration(startedAt, now)
                       }
-                      openLabel={`Open ${messageId ? "thread" : "conversation"} for ${name} in ${channelName}`}
+                      openLabel={t(
+                        messageId
+                          ? "v1shell.activity.openAgentThread"
+                          : "v1shell.activity.openAgentConversation",
+                        { name, channel: channelName },
+                      )}
                       onOpen={() => {
                         close();
                         onOpenWorkingAgent?.(channelId, agent, messageId);
@@ -388,9 +415,9 @@ export function ChannelActivityPopover({
               </section>
             )}
             {mentions.length > 0 && (
-              <section aria-label="Mentions">
+              <section aria-label={t("inbox.mentions")}>
                 <h2 className={activityStyles.activitySectionLabel}>
-                  Mentions
+                  {t("inbox.mentions")}
                 </h2>
                 {mentions.map((mention) => (
                   <ActivityRow
@@ -420,9 +447,9 @@ export function ChannelActivityPopover({
               </section>
             )}
             {items.length > 0 && (
-              <section aria-label="Unread threads">
+              <section aria-label={t("v1shell.activity.unreadThreads")}>
                 <h2 className={activityStyles.activitySectionLabel}>
-                  Unread threads
+                  {t("v1shell.activity.unreadThreads")}
                 </h2>
                 {items.map((item) => (
                   <ActivityRow
