@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useEffect,
   useId,
@@ -44,13 +45,19 @@ export function PrivateKey({
     feedback: ReactNode;
   }) => ReactNode;
 }) {
+  useLanguage();
   const warningId = useId();
   const fieldRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const focusReveal = useRef(false);
   const [secret, setSecret] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<
+    | "v1id.privateKeyCopiedClipboard"
+    | "identityMore.privateCopyFailed"
+    | "identityMore.privateRevealFailed"
+    | ""
+  >("");
   const [failed, setFailed] = useState(false);
   const generation = useRef(0);
   useLayoutEffect(() => {
@@ -107,9 +114,7 @@ export function PrivateKey({
       if (copy) {
         await writeClipboardSecret(value);
         if (current === generation.current)
-          setMessage(
-            "Private key copied. Paste it somewhere safe now: Buzz tries to clear it from your clipboard in a minute.",
-          );
+          setMessage("v1id.privateKeyCopiedClipboard");
       } else {
         focusReveal.current =
           presentation === "magnetic" &&
@@ -122,8 +127,8 @@ export function PrivateKey({
         setFailed(true);
         setMessage(
           copy
-            ? "Couldn’t copy your private key. Reveal it to copy manually, or retry."
-            : "Couldn’t reveal your private key. Retry when secure storage is available.",
+            ? "identityMore.privateCopyFailed"
+            : "identityMore.privateRevealFailed",
         );
       }
     } finally {
@@ -135,7 +140,7 @@ export function PrivateKey({
     <Input
       ref={fieldRef}
       id="identity-private-key"
-      aria-label="Private key (nsec)"
+      aria-label={t("identityMore.privateKeyLabel")}
       aria-describedby={warningId}
       readOnly={presentation !== "magnetic" || !secret}
       aria-readonly="true"
@@ -164,7 +169,7 @@ export function PrivateKey({
                 ref={triggerRef}
                 appearance="masked"
                 prefix="nsec"
-                aria-label="Private key actions"
+                aria-label={t("v1id.privateKeyActions")}
                 aria-describedby={warningId}
               />
             }
@@ -179,7 +184,7 @@ export function PrivateKey({
                   <IconButton
                     ref={triggerRef}
                     type="button"
-                    aria-label="Private key actions"
+                    aria-label={t("v1id.privateKeyActions")}
                     icon={<CaretDownIcon aria-hidden="true" />}
                   />
                 }
@@ -195,22 +200,26 @@ export function PrivateKey({
           finalFocus={secret ? fieldRef : triggerRef}
         >
           <MenuGroup>
-            <MenuGroupLabel>Private key</MenuGroupLabel>
+            <MenuGroupLabel>{t("v1id.privateKey")}</MenuGroupLabel>
             <MenuItem
-              aria-label="Copy private key"
+              aria-label={t("identityMore.copyPrivateKey")}
               disabled={busy}
               onClick={() => void access(true)}
             >
-              Copy
+              {t("settings.copy")}
             </MenuItem>
             <MenuItem
-              aria-label={secret ? "Hide private key" : "Reveal private key"}
+              aria-label={
+                secret
+                  ? t("identityMore.hidePrivateKey")
+                  : t("identityMore.revealPrivateKey")
+              }
               disabled={busy && !secret}
               onClick={() => (secret ? hide() : void access(false))}
             >
-              {secret ? "Hide" : "Reveal"}
+              {secret ? t("v1id.hide") : t("v1id.reveal")}
             </MenuItem>
-            {busy && <MenuItem onClick={hide}>Cancel</MenuItem>}
+            {busy && <MenuItem onClick={hide}>{t("settings.cancel")}</MenuItem>}
           </MenuGroup>
         </MenuPopup>
       </MenuRoot>
@@ -219,7 +228,7 @@ export function PrivateKey({
     );
   const warning = (
     <p id={warningId} className="text-body-sm text-muted">
-      Anyone with this key can act as you. Never share it.
+      {t("identityMore.privateWarning")}
     </p>
   );
   const actions =
@@ -227,23 +236,29 @@ export function PrivateKey({
       <div className="mt-3 flex flex-wrap gap-3">
         <Button
           type="button"
-          aria-label={secret ? "Hide private key" : "Reveal private key"}
+          aria-label={
+            secret
+              ? t("identityMore.hidePrivateKey")
+              : t("identityMore.revealPrivateKey")
+          }
           disabled={busy && !secret}
           onClick={() => (secret ? hide() : void access(false))}
         >
-          {secret ? "Hide private key" : "Reveal private key"}
+          {secret
+            ? t("identityMore.hidePrivateKey")
+            : t("identityMore.revealPrivateKey")}
         </Button>
         <Button
           type="button"
-          aria-label="Copy private key"
+          aria-label={t("identityMore.copyPrivateKey")}
           disabled={busy}
           onClick={() => void access(true)}
         >
-          Copy private key
+          {t("identityMore.copyPrivateKey")}
         </Button>
         {busy && (
           <Button type="button" onClick={hide}>
-            Cancel
+            {t("settings.cancel")}
           </Button>
         )}
       </div>
@@ -251,14 +266,14 @@ export function PrivateKey({
   const feedback = message ? (
     presentation === "magnetic" && !failed ? (
       <ToastNotice
-        title="Private key copied"
-        description="Paste it somewhere safe now: Buzz tries to clear it from your clipboard in a minute."
+        title={t("v1id.privateKeyCopied")}
+        description={t("v1id.privateKeyCopiedHint")}
         tone="success"
         timeout={5000}
         onDismiss={() => setMessage("")}
       />
     ) : (
-      <p role={failed ? "alert" : "status"}>{message}</p>
+      <p role={failed ? "alert" : "status"}>{t(message)}</p>
     )
   ) : null;
   if (children) return children({ input, warning, actions, feedback });
@@ -268,7 +283,7 @@ export function PrivateKey({
         className="mb-2 block text-label-sm"
         htmlFor="identity-private-key"
       >
-        Private key (nsec)
+        {t("identityMore.privateKeyLabel")}
       </label>
       {warning}
       {input}

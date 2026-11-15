@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useRef, useState, type PointerEvent } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 import styles from "./AvatarCustomColor.module.css";
@@ -51,6 +52,7 @@ export function AvatarCustomColor({
   onChange(color: string): void;
   onClose(): void;
 }) {
+  useLanguage();
   const [hsv, setHsv] = useState(() => fromHex(color));
   const drag = useRef<number | null>(null);
   const update = (next: Partial<typeof hsv>) => {
@@ -75,11 +77,14 @@ export function AvatarCustomColor({
         className={styles.spectrum}
         role="slider"
         tabIndex={0}
-        aria-label="Color spectrum"
+        aria-label={t("profileEditing.colorSpectrum")}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(hsv.saturation)}
-        aria-valuetext={`${Math.round(hsv.saturation)}% saturation, ${Math.round(hsv.value)}% brightness. Use left and right for saturation, up and down for brightness.`}
+        aria-valuetext={t("profileEditing.spectrumInstructions", {
+          saturation: Math.round(hsv.saturation),
+          brightness: Math.round(hsv.value),
+        })}
         style={{ backgroundColor: `hsl(${hsv.hue}, 100%, 50%)` }}
         onPointerDown={(event) => {
           if (event.button !== 0) return;
@@ -138,11 +143,11 @@ export function AvatarCustomColor({
         max={360}
         step={1}
         value={hsv.hue}
-        aria-label="Color hue"
+        aria-label={t("profileEditing.colorHue")}
         onChange={(event) => update({ hue: Number(event.target.value) })}
       />
       <Button variant="subtle" onClick={onClose}>
-        Use color
+        {t("profileEditing.useColor")}
       </Button>
     </div>
   );

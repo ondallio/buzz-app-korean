@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../shared/i18n";
 import { SettingsGroup } from "../shared/design-system/ui/SettingsGroup";
 import { InlineHeader } from "../shared/design-system/ui/Header";
 import { ToastNotice } from "../shared/design-system/ui/Toast";
@@ -13,31 +14,29 @@ export function UnreadIndicatorSettings({
   indicator: UnreadIndicator;
   active?: boolean;
 }) {
+  useLanguage();
   const state = useSyncExternalStore(indicator.subscribe, indicator.snapshot);
   const [checking, checkPermission] = usePermissionCheck(indicator.refresh);
   if (!indicator.available) return null;
   return (
     <div className="space-y-3">
-      <InlineHeader title="Dock unread badge" />
+      <InlineHeader title={t("notifications.dock.title")} />
       <SettingsGroup layout="form">
         <p className="text-body-sm text-subtle">
           {state.permission === "unavailable"
-            ? "Dock badges require a bundled macOS app and aren’t available from the development server."
-            : "Shows a dot for unread activity in the selected community. It doesn’t show a message count."}
+            ? t("notifications.dock.unavailable")
+            : t("notifications.dock.description")}
         </p>
         {state.permission !== "unavailable" && (
           <p role="status" className="text-body-sm text-muted">
             {state.requesting
-              ? "Waiting for system permission…"
+              ? t("notifications.permission.waiting")
               : {
-                  default:
-                    "Allow notifications and badges to show the unread dot.",
-                  setup: "Set up Dock badges to show the unread dot.",
-                  enabled: "Buzz can show Dock badges.",
-                  disabled:
-                    "Dock badges are off. Turn them on in macOS System Settings.",
-                  denied:
-                    "Notifications are off. Turn them on in macOS System Settings.",
+                  default: t("notifications.dock.default"),
+                  setup: t("notifications.dock.setupStatus"),
+                  enabled: t("notifications.dock.enabled"),
+                  disabled: t("notifications.dock.disabled"),
+                  denied: t("notifications.dock.denied"),
                 }[state.permission]}
           </p>
         )}
@@ -51,8 +50,8 @@ export function UnreadIndicatorSettings({
                 onClick={() => void indicator.request()}
               >
                 {state.permission === "setup"
-                  ? "Set up Dock badges"
-                  : "Allow notifications and badges"}
+                  ? t("notifications.dock.setup")
+                  : t("notifications.dock.allow")}
               </Button>
             )}
             <Button
@@ -61,13 +60,16 @@ export function UnreadIndicatorSettings({
               loading={checking}
               onClick={checkPermission}
             >
-              Check Dock permission
+              {t("notifications.dock.check")}
             </Button>
           </div>
         )}
       </SettingsGroup>
       {active && state.error && (
-        <ToastNotice title="Dock badge unavailable" description={state.error} />
+        <ToastNotice
+          title={t("notifications.dock.error")}
+          description={state.error}
+        />
       )}
     </div>
   );

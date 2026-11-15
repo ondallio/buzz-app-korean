@@ -1,3 +1,4 @@
+import { useLanguage } from "../shared/i18n";
 import { SidebarNavigation } from "../shared/design-system/ui/SidebarNavigation";
 import { CommunityAddress } from "./CommunityAddress";
 import { useMemo, useSyncExternalStore } from "react";
@@ -23,6 +24,7 @@ export function SettingsSidebar({
   recommendations?: number;
   onSection: (section: string) => void;
 }) {
+  const language = useLanguage();
   const contributed = useSyncExternalStore(cards.subscribe, cards.snapshot);
   const client = useSyncExternalStore(
     communities.subscribe,
@@ -32,8 +34,8 @@ export function SettingsSidebar({
     (membership) => membership.id === client.selected,
   );
   const { groups, defaultSection } = useMemo(
-    () => settingsSections(contributed, selectedCommunity),
-    [contributed, selectedCommunity],
+    () => settingsSections(contributed, selectedCommunity, language),
+    [contributed, selectedCommunity, language],
   );
   const current = selected ?? defaultSection;
   const section = ({

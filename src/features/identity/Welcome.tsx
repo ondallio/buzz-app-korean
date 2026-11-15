@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { invoke } from "@tauri-apps/api/core";
 import { OnboardingBack } from "./OnboardingBack";
 import {
@@ -98,6 +99,8 @@ import {
   unlinkKey,
 } from "./setup";
 import { SetupProgress } from "./SetupProgress";
+import { BACKUP_FAILURES, type BackupFailureKind } from "./backup-failure";
+import { backupFailureText } from "./backup-failure-text";
 import { PrivateKey } from "./PrivateKey";
 import { signOutFailure } from "./SignOut";
 import {
@@ -190,6 +193,7 @@ export function Welcome({
   /** The build's sign-in servers, for whether its Builderlab hosts a URL. */
   servers?: () => Promise<readonly SessionSnapshot[]>;
 }) {
+  useLanguage();
   const state = useSyncExternalStore(identity.subscribe, identity.snapshot);
   // Whether the next sign-in opens the sign-up screen: set by the landing's
   // Create account and taken by the sign-in it starts. A restart or a later
@@ -242,7 +246,7 @@ export function Welcome({
   // The hex key the account check found bound to the account: the returning-
   // user lane. Cleared by Start over and on the landing.
   const [linked, setLinked] = useState<string>();
-  const [switchError, setSwitchError] = useState<string>();
+  const [switchError, setSwitchError] = useState<true>();
   // The communities that key owns; `undefined` until found, or when the list failed.
   const [owned, setOwned] = useState<readonly OwnedCommunity[]>();
   // The destinations saved to the account, read with the account check and
@@ -286,8 +290,13 @@ export function Welcome({
   // failed join clears it.
   const [joinAtOnce, setJoinAtOnce] = useState(false);
   const [joinError, setJoinError] = useState<{
-    title: string;
+    title:
+      | "identity.failure.finishJoining"
+      | "identity.failure.join"
+      | "identity.failure.inviteRequired";
     error: string;
+    notice?: "unreachable" | "not-ready" | "invite" | undefined;
+    host?: string;
     /** Set when the relay refused the key: the page takes a code and offers Try again. */
     denied?: Denied;
     /** Why the relay refused the code the join claimed. */
@@ -442,7 +451,7 @@ export function Welcome({
    * progress page until the restart, or fails if none comes.
    */
   const replaceKey = (linked: string | undefined): SetupStep => ({
-    label: "Signing in…",
+    label: "identity.progress.signingIn",
     run: async () => {
       const withdraw = requestSignInAfterRestart(linked);
       try {
@@ -536,7 +545,7 @@ export function Welcome({
         setBackupUnknown(!!failed);
       }),
       {
-        label: "Preparing your identity…",
+        label: "identity.progress.preparing",
         run: async () => {
           // The account's key, with no backup and not on this device, may be
           // old Buzz's: a first run linked it, then stopped before saving it.
@@ -555,7 +564,7 @@ export function Welcome({
             communities.snapshot().memberships.length > 0
               ? [
                   {
-                    label: "Opening Buzz…",
+                    label: "identity.progress.opening",
                     run: async () => {
                       enterApp();
                       return { status: "idle" };
@@ -620,7 +629,7 @@ export function Welcome({
   };
   /** Rests where setup ends, as when the account check found its key here. */
   const settled: SetupStep = {
-    label: "Preparing your identity…",
+    label: "identity.progress.preparing",
     run: async () => ({ status: "done" }),
   };
   /**
@@ -869,7 +878,7 @@ export function Welcome({
       await finishJoin(step);
     } catch (error) {
       setJoinError({
-        title: "Couldn’t finish joining",
+        title: "identity.failure.finishJoining",
         error: error instanceof Error ? error.message : String(error),
         admitted: step,
       });
@@ -891,17 +900,18 @@ export function Welcome({
     consent: JoinConsent,
     code: string,
   ) => {
-    const fail = (error: string, title = "Couldn’t join community") =>
-      setJoinError({ title, error });
-    const unreachable = () =>
-      fail("Could not reach the relay. Check your connection and try again.");
+    const fail = (error: string, notice?: "unreachable" | "not-ready") =>
+      setJoinError({ title: "identity.failure.join", error, notice });
+    const unreachable = () => fail("", "unreachable");
     const client = communities.snapshot();
     if (client.status !== "ready")
-      return fail(client.error ?? "Your saved communities aren’t ready yet.");
+      return client.error ? fail(client.error) : fail("", "not-ready");
     const needsInvite = (codeError?: string) =>
       setJoinError({
-        title: "This community needs an invite",
-        error: `${found.host} admits members by invite, and this key has none yet. Enter an invite code, or send your public key to a community administrator so they can add you, then try again.`,
+        title: "identity.failure.inviteRequired",
+        error: "",
+        notice: "invite",
+        host: found.host,
         denied: { found, consent },
         codeError,
       });
@@ -1030,18 +1040,20 @@ export function Welcome({
         // Cancel leaves this device as it was, signed out of the new account.
         return (
           <>
-            <SetupProgress label="Signing in…" />
+            <SetupProgress label={t("identity.progress.signingIn")} />
             <AlertDialog
-              title="A different account is saved on this computer"
+              title={t("identity.replace.title")}
               description={
                 replacingBackedUp
-                  ? "Replacing it removes that account from this computer to continue with the one you just signed in to. Its key was backed up in Builderlab: sign in to that account again to restore it."
-                  : "Replacing it removes that account from this computer to continue with the one you just signed in to. Its key may not be backed up: copy its private key first, or you could lose that account."
+                  ? t("identity.replace.backedUp")
+                  : t("v1id.replaceNotBackedUp")
               }
               onClose={switchAccount}
               actions={
                 <>
-                  <Button onClick={switchAccount}>Cancel</Button>
+                  <Button onClick={switchAccount}>
+                    {t("identity.cancel")}
+                  </Button>
                   <Button
                     variant="destructive"
                     disabled={
@@ -1050,7 +1062,7 @@ export function Welcome({
                     }
                     onClick={() => void setup.start([replaceKey(linked)])}
                   >
-                    Replace
+                    {t("identity.replace")}
                   </Button>
                 </>
               }
@@ -1063,7 +1075,7 @@ export function Welcome({
                   />
                   <div className="mt-6">
                     <Checkbox
-                      label="I have my key"
+                      label={t("accessDialogs.haveKey")}
                       checked={replacingHaveKey}
                       disabled={!replacingKeyKept}
                       onCheckedChange={setReplacingHaveKey}
@@ -1096,12 +1108,12 @@ export function Welcome({
                 if (viewer !== linked) return switchAccount();
                 void identity
                   .signOut({ wipe: false, removeAgents: false })
-                  .catch(() =>
-                    setSwitchError("Couldn’t switch accounts. Try again."),
-                  );
+                  .catch(() => setSwitchError(true));
               }}
             />
-            {switchError && <p role="alert">{switchError}</p>}
+            {switchError && (
+              <p role="alert">{t("identity.failure.switchAccount")}</p>
+            )}
           </>
         ) : null;
       case "key-restore":
@@ -1180,25 +1192,22 @@ export function Welcome({
               tabIndex={-1}
               className="text-heading text-standard"
             >
-              Your Buzz identity
+              {t("identity.welcome.identity")}
             </h1>
             {state.status === "loading" ? (
-              <p role="status">Opening your saved identity…</p>
+              <p role="status">{t("identity.welcome.openingSaved")}</p>
             ) : state.error === MALFORMED_IDENTITY ? (
               // Reading it again gets the same bytes: only removing it, which
               // restarts into first run's restore or import, gets past it.
               <>
-                <p role="alert">
-                  Buzz can’t read the key saved on this computer, so it can’t
-                  open with it or copy it. Trying again won’t change that.
-                </p>
+                <p role="alert">{t("v1id.unreadableKey")}</p>
                 <Button onClick={() => setRemovingKey({ pending: false })}>
-                  Remove from device
+                  {t("v1id.removeFromDevice")}
                 </Button>
                 {removingKey && (
                   <AlertDialog
-                    title="Remove the unreadable key?"
-                    description="This deletes it from this computer’s secure storage, signs you out of your organizations and restarts Buzz. Then sign in to restore your account’s key from its backup, or enter your private key. Without a backup or a copy, that identity can’t be recovered."
+                    title={t("v1id.removeUnreadableKeyTitle")}
+                    description={t("v1id.removeUnreadableKeyDescription")}
                     pending={removingKey.pending}
                     onClose={() => setRemovingKey(undefined)}
                     actions={
@@ -1207,7 +1216,7 @@ export function Welcome({
                           disabled={removingKey.pending}
                           onClick={() => setRemovingKey(undefined)}
                         >
-                          Cancel
+                          {t("identity.cancel")}
                         </Button>
                         <Button
                           variant="destructive"
@@ -1224,7 +1233,7 @@ export function Welcome({
                               );
                           }}
                         >
-                          Remove from device
+                          {t("v1id.removeFromDevice")}
                         </Button>
                       </>
                     }
@@ -1239,7 +1248,7 @@ export function Welcome({
               <>
                 <p role="alert">{state.error}</p>
                 <Button onClick={() => void identity.retry()}>
-                  Retry secure storage access
+                  {t("identity.welcome.retryStorage")}
                 </Button>
               </>
             )}
@@ -1273,10 +1282,10 @@ export function Welcome({
               ref={focusCommunityHeading}
               className="text-heading text-standard"
             >
-              Join a community
+              {t("identity.welcome.join")}
             </h1>
             <p className="text-body-sm text-subtle">
-              Enter a community address or an invite link to continue.
+              {t("identity.welcome.joinDescription")}
             </p>
           </>
         }
@@ -1314,9 +1323,7 @@ export function Welcome({
             <h1 id="welcome-title" tabIndex={-1} className={styles.wordmark}>
               <OnboardingWordmark />
             </h1>
-            <p className={styles.tagline}>
-              Your people, your agents, one place.
-            </p>
+            <p className={styles.tagline}>{t("identity.welcome.tagline")}</p>
           </>
         }
       >
@@ -1327,7 +1334,9 @@ export function Welcome({
             disabled={restoring}
             onClick={() => start(!returning)}
           >
-            {returning ? "Sign in" : "Create account"}
+            {returning
+              ? t("identity.welcome.signIn")
+              : t("identity.welcome.createAccount")}
           </Button>
         )}
         {keyLanding ? (
@@ -1342,7 +1351,7 @@ export function Welcome({
               enterApp();
             }}
           >
-            Continue without signing in
+            {t("identity.welcome.continueWithoutSignIn")}
           </Button>
         ) : (
           <>
@@ -1353,7 +1362,9 @@ export function Welcome({
                 disabled={restoring}
                 onClick={() => start(returning)}
               >
-                {returning ? "Create account" : "Sign in"}
+                {returning
+                  ? t("identity.welcome.createAccount")
+                  : t("identity.welcome.signIn")}
               </Button>
             )}
             <Button
@@ -1374,7 +1385,7 @@ export function Welcome({
                 })
               }
             >
-              Other options
+              {t("identity.welcome.otherOptions")}
             </Button>
           </>
         )}
@@ -1419,8 +1430,18 @@ export function Welcome({
           // through Join Community: another automatic join would leave no way
           // out of a join that keeps failing.
           <Failure
-            title={joinError.title}
-            error={joinError.error}
+            title={t(joinError.title)}
+            error={
+              joinError.notice === "invite"
+                ? t("identity.failure.inviteDescription", {
+                    host: joinError.host ?? "",
+                  })
+                : joinError.notice === "unreachable"
+                  ? t("identity.failure.unreachable")
+                  : joinError.notice === "not-ready"
+                    ? t("identity.failure.notReady")
+                    : joinError.error
+            }
             onBack={
               admitted
                 ? undefined
@@ -1475,18 +1496,18 @@ export function Welcome({
           />
         ) : null
       ) : progress.status === "running" ? (
-        <SetupProgress label={progress.label} />
+        <SetupProgress label={setupProgressText(progress.label)} />
       ) : progress.status === "paused" ? (
         paused(progress.at)
       ) : progress.status === "failed" ? (
         <Failure
-          title="Couldn’t finish setup"
+          title={t("identity.failure.setup")}
           error={progress.error}
           note={
             blocked
-              ? UNLINKED_NOTE
+              ? t("identity.failure.unlinked")
               : failedAfterKey
-                ? "Your key is saved on this device."
+                ? t("identity.failure.keySaved")
                 : undefined
           }
           // After a Builderlab sign-in the way out signs out of it, so the
@@ -1513,7 +1534,11 @@ export function Welcome({
         <FinishInBrowser onContinue={resumeSignIn} onBack={backToLanding} />
       ) : auth.error ? (
         <Failure
-          title={auth.retrySignOut ? "Couldn’t sign out" : "Couldn’t sign in"}
+          title={
+            auth.retrySignOut
+              ? t("identity.failure.signOut")
+              : t("identity.failure.signIn")
+          }
           error={auth.error}
           onBack={backToLanding}
           onRetry={
@@ -1554,6 +1579,7 @@ function FinishInBrowser({
   onContinue: () => void;
   onBack: () => void;
 }) {
+  useLanguage();
   return (
     <>
       <h1
@@ -1561,16 +1587,16 @@ function FinishInBrowser({
         tabIndex={-1}
         className="text-heading text-standard"
       >
-        Finish in your browser
+        {t("identity.browser.title")}
       </h1>
       <p className="text-body text-subtle">
-        Finish signing in there, then come back and choose Continue.
+        {t("identity.browser.description")}
       </p>
       {/* Footer order: secondary first, primary last. */}
       <div data-onboarding-actions="">
-        <OnboardingBack onClick={onBack} aria-label="Back" />
+        <OnboardingBack onClick={onBack} aria-label={t("identity.back")} />
         <Button variant="prominent" size="lg" onClick={onContinue}>
-          Continue
+          {t("identity.continue")}
         </Button>
       </div>
     </>
@@ -1608,15 +1634,12 @@ function npubOf(state: ReturnType<Identity["snapshot"]>) {
  * which needs a linked key. The page has no way past it but Try again, where
  * another attempt can help, or leaving through Use a different account.
  */
-const UNLINKED_NOTE =
-  "Your key is saved on this device, but it isn’t linked to your account or backed up yet.";
-
 function Failure({
   title,
   error,
   note,
   onBack,
-  backLabel = "Back",
+  backLabel,
   publicKey,
   invite,
   onRetry,
@@ -1645,6 +1668,7 @@ function Failure({
   /** Which action is in flight: Try again's read, or the code's claim. */
   busy?: "read" | "code" | undefined;
 }) {
+  useLanguage();
   return (
     <>
       <h1
@@ -1656,7 +1680,7 @@ function Failure({
       </h1>
       <p role="alert" className="text-body text-danger">
         {note && <span>{note} </span>}
-        {error}
+        {setupErrorText(error)}
       </p>
       {invite && (
         <InviteCodeField
@@ -1673,7 +1697,9 @@ function Failure({
           <OnboardingBack
             onClick={onBack}
             disabled={!!busy}
-            aria-label={backLabel}
+            aria-label={
+              backLabel === undefined ? t("identity.back") : backLabel
+            }
           />
         )}
         {onSwitchAccount && (
@@ -1684,12 +1710,12 @@ function Failure({
             onClick={onSwitchAccount}
             disabled={!!busy}
           >
-            Use a different account
+            {t("identity.failure.otherAccount")}
           </Button>
         )}
         {onContinue && (
           <Button variant="prominent" size="lg" onClick={onContinue}>
-            Continue without backup
+            {t("identity.failure.withoutBackup")}
           </Button>
         )}
         {onRetry && (
@@ -1702,7 +1728,7 @@ function Failure({
             loading={busy === "read"}
             disabled={busy === "code"}
           >
-            Try again
+            {t("identity.failure.retry")}
           </Button>
         )}
       </div>
@@ -1712,4 +1738,64 @@ function Failure({
 
 function focusCommunityHeading(heading: HTMLHeadingElement | null) {
   heading?.focus();
+}
+
+/** Setup steps carry canonical labels; only known ones are shown translated. */
+function setupProgressText(label: string) {
+  switch (label) {
+    case "identity.progress.preparing":
+    case "Preparing your identity…":
+      return t("identity.progress.preparing");
+    case "identity.progress.opening":
+      return t("identity.progress.opening");
+    case "identity.progress.signingIn":
+      return t("identity.progress.signingIn");
+    case "Creating your key…":
+      return t("v1id.progress.creatingKey");
+    case "Checking your account…":
+      return t("v1id.progress.checkingAccount");
+    case "Linking your key…":
+      return t("v1id.progress.linkingKey");
+    case "Unlinking your old key…":
+      return t("v1id.progress.unlinkingKey");
+    case "Backing up your key…":
+      return t("v1id.progress.backingUp");
+    case "Finding communities…":
+      return t("v1id.progress.findingCommunities");
+    case "Restoring your communities…":
+      return t("v1id.progress.restoringCommunities");
+    case "Checking for a backed-up key…":
+      return t("v1id.progress.checkingBackup");
+    default:
+      return label;
+  }
+}
+
+/** Known setup failures are canonical English; only those are shown translated. */
+function setupErrorText(error: string) {
+  for (const kind of Object.keys(BACKUP_FAILURES) as BackupFailureKind[])
+    if (BACKUP_FAILURES[kind].message === error)
+      return backupFailureText(kind).message;
+  switch (error) {
+    case WRONG_ACCOUNT:
+      return t("v1id.setup.wrongAccount");
+    case "This Buzz build has no Builderlab sign-in.":
+      return t("v1id.setup.noBuilderlabSignIn");
+    case "Your key could not be saved on this device.":
+      return t("v1id.setup.keyNotSaved");
+    case "Sign in again to finish backing up your key.":
+      return t("v1id.setup.signInAgainToBackUp");
+    case "Buzz didn’t restart. Quit and reopen Buzz to finish.":
+      return t("v1id.setup.noRestart");
+    case "Setup failed. Try again.":
+      return t("v1id.setup.failed");
+    case "This computer already has a different Buzz key. Sign out of Buzz on this computer first, or use a different account.":
+      return t("v1id.setup.differentKeyHere");
+    default: {
+      const account = /^Sign in as (.+) to back up this key\.$/.exec(
+        error,
+      )?.[1];
+      return account ? t("v1id.setup.signInAsToBackUp", { account }) : error;
+    }
+  }
 }

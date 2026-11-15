@@ -1,3 +1,5 @@
+import { rich } from "../shared/i18n/rich";
+import { t, useLanguage, formattingLocale } from "../shared/i18n";
 import type {
   AdminAccessReader,
   AdminAccessState,
@@ -193,6 +195,31 @@ function groupPlugins(plugins: readonly PluginInfo[]) {
   ];
 }
 
+/** Projects host category text without changing category IDs or plugin metadata. */
+function pluginGroupLabel(group: ReturnType<typeof groupPlugins>[number]) {
+  const labels = [
+    ["communication", "Communication", "settingsHost.categoryCommunication"],
+    ["agents", "Agents", "settingsHost.categoryAgents"],
+    ["agent-tools", "Agent tools", "settingsHost.categoryAgentTools"],
+    [
+      "developer-tools-and-integrations",
+      "Developer tools & integrations",
+      "settingsHost.categoryDeveloper",
+    ],
+    [
+      "people-and-communities",
+      "People & communities",
+      "settingsHost.categoryPeople",
+    ],
+    ["productivity", "Productivity", "settingsHost.categoryProductivity"],
+    ["other", "Other", "settingsHost.categoryOther"],
+  ] as const;
+  const label = labels.find(
+    ([id, source]) => id === group.id && source === group.label,
+  );
+  return label ? t(label[2]) : group.label;
+}
+
 function PluginIcon({
   plugin,
   size = 24,
@@ -232,9 +259,10 @@ function PluginProvenance({
   managedBy?: string | undefined;
   className?: string | undefined;
 }) {
+  useLanguage();
   const label = [
     source === "bundled" ? "Buzz" : publisher,
-    managedBy && `Managed by ${managedBy}`,
+    managedBy && t("settingsHost.managedBy", { source: managedBy }),
   ]
     .filter(Boolean)
     .join(" · ");
@@ -261,11 +289,30 @@ function restrictedPlugin(plugin: PluginInfo) {
   );
 }
 
-function pluginActionLabel(plugin: PluginInfo, access: AdminAccessState) {
-  if (plugin.enabled) return "Disable";
-  if (restrictedPlugin(plugin) && access !== "allowed")
-    return access === "checking" ? "Enable" : "Unavailable";
-  return "Enable";
+function pluginActionLabel(
+  plugin: PluginInfo,
+  access: AdminAccessState,
+  name?: string,
+) {
+  const action = plugin.enabled
+    ? "disable"
+    : restrictedPlugin(plugin) && access !== "allowed" && access !== "checking"
+      ? "unavailable"
+      : "enable";
+  if (name !== undefined) {
+    const key = {
+      disable: "settingsHost.disableNamed",
+      enable: "settingsHost.enableNamed",
+      unavailable: "settingsHost.unavailableNamed",
+    } as const;
+    return t(key[action], { name });
+  }
+  const key = {
+    disable: "settingsHost.disable",
+    enable: "settingsHost.enable",
+    unavailable: "settingsHost.unavailable",
+  } as const;
+  return t(key[action]);
 }
 
 function accessMessage(plugin: PluginInfo, state: AdminAccessState) {
@@ -273,17 +320,17 @@ function accessMessage(plugin: PluginInfo, state: AdminAccessState) {
     case "allowed":
       return null;
     case "checking":
-      return "Checking access…";
+      return t("settingsHost.checkingAccess");
     case "no-community":
-      return "Select a community to check access.";
+      return t("settingsHost.accessSelectCommunity");
     case "error":
-      return "Could not check access. Open details to try again.";
+      return t("settingsHost.accessFailed");
     case "unavailable":
-      return "Access is unavailable in this build or on this relay.";
+      return t("settingsHost.accessUnavailable");
     case "denied":
       return plugin.manifest.id === "buzz.moderation"
-        ? "Select a community where you’re an owner or admin."
-        : "Select a community on a relay where you have staff access.";
+        ? t("settingsHost.accessOwner")
+        : t("settingsHost.accessStaff");
   }
 }
 
@@ -356,6 +403,7 @@ function PluginDetails({
   sections: readonly SettingsSection[];
   openSection: ((section: string) => void) | undefined;
 }) {
+  useLanguage();
   const accessReason = restrictedPlugin(plugin)
     ? accessMessage(plugin, access)
     : null;
@@ -377,7 +425,9 @@ function PluginDetails({
     <aside
       id="plugin-details"
       className={styles.pluginAside}
-      aria-label={`${plugin.manifest.name} details`}
+      aria-label={t("settingsHost.detailsNamed", {
+        name: plugin.manifest.name,
+      })}
       onKeyDown={(event) => {
         if (event.defaultPrevented || event.key !== "Escape" || event.shiftKey)
           return;
@@ -393,7 +443,7 @@ function PluginDetails({
             {plugin.source === "bundled" ? (
               <span className={styles.pluginInstallBadge}>
                 <CheckCircleIcon size={14} aria-hidden="true" />
-                Made by Buzz
+                {t("settingsHost.madeByBuzz")}
               </span>
             ) : (
               <PluginProvenance
@@ -404,7 +454,7 @@ function PluginDetails({
             {isEssentialPlugin(plugin) && (
               <span className={styles.pluginInstallBadge}>
                 <SparklesIcon size={14} aria-hidden="true" />
-                Essentials
+                {t("settingsHost.essentials")}
               </span>
             )}
           </div>
@@ -416,7 +466,7 @@ function PluginDetails({
         </div>
         <IconButton
           ref={close}
-          aria-label="Close plugin details"
+          aria-label={t("settingsHost.closeDetails")}
           size="sm"
           icon={<SidebarRightIcon size={16} aria-hidden="true" />}
           onClick={onClose}
@@ -426,11 +476,11 @@ function PluginDetails({
         <div className={styles.pluginBadges}>
           <span className={styles.pluginInstallBadge}>
             <CheckCircleIcon size={14} aria-hidden="true" />
-            Installed
+            {t("settingsHost.installed")}
           </span>
           {managed && (
             <span className={styles.pluginInstallBadge}>
-              Managed by {managed.source}
+              {t("settingsHost.managedBy", { source: managed.source })}
             </span>
           )}
           <span
@@ -442,7 +492,9 @@ function PluginDetails({
       <div className={styles.pluginStatus}>
         {plugin.enabled && accessReason && (
           <span className="text-caption text-muted">
-            {access === "checking" ? "Checking…" : "Unavailable"}
+            {access === "checking"
+              ? t("settingsHost.checking")
+              : t("settingsHost.unavailable")}
           </span>
         )}
         <div className={styles.pluginPrimaryActions}>
@@ -450,13 +502,13 @@ function PluginDetails({
             {/* Channels is required and has no enable/disable control. */}
             {plugin.manifest.id === "buzz.channels" ? (
               <Button variant="outline" size="sm" disabled>
-                Required
+                {t("settingsHost.required")}
               </Button>
             ) : (
               <Tooltip
                 content={
                   access === "error"
-                    ? "Could not check access. Try again."
+                    ? t("settingsHost.accessRetry")
                     : accessReason
                 }
                 {...(accessReason ? {} : { open: false })}
@@ -490,6 +542,7 @@ function PluginDetails({
             )}
           </div>
           <PluginMenu
+            label={t("settingsHost.morePluginActions")}
             plugin={plugin}
             plugins={plugins}
             busy={busy}
@@ -505,7 +558,7 @@ function PluginDetails({
               toggle.current?.focus();
             }}
           >
-            Check access again
+            {t("settingsHost.checkAccessAgain")}
           </Button>
         )}
 
@@ -558,31 +611,41 @@ function PluginDetails({
         // biome-ignore lint/a11y/useSemanticElements: This names links to Settings sections, not a fieldset of form controls.
         <p
           role="group"
-          aria-label={`${plugin.manifest.name} settings`}
+          aria-label={t("settingsHost.settingsNamed", {
+            name: plugin.manifest.name,
+          })}
           className="m-0 text-body-sm text-secondary"
         >
-          Settings:{" "}
-          {sections.map((section, index) => (
-            <Fragment key={section.id}>
-              {index > 0 && ", "}
-              <SettingsSectionLink section={section.id} open={openSection}>
-                {section.label}
-              </SettingsSectionLink>
-            </Fragment>
-          ))}
+          {rich("settingsHost.settingsList", {
+            sections: (
+              <>
+                {sections.map((section, index) => (
+                  <Fragment key={section.id}>
+                    {index > 0 && ", "}
+                    <SettingsSectionLink
+                      section={section.id}
+                      open={openSection}
+                    >
+                      {section.label}
+                    </SettingsSectionLink>
+                  </Fragment>
+                ))}
+              </>
+            ),
+          })}
         </p>
       )}
       {accessReason && (
         <p id="plugin-detail-access" className="sr-only">
-          {access === "error"
-            ? "Could not check access. Try again."
-            : accessReason}
+          {access === "error" ? t("settingsHost.accessRetry") : accessReason}
         </p>
       )}
       {readme && (
         <section
           className={styles.pluginAsideSection}
-          aria-label={`${plugin.manifest.name} README`}
+          aria-label={t("settingsHost.readmeNamed", {
+            name: plugin.manifest.name,
+          })}
         >
           <PluginReadme key={plugin.manifest.id} text={readme} />
         </section>
@@ -591,43 +654,47 @@ function PluginDetails({
         className={styles.pluginAsideSection}
         aria-labelledby="plugin-metadata-title"
       >
-        <h3 id="plugin-metadata-title">Details</h3>
+        <h3 id="plugin-metadata-title">{t("settingsHost.details")}</h3>
         <table
           className={styles.pluginMetadata}
           aria-labelledby="plugin-metadata-title"
         >
           <tbody>
             <tr>
-              <th scope="row">Identifier</th>
+              <th scope="row">{t("settingsHost.identifier")}</th>
               <td>
                 <code>{plugin.manifest.id}</code>
               </td>
             </tr>
             <tr>
-              <th scope="row">Plugin API</th>
+              <th scope="row">{t("settingsHost.pluginApi")}</th>
               <td>{plugin.manifest.apiVersion}</td>
             </tr>
             {otherTags.length > 0 && (
               <tr>
-                <th scope="row">Tags</th>
+                <th scope="row">{t("settingsHost.pluginTags")}</th>
                 <td>{otherTags.join(", ")}</td>
               </tr>
             )}
             {plugin.source === "external" && (
               <>
                 <tr>
-                  <th scope="row">Revision</th>
+                  <th scope="row">{t("settingsHost.revision")}</th>
                   <td>
                     <code>{plugin.revision}</code>
                   </td>
                 </tr>
                 <tr>
-                  <th scope="row">Signature</th>
-                  <td>{plugin.hasSignature ? "Signed" : "Unsigned"}</td>
+                  <th scope="row">{t("settingsHost.signature")}</th>
+                  <td>
+                    {plugin.hasSignature
+                      ? t("settingsHost.signed")
+                      : t("settingsHost.unsigned")}
+                  </td>
                 </tr>
                 {plugin.publisher && (
                   <tr>
-                    <th scope="row">Publisher</th>
+                    <th scope="row">{t("settingsHost.publisher")}</th>
                     <td>
                       <code title={plugin.publisher}>{plugin.publisher}</code>
                     </td>
@@ -650,7 +717,7 @@ function PluginDetails({
                   close.current?.focus({ preventScroll: true });
               }}
             >
-              Retry
+              {t("settingsHost.retry")}
             </Button>
           )}
         </div>
@@ -711,6 +778,7 @@ export function Settings({
   onDeparturePending?: (pending: boolean) => void;
   onUnsavedChange?: (unsaved: boolean) => void;
 }) {
+  const language = useLanguage();
   useEffect(() => cards.retainVisibility(), [cards]);
   useEffect(() => adminAccess?.ensure(), [adminAccess]);
   const installRequest = useSyncExternalStore(
@@ -770,8 +838,8 @@ export function Settings({
       ? (departure?.community ?? selectedCommunity)
       : selectedCommunity;
   const { groups, sections, defaultSection } = useMemo(
-    () => settingsSections(contributed, departureCommunity),
-    [contributed, departureCommunity],
+    () => settingsSections(contributed, departureCommunity, language),
+    [contributed, departureCommunity, language],
   );
   const [selected, setSelected] = useState(defaultSection);
   // Shortcuts lists every binding with its own controls, so it is built on
@@ -1114,7 +1182,7 @@ export function Settings({
         {...listMotion}
         className={core ? styles.pluginCoreSection : undefined}
         role="region"
-        aria-label={core ? "Core plugins" : undefined}
+        aria-label={core ? t("settingsHost.corePlugins") : undefined}
         aria-labelledby={core ? undefined : `plugin-category-${group.id}`}
         key={group.id}
       >
@@ -1123,11 +1191,13 @@ export function Settings({
             id={`plugin-category-${group.id}`}
             title={
               <span className={styles.pluginCategoryTitle}>
-                <span>{group.label}</span>
+                <span>{pluginGroupLabel(group)}</span>
                 <span className={styles.pluginCount}>
-                  {group.plugins.length}
+                  {group.plugins.length.toLocaleString(formattingLocale())}
                   <span className="sr-only">
-                    {group.plugins.length === 1 ? " plugin" : " plugins"}
+                    {group.plugins.length === 1
+                      ? t("v1id.pluginUnitOne")
+                      : t("v1id.pluginUnitMany")}
                   </span>
                 </span>
               </span>
@@ -1166,9 +1236,9 @@ export function Settings({
                     <SparklesIcon
                       size={14}
                       role="img"
-                      aria-label="Essential"
+                      aria-label={t("settingsHost.essential")}
                       aria-hidden={false}
-                      title="Essential"
+                      title={t("settingsHost.essential")}
                     />
                   )}
                 </span>
@@ -1194,7 +1264,9 @@ export function Settings({
                       }
                       className={styles.pluginRow}
                       data-enabled={plugin.enabled}
-                      aria-label={`View ${plugin.manifest.name} details`}
+                      aria-label={t("settingsHost.viewDetails", {
+                        name: plugin.manifest.name,
+                      })}
                       aria-describedby={
                         [
                           plugin.manifest.description
@@ -1222,7 +1294,7 @@ export function Settings({
                     >
                       {isEssentialPlugin(plugin) && (
                         <span id={`plugin-essential-${id}`} className="sr-only">
-                          Essential
+                          {t("settingsHost.essential")}
                         </span>
                       )}
                       {core ? (
@@ -1266,7 +1338,9 @@ export function Settings({
                     <div className={styles.pluginRowAction}>
                       {plugin.enabled && accessReason && (
                         <span className="text-caption text-muted self-center">
-                          {access === "checking" ? "Checking…" : "Unavailable"}
+                          {access === "checking"
+                            ? t("settingsHost.checking")
+                            : t("settingsHost.unavailable")}
                         </span>
                       )}
                       {updateAvailable ? (
@@ -1274,7 +1348,9 @@ export function Settings({
                           size="sm"
                           variant="prominent"
                           disabled={busy}
-                          aria-label={`Update ${plugin.manifest.name}`}
+                          aria-label={t("settingsHost.updateNamed", {
+                            name: plugin.manifest.name,
+                          })}
                           onClick={(event) => {
                             holdPluginRow(event.currentTarget);
                             setActivationAttempt(undefined);
@@ -1282,11 +1358,11 @@ export function Settings({
                             setReviewPluginId(id);
                           }}
                         >
-                          Update
+                          {t("settingsHost.update")}
                         </Button>
                       ) : isRequiredPlugin(plugin) ? (
                         <Button variant="outline" size="sm" disabled>
-                          Required
+                          {t("settingsHost.required")}
                         </Button>
                       ) : (
                         <Tooltip
@@ -1303,7 +1379,11 @@ export function Settings({
                                   : "prominent"
                             }
                             size="sm"
-                            aria-label={`${pluginActionLabel(plugin, access)} ${plugin.manifest.name}`}
+                            aria-label={pluginActionLabel(
+                              plugin,
+                              access,
+                              plugin.manifest.name,
+                            )}
                             disabled={pluginToggleDisabled(
                               plugin,
                               access,
@@ -1328,7 +1408,9 @@ export function Settings({
                         plugin={plugin}
                         plugins={plugins}
                         busy={busy}
-                        label={`More actions for ${plugin.manifest.name}`}
+                        label={t("settingsHost.moreActions", {
+                          name: plugin.manifest.name,
+                        })}
                         onRemoved={() => pluginSection.current?.focus()}
                         {...(updateAvailable
                           ? {
@@ -1566,7 +1648,7 @@ export function Settings({
             <motion.div {...layoutMotion} className={styles.pluginHeading}>
               <Header
                 id="plugin-settings-title"
-                title="Manage plugins"
+                title={t("settingsHost.managePlugins")}
                 actions={
                   plugins.imports && catalog ? (
                     <span ref={setPluginImportActions} />
@@ -1602,16 +1684,16 @@ export function Settings({
                 <motion.div {...layoutMotion}>
                   <Tabs
                     variant="panel"
-                    label="Plugin filters"
+                    label={t("settingsHost.pluginFilters")}
                     items={[
                       {
                         value: "all",
-                        label: "All plugins",
+                        label: t("settingsHost.allPlugins"),
                         panelId: "plugin-results-all",
                       },
                       {
                         value: "essentials",
-                        label: "Essentials",
+                        label: t("settingsHost.essentials"),
                         panelId: "plugin-results-essentials",
                       },
                     ]}
@@ -1622,8 +1704,9 @@ export function Settings({
                 <motion.div {...layoutMotion} className={styles.pluginSearch}>
                   <SearchField
                     inputRef={pluginSearch}
-                    label="Search plugins"
-                    placeholder="Search plugins…"
+                    label={t("settingsHost.searchPlugins")}
+                    placeholder={t("settingsHost.searchPluginsPlaceholder")}
+                    clearLabel={t("settingsHost.clearPluginSearch")}
                     value={pluginQuery}
                     onValueChange={setPluginQuery}
                   />
@@ -1649,7 +1732,7 @@ export function Settings({
                 catalog={catalog}
                 busy={busy}
                 source={linkedPlugin}
-                requester="A link"
+                requester={t("settingsHost.linkRequester")}
                 holdReview={installRequests?.holdReview}
                 returnFocus={() => pluginSection.current}
                 onOpenInstalled={openInstalledPlugin}
@@ -1691,33 +1774,32 @@ export function Settings({
             ) : configuration.status === "recovery" ? (
               <RecoveryScreen plugins={plugins} />
             ) : (
-              <p role="status">
-                Plugin settings are unavailable. Profile and Appearance still
-                work.
-              </p>
+              <p role="status">{t("settingsHost.pluginSettingsUnavailable")}</p>
             )}
 
             <div>
               <div>
                 {externalPluginsPaused && (
                   <p role="status" className="text-body-sm text-subtle">
-                    External plugins are paused for this launch. Your saved
-                    enabled settings are unchanged; you can still manage plugins
-                    here.
+                    {t("settingsHost.externalPluginsPaused")}
                   </p>
                 )}
                 {selected === "plugins" && refreshError && (
                   <ToastNotice
-                    title="Plugin settings couldn’t refresh"
-                    description={`Showing the last available configuration; retrying automatically. ${refreshError}`}
+                    title={t("settingsHost.refreshFailed")}
+                    description={t("settingsHost.refreshFailedDetail", {
+                      error: refreshError,
+                    })}
                   />
                 )}
                 {selected === "plugins" && error && (
                   <ToastNotice
-                    title="Plugin change wasn’t confirmed"
-                    description={`Check the current settings before trying again. ${error}`}
+                    title={t("settingsHost.pluginChangeFailed")}
+                    description={t("settingsHost.pluginChangeFailedDetail", {
+                      error,
+                    })}
                     onDismiss={plugins.dismissError}
-                    closeLabel="Dismiss"
+                    closeLabel={t("settingsHost.dismiss")}
                   />
                 )}
               </div>
@@ -1743,16 +1825,16 @@ export function Settings({
                             title={
                               pluginFiltersActive
                                 ? coreGroup
-                                  ? "No other plugins match"
-                                  : "No plugins match"
+                                  ? t("settingsHost.noOtherPluginsMatch")
+                                  : t("settingsHost.noPluginsMatch")
                                 : coreGroup
-                                  ? "No other plugins"
-                                  : "No plugins yet"
+                                  ? t("settingsHost.noOtherPlugins")
+                                  : t("settingsHost.noPluginsYet")
                             }
                             description={
                               pluginFiltersActive
-                                ? "Try another search or show all plugins."
-                                : "Additional plugins will appear here."
+                                ? t("settingsHost.pluginsSearchHelp")
+                                : t("settingsHost.pluginsWillAppear")
                             }
                             action={
                               pluginFiltersActive ? (
@@ -1764,7 +1846,7 @@ export function Settings({
                                     pluginSearch.current?.focus();
                                   }}
                                 >
-                                  Clear filters
+                                  {t("settingsHost.clearFilters")}
                                 </Button>
                               ) : undefined
                             }
@@ -1860,10 +1942,13 @@ export function Settings({
           <aside className={styles.sidebar}>
             <div className={styles.sidebarHeader}>
               <h1 id="settings-title" className="m-0 text-label">
-                Settings
+                {t("navigation.settings")}
               </h1>
             </div>
-            <nav aria-label="Settings sections" className={styles.navigation}>
+            <nav
+              aria-label={t("navigation.settingsSections")}
+              className={styles.navigation}
+            >
               <SidebarNavigation wrapSections>
                 {departureCommunity && (
                   <NavigationSection>

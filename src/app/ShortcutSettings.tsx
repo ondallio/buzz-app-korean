@@ -1,3 +1,9 @@
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../shared/i18n/deferred-message";
+import { t, useLanguage, english, type TranslationKey } from "../shared/i18n";
 import { SettingsGroup } from "../shared/design-system/ui/SettingsGroup";
 import { IconButton } from "../shared/design-system/ui/IconButton";
 import { PencilSimpleIcon, XIcon } from "../shared/design-system/icons";
@@ -63,8 +69,68 @@ type Group = Readonly<{
 type Notice = Readonly<{
   key: string;
   tone: "error" | "warning";
-  message: string;
+  message: DisplayMessage;
+  conflict?: Readonly<{
+    chord: string;
+    row: Pick<Row, "key" | "title" | "owner">;
+  }>;
 }>;
+
+const shortcutLabels = {
+  "focus-composer": "settings.shortcut.focus-composer",
+  "focus-pane": "settings.shortcut.focus-pane",
+  "focus-main-pane": "settings.shortcut.focus-main-pane",
+  "focus-side-pane": "settings.shortcut.focus-side-pane",
+  "set-status": "settings.shortcut.set-status",
+  settings: "settings.shortcut.settings",
+  "app-reload": "settings.shortcut.app-reload",
+  "close-tab": "settings.shortcut.close-tab",
+  "edit-message": "settings.shortcut.edit-message",
+  "react-to-message": "settings.shortcut.react-to-message",
+  "reply-to-message": "settings.shortcut.reply-to-message",
+  "mark-message-unread": "settings.shortcut.mark-message-unread",
+  "delete-message": "settings.shortcut.delete-message",
+  "react-to-latest": "settings.shortcut.react-to-latest",
+  home: "settings.shortcut.home",
+  "shortcuts-help": "settings.shortcut.shortcuts-help",
+  "navigation-back": "settings.shortcut.navigation-back",
+  "navigation-forward": "settings.shortcut.navigation-forward",
+  "font-increase": "settings.shortcut.font-increase",
+  "font-decrease": "settings.shortcut.font-decrease",
+  "font-reset": "settings.shortcut.font-reset",
+  "mark-all-read": "settings.shortcut.mark-all-read",
+  new: "navigation.openNew",
+  "global-search": "search.buzz",
+  "conversation-search": "search.conversationSearch",
+  "editor:Bold": "messages.format.bold",
+  "editor:Italic": "messages.format.italic",
+  "editor:Strikethrough": "messages.format.strike",
+  "editor:Spoiler": "messages.format.spoiler",
+  "editor:Code": "messages.format.code",
+  "editor:Code block": "messages.format.codeBlock",
+  "editor:Bullet list": "messages.format.bullets",
+  "editor:Ordered list": "messages.format.ordered",
+  "editor:Quote": "messages.format.quote",
+  "editor:Add or edit link": "settings.shortcut.link",
+  "editor:Undo": "settings.shortcut.undo",
+  "editor:Redo": "settings.shortcut.redo",
+  "editor:Send message": "settings.shortcut.send",
+  "editor:New line": "settings.shortcut.newline",
+} as const satisfies Readonly<Record<string, TranslationKey>>;
+
+function shortcutTitle(row: Pick<Row, "key" | "title">) {
+  const key = Object.entries(shortcutLabels).find(
+    ([key]) => key === row.key,
+  )?.[1];
+  return key && english[key] === row.title ? t(key) : row.title;
+}
+function shortcutOwner(row: Pick<Row, "key" | "owner" | "title">) {
+  return row.owner === "Message formatting" &&
+    row.key.startsWith("editor:") &&
+    shortcutTitle(row) !== row.title
+    ? t("settings.messageFormatting")
+    : row.owner;
+}
 
 /** The message editor's own keys, shown read-only: it handles them before any shortcut. */
 const editorRows = (sendWithModEnter: boolean): readonly Row[] =>
@@ -294,11 +360,12 @@ function ShortcutChords({
   chords: readonly KeyBinding[];
   apple: boolean;
 }) {
+  useLanguage();
   return (
     <span className="inline-flex flex-wrap items-center gap-1 text-body-sm text-subtle">
       {shownChords(chords).map((binding, index) => (
         <Fragment key={formatBinding(binding, apple).text}>
-          {index > 0 && <span>or</span>}
+          {index > 0 && <span>{t("settings.or")}</span>}
           <KeyCombo binding={binding} apple={apple} />
         </Fragment>
       ))}
@@ -326,6 +393,7 @@ export function ShortcutSettings({
   /** Packaged desktop build, where close/quit chords belong to the shell. */
   desktop?: boolean;
 }) {
+  useLanguage();
   const { overrides, error, rows, shownGroups } = useShortcutGroups({
     shortcuts,
     bindings,
@@ -365,17 +433,18 @@ export function ShortcutSettings({
     { binding, otherPrimary, code }: CapturedChord,
   ) => {
     const chord = formatBinding(binding, apple).text;
-    const refuse = (message: string) =>
+    const refuse = (message: DisplayMessage) =>
       setNotice({ key: target.key, tone: "error", message });
     if (binding.key === "Dead" || binding.key === "Unidentified")
-      return refuse("That key can’t be used for a shortcut. Try another.");
-    if (otherPrimary)
-      return refuse(
-        "The Windows/Command key isn’t used for shortcuts on this device. Try Control or Alt.",
-      );
+      return refuse(localMessage("settings.invalidShortcut"));
+    if (otherPrimary) return refuse(localMessage("settings.wrongPrimary"));
     if (!binding.mod && !binding.alt)
       return refuse(
-        `Include ${apple ? "Command or Option" : "Control or Alt"} so ordinary typing keeps working.`,
+        localMessage(
+          apple
+            ? "settings.includeMacModifier"
+            : "settings.includeOtherModifier",
+        ),
       );
     // Apple's ⌥⇧⌘V browser paste types a layout-specific key, so match the physical V.
     const applePlainPaste =
@@ -386,22 +455,28 @@ export function ShortcutSettings({
       binding.alt &&
       !binding.ctrl;
     if (includes(CLIPBOARD_CHORDS, binding) || applePlainPaste)
-      return refuse(
-        `${chord} is reserved for copy, cut, paste and select all. Try another.`,
-      );
+      return refuse(localMessage("settings.clipboardReserved", { chord }));
     if (desktop && includes(DESKTOP_CHORDS, binding))
-      return refuse(
-        `${chord} is reserved for switching or closing tabs and quitting Buzz. Try another.`,
-      );
+      return refuse(localMessage("settings.desktopReserved", { chord }));
     const conflict = rows.find(
       (row) =>
         row.key !== target.key &&
         row.effective.some((current) => sameBinding(current, binding)),
     );
     if (conflict)
-      return refuse(
-        `${chord} is already used by ${conflict.title} (${conflict.owner}).`,
-      );
+      return setNotice({
+        key: target.key,
+        tone: "error",
+        message: "",
+        conflict: {
+          chord,
+          row: {
+            key: conflict.key,
+            title: conflict.title,
+            owner: conflict.owner,
+          },
+        },
+      });
     const isDefault =
       target.defaults.length === 1 &&
       target.defaults.every((current) => sameBinding(current, binding));
@@ -415,7 +490,7 @@ export function ShortcutSettings({
         ? {
             key: target.key,
             tone: "warning",
-            message: `Saved. The message editor handles ${chord} itself while you are typing, so it wins there.`,
+            message: localMessage("settings.editorWins", { chord }),
           }
         : null,
     );
@@ -423,18 +498,18 @@ export function ShortcutSettings({
 
   return (
     <section aria-labelledby="shortcut-settings-title">
-      <Header id="shortcut-settings-title" title="Shortcuts" />
+      <Header id="shortcut-settings-title" title={t("settings.shortcuts")} />
       <div className="grid gap-5">
         <MessageKeyPreference
-          title="Sending messages"
-          label={`Send with ${sendChord}`}
-          description={`Enter adds a new line. ${sendChord} sends your message.`}
+          title={t("settings.sendingMessages")}
+          label={t("settings.sendWith", { chord: sendChord })}
+          description={t("settings.sendDescription", { chord: sendChord })}
           preference={sendKeyPreference}
         />
         <MessageKeyPreference
-          title="Editing messages"
-          label="Edit last message with Up Arrow"
-          description="When the composer is empty, Up Arrow edits your most recent editable message instead of selecting messages."
+          title={t("settings.editingMessages")}
+          label={t("settings.editUpArrow")}
+          description={t("settings.editUpArrowDescription")}
           preference={editKeyPreference}
         />
         {rows.length ? (
@@ -442,8 +517,16 @@ export function ShortcutSettings({
             {shownGroups.map((group) => (
               <section key={group.id}>
                 <InlineHeader
-                  title={group.label}
-                  subtitle={group.description}
+                  title={
+                    group.id === "editor"
+                      ? t("settings.messageFormatting")
+                      : group.label
+                  }
+                  subtitle={
+                    group.id === "editor"
+                      ? t("settings.editorKeysDescription")
+                      : group.description
+                  }
                 />
                 <SettingsGroup>
                   {group.rows.map((row) => (
@@ -471,7 +554,7 @@ export function ShortcutSettings({
           </div>
         ) : (
           <p className="m-0 px-control-inset text-body-sm text-subtle">
-            No shortcuts are available yet.
+            {t("settings.noShortcuts")}
           </p>
         )}
         <div className="flex flex-wrap items-center gap-3">
@@ -484,7 +567,7 @@ export function ShortcutSettings({
               bindings.reset();
             }}
           >
-            Reset all shortcuts
+            {t("settings.resetAllShortcuts")}
           </Button>
         </div>
         {error && (
@@ -492,7 +575,7 @@ export function ShortcutSettings({
             <p className="m-0">{error}</p>
             <div>
               <Button type="button" onClick={bindings.retry}>
-                Retry saving shortcuts
+                {t("settings.retryShortcuts")}
               </Button>
             </div>
           </div>
@@ -513,6 +596,7 @@ function MessageKeyPreference({
   description: string;
   preference: typeof sendKeyPreference;
 }) {
+  useLanguage();
   const checked = preference.usePreference();
   const [error, setError] = useState<string | null>(null);
   const change = (enabled: boolean) => setError(preference.set(enabled));
@@ -532,7 +616,7 @@ function MessageKeyPreference({
           <p className="m-0">{error}</p>
           <div>
             <Button type="button" onClick={() => change(checked)}>
-              Retry saving
+              {t("settings.retrySaving")}
             </Button>
           </div>
         </div>
@@ -566,6 +650,8 @@ function ShortcutRow({
   onCapture: (chord: CapturedChord) => void;
   onReset: () => void;
 }) {
+  useLanguage();
+  const title = shortcutTitle(row);
   const titleId = useId();
   const noticeId = useId();
   const change = useRef<HTMLButtonElement>(null);
@@ -588,23 +674,29 @@ function ShortcutRow({
       <PreferenceRow
         title={
           <h4 id={titleId} className="m-0 text-label-sm">
-            {row.title}
+            {title}
           </h4>
         }
         subtitle={
           row.readOnly ? (
             explained ? undefined : (
-              "Reserved by Buzz"
+              t("settings.reservedBuzz")
             )
           ) : row.override || sharedWith.length > 0 ? (
             <>
-              {row.override && <span className="block">Modified</span>}
+              {row.override && (
+                <span className="block">{t("settings.modified")}</span>
+              )}
               {sharedWith.length > 0 && (
                 <span className="block text-subtle">
-                  Also used by{" "}
-                  {sharedWith
-                    .map((other) => `${other.title} (${other.owner})`)
-                    .join(", ")}
+                  {t("settings.alsoUsed", {
+                    shortcuts: sharedWith
+                      .map(
+                        (other) =>
+                          `${shortcutTitle(other)} (${shortcutOwner(other)})`,
+                      )
+                      .join(", "),
+                  })}
                 </span>
               )}
             </>
@@ -615,7 +707,7 @@ function ShortcutRow({
             {listening ? (
               <KeyCaptureControl
                 apple={apple}
-                label={`New shortcut for ${row.title}`}
+                label={t("settings.newShortcut", { title })}
                 describedBy={notice ? noticeId : undefined}
                 onCapture={onCapture}
                 onCancel={onCancel}
@@ -633,14 +725,16 @@ function ShortcutRow({
                     <PencilSimpleIcon size={16} aria-hidden="true" />
                   )
                 }
-                title={listening ? "Cancel" : "Change shortcut"}
+                title={t(
+                  listening ? "settings.cancel" : "settings.changeShortcut",
+                )}
                 ref={change}
                 type="button"
                 size="sm"
                 aria-label={
                   listening
-                    ? `Cancel changing ${row.title}`
-                    : `Change shortcut for ${row.title}`
+                    ? t("settings.cancelChanging", { title })
+                    : t("settings.changeShortcutFor", { title })
                 }
                 // Keep focus on the listening control so a click here cancels once.
                 onMouseDown={(event) => event.preventDefault()}
@@ -651,13 +745,13 @@ function ShortcutRow({
               <Button
                 type="button"
                 size="sm"
-                aria-label={`Reset shortcut for ${row.title}`}
+                aria-label={t("settings.resetShortcutFor", { title })}
                 onClick={() => {
                   resetting.current = true;
                   onReset();
                 }}
               >
-                Reset
+                {t("settings.reset")}
               </Button>
             )}
           </>
@@ -669,7 +763,13 @@ function ShortcutRow({
           role="alert"
           className="m-0 text-body-sm text-standard"
         >
-          {notice.message}
+          {notice.conflict
+            ? t("settings.shortcutConflict", {
+                chord: notice.conflict.chord,
+                title: shortcutTitle(notice.conflict.row),
+                owner: shortcutOwner(notice.conflict.row),
+              })
+            : resolveMessage(notice.message)}
         </p>
       )}
     </article>

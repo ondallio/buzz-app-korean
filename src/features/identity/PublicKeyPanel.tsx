@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { t, useLanguage } from "../../shared/i18n";
 import { writeClipboardText } from "../../shared/clipboard";
 import { CopyIcon } from "../../shared/design-system/icons/index";
 import { Button } from "../../shared/design-system/ui/Button";
@@ -11,43 +12,49 @@ import { WireframePanel } from "./Wireframe";
  */
 export function PublicKeyPanel({
   publicKey,
-  heading = "Your public key (npub)",
+  heading,
 }: {
   publicKey: string;
   heading?: string;
 }) {
-  const [copyStatus, setCopyStatus] = useState("");
+  useLanguage();
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">(
+    "idle",
+  );
   return (
     <WireframePanel>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="m-0 text-body text-subtle">{heading}</h2>
+        <h2 className="m-0 text-body text-subtle">
+          {heading === undefined ? t("identity.publicKey.heading") : heading}
+        </h2>
         <Button
           size="sm"
           variant="ghost"
-          aria-label="Copy npub"
+          aria-label={t("identity.publicKey.copyLabel")}
           onClick={() => {
-            setCopyStatus("");
+            setCopyStatus("idle");
             writeClipboardText(publicKey).then(
-              () => setCopyStatus("Public key copied."),
-              () =>
-                setCopyStatus(
-                  "Could not copy. Select the key above to copy it.",
-                ),
+              () => setCopyStatus("copied"),
+              () => setCopyStatus("failed"),
             );
           }}
         >
           <CopyIcon size={16} aria-hidden="true" />
-          Copy
+          {t("identity.publicKey.copy")}
         </Button>
       </div>
       <code className="block select-text break-all font-mono text-mono">
         {publicKey}
       </code>
       <p className="m-0 text-body-sm text-subtle">
-        This is your public identity — it’s safe to share.
+        {t("identity.publicKey.description")}
       </p>
       <span role="status" className="text-body-sm text-subtle">
-        {copyStatus}
+        {copyStatus === "copied"
+          ? t("identity.publicKey.copied")
+          : copyStatus === "failed"
+            ? t("identity.publicKey.copyFailed")
+            : ""}
       </span>
     </WireframePanel>
   );

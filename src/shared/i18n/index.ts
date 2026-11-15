@@ -266,6 +266,10 @@ import {
   en as settingsHostEn,
   ko as settingsHostKo,
 } from "./catalogs/settings-host";
+import {
+  en as v1IdentitySettingsEn,
+  ko as v1IdentitySettingsKo,
+} from "./catalogs/v1-identity-settings";
 import { languagePreference, type Language } from "./language";
 import { formatMessage } from "./messages";
 
@@ -355,6 +359,7 @@ export const english = {
   ...profileEditingEn,
   ...messageNoticesEn,
   ...channelMenusEn,
+  ...v1IdentitySettingsEn,
 } as const;
 export const korean: Partial<Record<keyof typeof english, string>> = {
   ...coreKo,
@@ -436,6 +441,7 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...profileEditingKo,
   ...messageNoticesKo,
   ...channelMenusKo,
+  ...v1IdentitySettingsKo,
 };
 export type TranslationKey = keyof typeof english;
 type Variables<S extends string> =

@@ -1,3 +1,10 @@
+import {
+  localMessage,
+  type LocalMessage,
+} from "../shared/i18n/deferred-message";
+import { TranslatedMessage } from "../shared/i18n/Message";
+import type { LeaveOutcome } from "../features/communities/api";
+import { t, useLanguage } from "../shared/i18n";
 import { useEffect, useRef, useState } from "react";
 import {
   communityActionLabel,
@@ -7,13 +14,8 @@ import { communityDestination } from "../features/communities/destination";
 import type { Communities, Membership } from "../features/communities/service";
 import {
   CommunityDepartureError,
-  deviceRemovalFailureText,
-  leaveCleanupFailureText,
   leaveCommunity,
-  leaveCommunityFailureText,
-  leftCommunityText,
   removeCommunityFromDevice,
-  removedFromDeviceText,
 } from "../features/communities/departure";
 import { AlertDialog } from "../shared/design-system/ui/AlertDialog";
 import { Button } from "../shared/design-system/ui/Button";
@@ -23,6 +25,71 @@ import { SettingsGroup } from "../shared/design-system/ui/SettingsGroup";
 import { useToastNotification } from "../shared/design-system/ui/Toast";
 
 type Intent = "remove" | "leave";
+
+function completedDeparture(
+  name: string,
+  outcome: LeaveOutcome | "remove",
+  residue: boolean,
+): LocalMessage {
+  const keys = {
+    remove: ["settings.removed", "settings.removedResidue"],
+    left: ["settings.left", "settings.leftResidue"],
+    "already-absent": ["settings.absent", "settings.absentResidue"],
+    "access-revoked": ["settings.banned", "settings.bannedResidue"],
+  } as const;
+  return localMessage(keys[outcome][residue ? 1 : 0], { name });
+}
+
+function failedDeparture(
+  name: string,
+  intent: Intent,
+  error: unknown,
+): LocalMessage {
+  const departure =
+    error instanceof CommunityDepartureError ? error : undefined;
+  const failure =
+    intent === "leave" && departure?.phase === "device"
+      ? departure.reason
+      : (departure?.reason ?? error);
+  if (intent === "leave" && departure?.phase !== "device")
+    return localMessage(
+      failure instanceof Error &&
+        failure.message === "invalid: relay owner cannot leave"
+        ? "settings.ownerCannotLeave"
+        : "settings.leaveFailed",
+      { name },
+    );
+  const words = (value: unknown) =>
+    value instanceof Error
+      ? value.message
+      : typeof value === "string"
+        ? value
+        : "";
+  const reason = (
+    words(failure instanceof Error ? failure.cause : undefined) ||
+    words(failure)
+  ).replace(/\.$/, "");
+  const keys =
+    intent === "remove"
+      ? (["settings.removeFailed", "settings.removeFailedDetails"] as const)
+      : departure?.outcome === "already-absent"
+        ? ([
+            "settings.absentCleanupFailed",
+            "settings.absentCleanupFailedDetails",
+          ] as const)
+        : departure?.outcome === "access-revoked"
+          ? ([
+              "settings.bannedCleanupFailed",
+              "settings.bannedCleanupFailedDetails",
+            ] as const)
+          : ([
+              "settings.leftCleanupFailed",
+              "settings.leftCleanupFailedDetails",
+            ] as const);
+  return reason
+    ? localMessage(keys[1], { name, reason })
+    : localMessage(keys[0], { name });
+}
 
 export function CommunityDepartureSettings({
   communities,
@@ -35,6 +102,7 @@ export function CommunityDepartureSettings({
   onRemoved(): void;
   onPending?: (pending: boolean) => void;
 }) {
+  useLanguage();
   const notify = useToastNotification();
   const [intent, setIntent] = useState<Intent | null>(null);
   const [pending, setPending] = useState(false);
@@ -62,21 +130,26 @@ export function CommunityDepartureSettings({
         // finishes. Its result still belongs in the host toast, not a new form.
         if (communities.snapshot().viewer === viewer)
           notify(
-            leftCommunityText(
-              communityActionLabel(community),
-              result.outcome,
-              result.residue.length > 0,
-            ),
+            <TranslatedMessage
+              value={completedDeparture(
+                communityActionLabel(community),
+                result.outcome,
+                result.residue.length > 0,
+              )}
+            />,
             result.outcome === "left" ? "success" : "info",
           );
       } else {
         const result = await removeCommunityFromDevice(communities, community);
         if (communities.snapshot().viewer === viewer)
           notify(
-            removedFromDeviceText(
-              communityActionLabel(community),
-              result.residue.length > 0,
-            ),
+            <TranslatedMessage
+              value={completedDeparture(
+                communityActionLabel(community),
+                "remove",
+                result.residue.length > 0,
+              )}
+            />,
             "success",
           );
       }
@@ -87,24 +160,14 @@ export function CommunityDepartureSettings({
       }
     } catch (error) {
       if (communities.snapshot().viewer !== viewer) return;
-      const departure =
-        error instanceof CommunityDepartureError ? error : undefined;
       notify(
-        intent === "remove"
-          ? deviceRemovalFailureText(
-              communityActionLabel(community),
-              departure?.reason ?? error,
-            )
-          : departure?.phase === "device"
-            ? leaveCleanupFailureText(
-                communityActionLabel(community),
-                departure.reason,
-                departure.outcome,
-              )
-            : leaveCommunityFailureText(
-                communityActionLabel(community),
-                departure?.reason ?? error,
-              ),
+        <TranslatedMessage
+          value={failedDeparture(
+            communityActionLabel(community),
+            intent,
+            error,
+          )}
+        />,
         "error",
       );
       if (mounted.current) setIntent(null);
@@ -120,13 +183,13 @@ export function CommunityDepartureSettings({
     <section aria-labelledby="leave-community-title">
       <Header
         id="leave-community-title"
-        title="Leave or remove"
-        subtitle="Remove community from Buzz on this device or leave community completely."
+        title={t("settings.leaveRemove")}
+        subtitle={t("settings.leaveRemoveDescription")}
       />
       <SettingsGroup>
         <PreferenceRow
-          title="Remove from this device"
-          subtitle="Removes community connection and data from Buzz on this device only. Your membership won't change."
+          title={t("settings.removeDevice")}
+          subtitle={t("settings.removeDescription")}
           trailing={
             <Button
               ref={removeButton}
@@ -134,13 +197,13 @@ export function CommunityDepartureSettings({
               disabled={pending}
               onClick={() => setIntent("remove")}
             >
-              Remove from this device
+              {t("settings.removeDevice")}
             </Button>
           }
         />
         <PreferenceRow
-          title="Leave community"
-          subtitle="Ends your membership and removes community from this device. Rejoining may require a new invite."
+          title={t("settings.leaveCommunity")}
+          subtitle={t("settings.leaveDescription")}
           trailing={
             <Button
               ref={leaveButton}
@@ -149,7 +212,7 @@ export function CommunityDepartureSettings({
               disabled={pending}
               onClick={() => setIntent("leave")}
             >
-              Leave community
+              {t("settings.leaveCommunity")}
             </Button>
           }
         />
@@ -158,13 +221,17 @@ export function CommunityDepartureSettings({
         <AlertDialog
           title={
             intent === "leave"
-              ? `Leave ${communityDefaultName(community)}?`
-              : `Remove ${communityDefaultName(community)} from this device?`
+              ? t("settings.leaveConfirm", {
+                  community: communityDefaultName(community),
+                })
+              : t("settings.removeConfirm", {
+                  community: communityDefaultName(community),
+                })
           }
           description={
             intent === "leave"
-              ? "This will send a leave request to the community’s relay and remove it from this device. You may need a new invite to rejoin."
-              : "The community connection and any saved drafts or data will be removed from Buzz on this device."
+              ? t("settings.leaveConfirmDescription")
+              : t("settings.removeConfirmDescription")
           }
           pending={pending}
           finalFocus={() =>
@@ -178,7 +245,7 @@ export function CommunityDepartureSettings({
           actions={
             <>
               <Button disabled={pending} onClick={() => setIntent(null)}>
-                Cancel
+                {t("settings.cancel")}
               </Button>
               <Button
                 variant={intent === "leave" ? "destructive" : "prominent"}
@@ -186,8 +253,8 @@ export function CommunityDepartureSettings({
                 onClick={() => void run()}
               >
                 {intent === "leave"
-                  ? "Leave community"
-                  : "Remove from this device"}
+                  ? t("settings.leaveCommunity")
+                  : t("settings.removeDevice")}
               </Button>
             </>
           }
@@ -196,7 +263,7 @@ export function CommunityDepartureSettings({
             {community.localName &&
               community.localName !== communityDefaultName(community) && (
                 <p className="text-muted">
-                  Shown as {community.localName} on this device
+                  {t("settings.shownAs", { name: community.localName })}
                 </p>
               )}
             <p className="break-all">

@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { requestLeave, type LeaveOutcome } from "./api";
 import type { PurgeFailure } from "./device-state";
 import type { Communities, Membership } from "./service";
@@ -99,9 +100,10 @@ export function departedText(
 ): [string, "success" | "info"] {
   const residue = departure.residue.length > 0;
   if (departure.intent === "remove") {
-    const removed = `${name} was removed from this device. Its relay didn’t confirm the leave, so you may still be a member.`;
     return [
-      residue ? `${removed} Some saved data couldn’t be cleared.` : removed,
+      residue
+        ? t("v1id.departure.removedUnconfirmedResidue", { name })
+        : t("v1id.departure.removedUnconfirmed", { name }),
       "success",
     ];
   }
@@ -128,8 +130,9 @@ export function departureFailureText(
 }
 
 export function removedFromDeviceText(name: string, residue: boolean) {
-  const result = `${name} was removed from this device. Your membership wasn’t changed. You can add it again later.`;
-  return residue ? `${result} Some saved data couldn’t be cleared.` : result;
+  return residue
+    ? t("v1id.departure.removedResidue", { name })
+    : t("v1id.departure.removed", { name });
 }
 
 /** What the relay settled, plus whether any saved data outlived the purge. */
@@ -138,19 +141,28 @@ export function leftCommunityText(
   outcome: LeaveOutcome,
   residue: boolean,
 ) {
-  const settled =
-    outcome === "already-absent"
-      ? `You were no longer a member of ${name}, so it was removed from this device.`
-      : outcome === "access-revoked"
-        ? `You’re currently banned from ${name}, so the leave was refused. It was removed from this device and can be added again by its URL if access is restored.`
-        : `Left ${name}.`;
-  return residue ? `${settled} Some saved data couldn’t be cleared.` : settled;
+  if (outcome === "already-absent")
+    return residue
+      ? t("v1id.departure.absentResidue", { name })
+      : t("v1id.departure.absent", { name });
+  if (outcome === "access-revoked")
+    return residue
+      ? t("v1id.departure.bannedResidue", { name })
+      : t("v1id.departure.banned", { name });
+  return residue
+    ? t("v1id.departure.leftResidue", { name })
+    : t("v1id.departure.left", { name });
 }
 
 export function deviceRemovalFailureText(name: string, error: unknown) {
   const reason =
     wordsOf(error instanceof Error ? error.cause : undefined) || wordsOf(error);
-  return `Couldn’t remove ${name} from this device${reason ? ` (${reason.replace(/\.$/, "")})` : ""}. Try again.`;
+  return reason
+    ? t("v1id.departure.removeFailedReason", {
+        name,
+        reason: reason.replace(/\.$/, ""),
+      })
+    : t("v1id.departure.removeFailed", { name });
 }
 
 /** The relay has answered; only the device record failed before it changed. */
@@ -162,12 +174,17 @@ export function leaveCleanupFailureText(
   const reason = (
     wordsOf(error instanceof Error ? error.cause : undefined) || wordsOf(error)
   ).replace(/\.$/, "");
-  const details = reason ? ` (${reason})` : "";
   if (outcome === "already-absent")
-    return `The relay no longer had a membership for ${name}, but this device couldn’t finish removing it${details}. Try again.`;
+    return reason
+      ? t("v1id.departure.absentCleanupFailedReason", { name, reason })
+      : t("v1id.departure.absentCleanupFailed", { name });
   if (outcome === "access-revoked")
-    return `The leave was refused because you’re currently banned from ${name}, and this device couldn’t finish removing it${details}. Try again.`;
-  return `Left ${name}, but this device couldn’t finish cleaning up${details}. Leave it again to finish.`;
+    return reason
+      ? t("v1id.departure.bannedCleanupFailedReason", { name, reason })
+      : t("v1id.departure.bannedCleanupFailed", { name });
+  return reason
+    ? t("v1id.departure.leftCleanupFailedReason", { name, reason })
+    : t("v1id.departure.leftCleanupFailed", { name });
 }
 
 const OWNER_REFUSAL = "invalid: relay owner cannot leave";
@@ -184,8 +201,9 @@ export function leaveUnsettled(error: unknown) {
 
 export function leaveCommunityFailureText(name: string, error: unknown) {
   const reason = error instanceof Error ? error.message : "";
-  if (reason === OWNER_REFUSAL) return `The relay owner can’t leave ${name}.`;
-  return `Couldn’t leave ${name}. Check your connection and try again.`;
+  if (reason === OWNER_REFUSAL)
+    return t("v1id.departure.ownerCantLeave", { name });
+  return t("v1id.departure.leaveFailed", { name });
 }
 
 const wordsOf = (error: unknown) =>

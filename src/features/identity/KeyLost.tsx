@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { WarningCircleIcon } from "../../shared/design-system/icons";
 import { Button } from "../../shared/design-system/ui/Button";
 import { InlineHeader } from "../../shared/design-system/ui/Header";
@@ -16,6 +17,7 @@ export function KeyLost({
   onBack: () => void;
   onStartOver: () => void;
 }) {
+  useLanguage();
   return (
     <>
       <div>
@@ -24,31 +26,27 @@ export function KeyLost({
           tabIndex={-1}
           className="text-heading text-standard"
         >
-          Lost your key?
+          {t("identityMore.lostKeyTitle")}
         </h1>
         <p className="mt-2 text-body text-subtle">
-          Check another device where you’re signed in to Buzz, or look for a
-          backup. Without a copy or a usable backup, we can’t recover your key.
+          {t("identityMore.lostKeyHelp")}
         </p>
         <p className="mt-2 text-body text-subtle">
-          Starting over replaces the key linked to your Builderlab account. Your
-          profile, messages, and community access won’t carry over. Your old
-          content won’t be deleted. The new key will be backed up to your
-          Builderlab account automatically. Block can use that copy to restore
-          this key, including anywhere else you use it.
+          {t("identityMore.startOverHelp")}
         </p>
       </div>
       {(owned === undefined || owned.length > 0) && (
         <WireframePanel>
-          <h2 className="m-0 text-body text-subtle">Communities you own</h2>
+          <h2 className="m-0 text-body text-subtle">
+            {t("identityMore.ownedCommunities")}
+          </h2>
           {owned === undefined ? (
             <p className="m-0 text-body text-standard">
-              We couldn’t load your owned communities. Other communities may be
-              affected.
+              {t("identityMore.ownedLoadFailed")}
             </p>
           ) : (
             <ul
-              aria-label="Communities you own"
+              aria-label={t("identityMore.ownedCommunities")}
               className="m-0 flex list-none flex-col gap-1 p-0"
             >
               {owned.map(({ host, url }) => (
@@ -59,23 +57,23 @@ export function KeyLost({
             </ul>
           )}
           <p className="m-0 text-body-sm text-subtle">
-            Other communities you’ve joined aren’t listed.
+            {t("identityMore.joinedNotListed")}
           </p>
         </WireframePanel>
       )}
       {/* kgoose revokes an unlinked key: binding it again answers 409. */}
       <InlineHeader
         icon={<WarningCircleIcon size={16} aria-hidden="true" />}
-        title="Your old key can’t be linked again"
-        subtitle="Starting over permanently unlinks your old key."
+        title={t("identityMore.oldKeyUnlinkable")}
+        subtitle={t("identityMore.oldKeyUnlinkHelp")}
       />
       {/* Footer order: secondary first, primary last. */}
       <div data-onboarding-actions="">
         <Button size="lg" onClick={onBack}>
-          Go back
+          {t("identityMore.goBack")}
         </Button>
         <Button size="lg" variant="destructive" onClick={onStartOver}>
-          Start over with a new key
+          {t("identityMore.startOver")}
         </Button>
       </div>
     </>

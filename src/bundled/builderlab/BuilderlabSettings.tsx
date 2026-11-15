@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   useLayoutEffect,
   useRef,
@@ -20,22 +21,22 @@ import type { OverviewSnapshot } from "./overview";
 import styles from "./BuilderlabSettings.module.css";
 
 const sections = [
-  {
-    id: "agents",
-    title: "Remote agents",
-    icon: RobotIcon,
-    description: "Agents take on work for you in Buzz.",
-    action: "Set up an agent",
-  },
-  {
-    id: "communities",
-    title: "Communities",
-    icon: GlobeIcon,
-    description: "Spaces where your team and agents talk.",
-    action: "Create a community",
-  },
+  { id: "agents", icon: RobotIcon },
+  { id: "communities", icon: GlobeIcon },
 ] as const;
 type Section = (typeof sections)[number]["id"];
+const sectionText = (id: Section) =>
+  id === "agents"
+    ? {
+        title: t("v1id.blab.remoteAgents"),
+        description: t("v1id.blab.agentsDescription"),
+        action: t("v1id.blab.setUpAgent"),
+      }
+    : {
+        title: t("v1id.blab.communities"),
+        description: t("v1id.blab.communitiesDescription"),
+        action: t("v1id.blab.createCommunity"),
+      };
 
 /** A section keeps navigation beside its heading and outside the heading name. */
 export function ManagementHeader({
@@ -75,6 +76,7 @@ export function BuilderlabSettings({
   agents: ReactNode;
   summaries?: Record<Section, OverviewSnapshot>;
 }) {
+  useLanguage();
   const [selected, setSelected] = useState(initialSection);
   const triggers = useRef<Partial<Record<Section, HTMLElement | null>>>({});
   const back = useRef<HTMLButtonElement | null>(null);
@@ -98,8 +100,8 @@ export function BuilderlabSettings({
   const navigation = (
     <IconButton
       ref={back}
-      aria-label="Back to Builderlab"
-      title="Back to Builderlab"
+      aria-label={t("v1id.blab.back")}
+      title={t("v1id.blab.back")}
       hint="familiar"
       icon={<CaretLeftIcon />}
       onClick={() => {
@@ -129,7 +131,9 @@ export function BuilderlabSettings({
           id="builderlab-title"
           title={
             selected === "agents"
-              ? `Remote agents${agentCount === undefined ? "" : ` (${agentCount})`}`
+              ? agentCount === undefined
+                ? t("v1id.blab.remoteAgents")
+                : t("v1id.blab.remoteAgentsCount", { count: agentCount })
               : "Builderlab"
           }
         />
@@ -139,7 +143,8 @@ export function BuilderlabSettings({
       </div>
       <div hidden={!!selected} inert={!!selected}>
         <div className={styles.grid}>
-          {ordered.map(({ id, title, icon: Icon, description, action }) => {
+          {ordered.map(({ id, icon: Icon }) => {
+            const { title, description, action } = sectionText(id);
             const state = summaries?.[id] ?? { kind: "empty" };
             return (
               <section
@@ -160,7 +165,7 @@ export function BuilderlabSettings({
                       }}
                       variant="prominent"
                       shape="round"
-                      aria-label={`Open ${title}`}
+                      aria-label={t("v1id.blab.open", { title })}
                       icon={<ArrowUpRightIcon size={16} aria-hidden="true" />}
                       onClick={() => open(id)}
                     />
@@ -171,7 +176,7 @@ export function BuilderlabSettings({
                     <div className={styles.prompt}>
                       <p className="m-0 text-body-sm text-subtle">
                         {state.kind === "unavailable"
-                          ? "Not available for this account"
+                          ? t("v1id.blab.notAvailable")
                           : description}
                       </p>
                       <Button
@@ -179,7 +184,9 @@ export function BuilderlabSettings({
                         size="text"
                         onClick={() => open(id)}
                       >
-                        {state.kind === "unavailable" ? "Learn more" : action}{" "}
+                        {state.kind === "unavailable"
+                          ? t("v1id.blab.learnMore")
+                          : action}{" "}
                         <ArrowRightIcon aria-hidden="true" />
                       </Button>
                     </div>

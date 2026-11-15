@@ -1,5 +1,11 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { nip19 } from "nostr-tools";
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { formatPublicKey } from "../../shared/identity/public-key";
 import { relativeTimestamp } from "../../shared/relative-timestamp";
 import { CircleNotchIcon } from "../../shared/design-system/icons";
@@ -68,11 +74,32 @@ export function Row({
 }
 
 export function Loading() {
+  useLanguage();
   return (
     <p className="flex items-center gap-2 text-body-sm text-secondary">
-      <CircleNotchIcon className="animate-spin" /> Loading…
+      <CircleNotchIcon className="animate-spin" /> {t("adminStaff.loading")}
     </p>
   );
+}
+
+/** Keeps known UI explanations deferred while server-authored reasons remain literal. */
+export function displayStaffFailure(failure: StaffFailure): DisplayMessage {
+  switch (failure.category) {
+    case "unauthorized":
+      return localMessage("adminStaff.signatureRejected");
+    case "forbidden":
+      return failure.message || localMessage("adminStaff.permissionDenied");
+    case "intercepted":
+      return localMessage("adminStaff.intercepted");
+    case "ambiguous": {
+      const message = failure.message.trimEnd();
+      return message
+        ? localMessage("adminStaff.unconfirmedDetail", { message })
+        : localMessage("adminStaff.unconfirmed");
+    }
+    default:
+      return describe(failure);
+  }
 }
 
 export function Failure({
@@ -88,16 +115,17 @@ export function Failure({
   onRetry?: (() => void) | undefined;
   retrying?: boolean;
 }) {
+  useLanguage();
   return (
     <div className="flex flex-wrap items-center gap-2">
       <p className="text-body-sm text-danger" role="alert">
         {unsupportedText && unsupported(failure)
           ? unsupportedText
-          : describe(failure)}
+          : resolveMessage(displayStaffFailure(failure))}
       </p>
       {onRetry && (
         <Button size="sm" loading={retrying} onClick={onRetry}>
-          Retry
+          {t("adminStaff.retry")}
         </Button>
       )}
     </div>

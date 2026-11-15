@@ -5,6 +5,14 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  errorMessage,
+  localError,
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { communityFromScope } from "../../features/relay/gifs";
 import {
   useProfileGeneration,
@@ -69,20 +77,33 @@ import { DIRECT_MEMBER_ADD_ENABLED } from "./features";
 import { canShareInvite, shareInvite } from "./shareInvite";
 
 const DAY = 24 * 60 * 60;
-const EXPIRY = [1, 3, 7, 30].map((days) => ({
-  value: String(days * DAY),
-  label: days === 1 ? "1 day" : `${days} days`,
-}));
-const USES = [
-  { value: "", label: "No limit" },
+const expiryOptions = () =>
+  [1, 3, 7, 30].map((days) => ({
+    value: String(days * DAY),
+    label:
+      days === 1
+        ? t("communityAdmin.oneDay", { days })
+        : t("communityAdmin.days", { days }),
+  }));
+const maxUseOptions = () => [
+  { value: "", label: t("communityAdmin.unlimited") },
   ...[1, 5, 10, 25].map((uses) => ({
     value: String(uses),
-    label: uses === 1 ? "1 use" : `${uses} uses`,
+    label:
+      uses === 1
+        ? t("communityAdmin.oneUse", { uses })
+        : t("communityAdmin.uses", { uses }),
   })),
 ];
-const message = (reason: unknown) =>
-  reason instanceof Error ? reason.message : String(reason);
-const STALE = "The member list is out of date. Retry before making changes.";
+const STALE = localMessage("communityAdmin.stale");
+const roleLabel = (role: string) =>
+  role === "owner"
+    ? t("communityAdmin.owner")
+    : role === "admin"
+      ? t("communityAdmin.admin")
+      : role === "member"
+        ? t("communityAdmin.member")
+        : (role[0]?.toUpperCase() ?? "") + role.slice(1);
 
 export type MembershipMethod = "members" | "invite" | "direct";
 type MembershipSelection = {
@@ -103,6 +124,7 @@ export function CommunityAdmin({
   communityName?: string;
   active(): boolean;
 }) {
+  useLanguage();
   const [fallbackMembership] = useState(() =>
     suppliedMembership ? null : createCommunityMembership(relay),
   );
@@ -118,12 +140,12 @@ export function CommunityAdmin({
   return (
     <section aria-labelledby="community-admin-title">
       <h2 id="community-admin-title" className="mt-0 mb-2 text-label">
-        Membership
+        {t("communityAdmin.membership")}
       </h2>
       <p className="mt-0 mb-6 text-body-sm text-muted">
         {communityName
-          ? `Manage members and access to ${communityName}.`
-          : "Manage members and community access."}
+          ? t("communityAdmin.manageNamed", { community: communityName })
+          : t("communityAdmin.manage")}
       </p>
       {community && connection.viewer ? (
         <Members
@@ -137,7 +159,7 @@ export function CommunityAdmin({
           onMethodChange={onMethodChange}
         />
       ) : (
-        <p role="status">Choose a connected community to manage members.</p>
+        <p role="status">{t("communityAdmin.chooseCommunity")}</p>
       )}
     </section>
   );
@@ -160,14 +182,15 @@ function Members({
   membership: CommunityMembership;
   active(): boolean;
 }) {
+  useLanguage();
   const membershipState = useSyncExternalStore(
     membership.subscribe,
     membership.snapshot,
   );
   const members = membershipState.members;
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const readError = membershipState.error ?? "";
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<DisplayMessage>("");
   const refreshing = membershipState.refreshing;
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<Pending | null>(null);
@@ -210,7 +233,7 @@ function Members({
     if (!active()) return;
     if (locked) {
       setError(STALE);
-      throw new Error(STALE);
+      throw localError("communityAdmin.stale");
     }
     setBusy(true);
     setError("");
@@ -219,10 +242,10 @@ function Members({
       try {
         await changeMember(community, change);
       } catch (reason) {
-        setError(message(reason));
+        setError(errorMessage(reason));
         throw reason;
       }
-      setNotice("Change accepted by the relay.");
+      setNotice(localMessage("communityAdmin.accepted"));
       // Stay busy until the shared roster reflects the write, so no stale row acts.
       await refresh();
     } finally {
@@ -235,26 +258,27 @@ function Members({
       disabled={refreshing || busy}
       onClick={() => void refresh()}
     >
-      Retry
+      {t("communityAdmin.retry")}
     </Button>
   ) : null;
   const status = (
     <>
       {notice && (
         <p role="status" className="m-0 text-body-sm">
-          {notice}
+          {resolveMessage(notice)}
         </p>
       )}
       {readError && (
         <p role="alert" className="m-0 text-body-sm">
-          {readError}
-          {members ? " The list below may be out of date." : ""}
+          {members
+            ? t("communityAdmin.staleRead", { error: readError })
+            : readError}
         </p>
       )}
     </>
   );
   if (membershipState.status === "idle" || membershipState.status === "loading")
-    return <p role="status">Loading members…</p>;
+    return <p role="status">{t("communityAdmin.loading")}</p>;
   if (members === null || (role !== "owner" && role !== "admin"))
     return (
       <div className="mt-4 flex flex-col items-start gap-3">
@@ -262,8 +286,8 @@ function Members({
         {!readError && (
           <p role="status" className="m-0">
             {members === null
-              ? "This community does not publish a member list, so it has no member administration."
-              : "Only community owners and admins can invite people or manage members."}
+              ? t("communityAdmin.noRoster")
+              : t("communityAdmin.restricted")}
           </p>
         )}
         {refreshButton}
@@ -295,9 +319,9 @@ function Members({
       pending.action,
     );
   const verb = {
-    promote: "Make admin",
-    demote: "Make member",
-    remove: "Remove",
+    promote: t("communityAdmin.promote"),
+    demote: t("communityAdmin.demote"),
+    remove: t("communityAdmin.remove"),
   } as const;
   return (
     <MembershipContent
@@ -316,15 +340,15 @@ function Members({
       {status}
       {error && (
         <p role="alert" className="text-body-sm">
-          {error}
+          {resolveMessage(error)}
         </p>
       )}
       <div className="flex flex-col gap-4">
         <div className={styles.searchControls}>
           <div className="min-w-0 flex-1">
             <SearchField
-              label="Search members"
-              placeholder="Search members"
+              label={t("communityAdmin.search")}
+              placeholder={t("communityAdmin.search")}
               value={query}
               onValueChange={setQuery}
             />
@@ -333,9 +357,12 @@ function Members({
         </div>
         <div>
           <h3 className="m-0 pb-2 text-caption text-subtle">
-            Members · {members.length}
+            {t("v1id.membersCount", { count: members.length })}
           </h3>
-          <ul className={styles.members} aria-label="Members">
+          <ul
+            className={styles.members}
+            aria-label={t("communityAdmin.members")}
+          >
             {shown.map((member) => {
               // A stale list must not offer another destructive command.
               const actions = stale
@@ -367,7 +394,9 @@ function Members({
                         <MenuTrigger
                           render={
                             <IconButton
-                              aria-label={`Actions for ${label}`}
+                              aria-label={t("communityAdmin.actionsFor", {
+                                name: label,
+                              })}
                               icon={<DotsThreeIcon />}
                               disabled={busy || refreshing}
                             />
@@ -396,8 +425,11 @@ function Members({
                     </div>
                   )}
                   <span className="shrink-0 text-caption text-subtle">
-                    {member.role[0]?.toUpperCase() + member.role.slice(1)}
-                    {member.pubkey === viewer ? " · You" : ""}
+                    {member.pubkey === viewer
+                      ? t("communityAdmin.selfRole", {
+                          role: roleLabel(member.role),
+                        })
+                      : roleLabel(member.role)}
                   </span>
                 </li>
               );
@@ -405,22 +437,29 @@ function Members({
           </ul>
           {!shown.length && (
             <p role="status" className="text-body-sm text-muted">
-              No members match.
+              {t("communityAdmin.noMatch")}
             </p>
           )}
         </div>
       </div>
       {pending && (
         <AlertDialog
-          title={`${verb[pending.action]}: ${name(pending.member.pubkey)}?`}
+          title={t(
+            pending.action === "promote"
+              ? "communityAdmin.confirm.promote"
+              : pending.action === "demote"
+                ? "communityAdmin.confirm.demote"
+                : "communityAdmin.confirm.remove",
+            { name: name(pending.member.pubkey) },
+          )}
           description={
             stale
-              ? STALE
+              ? resolveMessage(STALE)
               : pending.action === "remove"
-                ? "They lose access to this community until they are invited again."
+                ? t("communityAdmin.removeHelp")
                 : pending.action === "promote"
-                  ? "Admins can invite people and remove members."
-                  : "They will no longer be able to invite people or manage members."
+                  ? t("communityAdmin.promoteHelp")
+                  : t("communityAdmin.demoteHelp")
           }
           pending={busy}
           initialFocus={pending.action === "remove" ? undefined : proceed}
@@ -428,7 +467,7 @@ function Members({
           actions={
             <>
               <Button disabled={busy} onClick={() => setPending(null)}>
-                Cancel
+                {t("communityAdmin.cancel")}
               </Button>
               <Button
                 ref={proceed}
@@ -465,7 +504,7 @@ function Members({
 function publicKey(input: string) {
   const key = typedPublicKey(input);
   if (key) return key;
-  throw new Error("Enter an npub or 64-character hex public key.");
+  throw localError("communityAdmin.invalidPublicKey");
 }
 
 /** Label-left, value-right choice row control, as in the Buzz desktop dialog. */
@@ -513,9 +552,9 @@ function Choice({
   );
 }
 
-const ROLES_OFFERED = [
-  { value: "member", label: "Member" },
-  { value: "admin", label: "Admin" },
+const rolesOffered = () => [
+  { value: "member", label: t("communityAdmin.member") },
+  { value: "admin", label: t("communityAdmin.admin") },
 ];
 
 function MembershipContent({
@@ -543,6 +582,7 @@ function MembershipContent({
   retry(): void;
   add(pubkey: string, role: "admin" | "member"): Promise<void>;
 }) {
+  useLanguage();
   const [localMethod, setMethod] = useState<MembershipMethod>("members");
   const requestedMethod = selectedMethod ?? localMethod;
   const method =
@@ -555,8 +595,8 @@ function MembershipContent({
   const [identity, setIdentity] = useState("");
   const [role, setRole] = useState<"admin" | "member">("member");
   const [adding, setAdding] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
+  const [notice, setNotice] = useState<DisplayMessage>("");
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
   // The QR code drawn for one link, or no svg when it failed; it never shows
@@ -605,7 +645,7 @@ function MembershipContent({
         if (minting.current !== request) return;
         requested.current = "";
         setLink({ settings, failed: true });
-        setError(message(reason));
+        setError(errorMessage(reason));
       },
     );
   }, [open, locked, current, active, community, settings, ttl, uses]);
@@ -630,7 +670,7 @@ function MembershipContent({
       (reason) => {
         if (!live) return;
         setQr({ url, variant });
-        setError(message(reason));
+        setError(errorMessage(reason));
       },
     );
     return () => {
@@ -643,9 +683,9 @@ function MembershipContent({
     try {
       directKey = publicKey(identity);
       if (members.some((member) => member.pubkey === directKey))
-        identityError = "This person is already a community member.";
+        identityError = t("communityAdmin.alreadyMember");
     } catch (reason) {
-      identityError = message(reason);
+      identityError = resolveMessage(errorMessage(reason));
     }
   }
   async function addDirectly() {
@@ -657,9 +697,9 @@ function MembershipContent({
       await add(directKey, owner ? role : "member");
       setIdentity("");
       setRole("member");
-      setNotice("Member added directly.");
+      setNotice(localMessage("communityAdmin.added"));
     } catch (reason) {
-      setError(message(reason));
+      setError(errorMessage(reason));
     } finally {
       setAdding(false);
     }
@@ -670,18 +710,18 @@ function MembershipContent({
         <Tabs
           value={method}
           onValueChange={onMethodChange ?? setMethod}
-          label="Membership sections"
+          label={t("v1id.membershipSections")}
           variant="panel"
           items={[
             {
               value: "members",
-              label: "Members",
+              label: t("communityAdmin.members"),
               panelId: "invite-members-panel",
               disabled: adding || busy,
             },
             {
               value: "invite",
-              label: "Invite",
+              label: t("v1id.invite"),
               panelId: "invite-share-panel",
               disabled: adding || busy,
             },
@@ -689,7 +729,7 @@ function MembershipContent({
               ? [
                   {
                     value: "direct" as const,
-                    label: "Add directly",
+                    label: t("communityAdmin.addDirectly"),
                     panelId: "invite-direct-panel",
                     disabled: adding || busy,
                   },
@@ -718,10 +758,7 @@ function MembershipContent({
             {showQr && (
               <div className="flex justify-center">
                 {drawn?.svg ? (
-                  <QrCode
-                    svg={drawn.svg}
-                    alt="Scan this QR code to open the invite link"
-                  />
+                  <QrCode svg={drawn.svg} alt={t("v1id.inviteQrAlt")} />
                 ) : (
                   // Holds the code's place while the link or its code is made.
                   <div
@@ -746,15 +783,13 @@ function MembershipContent({
                     try {
                       await shareInvite(url, anchor);
                     } catch {
-                      setError(
-                        "Could not open sharing. Try again or copy the link.",
-                      );
+                      setError(localMessage("v1id.shareFailed"));
                     } finally {
                       setSharing(false);
                     }
                   }}
                 >
-                  Share
+                  {t("v1id.share")}
                 </Button>
               </div>
             )}
@@ -781,31 +816,39 @@ function MembershipContent({
                       .then(() => {
                         setCopied(true);
                       })
-                      .catch(() => setError("Could not copy the invite link."));
+                      .catch(() =>
+                        setError(localMessage("communityAdmin.copyFailed")),
+                      );
                   }}
                 >
-                  {current?.failed ? "Retry" : copied ? "Copied" : "Copy link"}
+                  {current?.failed
+                    ? t("communityAdmin.retry")
+                    : copied
+                      ? t("communityAdmin.copied")
+                      : t("communityAdmin.copyLink")}
                 </Button>
               }
             >
               <Input
-                aria-label="Community invite link"
+                aria-label={t("communityAdmin.inviteLinkLabel")}
                 readOnly
                 value={url ?? ""}
                 placeholder={
                   current?.failed
-                    ? "Couldn’t create invite link"
-                    : "Creating invite link…"
+                    ? t("communityAdmin.createFailed")
+                    : t("communityAdmin.creating")
                 }
               />
             </InputGroup>
             <SettingsGroup>
               <div className="flex items-center justify-between gap-4 py-3">
-                <span className="text-body-sm">Expires after</span>
+                <span className="text-body-sm">
+                  {t("communityAdmin.expiresAfter")}
+                </span>
                 <Choice
-                  label="Choose invite expiry"
+                  label={t("communityAdmin.chooseExpiry")}
                   value={ttl}
-                  options={EXPIRY}
+                  options={expiryOptions()}
                   onChange={setTtl}
                   // Stays usable while a link is made, so the closing menu can
                   // return focus to it; the newest choice's link wins.
@@ -813,11 +856,11 @@ function MembershipContent({
                 />
               </div>
               <div className="flex items-center justify-between gap-4 py-3">
-                <span className="text-body-sm">Max uses</span>
+                <span className="text-body-sm">{t("v1id.maxUses")}</span>
                 <Choice
-                  label="Choose maximum invite uses"
+                  label={t("communityAdmin.chooseMaxUses")}
                   value={uses}
-                  options={USES}
+                  options={maxUseOptions()}
                   onChange={setUses}
                   disabled={locked}
                 />
@@ -833,7 +876,7 @@ function MembershipContent({
           aria-labelledby="invite-direct-panel-tab"
         >
           <p className="mt-1 mb-3 text-body-sm text-muted">
-            Paste the person’s npub or 64-character public key.
+            {t("communityAdmin.identityHelp")}
           </p>
           <form
             className="flex gap-2"
@@ -845,8 +888,8 @@ function MembershipContent({
             <div className="min-w-0 flex-1">
               <InputGroup>
                 <Input
-                  aria-label="Public identity"
-                  placeholder="npub1… or public key"
+                  aria-label={t("communityAdmin.publicIdentity")}
+                  placeholder={t("communityAdmin.identityPlaceholder")}
                   value={identity}
                   onChange={(event) => setIdentity(event.currentTarget.value)}
                   autoComplete="off"
@@ -855,9 +898,9 @@ function MembershipContent({
                 />
                 {owner && (
                   <Choice
-                    label="Choose member role"
+                    label={t("communityAdmin.chooseRole")}
                     value={role}
-                    options={ROLES_OFFERED}
+                    options={rolesOffered()}
                     onChange={(value) => setRole(value as "admin" | "member")}
                     disabled={adding}
                   />
@@ -875,7 +918,7 @@ function MembershipContent({
               loading={adding}
               disabled={adding || locked || !directKey || !!identityError}
             >
-              Add member
+              {t("communityAdmin.addMember")}
             </Button>
           </form>
         </section>
@@ -883,13 +926,13 @@ function MembershipContent({
       <div className="flex flex-col gap-2 empty:hidden">
         {error && (
           <p role="alert" className="m-0 text-body-sm">
-            {error}
+            {resolveMessage(error)}
           </p>
         )}
         {method !== "members" && stale && !adding && (
           <div className="flex items-center justify-between gap-3">
             <p role="alert" className="m-0 text-body-sm">
-              {STALE}
+              {resolveMessage(STALE)}
             </p>
             <Button
               size="sm"
@@ -897,13 +940,13 @@ function MembershipContent({
               disabled={refreshing}
               onClick={retry}
             >
-              Retry
+              {t("communityAdmin.retry")}
             </Button>
           </div>
         )}
         {notice && (
           <p role="status" className="m-0 text-body-sm">
-            {notice}
+            {resolveMessage(notice)}
           </p>
         )}
       </div>

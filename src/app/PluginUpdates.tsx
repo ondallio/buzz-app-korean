@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../shared/i18n";
 import {
   createContext,
   useCallback,
@@ -67,6 +68,7 @@ export function PluginUpdates({
   navigation: Pick<AppServices["navigation"], "open">;
   children: ReactNode;
 }) {
+  useLanguage();
   const [store, setStore] = useState<Updates>();
   const [action, setAction] = useState<PluginUpdate>();
   const [actionQueueId, setActionQueueId] = useState<string>();
@@ -316,7 +318,7 @@ export function PluginUpdates({
           );
           const name = plugin?.manifest.name ?? update.id;
           const manage = {
-            label: `Manage ${name} update checks`,
+            label: t("pluginManagement.updates.manageChecks", { name }),
             open: () =>
               void navigation.open({
                 version: 1,
@@ -329,11 +331,11 @@ export function PluginUpdates({
           return (
             <ToastNotice
               key={update.id}
-              title={`Update ${name}`}
-              description="Save unfinished forms and stop active plugin workers first. Updating an enabled plugin reloads it immediately."
+              title={t("pluginManagement.updateNamed", { name })}
+              description={t("pluginManagement.updates.warning")}
               tone="info"
               onDismiss={() => store?.later(update)}
-              closeLabel="Dismiss plugin update notice"
+              closeLabel={t("pluginManagement.updates.dismiss")}
               navigation={manage}
             >
               <Button
@@ -341,10 +343,12 @@ export function PluginUpdates({
                 disabled={state.busy || !!action}
                 onClick={() => open(update)}
               >
-                {review ? "Review permissions" : "Update and reload"}
+                {review
+                  ? t("pluginManagement.updates.reviewPermissions")
+                  : t("pluginManagement.updates.reload")}
               </Button>
               <Button size="sm" onClick={() => store?.later(update)}>
-                Later
+                {t("pluginManagement.updates.later")}
               </Button>
             </ToastNotice>
           );
@@ -384,7 +388,9 @@ export function PluginUpdates({
           return activation?.status === "failed" ? (
             <ToastNotice
               key={recovery.manifest.id}
-              title={`${recovery.manifest.name} cannot start`}
+              title={t("pluginManagement.updates.cannotStart", {
+                name: recovery.manifest.name,
+              })}
               description={`${activation.error}${recovery.rollbackBlockedReason ? ` ${recovery.rollbackBlockedReason}` : ""}`}
               tone="error"
             >
@@ -401,13 +407,13 @@ export function PluginUpdates({
                 }
                 onClick={() => plugins.retryPlugin(recovery.manifest.id)}
               >
-                Retry activation
+                {t("pluginManagement.updates.retryActivation")}
               </Button>
               <PluginMenu
                 plugin={recovery}
                 plugins={plugins}
                 busy={state.busy}
-                label="Plugin recovery actions"
+                label={t("pluginManagement.updates.recovery")}
               />
             </ToastNotice>
           ) : null;
@@ -423,6 +429,7 @@ export function PluginUpdatesMenu({
   onManage(): void;
   recommendations: number;
 }) {
+  useLanguage();
   const context = useContext(Context);
   // A failed check is reported on its plugin's row in Manage plugins.
   const updates = (context?.updates ?? empty).filter(
@@ -437,7 +444,7 @@ export function PluginUpdatesMenu({
       <MenuIcon>
         <SquaresFourIcon aria-hidden="true" size={16} />
       </MenuIcon>
-      Plugins
+      {t("pluginManagement.updates.plugins")}
       {count > 0 && (
         <MenuTrailing>
           <RecommendationCount count={count} />
@@ -456,11 +463,15 @@ export function PluginUpdatesMenu({
             disabled={context?.busy}
             onClick={() => context?.open(update)}
           >
-            Update {update.candidate?.manifest.name ?? update.id}
+            {t("pluginManagement.updateNamed", {
+              name: update.candidate?.manifest.name ?? update.id,
+            })}
           </MenuItem>
         ))}
         <MenuSeparator />
-        <MenuItem onClick={onManage}>Manage plugins</MenuItem>
+        <MenuItem onClick={onManage}>
+          {t("pluginManagement.updates.manage")}
+        </MenuItem>
       </MenuSubmenuPopup>
     </MenuSubmenu>
   );
@@ -492,7 +503,7 @@ export function PluginUpdateFailure({
     return (
       <LoadingRegion
         pending
-        label="Checking for updates…"
+        label={t("v1id.checkingUpdates")}
         statusVisibility="screen-reader"
       >
         {null}

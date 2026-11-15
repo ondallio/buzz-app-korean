@@ -1,3 +1,5 @@
+import { t, useLanguage } from "../../../shared/i18n";
+import { rich } from "../../../shared/i18n/rich";
 // The turns a remote agent published to its owner over the relay this session:
 // the conversation it was opened from, or all of them.
 import {
@@ -28,8 +30,6 @@ import type { IdentityNameView } from "../../../features/identity-names/service"
 import { useIdentityNames } from "../../../features/identity-names/react";
 
 export type AgentActivity = RelaySession["agentActivity"];
-
-const UNAVAILABLE = "Activity isn't available here.";
 
 export function createActivityTab(
   relay: RelayData,
@@ -82,7 +82,8 @@ export function ActivityPanel({
   /** Names the people whose messages prompted the turns. */
   names?: IdentityNameView | undefined;
 }) {
-  if (!activity) return <Note>Activity shows once Buzz is connected.</Note>;
+  useLanguage();
+  if (!activity) return <Note>{t("v1id.activity.notConnected")}</Note>;
   return (
     <ActivityFeed
       agent={agent}
@@ -125,6 +126,7 @@ function ActivityFeed({
   openConversation: AgentViewProps["openConversation"];
   names: IdentityNameView | undefined;
 }) {
+  useLanguage();
   const resolve = useIdentityNames(names);
   const [everywhere, setEverywhere] = useState(false);
   // A new request for the opened conversation's transcript shows it again.
@@ -171,19 +173,22 @@ function ActivityFeed({
     channelId,
     rootId,
   ]);
-  if (snapshot.status === "unavailable") return <Note>{UNAVAILABLE}</Note>;
+  if (snapshot.status === "unavailable")
+    return <Note>{t("v1id.activity.unavailable")}</Note>;
   if (snapshot.status === "disabled")
     return (
       <Note>
-        Turn on Agent Activity in{" "}
-        <SettingsSectionLink section="plugins" open={openSettings}>
-          Manage plugins
-        </SettingsSectionLink>{" "}
-        to see activity.
+        {rich("v1id.activity.turnOn", {
+          plugins: (
+            <SettingsSectionLink section="plugins" open={openSettings}>
+              {t("settingsHost.managePlugins")}
+            </SettingsSectionLink>
+          ),
+        })}
       </Note>
     );
   if (!transcript.turns.length && snapshot.status === "connecting")
-    return <Note>Connecting to the live feed…</Note>;
+    return <Note>{t("v1id.activity.connecting")}</Note>;
   const state = new Map(
     snapshot.turns
       .filter((turn) => turn.agent === agent.pubkey)
@@ -206,7 +211,7 @@ function ActivityFeed({
       before={
         <>
           <Note>
-            {`Turns from ${here ? "this conversation" : "all of this agent's conversations"}, captured while Buzz has been open. Earlier turns aren't shown.`}
+            {here ? t("v1id.activity.turnsHere") : t("v1id.activity.turnsAll")}
           </Note>
           {conversation && (
             // An inline link wraps in a narrow pane at large text sizes.
@@ -217,19 +222,15 @@ function ActivityFeed({
                 onClick={() => setEverywhere(!everywhere)}
               >
                 {everywhere
-                  ? "Show this conversation"
-                  : "Show all conversations"}
+                  ? t("v1id.activity.showThis")
+                  : t("v1id.activity.showAll")}
               </BaseButton>
             </p>
           )}
           {snapshot.status === "interrupted" && (
-            <Note>
-              The live feed was interrupted; it reconnects on its own.
-            </Note>
+            <Note>{t("v1id.activity.interrupted")}</Note>
           )}
-          {snapshot.trimmed > 0 && (
-            <Note>Older activity was dropped to save memory.</Note>
-          )}
+          {snapshot.trimmed > 0 && <Note>{t("v1id.activity.trimmed")}</Note>}
         </>
       }
     />

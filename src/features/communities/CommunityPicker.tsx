@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   createContext,
   useEffect,
@@ -83,6 +84,7 @@ export function CommunityPicker({
   /** Menu destinations (Invites, hosting) open through the host's navigation. */
   onOpenTarget?: ((target: OpenTarget) => void) | undefined;
 } & SwitcherState) {
+  useLanguage();
   const [localOpen, setLocalOpen] = useState(false);
   const switcherOpen = open ?? localOpen;
   const setSwitcherOpen = onOpenChange ?? setLocalOpen;
@@ -207,7 +209,7 @@ export function CommunityPicker({
   );
   return (
     <>
-      <nav aria-label="Communities" className={styles.picker}>
+      <nav aria-label={t("v1id.picker.communities")} className={styles.picker}>
         <PopoverRoot open={switcherOpen} onOpenChange={setSwitcherOpen}>
           <PopoverTrigger
             render={
@@ -216,13 +218,19 @@ export function CommunityPicker({
                 size="md"
                 variant="avatar"
                 shape="round"
-                aria-label={`Community switcher: ${active ? communityName(active) : client.memberships.length === 0 ? "Communities" : "Personal space"}`}
+                aria-label={t("v1id.picker.switcher", {
+                  name: active
+                    ? communityName(active)
+                    : client.memberships.length === 0
+                      ? t("v1id.picker.communities")
+                      : t("v1id.picker.personalSpace"),
+                })}
                 title={
                   active
                     ? communityName(active)
                     : client.memberships.length === 0
-                      ? "Communities"
-                      : "Personal space"
+                      ? t("v1id.picker.communities")
+                      : t("v1id.picker.personalSpace")
                 }
                 icon={
                   active ? (
@@ -241,7 +249,7 @@ export function CommunityPicker({
             }
           />
           <PopoverPopup
-            aria-label="Switch community"
+            aria-label={t("v1id.picker.switchCommunity")}
             onKeyDown={(event) => {
               if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key))
                 return;
@@ -277,7 +285,7 @@ export function CommunityPicker({
             }
           >
             <NavigationItem
-              label="Personal space"
+              label={t("v1id.picker.personalSpace")}
               selected={client.selected === null}
               aria-current={client.selected === null ? "true" : undefined}
               icon={<GlobeIcon size={20} />}
@@ -322,7 +330,7 @@ export function CommunityPicker({
               );
             })}
             <NavigationItem
-              label="Join a community"
+              label={t("v1id.picker.joinCommunity")}
               icon={<UsersPlusIcon size={20} />}
               onClick={() => {
                 setSwitcherOpen(false);
@@ -331,7 +339,7 @@ export function CommunityPicker({
             />
             {onOpenTarget && hostedAvailable && (
               <NavigationItem
-                label="Create community"
+                label={t("v1id.picker.createCommunity")}
                 icon={<PlusIcon size={20} />}
                 onClick={() => {
                   navigated.current = true;
@@ -367,13 +375,21 @@ export function CommunityPicker({
         <AlertDialog
           title={
             leaving.intent === "leave"
-              ? `Leave ${communityDefaultName(leaving.membership)}?`
-              : `Couldn’t leave ${communityDefaultName(leaving.membership)}`
+              ? t("v1id.picker.leaveTitle", {
+                  name: communityDefaultName(leaving.membership),
+                })
+              : t("v1id.picker.leaveFailedTitle", {
+                  name: communityDefaultName(leaving.membership),
+                })
           }
           description={
             leaving.intent === "leave"
-              ? `This sends a leave request to the community’s relay, then removes ${communityDefaultName(leaving.membership)} from this device along with its saved drafts and reading positions. Rejoining may need a new invite.`
-              : `Its relay didn’t confirm the leave, so you may still be a member. You can remove ${communityDefaultName(leaving.membership)} from this device instead, along with its saved drafts and reading positions. This doesn’t change your membership.`
+              ? t("v1id.picker.leaveDescription", {
+                  name: communityDefaultName(leaving.membership),
+                })
+              : t("v1id.picker.removeDescription", {
+                  name: communityDefaultName(leaving.membership),
+                })
           }
           pending={leaving.pending}
           onClose={() => setLeaving(null)}
@@ -386,7 +402,7 @@ export function CommunityPicker({
                 disabled={leaving.pending}
                 onClick={() => setLeaving(null)}
               >
-                Cancel
+                {t("settings.cancel")}
               </Button>
               <Button
                 variant={
@@ -396,8 +412,8 @@ export function CommunityPicker({
                 onClick={() => void depart()}
               >
                 {leaving.intent === "leave"
-                  ? "Leave community"
-                  : "Remove from this device"}
+                  ? t("v1id.picker.leaveCommunity")
+                  : t("v1id.picker.removeFromThisDevice")}
               </Button>
             </>
           }
@@ -407,7 +423,9 @@ export function CommunityPicker({
               leaving.membership.localName !==
                 communityDefaultName(leaving.membership) && (
                 <p className="text-muted">
-                  Shown as {leaving.membership.localName} on this device
+                  {t("v1id.picker.shownAs", {
+                    name: leaving.membership.localName,
+                  })}
                 </p>
               )}
             <p className="break-all">

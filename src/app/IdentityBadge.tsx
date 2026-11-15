@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../shared/i18n";
 import {
   useId,
   useLayoutEffect,
@@ -34,7 +35,7 @@ export function IdentityBadge({
   picture,
   photoContext,
   backup,
-  backupAccount = "your Builderlab account",
+  backupAccount,
   onCopy,
   children,
 }: {
@@ -51,6 +52,9 @@ export function IdentityBadge({
     action: RefObject<HTMLButtonElement | null>,
   ): ReactNode;
 }) {
+  useLanguage();
+  const account =
+    backupAccount ?? t("v1id.yourServerAccount", { server: "Builderlab" });
   const [back, setBack] = useState(false);
   const [loaded, setLoaded] = useState<string>();
   const faceId = useId();
@@ -74,15 +78,15 @@ export function IdentityBadge({
   const tilt = useIdentityTilt();
   const { x: pointerX, y: pointerY, reducedMotion } = tilt;
   return (
-    <Panel aria-label="Your Buzz ID">
+    <Panel aria-label={t("v1id.yourBuzzId")}>
       <div className={styles.badge}>
         <div className={styles.actions}>
-          <Tooltip content={back ? "Back" : "More options"}>
+          <Tooltip content={back ? t("v1id.back") : t("v1id.moreOptions")}>
             <IconButton
               ref={action}
               variant={back ? "ghost" : "subtle"}
               size="sm"
-              aria-label={back ? "Back" : "More options"}
+              aria-label={back ? t("v1id.back") : t("v1id.moreOptions")}
               aria-controls={faceId}
               aria-pressed={back}
               icon={
@@ -141,8 +145,8 @@ export function IdentityBadge({
                     <Tooltip
                       content={
                         photoContext
-                          ? `Photo from ${photoContext}`
-                          : "Your ID is shared across communities."
+                          ? t("v1id.photoFrom", { community: photoContext })
+                          : t("v1id.idShared")
                       }
                     >
                       <span
@@ -150,8 +154,8 @@ export function IdentityBadge({
                         className={styles.photoHint}
                         aria-label={
                           photoContext
-                            ? `Photo from ${photoContext}`
-                            : "Buzz identity photo"
+                            ? t("v1id.photoFrom", { community: photoContext })
+                            : t("v1id.identityPhoto")
                         }
                       >
                         <Avatar
@@ -170,7 +174,7 @@ export function IdentityBadge({
                     <div className={styles.backupCaption}>
                       {backup === "confirmed" ? (
                         <Tooltip
-                          content={`Your private key is saved on this device and backed up with ${backupAccount}.`}
+                          content={t("v1id.backedUpTooltip", { account })}
                         >
                           <span
                             // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users focus this informational pill to read its destination tooltip.
@@ -178,7 +182,7 @@ export function IdentityBadge({
                             className={`${styles.backupPill} text-label-sm`}
                           >
                             <CheckIcon size={14} aria-hidden="true" />
-                            Backed up
+                            {t("v1id.backedUp")}
                           </span>
                         </Tooltip>
                       ) : backup === "attention" ? (
@@ -192,13 +196,13 @@ export function IdentityBadge({
                               setBack(true);
                             }}
                           >
-                            Check backup
+                            {t("v1id.checkBackup")}
                           </Button>
                         </span>
                       ) : backup === "running" ? (
                         <span
                           role="status"
-                          aria-label="Backing up your key"
+                          aria-label={t("v1id.backingUpKey")}
                           className={styles.backupPill}
                         >
                           <CircleNotchIcon
@@ -242,11 +246,11 @@ export function IdentityBadge({
                     </code>
                     <span className={styles.copyAction}>
                       <Tooltip
-                        content="Copy your full public Buzz ID"
+                        content={t("v1id.copyFullBuzzId")}
                         hint="familiar"
                       >
                         <IconButton
-                          aria-label="Copy Buzz ID"
+                          aria-label={t("v1id.copyBuzzId")}
                           size="xs"
                           icon={<CopyIcon aria-hidden="true" />}
                           onClick={onCopy}
@@ -274,7 +278,9 @@ export function IdentityBadge({
                 <section
                   ref={details}
                   className={styles.details}
-                  aria-label={overflowing ? "Identity details" : undefined}
+                  aria-label={
+                    overflowing ? t("v1id.identityDetails") : undefined
+                  }
                   tabIndex={overflowing ? 0 : undefined}
                 >
                   {children(back, action)}
