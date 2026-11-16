@@ -1,4 +1,5 @@
 export const en = {
+  "u275e.members.pagePrefix": "Page ",
   "u275e.lifecycle.retry": "Retry",
   "u275e.lifecycle.pausedWait":
     "{description} Relay requests are paused, so nothing was deleted. You can retry in {wait}.",
@@ -32,6 +33,7 @@ export const en = {
 } as const;
 
 export const ko: Record<keyof typeof en, string> = {
+  "u275e.members.pagePrefix": "현재 ",
   "u275e.lifecycle.retry": "다시 시도",
   "u275e.lifecycle.pausedWait":
     "{description} 릴레이 요청이 일시 중지되어 아무것도 삭제되지 않았습니다. {wait} 후에 다시 시도할 수 있습니다.",

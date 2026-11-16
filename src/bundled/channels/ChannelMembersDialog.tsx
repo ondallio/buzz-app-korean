@@ -2588,18 +2588,13 @@ export function ChannelMembersDialog({
                             className="text-caption text-subtle"
                             aria-live="polite"
                           >
-                            <span aria-hidden="true">
-                              {t("channelForms.members.pageVisible", {
-                                page: page + 1,
-                                total: pageCount,
-                              })}
-                            </span>
                             <span className="sr-only">
-                              {t("channelForms.members.page", {
-                                page: page + 1,
-                                total: pageCount,
-                              })}
+                              {t("u275e.members.pagePrefix")}
                             </span>
+                            {t("channelForms.members.pageVisible", {
+                              page: page + 1,
+                              total: pageCount,
+                            })}
                           </span>
                           <Button
                             size="sm"
