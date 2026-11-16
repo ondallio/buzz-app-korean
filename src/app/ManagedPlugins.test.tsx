@@ -1056,7 +1056,7 @@ it("keeps a managed review and exact pinned pending install while labels change 
     "https://example.com/plugins",
     "v1",
     undefined,
-    commit,
+    { commit, path: "dist" },
   );
   const enable = screen.getByRole("switch", { name: "플러그인 활성화" });
   fireEvent.click(enable);
@@ -1111,7 +1111,7 @@ it.each([false, true])(
       "https://example.com/plugins",
       "v1",
       undefined,
-      commit,
+      { commit, path: "dist" },
     );
     expect(h.manager.installImport).not.toHaveBeenCalled();
     act(() => setLanguage("en"));

@@ -472,7 +472,7 @@ it("translates the explicit retry control while retaining its cancel path and ma
   fireEvent.click(retry);
   expect(acquire).toHaveBeenCalledOnce();
   await act(async () => held.resolve(credential));
-  expect(session.snapshot().status).toBe("signed-in");
+  await waitFor(() => expect(session.snapshot().status).toBe("signed-in"));
   expect(cancel).toHaveBeenCalledOnce();
   session.dispose();
 });

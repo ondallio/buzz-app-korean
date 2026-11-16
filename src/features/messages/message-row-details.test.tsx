@@ -342,7 +342,8 @@ it.each([false, true])(
     expect(trigger).toHaveAttribute("aria-expanded", "true");
     expect(trigger.parentElement).toBe(panel);
     expect(document.querySelector("[data-message-payload]")).toHaveTextContent(
-      "Raw 한글 {author} (edited)",
+      // The hard break renders as a line break element, not text.
+      "Raw한글 {author} (edited)",
     );
     act(() => setLanguage("en"));
     expect(trigger).toHaveAccessibleName(

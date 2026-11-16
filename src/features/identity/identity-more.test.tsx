@@ -275,7 +275,7 @@ it("retranslates retained backup-save fallback and retries with unchanged public
       onClose={close}
     />,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Sync with Builderlab" }));
+  fireEvent.click(screen.getByRole("button", { name: "Back up key" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Could not save your choice. Try again.",
   );
@@ -285,7 +285,7 @@ it("retranslates retained backup-save fallback and retries with unchanged public
   expect(screen.getByRole("alert")).toHaveTextContent(
     "선택한 설정을 저장하지 못했습니다. 다시 시도해 주세요.",
   );
-  fireEvent.click(screen.getByRole("button", { name: "Builderlab과 동기화" }));
+  fireEvent.click(screen.getByRole("button", { name: "키 백업" }));
   await act(async () => {});
   expect(save.mock.calls).toEqual([
     [pubkey, true],
@@ -311,7 +311,7 @@ it("retranslates private-key copy result while preserving the exact clipboard fi
   expect(screen.getByRole("textbox", { name: "비밀 키(nsec)" })).toBe(input);
   expect(input).toHaveValue(nsec);
   expect(screen.getByRole("status")).toHaveTextContent(
-    "비밀 키를 복사했습니다. 안전한 곳에 보관하세요. 현재 클립보드에 비밀 키가 들어 있습니다.",
+    "비밀 키를 복사했습니다. 지금 안전한 곳에 붙여넣어 두세요. Buzz가 1분 뒤 클립보드에서 지우려고 시도합니다.",
   );
   act(() => setLanguage("en"));
   expect(screen.getByRole("textbox", { name: "Private key (nsec)" })).toBe(

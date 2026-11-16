@@ -16,6 +16,7 @@ import type { ChannelLifecycleAction } from "../../features/relay/channel-lifecy
 import { ReadError } from "../../features/relay/errors";
 import { ApiPaused } from "../../features/relay/http-admission";
 import { PublishNotSent } from "../../features/relay/outbox";
+import { localMessage } from "../../shared/i18n/deferred-message";
 import { ToastProvider } from "../../shared/design-system/ui/Toast";
 import { ChannelLifecycleDialog } from "./ChannelLifecycleDialog";
 
@@ -192,7 +193,7 @@ it.each([
   fireEvent.click(screen.getByRole("button", { name: "Delete channel" }));
   await flush();
   expect(failed).toHaveBeenCalledExactlyOnceWith(
-    "Delete channel failed",
+    localMessage("channelsMenus.lifecycle.channel.delete.failure"),
     error.message,
   );
   expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();

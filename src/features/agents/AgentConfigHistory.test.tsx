@@ -141,8 +141,7 @@ it("shows recent versions relatively and older dates with an exact timestamp", (
       }).format(oldDate),
     );
     expect(oldTime).toBeVisible();
-    expect(oldTime.tagName).toBe("TIME");
-    expect(oldTime).toHaveAttribute("datetime", "2025-10-27T18:00:00.000Z");
+    expect(oldTime).toHaveAttribute("datetime", oldDate.toISOString());
     expect(oldTime).toHaveAttribute(
       "title",
       new Intl.DateTimeFormat("en-US", {

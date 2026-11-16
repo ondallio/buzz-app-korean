@@ -384,7 +384,9 @@ it("keeps the same failed-connection recovery action through language changes", 
   } as RelaySnapshot;
   render(
     <ChannelsPage
-      relay={{ snapshot: () => snapshot, retry } as unknown as RelayData}
+      relay={
+        { snapshot: () => snapshot, tryAgain: retry } as unknown as RelayData
+      }
       panels={{} as Panels}
       navigator={createNavigationController(createMemoryHistory()).navigation}
     />,

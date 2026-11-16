@@ -4396,7 +4396,7 @@ it("retains the canonical people filter and same focused option while its labels
   const h = await setup("stream", false, true);
   await act(async () => h.replaceRoster([h.viewer.pubkey, h.agent.pubkey]));
   const filter = await screen.findByRole("button", {
-    name: "Filter people and agents: All",
+    name: "Filter members: All",
   });
   await h.user.click(filter);
   await h.user.click(
@@ -4406,9 +4406,7 @@ it("retains the canonical people filter and same focused option while its labels
   const input = screen.getByRole("searchbox");
   const person = screen.getByText("Carl (you)");
   act(() => setLanguage("ko"));
-  expect(
-    screen.getByRole("button", { name: "사람 및 에이전트 필터: 사람" }),
-  ).toBe(filter);
+  expect(screen.getByRole("button", { name: "멤버 필터: 사람" })).toBe(filter);
   expect(screen.getByRole("searchbox", { name: "사람 및 에이전트 검색" })).toBe(
     input,
   );

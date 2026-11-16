@@ -2761,7 +2761,8 @@ it.each(["en", "ko"] as const)(
             : "View agent activity: Blossom, Received · waiting to start",
       });
       expect(replacement).toHaveFocus();
-      expect(replacement).toHaveAttribute("aria-expanded", "false");
+      // A lone agent's bubble opens its profile, not a popup.
+      expect(replacement).not.toHaveAttribute("aria-expanded");
       expect(retryRequest).toHaveBeenCalledExactlyOnceWith(A, "c", root);
       expect(again).toHaveBeenCalledOnce();
       expect(dismiss).not.toHaveBeenCalled();
@@ -2869,20 +2870,18 @@ it("keeps local state and canonical Sending-a-message classification while finit
     const trigger = screen.getByRole("button", {
       name: "View agent activity: Blossom, Received · waiting to start",
     });
-    fireEvent.click(trigger);
-    await act(async () => vi.advanceTimersToNextFrame());
-    const item = screen.getByRole("button", {
-      name: "View activity for Blossom",
-    });
+    // A lone agent's bubble is its own activity row; there is no popup.
+    const item = trigger;
     item.focus();
     act(() => setLanguage("ko"));
-    expect(item).toHaveTextContent("요청 받음 · 시작 대기 중");
     expect(item).toHaveFocus();
     expect(trigger).toHaveAccessibleName(
       "에이전트 활동 보기: Blossom, 요청 받음 · 시작 대기 중",
     );
     act(() => work.started());
-    expect(item).toHaveTextContent("시작 중");
+    expect(trigger).toHaveAccessibleName(
+      "에이전트 활동 보기: Blossom, 시작 중",
+    );
     expect(local.reader.work()[0]?.state).toBe("working");
     act(() => work.step("send_message"));
     expect(trigger).toHaveAccessibleName(
@@ -2892,14 +2891,13 @@ it("keeps local state and canonical Sending-a-message classification while finit
       within(trigger).queryByText("Sending a message"),
     ).not.toBeInTheDocument();
     act(() => work.step("Read", "Starting {name}.txt"));
-    expect(item).toHaveTextContent("Reading Starting {name}.txt");
+    expect(trigger).toHaveAccessibleName(
+      "에이전트 활동 보기: Blossom, Reading Starting {name}.txt",
+    );
     expect(local.reader.work()[0]?.step).toEqual({
       tool: "Read",
       target: "Starting {name}.txt",
     });
-    expect(screen.getByRole("button", { name: "Blossom 활동 보기" })).toBe(
-      item,
-    );
     expect(f.props.open).not.toHaveBeenCalled();
   } finally {
     view.unmount();
@@ -2945,23 +2943,13 @@ it.each([
       const trigger = screen.getByRole("button", {
         name: "View agent activity: Agent, remote, working",
       });
-      fireEvent.click(trigger);
-      await act(async () => vi.advanceTimersToNextFrame());
-      const dialog = screen.getByRole("dialog", { name: "Agent activity" });
-      const item = screen.getByRole("button", {
-        name: "View activity for Agent",
-      });
+      // A lone agent's bubble is its own activity row; there is no popup.
+      const item = trigger;
       expect(item).toHaveTextContent(en);
       item.focus();
       act(() => setLanguage("ko"));
-      expect(screen.getByRole("dialog", { name: "에이전트 활동" })).toBe(
-        dialog,
-      );
       expect(trigger).toHaveAccessibleName(
         "에이전트 활동 보기: Agent, 원격, 작업 중",
-      );
-      expect(screen.getByRole("button", { name: "Agent 활동 보기" })).toBe(
-        item,
       );
       expect(item).toHaveTextContent(ko);
       expect(item).toHaveFocus();
@@ -3096,8 +3084,6 @@ it.each([false, true])(
           })
           .interruptible(stop),
       );
-      openBubble();
-      await act(async () => vi.advanceTimersToNextFrame());
       const button = screen.getByRole("button", { name: "Stop Blossom" });
       button.focus();
       act(() => setLanguage("ko"));
@@ -3112,9 +3098,9 @@ it.each([false, true])(
       await act(async () => vi.runAllTicks());
       expect(button).not.toBeInTheDocument();
       const outcome = screen.getByRole("button", {
-        name: "활동 기록 접기: Blossom, 중지됨",
+        name: "활동 기록 보기: Blossom, 중지됨",
       });
-      expect(outcome).toHaveAttribute("aria-expanded", "true");
+      expect(outcome).toHaveAttribute("aria-expanded", "false");
       expect(moved ? other : outcome).toHaveFocus();
       expect(local.reader.work()[0]?.state).toBe("stopped");
       expect(stop).toHaveBeenCalledOnce();

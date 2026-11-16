@@ -253,9 +253,7 @@ it.each([true, false])(
     );
     const draft = input();
     draft.setSelectionRange(1, 6);
-    const sentence = screen.getByText(
-      /Uses your Builderlab sign-in/,
-    ).parentElement;
+    const sentence = parentOf(screen.getByText(/Uses your Builderlab sign-in/));
     const link = hasAction
       ? screen.getByRole("button", { name: "Manage account" })
       : sentence;
@@ -266,19 +264,21 @@ it.each([true, false])(
       expect(
         hasAction
           ? screen.getByRole("button", { name: label })
-          : screen.getByText(
-              language === "ko"
-                ? /Builderlab 로그인을 사용합니다/
-                : /Uses your Builderlab sign-in/,
-            ).parentElement,
+          : parentOf(
+              screen.getByText(
+                language === "ko"
+                  ? /Builderlab 로그인을 사용합니다/
+                  : /Uses your Builderlab sign-in/,
+              ),
+            ),
       ).toBe(link);
       expect(link.closest("p")).toBe(sentence);
-      expect(sentence?.textContent).toBe(
+      expect(sentence.textContent).toBe(
         language === "ko"
           ? `Builderlab 로그인을 사용합니다.${hasAction ? label : "신원에서 계정 관리"}`
           : `Uses your Builderlab sign-in.${hasAction ? label : "Manage account in Identity"}`,
       );
-      if (hasAction) expect(sentence?.textContent?.split(label).length).toBe(2);
+      if (hasAction) expect(sentence.textContent?.split(label).length).toBe(2);
       expect(input()).toBe(draft);
       expect(draft).toHaveValue(rawDraft);
       expect([draft.selectionStart, draft.selectionEnd]).toEqual([1, 6]);
@@ -299,6 +299,12 @@ it.each([true, false])(
     session.dispose();
   },
 );
+
+function parentOf(element: HTMLElement): HTMLElement {
+  const parent = element.parentElement;
+  if (!parent) throw new Error("Expected element to have a parent");
+  return parent;
+}
 
 it("keeps checking and raw same-English diagnostics without acquiring or cancelling on locale", () => {
   const acquire = vi.fn(async () => credential),

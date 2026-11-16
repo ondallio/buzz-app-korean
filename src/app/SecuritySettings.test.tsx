@@ -384,6 +384,10 @@ it("updates paired dates and labels without reloading tools or changing native r
   act(() => setLanguage("en"));
   expect(screen.getByRole("button", { name: "Revoke" })).toBe(revoke);
   await userEvent.click(revoke);
+  const dialog = await screen.findByRole("alertdialog", {
+    name: "Revoke buzz-cli?",
+  });
+  await userEvent.click(within(dialog).getByRole("button", { name: "Revoke" }));
   expect(invoke).toHaveBeenLastCalledWith("credential_pairing_revoke", {
     id: "p1",
   });

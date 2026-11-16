@@ -119,23 +119,23 @@ it("retains install code and buttons across locale, then shows the real checking
       />,
     );
     fireEvent.click(
-      await screen.findByRole("button", { name: "Install Codex" }),
+      await screen.findByRole("button", { name: "Install integration" }),
     );
-    const dialog = await screen.findByRole("dialog", { name: "Set up Codex" });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Codex integration",
+    });
     await waitFor(() =>
       expect(f.request).toHaveBeenCalledExactlyOnceWith({
         url: "https://releases.openai.com/codex/channels/latest",
       }),
     );
-    const code = dialog.querySelector("code");
-    if (!code) throw new Error("Missing command code");
-    const paragraph = code.closest("p");
-    expect(code).toHaveTextContent("codex");
+    const paragraph = dialog.querySelector("p.text-subtle");
+    if (!paragraph) throw new Error("Missing download description");
     expect(paragraph).toHaveTextContent(
-      "Downloads Buzz's own copy of Codex (about 130 MB) from releases.openai.com and keeps it on the latest release. It does not change the codex in your terminal, and uses the same sign-in and settings.",
+      "Downloads Buzz's own copy of Codex (about 130 MB) and keeps it on the latest release. Your own installation of Codex will be unaffected, and uses the same sign-in and settings.",
     );
     const install = within(dialog).getByRole("button", {
-      name: "Install Codex",
+      name: "Install integration",
     });
     const cancel = within(dialog).getByRole("button", { name: "Cancel" });
     cancel.focus();
@@ -145,21 +145,18 @@ it("retains install code and buttons across locale, then shows the real checking
       act(() => setLanguage(language));
       expect(
         screen.getByRole("dialog", {
-          name: language === "ko" ? "Codex 설정" : "Set up Codex",
+          name: language === "ko" ? "Codex 연동" : "Codex integration",
         }),
       ).toBe(dialog);
-      expect(dialog.querySelector("code")).toBe(code);
-      expect(code.closest("p")).toBe(paragraph);
-      expect(code.textContent).toBe("codex");
+      expect(dialog.querySelector("p.text-subtle")).toBe(paragraph);
       expect(paragraph).toHaveTextContent("130 MB");
-      expect(paragraph).toHaveTextContent("releases.openai.com");
       if (language === "ko")
         expect(paragraph).toHaveTextContent(
-          "터미널에서 사용하는 codex는 변경하지 않으며, 같은 로그인 정보와 설정을 사용합니다.",
+          "사용자가 직접 설치한 Codex에는 영향을 주지 않으며, 같은 로그인 정보와 설정을 사용합니다.",
         );
       expect(
         within(dialog).getByRole("button", {
-          name: language === "ko" ? "Codex 설치" : "Install Codex",
+          name: language === "ko" ? "연동 설치" : "Install integration",
         }),
       ).toBe(install);
       expect(cancel).toHaveFocus();
@@ -187,11 +184,10 @@ it("retains install code and buttons across locale, then shows the real checking
     );
     const again = within(dialog).getByRole("button", { name: "다시 확인" });
     expect(again).toHaveAttribute("aria-disabled", "true");
-    expect(dialog.querySelector("code")).toBe(code);
     await act(async () => version.resolve());
     await waitFor(() =>
       expect(within(dialog).getByRole("status")).toHaveTextContent(
-        "Codex가 설치되어 있지 않습니다.",
+        "Codex 연동이 아직 설치되어 있지 않습니다.",
       ),
     );
     expect(again).not.toHaveAttribute("aria-disabled", "true");

@@ -233,6 +233,7 @@ it("retains the actual nav and production keyboard dispatcher through locale cha
       conversation: {
         registerCompletion() {},
         registerTabs() {},
+        registerWorkspace() {},
         registerMessageAction() {},
       },
       settingsCards: { register() {} },

@@ -37,12 +37,14 @@ it("keeps the exact wipe phrase, revealed fixture and controls through locale ch
   ) as HTMLInputElement;
   await user.type(phrase, WIPE_PHRASE);
   phrase.setSelectionRange(1, 5);
-  const dialog = screen.getByRole("alertdialog", { name: "Sign out of Buzz?" });
-  const confirm = screen.getByRole("button", { name: "Sign out and erase" });
+  const dialog = screen.getByRole("alertdialog", {
+    name: "Remove your key from this device?",
+  });
+  const confirm = screen.getByRole("button", { name: "Remove and erase data" });
   expect(confirm).toBeEnabled();
   act(() => setLanguage("ko"));
   expect(
-    screen.getByRole("alertdialog", { name: "Buzz에서 로그아웃할까요?" }),
+    screen.getByRole("alertdialog", { name: "이 기기에서 키를 제거할까요?" }),
   ).toBe(dialog);
   expect(
     screen.getByLabelText(`확인하려면 “${WIPE_PHRASE}”을 입력하세요`),
@@ -52,7 +54,7 @@ it("keeps the exact wipe phrase, revealed fixture and controls through locale ch
   expect(phrase).toHaveValue("erase all my data");
   expect(identity.signOut).not.toHaveBeenCalled();
   act(() => setLanguage("en"));
-  expect(screen.getByRole("button", { name: "Sign out and erase" })).toBe(
+  expect(screen.getByRole("button", { name: "Remove and erase data" })).toBe(
     confirm,
   );
   await user.click(confirm);

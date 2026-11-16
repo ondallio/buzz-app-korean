@@ -574,8 +574,12 @@ function ActivityBubble({
       ? [currentPreview.title, currentPreview.detail]
           .filter(Boolean)
           .join(" · ")
-      : entries.length === 1
-        ? current?.remoteStatus
+      : entries.length === 1 && current?.remoteStatus
+        ? t(
+            current.remoteRuntime === "block.builderlab/builderlab"
+              ? "activityAccessory.remoteBuilderlab"
+              : "activityAccessory.remoteMachine",
+          )
         : undefined;
   const avatars = (group: Entry[]) => (
     <AvatarStack
