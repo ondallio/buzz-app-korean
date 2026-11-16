@@ -40,6 +40,7 @@ it("moves idle Solo huddles to the menu while preserving Team's header action", 
     snapshot: () => snapshot,
     subscribe: () => () => {},
     retry() {},
+    tryAgain() {},
     disconnect() {},
     async clearCache() {},
   };
@@ -230,6 +231,7 @@ it("offers voice for a capable agent DM, explains automatic joining, and keeps o
     snapshot: () => snapshot,
     subscribe: () => () => {},
     retry() {},
+    tryAgain() {},
     disconnect() {},
     async clearCache() {},
   };
@@ -328,6 +330,7 @@ function localizedLauncherFixture(
     snapshot: () => snapshot,
     subscribe: () => () => {},
     retry() {},
+    tryAgain() {},
     disconnect() {},
     async clearCache() {},
   };

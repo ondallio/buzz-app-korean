@@ -1,4 +1,5 @@
 import { useContext, useSyncExternalStore, type ReactNode } from "react";
+import { t, useLanguage } from "../../shared/i18n";
 import { agentAvatars } from "../../features/agents/avatar-packs";
 import { bestieChat } from "../../bundled/bestie/chat";
 import { UnreadBadge } from "../../bundled/channels/UnreadBadge";
@@ -7,7 +8,7 @@ import { useAgentChoices } from "../../features/agents/use-choices";
 import type { RegisteredPage } from "../../features/pages/service";
 import { useRelayConnection } from "../../features/relay/react";
 import type { RelayData } from "../../features/relay/service";
-import { useSavedAgent } from "../../features/solo/default-agent";
+import { useSavedAgentState } from "../../features/solo/default-agent";
 import { pagePresentation } from "./presentation";
 import { useAvatarPreview } from "../../features/profiles/use-avatar-preview";
 import styles from "./BestieNavigation.module.css";
@@ -28,6 +29,7 @@ export function BestieNavigationProvider({
   relay: RelayData;
   children: ReactNode;
 }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const { viewer, scope, session } = connection;
   const enabled =
@@ -35,7 +37,8 @@ export function BestieNavigationProvider({
     !!viewer &&
     !!scope?.endsWith(`:${viewer}`);
   const active = enabled && connection.status === "ready";
-  const saved = useSavedAgent(session, scope ?? "");
+  const savedState = useSavedAgentState(session, scope ?? "");
+  const saved = savedState.agent;
   const choices = useAgentChoices(session, active, active);
   const agent = enabled
     ? choices.selectable.find((item) => item.pubkey === saved)
@@ -69,7 +72,20 @@ export function BestieNavigationProvider({
         detail: "Bestie",
         avatar: { src: avatar, shape: "squircle" },
       }
-    : undefined;
+    : active &&
+        savedState.read &&
+        !savedState.error &&
+        !saved &&
+        choices.complete &&
+        ["ready", "unavailable"].includes(choices.archives.status) &&
+        !choices.archives.error &&
+        !choices.error
+      ? {
+          label: t("u275f00.bestieNav.create"),
+          detail: "Bestie",
+          placeholder: true,
+        }
+      : undefined;
   return (
     <BestieNavigationContext value={mark}>
       <BestieConversationContext

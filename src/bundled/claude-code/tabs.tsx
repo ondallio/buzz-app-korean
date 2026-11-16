@@ -178,6 +178,7 @@ function ClaudeSignIn({
   disabled: boolean;
   inline?: boolean;
 }) {
+  useLanguage();
   const [open, setOpen] = useState(false);
   const state = useSyncExternalStore(setup.subscribe, setup.snapshot);
   const missing = state.status?.state === "missing";
@@ -199,7 +200,7 @@ function ClaudeSignIn({
         }}
       >
         {missing
-          ? "Install Claude"
+          ? t("u275f01.claude.installIntegration")
           : outdated
             ? "Update Claude"
             : signedOut
@@ -208,7 +209,11 @@ function ClaudeSignIn({
       </Button>
       <Dialog
         open={open}
-        title="Set up Claude"
+        title={
+          missing || outdated
+            ? t("u275f01.claude.integration")
+            : "Set up Claude"
+        }
         onOpenChange={(next) => {
           setOpen(next);
           if (!next) void setup.cancel();
@@ -237,6 +242,7 @@ function ClaudeSetupPanel({
   /** Follows saved credentials, so the panel's dialog can close. */
   onSaved?: (() => void) | undefined;
 }) {
+  useLanguage();
   const state = useSyncExternalStore(setup.subscribe, setup.snapshot);
   useEffect(() => {
     if (!setup.snapshot().status) void setup.check();
@@ -249,7 +255,7 @@ function ClaudeSetupPanel({
     !status || state.checking
       ? "Checking Claude…"
       : status.state === "missing"
-        ? "Claude is not installed."
+        ? t("u275f01.claude.notInstalled")
         : status.state === "outdated"
           ? `Claude ${status.version} is older than Buzz needs.`
           : status.state === "signed-out"
@@ -260,7 +266,10 @@ function ClaudeSetupPanel({
   // One button per slot, so focus stays put as Install becomes Check again.
   const action =
     status?.state === "missing"
-      ? ({ step: "install", label: "Install Claude" } as const)
+      ? ({
+          step: "install",
+          label: t("u275f01.claude.installIntegration"),
+        } as const)
       : status?.state === "outdated"
         ? ({ step: "install", label: "Update Claude" } as const)
         : undefined;
@@ -312,10 +321,7 @@ function ClaudeSetupPanel({
       </div>
       {status?.state === "missing" && (
         <p className="m-0 text-body-sm text-subtle">
-          Downloads Buzz's own copy of Claude (about 250 MB) from
-          downloads.claude.ai and keeps it on the latest release. It does not
-          change the <code>claude</code> in your terminal, and uses the same
-          settings.
+          {t("u275f01.claude.downloads")}
         </p>
       )}
       {state.output && (
@@ -815,6 +821,7 @@ export function createTabs({
   }
 
   function ProviderDialogBody({ onClose }: { onClose(): void }) {
+    useLanguage();
     const state = useSetupCatalog();
     const status = state.status;
     const ready = status?.state === "ready" && !state.checking;
@@ -827,7 +834,7 @@ export function createTabs({
       !status || state.checking
         ? "Checking Claude…"
         : status.state === "missing"
-          ? "Claude is not installed."
+          ? t("u275f01.claude.notInstalled")
           : status.state === "outdated"
             ? `Claude ${status.version} is older than Buzz needs.`
             : status.state === "signed-out"
@@ -837,7 +844,10 @@ export function createTabs({
                 : undefined;
     const action =
       status?.state === "missing"
-        ? ({ step: "install", label: "Install Claude" } as const)
+        ? ({
+            step: "install",
+            label: t("u275f01.claude.installIntegration"),
+          } as const)
         : status?.state === "outdated"
           ? ({ step: "install", label: "Update Claude" } as const)
           : status?.state === "signed-out" && setup.auth.signIn
@@ -883,10 +893,7 @@ export function createTabs({
           )}
           {status?.state === "missing" && !state.running && (
             <p className="m-0 text-body-sm text-subtle">
-              Downloads Buzz's own copy of Claude (about 250 MB) from
-              downloads.claude.ai and keeps it on the latest release. It does
-              not change the <code>claude</code> in your terminal, and uses the
-              same settings.
+              {t("u275f01.claude.downloads")}
             </p>
           )}
           {state.output && state.running !== "install" && (

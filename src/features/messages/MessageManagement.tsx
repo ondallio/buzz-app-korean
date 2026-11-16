@@ -32,10 +32,12 @@ import { useConversationPresentation } from "../conversation/ConversationPresent
 import { useAgentOwnerEvidence } from "../profiles/useAgentOwnerEvidence";
 import type { ChannelMessage } from "../relay/contracts";
 import { useListedChannel } from "../relay/listed-channel";
+import { headReadPending } from "../relay/live-recovery";
 import type { RelaySession } from "../relay/session";
 import type { MessageAttention } from "../relay/unread";
 import type { AgentOwnerAuthorization } from "../relay/messages";
 import type { OutgoingEvent } from "../relay/outbox";
+import { followUpQueue } from "./follow-up-queue";
 import { MessageEditScope, useMessageEditScope } from "./MessageEditScope";
 import { useAfterMessageMenuClose } from "./MessageActionBar";
 import { lastEditableMessage } from "./useMessageEdit";
@@ -116,7 +118,8 @@ type MessageVisit = Readonly<{
   session: RelaySession;
   channelId: string | undefined;
   token: object;
-  entryMessageIds: ReadonlySet<string>;
+  /** Unset when the window showed no verified page: the first one defines them. */
+  entryMessageIds: ReadonlySet<string> | undefined;
   entryHistoryComplete: boolean;
   entryReadRevision: number;
   entryAttention: ReadonlyMap<
@@ -210,6 +213,23 @@ export function useMessageKeyActions(session: RelaySession) {
   }, [management, editor, session]);
 }
 
+/** A failed or unconfirmed send is still this device's outbox intent. */
+const unsent = (row: ChannelMessage) =>
+  row.delivery === "failed" || row.delivery === "unknown";
+
+/** An unconfirmed send may be discarded here only when no caller still owns its
+ * recovery: a Solo follow-up's queue releases it once its record is gone. */
+const discardable = (
+  session: RelaySession,
+  row: ChannelMessage,
+  item: OutgoingEvent | undefined,
+) =>
+  item?.event.id === row.id &&
+  item.delivery === row.delivery &&
+  (row.delivery === "failed" ||
+    !item.recovery ||
+    followUpQueue(session).discardable(item));
+
 /** Recovery stays outside virtualized rows; each conversation has one edit destination. */
 export function MessageManagement({
   session,
@@ -265,7 +285,7 @@ export function MessageManagement({
   const available =
     !selection ||
     ((!channelId || channelId === selection.row.channelId) &&
-      (selection.row.delivery === "failed" || deletable));
+      (unsent(selection.row) || deletable));
   useEffect(() => {
     if (!available) setSelection(undefined);
   }, [available]);
@@ -287,6 +307,9 @@ export function MessageManagement({
   const captureVisit = () => {
     const window = channelId ? session.channels.window(channelId) : undefined;
     const rows = window?.rows ?? [];
+    // An older page can mark the window verified while the catch-up head read
+    // is still queued or in flight: those rows are not yet the head.
+    const headPending = !!channelId && headReadPending(session.live, channelId);
     const entryAttention = new Map<
       string,
       Pick<MessageAttention, "unread" | "forced"> | null
@@ -305,11 +328,21 @@ export function MessageManagement({
       session,
       channelId,
       visitChannelId,
-      entryMessageIds: new Set(rows.map((row) => row.id)),
+      // A window first opened this session or evicted since has no rows yet,
+      // and one restored from disk, or whose stream dropped, shows rows its
+      // head read has not verified. Either set would rule out every message
+      // that arrived while the channel was not being followed.
+      entryMessageIds:
+        window?.status === "ready" &&
+        window.freshness === "verified" &&
+        !headPending
+          ? new Set(rows.map((row) => row.id))
+          : undefined,
       entryHistoryComplete:
         window?.status === "ready" &&
         window.freshness === "verified" &&
         !window.refreshing &&
+        !headPending &&
         !window.loadingOlder &&
         !window.hasMore &&
         !window.historyLimited,
@@ -525,15 +558,16 @@ export function MessageManagementItems({
   row: ChannelMessage;
   session: RelaySession;
 }) {
-  return row.delivery === "failed" ? (
+  return unsent(row) ? (
     <UnsentMessageItems row={row} session={session} />
   ) : (
     <ManagedMessageItems row={row} session={session} />
   );
 }
 
-/** The relay never stored a failed send, so Delete, which discards it from this
- * device, is its only item, and channel state does not gate it. */
+/** Removing an unsent message discards it from this device, so it is the only
+ * item and channel state does not gate it. An unconfirmed send may have reached
+ * the relay; a caller that owns its recovery confirms it instead. */
 function UnsentMessageItems({
   row,
   session,
@@ -549,7 +583,13 @@ function UnsentMessageItems({
     !management ||
     row.authorId !== session.viewer ||
     row.membership ||
-    row.diff
+    row.diff ||
+    (row.delivery === "unknown" &&
+      !discardable(
+        session,
+        row,
+        management.operations.find((item) => item.event.id === row.id),
+      ))
   )
     return null;
   const remove = () =>
@@ -559,7 +599,9 @@ function UnsentMessageItems({
       <MenuIcon>
         <TrashIcon size={14} />
       </MenuIcon>
-      {t("messageActions.delete.label")}
+      {row.delivery === "unknown"
+        ? t("u275c.delete.removeLabel")
+        : t("messageActions.delete.label")}
     </MenuItem>
   );
 }
@@ -722,8 +764,10 @@ function DeleteMessageDialog({
   );
   const cancelAction = useRef<HTMLButtonElement>(null);
   const [error, setError] = useState<DisplayMessage>();
-  // The relay never stored a failed send; deleting it discards the outbox intent.
-  const unsent = row.delivery === "failed";
+  // Deleting an unsent message discards only its outbox intent. An unconfirmed
+  // one may already be on the relay; discarding it never retracts that copy.
+  const local = unsent(row);
+  const unconfirmed = row.delivery === "unknown";
   const [discarding, setDiscarding] = useState(false);
   const operation = operations.find((item) => item.event.id === operationId);
   const pending = operation?.delivery === "sending" || discarding;
@@ -744,7 +788,7 @@ function DeleteMessageDialog({
     setError(undefined);
     try {
       if (
-        !unsent &&
+        !local &&
         !session.channels
           .list()
           .channels.some(
@@ -757,18 +801,17 @@ function DeleteMessageDialog({
           )
       )
         throw localError("messageActions.delete.unavailable");
-      if (unsent) {
+      if (local) {
         // dismiss() leaves a send that is retrying alone, without an error.
-        if (
-          !session.outbox
-            ?.snapshot()
-            .some(
-              (item) => item.event.id === row.id && item.delivery === "failed",
-            )
-        )
+        const item = session.outbox
+          ?.snapshot()
+          .find((item) => item.event.id === row.id);
+        if (!session.outbox || !discardable(session, row, item))
           throw localError("messageActions.delete.changed");
         setDiscarding(true);
-        await session.outbox.dismiss(row.id);
+        await (unconfirmed && item?.recovery
+          ? followUpQueue(session).discard(row.id)
+          : session.outbox.dismiss(row.id));
         close();
       } else if (operationId) {
         session.outbox?.retry(operationId);
@@ -789,12 +832,18 @@ function DeleteMessageDialog({
   };
   return (
     <AlertDialog
-      title={t("messageActions.delete.title")}
+      title={
+        unconfirmed
+          ? t("u275c.delete.unconfirmedTitle")
+          : t("messageActions.delete.title")
+      }
       initialFocus={cancelAction}
       description={
-        unsent
-          ? t("messageActions.delete.unsentDescription")
-          : t("messageActions.delete.sentDescription")
+        unconfirmed
+          ? t("u275c.delete.unconfirmedDescription")
+          : local
+            ? t("messageActions.delete.unsentDescription")
+            : t("messageActions.delete.sentDescription")
       }
       pending={pending}
       finalFocus={() =>
@@ -810,10 +859,14 @@ function DeleteMessageDialog({
           </Button>
           <Button variant="destructive" disabled={pending} onClick={run}>
             {pending
-              ? t("messageActions.delete.pending")
+              ? unconfirmed
+                ? t("u275c.delete.removePending")
+                : t("messageActions.delete.pending")
               : retryable
                 ? t("messageActions.retry")
-                : t("messageActions.delete.confirm")}
+                : unconfirmed
+                  ? t("u275c.delete.removeConfirm")
+                  : t("messageActions.delete.confirm")}
           </Button>
         </>
       }

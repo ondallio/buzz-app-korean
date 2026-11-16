@@ -82,8 +82,8 @@ export function SignOutDialog({
   }
   return (
     <AlertDialog
-      title={t("accessDialogs.signOutTitle")}
-      description={t("accessDialogs.signOutDescription")}
+      title={t("u275b.identity.removeKeyTitle")}
+      description={t("u275b.identity.removeKeyDescription")}
       onClose={onClose}
       pending={pending}
       actions={
@@ -96,7 +96,11 @@ export function SignOutDialog({
             disabled={!ready || pending}
             onClick={() => void confirm()}
           >
-            {t(wipe ? "accessDialogs.signOutErase" : "accessDialogs.signOut")}
+            {t(
+              wipe
+                ? "u275b.identity.removeAndErase"
+                : "u275b.identity.removeFromDevice",
+            )}
           </Button>
         </>
       }

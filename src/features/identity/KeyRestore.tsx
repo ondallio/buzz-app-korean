@@ -59,8 +59,9 @@ export function KeyRestore({
         ? state.candidates.length === 0
           ? t("identityMore.restoreNotFound")
           : t("identityMore.restoreMismatch")
-        : failed
-          ? t("identityMore.restoreRetryHelp")
+        : state?.status === "error"
+          ? // Native names the cause: canceled, timed out, offline or a retry.
+            t("u275b.identity.restoreErrorHelp", { error: state.error })
           : saving
             ? t("identityMore.restoringKey")
             : canceling

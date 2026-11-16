@@ -321,6 +321,7 @@ export function ProfileSettings({
                 <ProfileBackdrop src={backdrop} />
                 <div>
                   <AvatarEditor
+                    personal
                     size="compact"
                     value={profile.picture}
                     name={verifiedName?.name ?? profile.name}

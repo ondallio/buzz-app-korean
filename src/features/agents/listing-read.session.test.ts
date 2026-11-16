@@ -131,6 +131,7 @@ function fixture() {
       };
     },
     retry() {},
+    tryAgain() {},
     disconnect() {
       snapshot = {
         status: "disconnected",

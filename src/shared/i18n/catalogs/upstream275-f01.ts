@@ -1,0 +1,123 @@
+export const en = {
+  "u275f01.chart.cantDraw": "This chart couldn't be drawn.",
+  "u275f01.chart.sourceTruncated": "… (source truncated)",
+  "u275f01.chart.label": "Chart: {title}",
+  "u275f01.chart.source": "Source:",
+  "u275f01.chart.viewRows": "View {count}{more} data rows",
+  "u275f01.chart.expand": "Expand chart",
+  "u275f01.chart.title": "Chart",
+  "u275f01.chart.close": "Close chart",
+  "u275f01.claude.title": "Claude",
+  "u275f01.claude.subtitle": "Manage Claude’s credentials on this computer.",
+  "u275f01.claude.apiKey": "Anthropic API key",
+  "u275f01.claude.checkingKey": "Checking for a saved key…",
+  "u275f01.claude.retry": "Retry",
+  "u275f01.claude.removeTitle": "Remove Claude API key?",
+  "u275f01.claude.removeDescription":
+    "This removes the key from {storage}. New local Claude sessions will need a key. A turn already running can finish.",
+  "u275f01.claude.storageMac": "this Mac’s Keychain",
+  "u275f01.claude.storageDevice": "this device’s secure storage",
+  "u275f01.claude.cancel": "Cancel",
+  "u275f01.claude.removeKey": "Remove key",
+  "u275f01.claude.installIntegration": "Install integration",
+  "u275f01.claude.integration": "Claude integration",
+  "u275f01.claude.notInstalled": "The Claude integration isn't installed yet.",
+  "u275f01.claude.downloads":
+    "Downloads Buzz's own copy of Claude (about 250 MB) and keeps it on the latest release. Your own installation of Claude will be unaffected, and uses the same settings.",
+  "u275f01.goose.default": "Default",
+  "u275f01.goose.levelsError": "Could not read goose's levels: {error}",
+  "u275f01.mentions.localFolder": "Local folder · {path}",
+  "u275f01.mentions.skillsFor": "Skills for {name}",
+  "u275f01.mentions.oneAgent": "Mention one agent to choose a skill.",
+  "u275f01.mobile.checking": "Checking your Builderlab account…",
+  "u275f01.mobile.title": "Mobile app",
+  "u275f01.mobile.getTitle": "Get Buzz on your phone",
+  "u275f01.mobile.install":
+    "Install Buzz on your phone, then sign in with Builderlab.",
+  "u275f01.mobile.installAs":
+    "Install Buzz on your phone, then sign in with Builderlab as {email}.",
+  "u275f01.mobile.installStore":
+    "Install Buzz on your phone from its app store, then sign in with Builderlab.",
+  "u275f01.mobile.installStoreAs":
+    "Install Buzz on your phone from its app store, then sign in with Builderlab as {email}.",
+  "u275f01.mobile.appStore": "the App Store",
+  "u275f01.mobile.scan": "Scan with your phone to get Buzz from {store}",
+  "u275f01.mobile.getIt": "Get it on {store}",
+  "u275f01.usage.desktopTitle": "Usage runs in the desktop app",
+  "u275f01.usage.desktopDescription":
+    "It reads the sessions your agents run on your computer.",
+  "u275f01.usage.tryAgain": "Try again in a moment.",
+  "u275f01.usage.openAgents": "Open Agents",
+  "u275f01.usage.openInAgents": "{agent}, {harness}, {cost}. Open in Agents",
+  "u275f01.watch.deleteNamed": "Delete {name}?",
+  "u275f01.watch.deleteTimer": "Delete this timer?",
+  "u275f01.watch.deleteWatch": "Delete this watch?",
+  "u275f01.watch.deleteTimerBody":
+    "This deletes the timer. The agent will stop watching for this trigger. This cannot be undone.",
+  "u275f01.watch.deleteWatchBody":
+    "This deletes the watch. The agent will stop watching for this trigger. This cannot be undone.",
+  "u275f01.watch.cancel": "Cancel",
+  "u275f01.watch.delete": "Delete",
+} as const;
+
+export const ko: Record<keyof typeof en, string> = {
+  "u275f01.chart.cantDraw": "차트를 그릴 수 없습니다.",
+  "u275f01.chart.sourceTruncated": "… (소스 일부 생략)",
+  "u275f01.chart.label": "차트: {title}",
+  "u275f01.chart.source": "출처:",
+  "u275f01.chart.viewRows": "데이터 {count}{more}행 보기",
+  "u275f01.chart.expand": "차트 확대",
+  "u275f01.chart.title": "차트",
+  "u275f01.chart.close": "차트 닫기",
+  "u275f01.claude.title": "Claude",
+  "u275f01.claude.subtitle": "이 컴퓨터의 Claude 자격 증명을 관리합니다.",
+  "u275f01.claude.apiKey": "Anthropic API 키",
+  "u275f01.claude.checkingKey": "저장된 키를 확인하는 중…",
+  "u275f01.claude.retry": "다시 시도",
+  "u275f01.claude.removeTitle": "Claude API 키를 제거할까요?",
+  "u275f01.claude.removeDescription":
+    "{storage}에서 키를 제거합니다. 새 로컬 Claude 세션에는 키가 필요합니다. 이미 실행 중인 턴은 끝까지 진행할 수 있습니다.",
+  "u275f01.claude.storageMac": "이 Mac의 키체인",
+  "u275f01.claude.storageDevice": "이 기기의 보안 저장소",
+  "u275f01.claude.cancel": "취소",
+  "u275f01.claude.removeKey": "키 제거",
+  "u275f01.claude.installIntegration": "통합 설치",
+  "u275f01.claude.integration": "Claude 통합",
+  "u275f01.claude.notInstalled": "Claude 통합이 아직 설치되지 않았습니다.",
+  "u275f01.claude.downloads":
+    "Buzz 전용 Claude 사본(약 250MB)을 내려받고 최신 버전으로 유지합니다. 이미 설치한 Claude에는 영향이 없으며 같은 설정을 사용합니다.",
+  "u275f01.goose.default": "기본값",
+  "u275f01.goose.levelsError": "goose의 수준을 읽지 못했습니다: {error}",
+  "u275f01.mentions.localFolder": "로컬 폴더 · {path}",
+  "u275f01.mentions.skillsFor": "{name}의 스킬",
+  "u275f01.mentions.oneAgent": "스킬을 선택하려면 에이전트 한 명만 멘션하세요.",
+  "u275f01.mobile.checking": "Builderlab 계정을 확인하는 중…",
+  "u275f01.mobile.title": "모바일 앱",
+  "u275f01.mobile.getTitle": "휴대폰에서 Buzz 사용하기",
+  "u275f01.mobile.install":
+    "휴대폰에 Buzz를 설치한 뒤 Builderlab에 로그인하세요.",
+  "u275f01.mobile.installAs":
+    "휴대폰에 Buzz를 설치한 뒤 {email} 계정으로 Builderlab에 로그인하세요.",
+  "u275f01.mobile.installStore":
+    "휴대폰의 앱 스토어에서 Buzz를 설치한 뒤 Builderlab에 로그인하세요.",
+  "u275f01.mobile.installStoreAs":
+    "휴대폰의 앱 스토어에서 Buzz를 설치한 뒤 {email} 계정으로 Builderlab에 로그인하세요.",
+  "u275f01.mobile.appStore": "App Store",
+  "u275f01.mobile.scan": "휴대폰으로 스캔해 {store}에서 Buzz를 받으세요",
+  "u275f01.mobile.getIt": "{store}에서 받기",
+  "u275f01.usage.desktopTitle": "사용량은 데스크톱 앱에서 확인할 수 있습니다",
+  "u275f01.usage.desktopDescription":
+    "에이전트가 이 컴퓨터에서 실행한 세션을 읽어 보여 줍니다.",
+  "u275f01.usage.tryAgain": "잠시 후 다시 시도하세요.",
+  "u275f01.usage.openAgents": "에이전트 열기",
+  "u275f01.usage.openInAgents": "{agent}, {harness}, {cost}. 에이전트에서 열기",
+  "u275f01.watch.deleteNamed": "{name}을(를) 삭제할까요?",
+  "u275f01.watch.deleteTimer": "이 타이머를 삭제할까요?",
+  "u275f01.watch.deleteWatch": "이 감시를 삭제할까요?",
+  "u275f01.watch.deleteTimerBody":
+    "타이머를 삭제합니다. 에이전트가 이 트리거를 더 이상 감시하지 않습니다. 되돌릴 수 없습니다.",
+  "u275f01.watch.deleteWatchBody":
+    "감시를 삭제합니다. 에이전트가 이 트리거를 더 이상 감시하지 않습니다. 되돌릴 수 없습니다.",
+  "u275f01.watch.cancel": "취소",
+  "u275f01.watch.delete": "삭제",
+};

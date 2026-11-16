@@ -49,6 +49,7 @@ pub(crate) fn may_have(plugin: &str, process_id: &str) -> bool {
 pub(crate) trait KeyStore: Send + Sync {
     fn read(&self) -> Result<Option<Zeroizing<String>>, String>;
     fn replace(&self, key: &str) -> Result<(), String>;
+    fn delete(&self) -> Result<(), String>;
 }
 
 pub(crate) struct ClaudeKey {
@@ -121,6 +122,18 @@ impl ClaudeKey {
         *key = Some(saved);
         Ok(())
     }
+
+    /// Remove the saved key before dropping the copy used by new processes.
+    /// A failed delete preserves that copy so the caller can retry.
+    pub(crate) async fn clear(&self) -> Result<(), String> {
+        let mut key = self.key.lock().await;
+        let store = self.store.clone();
+        tokio::task::spawn_blocking(move || store.delete())
+            .await
+            .map_err(|_| "Secure storage is unavailable".to_string())??;
+        *key = None;
+        Ok(())
+    }
 }
 
 /// The OS credential store: the login Keychain on macOS, the Secret Service on
@@ -147,6 +160,12 @@ impl KeyStore for OsKeyStore {
     fn replace(&self, key: &str) -> Result<(), String> {
         buzz_credential_store::replace(SERVICE, ACCOUNT, key.as_bytes()).map_err(stored)
     }
+    fn delete(&self) -> Result<(), String> {
+        match buzz_credential_store::delete(SERVICE, ACCOUNT) {
+            Ok(()) | Err(buzz_credential_store::Error::Absent) => Ok(()),
+            Err(error) => Err(stored(error)),
+        }
+    }
 }
 
 #[cfg(all(
@@ -161,7 +180,7 @@ fn stored(error: buzz_credential_store::Error) -> String {
         }
         Error::Denied => "Secure storage access was denied. Allow access and retry",
         Error::Busy => "Another Buzz app is using secure storage. Retry shortly",
-        Error::Corrupt => "The saved key is damaged",
+        Error::Corrupt | Error::Ambiguous => "The saved key is damaged",
         _ if cfg!(target_os = "macos") => "The Keychain is unavailable",
         _ => "Secure storage is unavailable. Unlock it and retry",
     }
@@ -180,6 +199,9 @@ impl KeyStore for OsKeyStore {
     fn replace(&self, _key: &str) -> Result<(), String> {
         Err("Secure storage is not available here".into())
     }
+    fn delete(&self) -> Result<(), String> {
+        Err("Secure storage is not available here".into())
+    }
 }
 
 #[tauri::command]
@@ -196,6 +218,11 @@ pub(crate) async fn claude_api_key_set(
 ) -> Result<(), String> {
     let value = Zeroizing::new(value);
     key.set(&value).await
+}
+
+#[tauri::command]
+pub(crate) async fn claude_api_key_clear(key: tauri::State<'_, ClaudeKey>) -> Result<(), String> {
+    key.clear().await
 }
 
 #[cfg(test)]

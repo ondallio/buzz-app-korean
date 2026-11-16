@@ -523,6 +523,7 @@ function group(
     ],
     liveParticipants: [],
     presentedParticipants: [],
+    workingParticipants: [],
     working: true,
     workingUpdate: { ...row, authorId: "raw-helper" },
     standalone: true,

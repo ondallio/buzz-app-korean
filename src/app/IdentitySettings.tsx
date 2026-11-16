@@ -3,19 +3,31 @@ import {
   resolveMessage,
   type DisplayMessage,
 } from "../shared/i18n/deferred-message";
+import { rich } from "../shared/i18n/rich";
 import { t, useLanguage, formattingLocale } from "../shared/i18n";
 import {
+  type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
+import { motion } from "motion/react";
 import { npubEncode } from "nostr-tools/nip19";
-import type { BackupStatus } from "../features/identity/backup";
+import type {
+  IdentityManagement,
+  BackupStatus,
+} from "../features/identity/backup";
+import {
+  BACKUP_FAILURES,
+  type BackupFailureKind,
+} from "../features/identity/backup-failure";
 import { BackupPrompt } from "../features/identity/BackupConsent";
 import {
+  backedUpLinkedKey,
   backupOfferedFor,
   federatedBuilderlabAccount,
 } from "../features/identity/builderlab-account";
@@ -27,63 +39,44 @@ import {
 } from "../features/federated-identity/service";
 import type { Membership } from "../features/communities/service";
 import {
-  coveredCommunities,
+  useSignInMemberships,
   serverName,
 } from "../features/federated-identity/community-servers";
-
+import { SettingsSectionLink } from "../features/navigation/SettingsSectionLink";
 import { PrivateKey } from "../features/identity/PrivateKey";
 import { SignOutDialog } from "../features/identity/SignOut";
-import { Header, InlineHeader } from "../shared/design-system/ui/Header";
+import { Header } from "../shared/design-system/ui/Header";
 import { SettingsGroup } from "../shared/design-system/ui/SettingsGroup";
 import { PreferenceRow } from "../shared/design-system/ui/PreferenceRow";
-import { IconButton } from "../shared/design-system/ui/IconButton";
 import { Button } from "../shared/design-system/ui/Button";
-
-import { CHANNEL_ACTIVITY_KINDS } from "../features/relay/channel-activity";
+import {
+  PopoverRoot,
+  PopoverPopup,
+  PopoverTrigger,
+} from "../shared/design-system/ui/Popover";
 import type { RelaySession } from "../features/relay/session";
-import { Tooltip } from "../shared/design-system/ui/Tooltip";
 import { ToastNotice } from "../shared/design-system/ui/Toast";
-import { CopyIcon } from "../shared/design-system/icons";
 import styles from "./IdentitySettings.module.css";
 import { writeClipboardText } from "../shared/clipboard";
-
-const backupMessages = {
-  busy: "settings.backup.busy",
-  signed_out: "settings.backup.signed_out",
-  not_offered: "settings.backup.not_offered",
-  other_key_linked: "settings.backup.other_key_linked",
-  invalid_service: "settings.backup.invalid_service",
-  refused: "settings.backup.refused",
-  unreachable: "settings.backup.unreachable",
-  unconfirmed: "settings.backup.unconfirmed",
-  storage: "settings.backup.storage",
-} as const satisfies Record<
-  Extract<BackupStatus, { status: "failed" }>["kind"],
-  string
->;
-
-/** Resolves only structured backup outcomes, never arbitrary service text. */
-function backupFeedback(status: BackupStatus) {
-  switch (status.status) {
-    case "idle":
-      return t("settings.backupUnchecked");
-    case "running":
-    case "complete":
-      return undefined;
-    case "waiting":
-      return status.reason === "no_consent"
-        ? undefined
-        : status.reason === "no_session"
-          ? t("settings.backupSignIn")
-          : t("settings.backup.not_linked");
-    case "failed":
-      return t(backupMessages[status.kind]);
-  }
-}
+import { IdentityBadge } from "./IdentityBadge";
+import { IdentityReflection } from "./IdentityReflection";
+import { useIdentityTilt } from "./useIdentityTilt";
+import { communityIcon } from "../features/communities/community-icon";
+import { Avatar } from "../shared/design-system/ui/Avatar";
+import { Tooltip } from "../shared/design-system/ui/Tooltip";
+import { SplitButton } from "../shared/design-system/ui/SplitButton";
+import { MenuItem } from "../shared/design-system/ui/Menu";
+import { AlertDialog } from "../shared/design-system/ui/AlertDialog";
+import { useProfileGeneration } from "../features/relay/react";
+import { useAvatarPreview } from "../features/profiles/use-avatar-preview";
+import { communityDestination } from "../features/communities/destination";
+import { communityName } from "../features/communities/names";
+import type { Profile } from "../features/relay/contracts";
 
 function signInRecovery(code: string) {
   if (code === "sign-in-timed-out") return t("settings.recoveryTimeout");
   if (code === "storage-busy") return t("settings.recoveryBusy");
+  if (code === "storage-corrupt") return t("u275a.identity.recoveryCorrupt");
   if (code.startsWith("storage-")) return t("settings.recoveryStorage");
   if (code === "sign-in-canceled") return t("settings.recoveryCanceled");
   if (code === "reauthentication-required")
@@ -91,292 +84,102 @@ function signInRecovery(code: string) {
   return t("settings.recoveryOther");
 }
 
-function activityTimestamp(seconds: number) {
-  const age = Math.max(0, Date.now() / 1000 - seconds);
-  if (age < 60) return t("settings.justNow");
-  if (age < 3600) {
-    const count = Math.floor(age / 60);
-    return t(count === 1 ? "settings.minuteAgo" : "settings.minutesAgo", {
-      count,
-    });
-  }
-  if (age < 86400) {
-    const count = Math.floor(age / 3600);
-    return t(count === 1 ? "settings.hourAgo" : "settings.hoursAgo", { count });
-  }
-  if (age < 604800) {
-    const count = Math.floor(age / 86400);
-    return t(count === 1 ? "settings.dayAgo" : "settings.daysAgo", { count });
-  }
-  return t("settings.onDate", {
-    date: new Date(seconds * 1000).toLocaleDateString(formattingLocale(), {
-      month: "short",
-      day: "numeric",
-    }),
-  });
-}
+/** The shown wording of each backup failure; the English is `BACKUP_FAILURES`'s. */
+const backupFailureMessages = {
+  unavailable: "u275a.identity.failure.unavailable",
+  busy: "u275a.identity.failure.busy",
+  interrupted: "u275a.identity.failure.interrupted",
+  timeout: "u275a.identity.failure.timeout",
+  signed_out: "u275a.identity.failure.signed_out",
+  not_offered: "u275a.identity.failure.not_offered",
+  not_linked: "u275a.identity.failure.not_linked",
+  other_key_linked: "u275a.identity.failure.other_key_linked",
+  invalid_service: "u275a.identity.failure.invalid_service",
+  refused: "u275a.identity.failure.refused",
+  unreachable: "u275a.identity.failure.unreachable",
+  unconfirmed: "u275a.identity.failure.unconfirmed",
+  storage: "u275a.identity.failure.storage",
+  unknown: "u275a.identity.failure.unknown",
+} as const satisfies Record<BackupFailureKind, string>;
 
-/**
- * What sync is for, and the uploader's status. While it waits for consent
- * (signed in to Builderlab, backup off or not yet chosen), Sync with
- * Builderlab opens the backup prompt, so a declined prompt can be reversed;
- * the prompt closes if the wait settles otherwise. Synced shows only once an
- * upload is confirmed. Hidden wherever first run would not offer backup, by
- * the same rule.
- */
-function BackupRow({
-  identity,
-  viewer,
-}: {
-  identity: Identity;
-  viewer: string;
-}) {
-  useLanguage();
-  const { backup } = identity;
-  const status = useSyncExternalStore(backup.subscribe, backup.snapshot);
-  const [offered, setOffered] = useState(false);
-  const [asking, setAsking] = useState(false);
-  const action = useRef<HTMLButtonElement>(null);
-  const sentence = useRef<HTMLSpanElement>(null);
-  const backedUp = useRef(false);
-  useEffect(() => {
-    void backupOfferedFor(backup).then(setOffered);
-  }, [backup]);
-  const close = useCallback((saved?: boolean) => {
-    backedUp.current = saved === true;
-    setAsking(false);
-  }, []);
-  if (!offered || !status) return null;
-  const waiting = status.status === "waiting" && status.reason === "no_consent";
-  // Every pass runs before it is admitted, so only a settled outcome ends the wait.
-  const settled =
-    status.status !== "running" && status.status !== "idle" && !waiting;
-  const feedback = backupFeedback(status);
-  const indicator =
-    status.status === "running" || status.status === "complete"
-      ? t(status.status === "running" ? "settings.syncing" : "settings.synced")
-      : undefined;
-  return (
-    <>
-      <PreferenceRow
-        title={t("settings.identitySync")}
-        subtitle={
-          <span ref={sentence} tabIndex={-1}>
-            {t("settings.identitySyncDescription")}
-            {/* Mounted empty so a later sentence is announced. */}
-            <span role="status" className="block">
-              {feedback}
-            </span>
-          </span>
-        }
-        trailing={
-          <>
-            {waiting && (
-              <Button
-                ref={action}
-                type="button"
-                onClick={() => setAsking(true)}
-              >
-                {t("settings.syncBuilderlab")}
-              </Button>
-            )}
-            {/* Mounted empty so a later indicator is announced. */}
-            <span role="status" className="text-body-sm text-subtle">
-              {indicator}
-            </span>
-          </>
-        }
-      />
-      {asking && (
-        <BackupPrompt
-          identity={identity}
-          pubkey={viewer}
-          ended={settled}
-          onClose={close}
-          // Sync ends the consent wait, which removes the action, perhaps
-          // only after the prompt has closed; the description stays.
-          finalFocus={() =>
-            (backedUp.current ? null : action.current) ?? sentence.current
-          }
-        />
-      )}
-    </>
-  );
-}
+const emptyProfiles = new Map<string, Profile>();
+const emptyProfileSnapshot = () => emptyProfiles;
+const emptySubscribe = () => () => {};
+const emptySnapshot = () => undefined;
 
-/**
- * When `pubkey` was last active in a channel on the current community's relay,
- * in Unix seconds; undefined without any activity there. Throws without a
- * connected session, so that reads as unchecked rather than inactive.
- */
-export async function keyActivity(
-  session: Pick<RelaySession, "read"> | undefined,
-  pubkey: string,
-): Promise<number | undefined> {
-  if (!session) throw new Error("The relay isn’t connected");
-  const [latest] = await session.read(
-    // Relay reads must name kinds: channel activity, the messages people see.
-    [{ kinds: [...CHANNEL_ACTIVITY_KINDS], authors: [pubkey], limit: 1 }],
-    { priority: "background" },
-  );
-  return latest?.created_at;
-}
+type BackedUp = { scope: object; attempt: number } & (
+  | { key: string | null }
+  | { failed: true }
+);
 
-type BackedUp =
-  | { revision: string; key: string | null }
-  | { revision: string; failed: string };
-
-/**
- * The account's linked key when it is backed up, read with the organization
- * sign-in as first run reads it (`nsec-backups/status`). Backups of other keys
- * are left out: making one the account's would unlink the linked key, and
- * kgoose never links an unlinked key again.
- */
-function BackedUpKey({
-  viewer,
-  identity,
-  federated,
-  lastActive,
-}: {
-  viewer: string;
-  identity: Identity;
-  federated: FederatedIdentity;
-  lastActive?: ((pubkey: string) => Promise<number | undefined>) | undefined;
-}) {
-  useLanguage();
+/** Account lookup is independent of native backup health, but shares its recovery UI. */
+function useBackedUpKey(
+  viewer: string | undefined,
+  identity: Identity | undefined,
+  federated: FederatedIdentity | undefined,
+  offered: boolean,
+  backedUp: boolean,
+) {
   const session = useSyncExternalStore(
-    federated.subscribe,
-    federated.snapshot,
-    federated.snapshot,
+    federated?.subscribe ?? emptySubscribe,
+    federated?.snapshot ?? emptySnapshot,
   );
   const revision =
-    session.status === "signed-in" && session.authority
+    offered && session?.status === "signed-in" && session.authority
       ? session.revision
       : undefined;
-  // A backup finishing after the read may have just added the linked key.
-  const backedUp =
-    useSyncExternalStore(identity.backup.subscribe, identity.backup.snapshot)
-      ?.status === "complete";
+  const scope = useMemo(
+    () => ({ viewer, identity, federated, revision }),
+    [viewer, identity, federated, revision],
+  );
+  const [attempt, setAttempt] = useState(0);
   const [read, setRead] = useState<BackedUp>();
   // biome-ignore lint/correctness/useExhaustiveDependencies: a finished backup reads the account again.
   useEffect(() => {
-    if (!revision) return;
+    if (!scope.revision || !scope.identity || !scope.federated || !scope.viewer)
+      return;
     let current = true;
     const account = federatedBuilderlabAccount(
-      { revision },
-      federated,
-      identity,
+      { revision: scope.revision },
+      scope.federated,
+      scope.identity,
     );
-    Promise.all([account.linkedKey(), account.backupStatus()]).then(
-      ([linked, backups]) => {
-        if (!current) return;
-        const key =
-          linked && backups !== "unavailable" && backups.includes(linked)
-            ? linked
-            : null;
-        setRead({ revision, key });
+    backedUpLinkedKey(account).then(
+      (key) => {
+        if (current) setRead({ scope, attempt, key });
       },
-      (error: unknown) => {
-        if (current)
-          setRead({
-            revision,
-            failed: error instanceof Error ? error.message : String(error),
-          });
+      () => {
+        if (current) setRead({ scope, attempt, failed: true });
       },
     );
     return () => {
       current = false;
     };
-  }, [revision, federated, identity, backedUp]);
-  const shown = read?.revision === revision ? read : undefined;
-  const key = shown && "key" in shown ? shown.key : null;
-  // undefined: checking; null: no events there; false: the read failed.
-  const [active, setActive] = useState<number | null | false>();
-  useEffect(() => {
-    if (!key || !lastActive) return;
-    let current = true;
-    setActive(undefined);
-    lastActive(key).then(
-      (at) => {
-        if (current) setActive(at ?? null);
-      },
-      (error: unknown) => {
-        console.warn("Couldn’t read the backed-up key’s activity", error);
-        if (current) setActive(false);
-      },
-    );
-    return () => {
-      current = false;
-    };
-  }, [key, lastActive]);
-  if (!revision)
-    return (
-      <PreferenceRow
-        title={t("settings.backedUpKey")}
-        subtitle={t("settings.backupSignInOrganization")}
-      />
-    );
-  if (!shown)
-    return (
-      <PreferenceRow
-        title={t("settings.backedUpKey")}
-        subtitle={<span role="status">{t("settings.checkingBackup")}</span>}
-      />
-    );
-  if ("failed" in shown)
-    return (
-      <PreferenceRow
-        title={t("settings.backedUpKey")}
-        subtitle={
-          <span role="alert">
-            {t("settings.backupCheckFailed", { error: shown.failed })}
-          </span>
-        }
-      />
-    );
-  if (!shown.key) return null;
-  return (
-    <PreferenceRow
-      title={t(
-        shown.key === viewer
-          ? "settings.backedUpThisDevice"
-          : "settings.backedUpLinked",
-      )}
-      subtitle={
-        <>
-          <code className={`text-mono ${styles.identityValue}`}>
-            {npubEncode(shown.key)}
-          </code>
-          {lastActive &&
-            (active === undefined
-              ? t("settings.checkingActivity")
-              : active === null
-                ? t("settings.noActivity")
-                : active === false
-                  ? t("settings.activityFailed")
-                  : t("settings.lastActive", {
-                      time: activityTimestamp(active),
-                    }))}
-        </>
-      }
-    />
-  );
+  }, [scope, attempt, backedUp]);
+  const shown = read?.scope === scope ? read : undefined;
+  return {
+    key: shown && "key" in shown ? shown.key : null,
+    failed: !!shown && "failed" in shown,
+    pending: !!revision && shown?.attempt !== attempt,
+    refresh: useCallback(() => setAttempt((value) => value + 1), []),
+  };
 }
 
 export function IdentitySettings({
   viewer,
   identity,
   federatedIdentity,
-  memberships = [],
   servers = signInServers,
   builderlabIdentity,
-  lastActive,
+  accountRows,
+  openBuilderlab,
+  profileSession,
+  community,
+  memberships = [],
 }: {
   viewer?: string | undefined;
   identity?: Identity | undefined;
   federatedIdentity?: FederatedIdentity | undefined;
-  /** Joined communities, for each server's "Used by". */
-  memberships?: readonly Membership[] | undefined;
   /** The build's sign-in servers; native's compiled list by default. */
   servers?: () => Promise<readonly SessionSnapshot[]>;
   /**
@@ -384,8 +187,12 @@ export function IdentitySettings({
    * first run uses it: the host's own refuses authenticated requests.
    */
   builderlabIdentity?: FederatedIdentity | undefined;
-  /** When `pubkey` was last active in a channel on the current community's relay. */
-  lastActive?: ((pubkey: string) => Promise<number | undefined>) | undefined;
+  accountRows?: ReactNode;
+  /** Opens Builderlab where its page holds the next backup step. */
+  openBuilderlab?: (() => void) | undefined;
+  profileSession?: RelaySession | undefined;
+  community?: Membership | undefined;
+  memberships?: readonly Membership[];
 }) {
   useLanguage();
   const [signingOut, setSigningOut] = useState(false);
@@ -393,127 +200,301 @@ export function IdentitySettings({
   useEffect(() => {
     if (identity) void backupOfferedFor(identity.backup).then(setOffered);
   }, [identity]);
+  const keyScope = useRef(viewer);
+  const [policyError, setPolicyError] = useState(false);
+  const status = useSyncExternalStore(
+    identity?.backup.subscribe ?? emptySubscribe,
+    identity?.backup.snapshot ?? emptySnapshot,
+  );
+  const candidate = status?.management;
+  const management = candidate?.pubkey === viewer ? candidate : undefined;
+  const checking = !!identity && !management;
+  const managed = management?.policy === "organization-managed";
+  const accountBackup = useBackedUpKey(
+    viewer,
+    identity,
+    builderlabIdentity,
+    offered,
+    status?.status === "complete",
+  );
+  // A receipt or finished pass confirms this key's backup unless the account
+  // read succeeded and showed another key linked and backed up there.
+  const backupConfirmed =
+    !!management &&
+    (management.initialBackupConfirmed || status?.status === "complete") &&
+    (!accountBackup.key || accountBackup.key === viewer);
+  const provider = useSyncExternalStore(
+    federatedIdentity?.subscribe ?? emptySubscribe,
+    federatedIdentity?.snapshot ?? emptySnapshot,
+  );
+  const backupLocation = provider?.authority
+    ? serverName(provider.authority)
+    : "Builderlab";
+  // The receipt counts for any account: only a finished pass for this account,
+  // or this account's read of this key, makes the backup this account's.
+  const backupAccount = t(
+    status?.status === "complete" || accountBackup.key === viewer
+      ? "u275a.identity.yourAccount"
+      : "u275a.identity.anAccount",
+    { location: backupLocation },
+  );
+  useEffect(() => {
+    if (keyScope.current !== viewer) setSigningOut(false);
+    keyScope.current = viewer;
+    setPolicyError(false);
+    let current = true;
+    void identity?.backup
+      .ready()
+      .then((next) =>
+        next.management?.pubkey === viewer ? next : identity.backup.refresh(),
+      )
+      .then(
+        (next) => {
+          if (current && next.management?.pubkey !== viewer)
+            setPolicyError(true);
+        },
+        () => {
+          if (current) setPolicyError(true);
+        },
+      );
+    return () => {
+      current = false;
+    };
+  }, [identity, viewer]);
+  const selectedProfileSession =
+    profileSession?.viewer === viewer &&
+    (!community ||
+      profileSession?.scope ===
+        `${communityDestination(community.id).url}:${viewer}`)
+      ? profileSession
+      : undefined;
+  const profiles = useSyncExternalStore(
+    selectedProfileSession?.profiles.subscribe ?? emptySubscribe,
+    selectedProfileSession?.profiles.snapshot ?? emptyProfileSnapshot,
+  );
+  const profileGeneration = useProfileGeneration(
+    selectedProfileSession?.profiles,
+  );
+  useEffect(() => {
+    void profileGeneration;
+    if (viewer && selectedProfileSession)
+      void selectedProfileSession.profiles
+        .ensure([viewer], "background")
+        .catch(() => {});
+  }, [viewer, selectedProfileSession, profileGeneration]);
+  const profile =
+    viewer && selectedProfileSession ? profiles.get(viewer) : undefined;
+  const picture = useAvatarPreview(
+    profile?.picture ?? "",
+    community?.id,
+    "small",
+    selectedProfileSession?.media,
+  );
   const [copyStatus, setCopyStatus] = useState<{
     message: DisplayMessage;
     failed: boolean;
   } | null>(null);
   const copyAttempt = useRef(0);
   const npub = viewer ? npubEncode(viewer) : "";
-  async function copyIdentity(value: string, kind: "hex" | "npub") {
+  async function copyIdentity(value: string) {
     const attempt = ++copyAttempt.current;
     setCopyStatus(null);
     try {
       await writeClipboardText(value);
       if (attempt === copyAttempt.current)
         setCopyStatus({
-          message: localMessage(
-            kind === "hex"
-              ? "settings.publicKeyCopied"
-              : "settings.nostrAddressCopied",
-          ),
+          message: localMessage("u275a.identity.copied"),
           failed: false,
         });
     } catch {
       if (attempt === copyAttempt.current)
         setCopyStatus({
-          message: localMessage(
-            kind === "hex"
-              ? "settings.publicKeyCopyFailed"
-              : "settings.nostrCopyFailed",
-          ),
+          message: localMessage("u275a.identity.copyFailed"),
           failed: true,
         });
     }
   }
   return (
-    <section aria-labelledby="identity-settings-title">
+    <section
+      className={styles.identityLayout}
+      aria-labelledby="identity-settings-title"
+    >
       <Header
         id="identity-settings-title"
         title={t("settings.identity")}
-        subtitle={t("settings.identityDescription")}
+        subtitle={t("u275a.identity.subtitle")}
       />
       {!viewer && <p>{t("settings.identityUnavailable")}</p>}
       {viewer && (
         <>
-          <SettingsGroup>
-            {(
-              [
-                [
-                  "hex",
-                  t("settings.publicKeyHex"),
-                  t("settings.copyPublicKey"),
-                  viewer,
-                ],
-                [
-                  "npub",
-                  t("settings.nostrAddressNpub"),
-                  t("settings.copyNostrAddress"),
-                  npub,
-                ],
-              ] as const
-            ).map(([kind, label, copyLabel, value]) => (
-              <PreferenceRow
-                key={kind}
-                title={label}
-                subtitle={
-                  <code className={`text-mono ${styles.identityValue}`}>
-                    {value}
-                  </code>
-                }
-                trailing={
-                  <Tooltip content={copyLabel} hint="familiar">
-                    <IconButton
-                      size="sm"
-                      variant="ghost"
-                      aria-label={copyLabel}
-                      icon={<CopyIcon aria-hidden="true" />}
-                      onClick={() => void copyIdentity(value, kind)}
-                    />
-                  </Tooltip>
-                }
-              />
-            ))}
-          </SettingsGroup>
-          {identity && (
-            <div className="mt-6">
-              <SettingsGroup layout="form">
-                {/* One key widget at a time; the dialog brings its own. */}
-                {!signingOut && <PrivateKey identity={identity} />}
-              </SettingsGroup>
-              <SettingsGroup>
-                <BackupRow identity={identity} viewer={viewer} />
-                {offered && viewer && builderlabIdentity && (
-                  <BackedUpKey
-                    viewer={viewer}
-                    identity={identity}
-                    federated={builderlabIdentity}
-                    lastActive={lastActive}
-                  />
-                )}
-                <PreferenceRow
-                  title={t("settings.signOutBuzz")}
-                  subtitle={t("settings.signOutDescription")}
-                  trailing={
-                    <Button type="button" onClick={() => setSigningOut(true)}>
-                      {t("settings.signOutBuzz")}
-                    </Button>
-                  }
+          <div className={styles.overview}>
+            <IdentityBadge
+              key={viewer}
+              viewer={viewer}
+              name={
+                profile && !profile.nameIsFallback
+                  ? profile.name
+                  : t("u275a.identity.yourId")
+              }
+              picture={picture}
+              photoContext={community ? communityName(community) : undefined}
+              backup={
+                !status?.builderlab
+                  ? undefined
+                  : !management
+                    ? "pending"
+                    : status.status === "running"
+                      ? "running"
+                      : // A confirmed backup stays confirmed through a
+                        // re-check or account read that did not finish.
+                        backupConfirmed
+                        ? "confirmed"
+                        : status.status === "failed" || accountBackup.failed
+                          ? "attention"
+                          : managed
+                            ? "attention"
+                            : "pending"
+              }
+              backupAccount={backupAccount}
+              onCopy={() => void copyIdentity(npub)}
+            >
+              {(active, badgeAction) => (
+                <>
+                  {identity && !signingOut ? (
+                    <PrivateKey
+                      key={active ? "active" : "hidden"}
+                      identity={identity}
+                      presentation="magnetic"
+                    >
+                      {({ input, warning, feedback }) => (
+                        <>
+                          <div
+                            className={`dark interaction-panel ${styles.magneticKeyInput}`}
+                          >
+                            {input}
+                          </div>
+                          <div className={styles.keyNotice}>
+                            <p className="text-label-sm">
+                              {t("u275a.identity.privateKey")}
+                            </p>
+                            <p className="text-body-sm text-secondary">
+                              {t("u275a.identity.keyStored")}
+                              {status?.builderlab && backupConfirmed && (
+                                <>
+                                  {" "}
+                                  {t("u275a.identity.backupSaved", {
+                                    account: backupAccount,
+                                  })}
+                                </>
+                              )}
+                            </p>
+                            <p className="text-body-sm text-secondary">
+                              {t("u275a.identity.saveCopy")}
+                            </p>
+                            <div className={styles.keyWarning}>{warning}</div>
+                            {feedback}
+                          </div>
+                        </>
+                      )}
+                    </PrivateKey>
+                  ) : (
+                    <>
+                      <div>
+                        <p className="text-label-sm">
+                          {t("u275a.identity.onThisDevice")}
+                        </p>
+                        <p className="text-body-sm text-secondary">
+                          {t("u275a.identity.onThisDeviceDescription")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-label-sm">
+                          {t("u275a.identity.onNewDevice")}
+                        </p>
+                        <p className="text-body-sm text-secondary">
+                          {t("u275a.identity.onNewDeviceDescription")}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  {identity && (
+                    <div className={styles.removeKey}>
+                      {!signingOut && (
+                        <BackupRecovery
+                          viewer={viewer}
+                          management={management}
+                          status={status}
+                          statusError={checking && policyError}
+                          identity={identity}
+                          offered={offered}
+                          confirmed={backupConfirmed}
+                          openBuilderlab={openBuilderlab}
+                          accountError={accountBackup.failed}
+                          accountPending={accountBackup.pending}
+                          onStatusError={setPolicyError}
+                          finalFocus={() => badgeAction.current}
+                          onRetry={() => {
+                            badgeAction.current?.focus({ preventScroll: true });
+                            accountBackup.refresh();
+                          }}
+                        />
+                      )}
+                      <Button
+                        variant="destructive"
+                        onClick={() => setSigningOut(true)}
+                      >
+                        {t("u275a.identity.removeFromDevice")}
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </IdentityBadge>
+            {federatedIdentity && (
+              <div className={styles.accounts}>
+                <Header
+                  level={3}
+                  title={t("u275a.identity.communitySignIns")}
+                  subtitle={t("u275a.identity.communitySignInsDescription")}
                 />
-              </SettingsGroup>
+                <OrganizationSignIns
+                  identity={federatedIdentity}
+                  servers={servers}
+                  accountRows={accountRows}
+                  memberships={memberships}
+                />
+              </div>
+            )}
+          </div>
+          {copyStatus?.failed && (
+            <p className="text-body-sm">
+              {t("u275a.identity.fullId")}{" "}
+              <code className={`text-mono ${styles.identityValue}`}>
+                {npub}
+              </code>
+            </p>
+          )}
+          {identity && (
+            <>
+              {accountBackup.key && accountBackup.key !== viewer && (
+                <SettingsGroup>
+                  <PreferenceRow
+                    title={t("settings.backedUpLinked")}
+                    subtitle={
+                      <code className={`text-mono ${styles.identityValue}`}>
+                        {npubEncode(accountBackup.key)}
+                      </code>
+                    }
+                  />
+                </SettingsGroup>
+              )}
               {signingOut && (
                 <SignOutDialog
                   identity={identity}
                   onClose={() => setSigningOut(false)}
                 />
               )}
-            </div>
-          )}
-          {federatedIdentity && (
-            <OrganizationSignIns
-              identity={federatedIdentity}
-              memberships={memberships}
-              servers={servers}
-            />
+            </>
           )}
           {copyStatus && (
             <ToastNotice
@@ -561,16 +542,17 @@ function useSessions(sessions: readonly FederatedIdentity[]) {
   return useSyncExternalStore(store.subscribe, store.snapshot, store.snapshot);
 }
 
-/** One row per signed-in server, each signing out of that server only, and
- * the build's Builderlab row to sign in from while it isn't signed in. */
+/** One row per configured provider, using each server's existing session controls. */
 function OrganizationSignIns({
   identity,
-  memberships,
   servers,
+  accountRows,
+  memberships,
 }: {
   identity: FederatedIdentity;
-  memberships: readonly Membership[];
   servers: () => Promise<readonly SessionSnapshot[]>;
+  accountRows?: ReactNode;
+  memberships: readonly Membership[];
 }) {
   useLanguage();
   const [ids, setIds] = useState<readonly string[]>([]);
@@ -614,10 +596,6 @@ function OrganizationSignIns({
       }),
     );
   };
-  const signedIn = sessions.filter(
-    (_, index) =>
-      states[index]?.status === "signed-in" && states[index]?.authority,
-  );
   // Native reports a sign-out it couldn't finish, such as a storage failure,
   // as that server's snapshot with `cleanup` rather than an error. Read from
   // the session, it survives Settings closing and a reload until cleanup ends.
@@ -650,36 +628,59 @@ function OrganizationSignIns({
   const firstFailed = [...unfinished.values()].some(
     ({ authority }) => authority.id === first,
   );
-  const firstSignedIn = states.some(
-    (state) => state.status === "signed-in" && state.authority?.id === first,
+  const accountDetails = accountRows && (
+    <div className={styles.accountEndnote}>{accountRows}</div>
   );
-  if (signedIn.length === 0)
+  if (sessions.length === 0)
     return (
       <>
-        {!firstFailed && <OrganizationSignIn identity={identity} />}
+        {!firstFailed ? (
+          <OrganizationSignIn
+            identity={identity}
+            accountRows={accountRows}
+            memberships={memberships}
+          />
+        ) : (
+          accountDetails && (
+            <div className={styles.accountList}>{accountDetails}</div>
+          )
+        )}
         {problems}
       </>
     );
   return (
-    <section className="mt-6" aria-labelledby="organization-sign-in-title">
-      <InlineHeader
-        id="organization-sign-in-title"
-        title={t("settings.organizationSignIn")}
-      />
-      <SettingsGroup>
-        {!firstSignedIn && !firstFailed && (
-          <OrganizationSignIn identity={identity} listed />
-        )}
-        {signedIn.map((session) => (
-          <ServerSession
-            key={session.snapshot().authority?.id}
-            session={session}
-            memberships={memberships}
-            onSignOut={() => signOut(session)}
-          />
-        ))}
+    <section
+      className={styles.accounts}
+      aria-label={t("u275a.identity.accounts")}
+    >
+      <div className={styles.accountList}>
+        {sessions.map((session, index) => {
+          const state = states[index];
+          if (
+            !state?.authority ||
+            (state.status !== "signed-in" && unfinished.has(session))
+          )
+            return null;
+          const details = state.authority.id === first;
+          return (
+            <AccountCard
+              key={state.authority.id}
+              state={state}
+              identity={session}
+              memberships={memberships}
+              endnote={details && state.status !== "restoring" && accountRows}
+            >
+              <OrganizationSignIn
+                identity={session}
+                listed
+                onSignOut={() => signOut(session)}
+              />
+            </AccountCard>
+          );
+        })}
+        {firstFailed && accountDetails}
         {problems}
-      </SettingsGroup>
+      </div>
     </section>
   );
 }
@@ -689,63 +690,6 @@ type SignOutFailure = Readonly<{
   failure: string;
 }>;
 
-function ServerSession({
-  session,
-  memberships,
-  onSignOut,
-}: {
-  session: FederatedIdentity;
-  memberships: readonly Membership[];
-  onSignOut: () => void;
-}) {
-  useLanguage();
-  const state = useSyncExternalStore(
-    session.subscribe,
-    session.snapshot,
-    session.snapshot,
-  );
-  if (!state.authority) return null;
-  const host = new URL(state.authority.identityOrigin).host;
-  const usedBy = coveredCommunities(
-    state.authority.communityHosts,
-    memberships,
-  );
-  const expires = state.expiresAt
-    ? new Date(state.expiresAt).toLocaleString(formattingLocale(), {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-    : "";
-  return (
-    <PreferenceRow
-      title={serverTitle(state.authority)}
-      subtitle={
-        <>
-          {state.email
-            ? t("settings.signedInAs", { account: state.email })
-            : t("settings.signedInOrganization")}
-          {expires && t("settings.expiresSuffix", { time: expires })}
-          {usedBy.length > 0 && (
-            <>
-              <br />
-              {t("settings.usedBy", { communities: usedBy.join(", ") })}
-            </>
-          )}
-        </>
-      }
-      trailing={
-        <Button
-          type="button"
-          aria-label={t("settings.signOutServer", { host })}
-          onClick={onSignOut}
-        >
-          {t("settings.signOut")}
-        </Button>
-      }
-    />
-  );
-}
-
 /** A server's row title: its name, and its host when that differs. */
 function serverTitle(authority: NonNullable<SessionSnapshot["authority"]>) {
   const host = new URL(authority.identityOrigin).host;
@@ -753,14 +697,193 @@ function serverTitle(authority: NonNullable<SessionSnapshot["authority"]>) {
   return name === host ? host : `${name} (${host})`;
 }
 
-/** The build's Builderlab sign-in, in a section of its own; `listed`, only
- * its row, named by its server, among other servers' rows. */
+function needsRenewal(state: SessionSnapshot) {
+  return (
+    state.status === "signed-in" &&
+    !!state.expiresAt &&
+    new Date(state.expiresAt).getTime() <= Date.now() + 7 * 86_400_000
+  );
+}
+
+/** One host and its current sign-in, with its actions and endnote below. */
+function AccountCard({
+  state,
+  identity,
+  children,
+  endnote,
+  memberships,
+}: {
+  state: SessionSnapshot;
+  identity: FederatedIdentity;
+  children: ReactNode;
+  endnote?: ReactNode;
+  memberships: readonly Membership[];
+}) {
+  useLanguage();
+  const tilt = useIdentityTilt();
+  const communityArtwork = useRef<HTMLDivElement>(null);
+  const reflectionRegions = useCallback(
+    () =>
+      Array.from(
+        communityArtwork.current?.querySelectorAll<HTMLElement>(
+          "[data-community-icon]",
+        ) ?? [],
+        (element) => ({
+          x: element.offsetLeft,
+          y: element.offsetTop,
+          width: element.offsetWidth,
+          height: element.offsetHeight,
+        }),
+      ),
+    [],
+  );
+  const authority = state.authority;
+  const communities = useSignInMemberships(
+    identity,
+    authority?.communityHosts ?? [],
+    memberships,
+  );
+  if (!authority) return null;
+  const name = serverTitle(authority);
+  const signedIn = state.status === "signed-in";
+  const status = state.failure
+    ? t("u275a.identity.needsAttention")
+    : signedIn
+      ? t("u275a.identity.signedIn")
+      : state.status === "restoring"
+        ? t("u275a.identity.checkingSignIn")
+        : state.status === "signing-in"
+          ? t("u275a.identity.signingIn")
+          : t("settings.notSignedIn");
+  return (
+    <article
+      className={styles.accountEntry}
+      aria-label={name}
+      data-connected={signedIn}
+      data-account-status={state.status}
+      onPointerMove={tilt.onPointerMove}
+      onPointerLeave={tilt.onPointerLeave}
+    >
+      <motion.div
+        className={`interaction-panel text-standard ${styles.accountCard}`}
+        style={tilt.style}
+      >
+        <div className="grid gap-1">
+          <h4 className="m-0 text-body-lg">{name}</h4>
+          {signedIn && (
+            <p className="m-0 text-body-sm text-secondary">
+              {rich("settings.signedInAs", {
+                account: (
+                  <span className="text-label-sm text-standard">
+                    {state.email ?? t("u275a.identity.organizationAccount")}
+                  </span>
+                ),
+              })}
+            </p>
+          )}
+          <p
+            className={
+              signedIn && !state.failure
+                ? "sr-only"
+                : "m-0 text-body-sm text-secondary"
+            }
+          >
+            {status}
+          </p>
+        </div>
+        {needsRenewal(state) && state.expiresAt && (
+          <p className="m-0 text-caption text-secondary">
+            {t("settings.expiresAt", {
+              time: new Date(state.expiresAt).toLocaleString(
+                formattingLocale(),
+                {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                },
+              ),
+            })}
+          </p>
+        )}
+        {communities.length > 0 && (
+          <section
+            aria-label={t("u275a.identity.savedCommunities")}
+            className="grid gap-2"
+          >
+            <p className="m-0 text-caption text-secondary">
+              {t(
+                signedIn
+                  ? "u275a.identity.usedToAccess"
+                  : "u275a.identity.signInToAccess",
+              )}
+            </p>
+            <div className={styles.communityAssets} ref={communityArtwork}>
+              <span className={styles.communityIcons}>
+                {communities.slice(0, 6).map((membership) => {
+                  const name = communityName(membership);
+                  return (
+                    <Tooltip key={membership.id} content={name}>
+                      <span
+                        className={styles.communityIcon}
+                        role="img"
+                        aria-label={name}
+                        // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users focus named artwork to read its tooltip.
+                        tabIndex={0}
+                        data-community-icon=""
+                      >
+                        <Avatar
+                          src={communityIcon(
+                            membership.publishedIcon ?? membership.icon,
+                          )}
+                          alt=""
+                          fallback={name}
+                          shape="squircle"
+                          size="fill"
+                        />
+                      </span>
+                    </Tooltip>
+                  );
+                })}
+                {communities.length > 6 && (
+                  <span className="text-caption text-subtle">
+                    +{communities.length - 6}
+                  </span>
+                )}
+              </span>
+              <IdentityReflection
+                x={tilt.x}
+                y={tilt.y}
+                active={!tilt.reducedMotion}
+                surface="film"
+                regions={reflectionRegions}
+              />
+            </div>
+            <span className="sr-only">
+              {communities.map(communityName).join(", ")}
+            </span>
+          </section>
+        )}
+      </motion.div>
+      <div className={styles.accountFooter}>
+        {endnote && <div>{endnote}</div>}
+        <div className={styles.accountActions}>{children}</div>
+      </div>
+    </article>
+  );
+}
+
+/** A provider's existing sign-in controls; `listed` places its row among accounts. */
 function OrganizationSignIn({
   identity,
+  accountRows,
   listed = false,
+  memberships = [],
+  onSignOut,
 }: {
   identity: FederatedIdentity;
+  accountRows?: ReactNode;
   listed?: boolean;
+  memberships?: readonly Membership[];
+  onSignOut?: () => void;
 }) {
   useLanguage();
   const state = useSyncExternalStore(
@@ -768,108 +891,495 @@ function OrganizationSignIn({
     identity.snapshot,
     identity.snapshot,
   );
-  const [failure, setFailure] = useState<DisplayMessage>("");
-  const problem = failure || state.failure;
+  const [failure, setFailure] = useState<{
+    revision: string;
+    message: string;
+  } | null>(null);
+  const problem =
+    (failure?.revision === state.revision ? failure.message : "") ||
+    state.failure;
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [confirmRevision, setConfirmRevision] = useState<string | null>(null);
+  // The session a browser renewal started from, while that renewal runs.
+  // Native's `renewing` says so too, after this page was left and reopened.
+  const [renewal, setRenewal] = useState<string | null>(null);
+  // Renew and Cancel replace each other, on a click or when a renewal fails,
+  // times out or finishes. The one that had focus hands it to its
+  // replacement, unless the person has moved focus elsewhere.
+  const handoff = useRef<Element | null>(null);
+  const actions = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const from = handoff.current;
+    if (!from || from.isConnected) return;
+    handoff.current = null;
+    const active = document.activeElement;
+    if (!active || active === document.body || active.contains(actions.current))
+      trigger.current?.focus();
+  });
+  useEffect(() => setErrorOpen(!!problem), [problem]);
+  // Cancel shows as soon as Renew is chosen, but native records the renewal
+  // only once it starts the browser step. A Cancel before then waits for it,
+  // so the click ends that step instead of finding nothing to cancel.
+  const [cancelPending, setCancelPending] = useState<string | null>(null);
+  useEffect(() => {
+    if (!cancelPending || !state.renewing) return;
+    setCancelPending(null);
+    if (cancelPending === state.revision)
+      void run(() => identity.cancelSignIn());
+  });
   if (!state.authority || state.status === "unconfigured") return null;
-  const unavailable = state.status === "unavailable";
-  // Controls hide when unavailable, but a failed restore still explains itself.
-  if (unavailable && !listed)
-    return problem ? (
-      <p role="alert" className="mt-6 text-body-sm text-danger">
-        {typeof problem === "string"
-          ? signInRecovery(problem)
-          : resolveMessage(problem)}
-      </p>
-    ) : null;
-  const organization = new URL(state.authority.identityOrigin).host;
+  // A failed restore keeps its stored session, which may still be valid: no
+  // sign-in or sign-out, only a check that retries the restore.
+  // An unreachable server means no browser step ever ran: say what Check
+  // again does instead of the generic sign-in advice.
+  const explanation =
+    problem &&
+    (state.status === "unavailable" &&
+    identity.recheck &&
+    /^network-(unavailable|timeout)$/.test(problem)
+      ? t("u275a.identity.recheckHint")
+      : signInRecovery(problem));
+  const recheck = state.status === "unavailable" && identity.recheck && (
+    <Button
+      size="sm"
+      type="button"
+      onClick={() => run(() => identity.recheck?.())}
+    >
+      {t("u275a.identity.checkAgain")}
+    </Button>
+  );
+  if (state.status === "unavailable" && !listed)
+    return (
+      <>
+        {problem && (
+          <p role="alert" className="mt-6 text-body-sm text-danger">
+            {explanation}
+          </p>
+        )}
+        {recheck && <div className={styles.accountActions}>{recheck}</div>}
+      </>
+    );
+  const organization =
+    state.authority.organization ||
+    new URL(state.authority.identityOrigin).host;
   const signedIn = state.status === "signed-in";
   const signingIn = state.status === "signing-in";
-  const status = signedIn
-    ? state.email
-      ? t("settings.signedInAs", { account: state.email })
-      : t("settings.signedInOrganization")
-    : t("settings.notSignedIn");
-  const expires =
-    signedIn && state.expiresAt
-      ? new Date(state.expiresAt).toLocaleString(formattingLocale(), {
-          dateStyle: "medium",
-          timeStyle: "short",
-        })
-      : "";
-  function run(operation: () => Promise<unknown>) {
-    setFailure("");
-    void Promise.resolve()
+  const renewing = needsRenewal(state);
+  const signOutLabel = listed
+    ? t("settings.signOutServer", {
+        host: new URL(state.authority.identityOrigin).host,
+      })
+    : t("settings.signOutOrganization");
+  function run(operation: () => Promise<unknown> | undefined) {
+    setFailure(null);
+    setErrorOpen(false);
+    return Promise.resolve()
       .then(operation)
-      .catch((error: unknown) =>
-        setFailure(
-          error instanceof Error
-            ? error.message
-            : localMessage("settings.signInUnavailable"),
-        ),
-      );
+      .then(() => {
+        // Native can return the same retained refusal on a retry.
+        if (identity.snapshot().failure) setErrorOpen(true);
+      })
+      .catch((error: unknown) => {
+        setFailure({
+          revision: state.revision,
+          message:
+            error instanceof Error
+              ? error.message
+              : t("settings.signInUnavailable"),
+        });
+        setErrorOpen(true);
+      });
   }
-  const row = (
+  // The current session stays live while the browser step runs; Cancel ends
+  // only that step.
+  const renew = () => {
+    const revision = state.revision;
+    setRenewal(revision);
+    void run(() => {
+      const current = identity.snapshot();
+      return current.status === "signed-in" && current.revision === revision
+        ? identity.signIn()
+        : Promise.resolve();
+    }).finally(() => {
+      setRenewal((pending) => (pending === revision ? null : pending));
+      // A renewal that ended before native recorded it has nothing to cancel.
+      setCancelPending((pending) => (pending === revision ? null : pending));
+    });
+  };
+  const content = (
     <>
-      <PreferenceRow
-        title={listed ? serverTitle(state.authority) : status}
-        subtitle={
-          <>
-            {listed && !unavailable && (
-              <>
-                {status}
-                <br />
-              </>
-            )}
-            {expires && (
-              <>
-                {t("settings.expiresAt", { time: expires })}
-                <br />
-              </>
-            )}
-            {t("settings.organizationDescription", { organization })}
-          </>
-        }
-        trailing={
-          unavailable ? undefined : (
-            <Button
-              type="button"
-              disabled={state.status === "restoring"}
-              onClick={() =>
-                run(() =>
-                  signedIn
-                    ? identity.signOut()
-                    : signingIn
-                      ? identity.cancelSignIn()
-                      : identity.signIn(),
-                )
+      <PopoverRoot
+        open={!listed && !!problem && errorOpen}
+        onOpenChange={(open, details) => {
+          // The trigger starts sign-in; failures alone open its supporting popup.
+          if (details.reason !== "trigger-press") setErrorOpen(open);
+        }}
+      >
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: observes focus within its buttons, so a swap can hand it on. */}
+        <div
+          onFocus={(event) => {
+            handoff.current = event.target;
+          }}
+          onBlur={(event) => {
+            // Focus lost to removal has no next target; a move elsewhere has one.
+            if (
+              event.relatedTarget &&
+              !actions.current?.contains(event.relatedTarget)
+            )
+              handoff.current = null;
+          }}
+          ref={(element) => {
+            actions.current = element;
+            // The primary action owns return focus, including SplitButton’s first half.
+            trigger.current = element?.querySelector("button") ?? null;
+          }}
+        >
+          {signedIn && (state.renewing || renewal === state.revision) ? (
+            <span className="flex items-center gap-3">
+              <span className="text-body-sm text-subtle" role="status">
+                {t("u275a.identity.finishInBrowser")}
+              </span>
+              <Button
+                variant="subtle"
+                size="sm"
+                type="button"
+                onClick={() => {
+                  if (state.renewing) void run(() => identity.cancelSignIn());
+                  else setCancelPending(state.revision);
+                }}
+              >
+                {t("settings.cancel")}
+              </Button>
+            </span>
+          ) : renewing ? (
+            <SplitButton
+              variant="prominent"
+              size="sm"
+              onClick={renew}
+              menuLabel={t("u275a.identity.moreActions", { organization })}
+              menu={
+                <MenuItem onClick={() => setConfirmRevision(state.revision)}>
+                  {t("settings.signOut")}
+                </MenuItem>
               }
             >
-              {signedIn
-                ? t("settings.signOutOrganization")
-                : signingIn
-                  ? t("settings.cancelSignIn")
-                  : t("settings.signIn")}
-            </Button>
-          )
-        }
-      />
-      {problem && (
-        <p role="alert" className="text-body-sm text-danger">
-          {typeof problem === "string"
-            ? signInRecovery(problem)
-            : resolveMessage(problem)}
-        </p>
+              {t("u275a.identity.renewSignIn")}
+            </SplitButton>
+          ) : state.status === "unavailable" ? (
+            recheck
+          ) : (
+            <PopoverTrigger
+              render={
+                <Button
+                  variant={signedIn || signingIn ? "subtle" : "prominent"}
+                  size="sm"
+                  type="button"
+                  disabled={state.status === "restoring"}
+                  aria-label={signedIn ? signOutLabel : undefined}
+                  onClick={() => {
+                    if (signedIn) setConfirmRevision(state.revision);
+                    else
+                      run(() =>
+                        signingIn ? identity.cancelSignIn() : identity.signIn(),
+                      );
+                  }}
+                >
+                  {signedIn
+                    ? listed
+                      ? t("settings.signOut")
+                      : t("settings.signOutOrganization")
+                    : signingIn
+                      ? t("settings.cancelSignIn")
+                      : t("settings.signIn")}
+                </Button>
+              }
+            />
+          )}
+          {listed && problem && (
+            <p role="alert" className="text-body-sm text-danger">
+              {explanation}
+            </p>
+          )}
+        </div>
+        <PopoverPopup
+          anchor={trigger}
+          side="bottom"
+          align="end"
+          size="compact"
+          finalFocus={trigger}
+          aria-label={t("u275a.identity.signInError")}
+        >
+          <p role="alert" className="m-0 text-body-sm">
+            {explanation}
+          </p>
+        </PopoverPopup>
+      </PopoverRoot>
+      {signedIn && confirmRevision === state.revision && (
+        <AlertDialog
+          title={t("u275a.identity.signOutTitle", { organization })}
+          description={t("u275a.identity.signOutDescription", {
+            organization,
+          })}
+          finalFocus={trigger}
+          onClose={() => setConfirmRevision(null)}
+          actions={
+            <>
+              <Button onClick={() => setConfirmRevision(null)}>
+                {t("settings.cancel")}
+              </Button>
+              <Button
+                variant="prominent"
+                onClick={() => {
+                  setConfirmRevision(null);
+                  run(() => {
+                    const current = identity.snapshot();
+                    return current.status === "signed-in" &&
+                      current.revision === confirmRevision
+                      ? onSignOut
+                        ? Promise.resolve(onSignOut())
+                        : identity.signOut()
+                      : Promise.resolve();
+                  });
+                }}
+              >
+                {t("settings.signOut")}
+              </Button>
+            </>
+          }
+        />
       )}
     </>
   );
-  if (listed) return row;
-  return (
-    <section className="mt-6" aria-labelledby="organization-sign-in-title">
-      <InlineHeader
-        id="organization-sign-in-title"
-        title={t("settings.organizationSignIn")}
-      />
-      <SettingsGroup>{row}</SettingsGroup>
+  return listed ? (
+    content
+  ) : (
+    <section
+      className={styles.accounts}
+      aria-label={t("u275a.identity.accounts")}
+    >
+      <div className={styles.accountList}>
+        <AccountCard
+          state={state}
+          identity={identity}
+          memberships={memberships}
+          endnote={state.status !== "restoring" && accountRows}
+        >
+          {content}
+        </AccountCard>
+      </div>
     </section>
+  );
+}
+
+function BackupRecovery({
+  viewer,
+  management,
+  status,
+  statusError,
+  identity,
+  offered,
+  confirmed,
+  openBuilderlab,
+  accountError,
+  accountPending,
+  onStatusError,
+  onRetry,
+  finalFocus,
+}: {
+  viewer: string;
+  management: IdentityManagement | undefined;
+  status: BackupStatus | undefined;
+  statusError: boolean;
+  identity: Identity;
+  offered: boolean;
+  /** The page's backup confirmation, as the badge shows it. */
+  confirmed: boolean;
+  openBuilderlab: (() => void) | undefined;
+  accountError: boolean;
+  accountPending: boolean;
+  onStatusError(failed: boolean): void;
+  onRetry(): void;
+  finalFocus(): HTMLButtonElement | null;
+}) {
+  useLanguage();
+  const { backup } = identity;
+  const [asking, setAsking] = useState(false);
+  const action = useRef<HTMLButtonElement>(null);
+  const backedUp = useRef(false);
+  const close = useCallback((saved?: boolean) => {
+    backedUp.current = saved === true;
+    setAsking(false);
+  }, []);
+  const needsConsent =
+    status?.status === "waiting" && status.reason === "no_consent";
+  const waiting = offered && needsConsent;
+  const settled =
+    !!status &&
+    status.status !== "running" &&
+    status.status !== "idle" &&
+    !needsConsent;
+  const [failedAt, setFailedAt] = useState<number>();
+  const [starting, setStarting] = useState(false);
+  const pending = useRef(false);
+  const current = useRef(true);
+  useEffect(() => {
+    current.current = true;
+    return () => {
+      current.current = false;
+    };
+  }, []);
+  // A confirmed key's backup is not in question when the account read fails.
+  const accountProblem = accountError && !confirmed;
+  const running = !!management && status?.status === "running";
+  // A new native status retires a failed-start message from an earlier pass.
+  const failure = failedAt !== undefined && failedAt === status?.seq;
+  const problem =
+    status?.status === "failed" ? BACKUP_FAILURES[status.kind] : undefined;
+  // `cause` is what the English copy shows alone; its wording is the kind's.
+  const feedback = waiting
+    ? t("u275a.identity.backUpToBuilderlab")
+    : statusError || accountProblem
+      ? t("u275a.identity.backupUnknown")
+      : status?.status === "waiting"
+        ? status.reason === "no_session"
+          ? t("u275a.identity.signInToBackUp")
+          : t(backupFailureMessages.not_linked).replace(/[.。]$/, "")
+        : status?.status === "failed" &&
+          t(backupFailureMessages[status.kind]).replace(/[.。]$/, "");
+  // These are the two waits whose next step is on Builderlab's Settings page.
+  const onBuilderlab =
+    (status?.status === "waiting" && status.reason === "not_linked") ||
+    (status?.status === "failed" && status.kind === "other_key_linked");
+  const at =
+    openBuilderlab && onBuilderlab
+      ? feedback
+        ? feedback.indexOf("Builderlab")
+        : -1
+      : -1;
+  // Retry backup is offered only where another attempt can change the answer:
+  // after the fix on Builderlab's page, or for a failure that may clear. With
+  // no session, a sign-in on this page hands native one, which starts its own
+  // pass; a refusal answers the same way again. An ended sign-in keeps Retry:
+  // its session can still be live here, with no sign-in control to offer.
+  const retryable =
+    statusError ||
+    accountProblem ||
+    onBuilderlab ||
+    (status?.status === "failed" && status.kind === "signed_out") ||
+    !(
+      (status?.status === "waiting" && status.reason === "no_session") ||
+      (status?.status === "failed" && !BACKUP_FAILURES[status.kind].retryable)
+    );
+  async function retry() {
+    if (pending.current || running) return;
+    pending.current = true;
+    onRetry();
+    setStarting(true);
+    setFailedAt(undefined);
+    try {
+      if (!management) {
+        const next = await backup.refresh().catch(() => undefined);
+        if (!current.current) return;
+        if (next?.management?.pubkey !== viewer) {
+          onStatusError(true);
+          return;
+        }
+        onStatusError(false);
+        if (next.status === "running") return;
+      }
+      const ticket = await backup.retry();
+      if (current.current && typeof ticket !== "number")
+        setFailedAt(backup.snapshot()?.seq);
+    } catch {
+      if (current.current) setFailedAt(backup.snapshot()?.seq);
+    } finally {
+      pending.current = false;
+      if (current.current) setStarting(false);
+    }
+  }
+  // A confirmed backup needs no recovery: a failed re-check leaves it backed up.
+  const recovery =
+    !!management &&
+    !confirmed &&
+    (offered || management.policy === "organization-managed") &&
+    (status?.status === "failed" ||
+      (status?.status === "waiting" && !needsConsent) ||
+      management.policy === "organization-managed");
+  const busy = starting || running || (accountProblem && accountPending);
+  if (
+    !waiting &&
+    !asking &&
+    !statusError &&
+    !accountProblem &&
+    !recovery &&
+    !busy &&
+    !failure
+  )
+    return null;
+  return (
+    <div className={styles.keyNotice}>
+      {(waiting ||
+        statusError ||
+        accountProblem ||
+        (!confirmed && problem) ||
+        (!confirmed && status?.status === "waiting")) && (
+        <p
+          role={statusError || accountProblem ? "status" : undefined}
+          className="m-0 text-center text-caption text-subtle"
+        >
+          {feedback && at >= 0 ? (
+            <>
+              {feedback.slice(0, at)}
+              <SettingsSectionLink
+                section="block.builderlab/login"
+                open={openBuilderlab}
+              >
+                Builderlab
+              </SettingsSectionLink>
+              {feedback.slice(at + "Builderlab".length)}
+            </>
+          ) : (
+            feedback
+          )}
+        </p>
+      )}
+      {failure && (
+        <p role="alert" className="m-0 text-body-sm text-danger">
+          {t("u275a.identity.backupStartFailed")}
+        </p>
+      )}
+      {waiting ? (
+        <Button
+          ref={action}
+          variant="prominent"
+          onClick={() => setAsking(true)}
+        >
+          {t("u275a.identity.backUpKey")}
+        </Button>
+      ) : (
+        (busy || retryable) && (
+          <Button
+            loading={busy}
+            loadingAppearance="disabled"
+            disabled={busy}
+            onClick={() => void retry()}
+          >
+            {t("u275a.identity.retryBackup")}
+          </Button>
+        )
+      )}
+      {asking && (
+        <BackupPrompt
+          identity={identity}
+          pubkey={viewer}
+          ended={settled}
+          onClose={close}
+          finalFocus={() =>
+            (backedUp.current ? null : action.current) ?? finalFocus()
+          }
+        />
+      )}
+    </div>
   );
 }

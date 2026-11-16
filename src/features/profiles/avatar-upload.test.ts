@@ -10,6 +10,7 @@ import {
   avatarPictureError,
   avatarPictureErrorMessage,
   avatarPreview,
+  profilePictureError,
   uploadAvatar,
 } from "./avatar-upload";
 
@@ -199,4 +200,20 @@ it("keeps app-owned upload failure diagnostics canonical while display changes l
     ),
   ).toBe("Choose a PNG, JPEG, GIF, WebP or HEIC image.");
   expect(uploadAttachment).not.toHaveBeenCalled();
+});
+
+it("saves Buzz mobile's emoji avatar as-is in a personal profile only", () => {
+  const emoji = `data:image/svg+xml,${encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" rx="256" fill="#FFB84D"/><text x="50%" y="56%" dominant-baseline="middle" text-anchor="middle" font-size="258">🛹</text></svg>',
+  )}`;
+  for (const picture of [
+    emoji,
+    ` ${emoji}\n`,
+    " https://images.example/a.png ",
+  ])
+    expect(profilePictureError(picture)).toBeUndefined();
+  expect(profilePictureError("data:image/svg+xml,%3Csvg%3E")).toBeDefined();
+  // Agents save HTTPS pictures only.
+  expect(avatarPictureError(emoji)).toBeDefined();
+  expect(avatarPictureError(" https://images.example/a.png ")).toBeUndefined();
 });

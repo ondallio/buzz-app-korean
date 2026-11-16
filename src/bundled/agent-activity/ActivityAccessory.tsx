@@ -6,6 +6,7 @@ import { useRecordedActivityAgents } from "../../features/conversation/typing-pr
 import { useToastNotification } from "../../shared/design-system/ui/Toast";
 import { useProfileGeneration } from "../../features/relay/react";
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -327,7 +328,8 @@ function MessageActivity(
       >
         {shown.map((entry) => (
           <TypingReplacement
-            shared
+            // A settled outcome is not working, so it leaves the cue alone.
+            shared={entry.working || entry.state === "waiting"}
             key={entry.agent}
             {...props}
             agent={entry.agent}
@@ -380,6 +382,9 @@ function ActivityBubble({
 }) {
   useLanguage();
   const [expanded, setExpanded] = useState(false);
+  useLayoutEffect(() => {
+    if (entries.length === 1 && !compact) setExpanded(false);
+  }, [entries.length, compact]);
   const message = props.message;
   const controls = new Map(
     entries.flatMap((entry) => {
@@ -426,6 +431,14 @@ function ActivityBubble({
   };
   const trigger = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLDivElement>(null);
+  const controlsRoot = useRef<HTMLDivElement>(null);
+  const restoreFocusOnRemoval = useCallback((node: HTMLElement | null) => {
+    if (!node) return;
+    return () => {
+      if (node.contains(node.ownerDocument.activeElement))
+        trigger.current?.focus({ preventScroll: true });
+    };
+  }, []);
   const stoppedFocus = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
     const source = stoppedFocus.current;
@@ -455,7 +468,9 @@ function ActivityBubble({
       const focused = trigger.current?.ownerDocument.activeElement;
       if (
         focused &&
-        (trigger.current?.contains(focused) || popup.current?.contains(focused))
+        (controlsRoot.current?.contains(focused) ||
+          trigger.current?.contains(focused) ||
+          popup.current?.contains(focused))
       )
         retirement.current.onFocusedRemoval?.();
     },
@@ -464,7 +479,7 @@ function ActivityBubble({
   useLayoutEffect(() => {
     if (interactive) return;
     const source = popup.current;
-    const button = trigger.current;
+    const button = controlsRoot.current ?? trigger.current;
     const document = (source ?? button)?.ownerDocument;
     const active = document?.activeElement;
     setExpanded(false);
@@ -559,7 +574,9 @@ function ActivityBubble({
       ? [currentPreview.title, currentPreview.detail]
           .filter(Boolean)
           .join(" · ")
-      : undefined;
+      : entries.length === 1
+        ? current?.remoteStatus
+        : undefined;
   const avatars = (group: Entry[]) => (
     <AvatarStack
       size="mini"
@@ -611,8 +628,57 @@ function ActivityBubble({
     </span>
   );
   if (!entries.length) return null;
+  const stopAction = (entry: Entry) => {
+    const control = controls.get(entry.agent);
+    if (!control) return null;
+    const stopping = stops.has(control.key);
+    return (
+      <Button
+        size="sm"
+        variant="plain"
+        aria-label={t("activityAccessory.stopName", {
+          name: entry.name,
+        })}
+        loading={stopping}
+        tabIndex={interactive ? undefined : -1}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (!interactive) return;
+          if (
+            event.currentTarget ===
+            event.currentTarget.ownerDocument.activeElement
+          )
+            stoppedFocus.current = event.currentTarget;
+          stop(control, entry.name);
+        }}
+      >
+        <OctagonIcon className={styles.stopIcon} aria-hidden="true" />
+        <span>{t("messageActions.typing.stopLabel")}</span>
+      </Button>
+    );
+  };
+  const activityLabel = t("activityAccessory.viewAgents", {
+    summary: entries
+      .map((entry) => {
+        const control = controls.get(entry.agent);
+        const state =
+          control && stops.has(control.key)
+            ? t("messageActions.typing.stopping")
+            : displayLabel(entry);
+        return t(
+          entry.remoteStatus
+            ? "activityAccessory.summaryRemote"
+            : "activityAccessory.summaryEntry",
+          { name: entry.name, state },
+        );
+      })
+      .join("; "),
+  });
+  const single = entries.length === 1 ? entries[0] : undefined;
+  const singleControl = single && controls.get(single.agent);
+  const singleStopping = !!singleControl && stops.has(singleControl.key);
   const details = (
-    <div className={styles.previews}>
+    <div ref={restoreFocusOnRemoval} className={styles.previews}>
       {entries.map((entry) => {
         // Opens the agent's Activity on this message's transcript.
         const target = profileActivityViewTarget(entry.agent);
@@ -734,31 +800,7 @@ function ActivityBubble({
                   />
                 </span>
               ) : control ? (
-                <span className={styles.action}>
-                  <Button
-                    size="sm"
-                    variant="plain"
-                    aria-label={t("activityAccessory.stopName", {
-                      name: entry.name,
-                    })}
-                    loading={stopping}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      if (
-                        event.currentTarget ===
-                        event.currentTarget.ownerDocument.activeElement
-                      )
-                        stoppedFocus.current = event.currentTarget;
-                      stop(control, entry.name);
-                    }}
-                  >
-                    <OctagonIcon
-                      className={styles.stopIcon}
-                      aria-hidden="true"
-                    />
-                    <span>{t("messageActions.typing.stopLabel")}</span>
-                  </Button>
-                </span>
+                <span className={styles.action}>{stopAction(entry)}</span>
               ) : undefined}
             </NavigationCard>
           </div>
@@ -788,46 +830,75 @@ function ActivityBubble({
     );
   return (
     <PopoverRoot
-      open={expanded}
-      onOpenChange={(open) => setExpanded(interactive && open)}
+      open={!single && expanded}
+      onOpenChange={(open) => setExpanded(!single && interactive && open)}
     >
-      <PopoverTrigger
-        openOnHover={interactive && "preview"}
-        {...(!interactive
-          ? {
-              "aria-haspopup": undefined,
-              "aria-expanded": undefined,
-              "aria-controls": undefined,
+      <div
+        ref={controlsRoot}
+        className={`${messageStyles.activityBubbleControls} ${singleControl ? styles.overlayControls : ""}`}
+        data-activity-controls=""
+      >
+        <PopoverTrigger
+          openOnHover={!single && interactive && "preview"}
+          {...(!interactive || single
+            ? {
+                "aria-haspopup": undefined,
+                "aria-expanded": undefined,
+                "aria-controls": undefined,
+              }
+            : {})}
+          onClick={(event) => {
+            if (!interactive) {
+              event.preventBaseUIHandler();
+              return;
             }
-          : {})}
-        onClick={(event) => {
-          if (!interactive) {
-            event.preventBaseUIHandler();
-            return;
+            if (single) {
+              event.preventBaseUIHandler();
+              const target = profileActivityViewTarget(single.agent);
+              if (target && props.canOpen(target))
+                openProfileTranscript(target, props.open);
+            }
+          }}
+          render={
+            <button
+              ref={trigger}
+              tabIndex={interactive ? undefined : -1}
+              type="button"
+              className={messageStyles.activityBubbleTrigger}
+              data-activity-summary=""
+              data-agent-activity-trigger=""
+              aria-label={activityLabel}
+            >
+              {singleControl ? (
+                <span className={styles.overlayContent}>
+                  {singleStopping ? (
+                    <ShimmerText active>
+                      {t("messageActions.typing.stopping")}
+                    </ShimmerText>
+                  ) : (
+                    content
+                  )}
+                </span>
+              ) : (
+                content
+              )}
+            </button>
           }
-        }}
-        render={
-          <button
-            ref={trigger}
-            tabIndex={interactive ? undefined : -1}
-            type="button"
-            className={messageStyles.activityBubbleTrigger}
-            data-activity-summary=""
-            data-agent-activity-trigger=""
-            aria-label={t("activityAccessory.viewAgents", {
-              summary: summary(true),
-            })}
+        />
+        {single && singleControl && (
+          <span
+            ref={restoreFocusOnRemoval}
+            className={styles.inlineStop}
+            data-stopping={singleStopping || undefined}
           >
-            {content}
-          </button>
-        }
-      />
+            {stopAction(single)}
+          </span>
+        )}
+      </div>
       <PopoverPopup
         ref={popup}
         finalFocus={() =>
-          retirement.current.interactive
-            ? trigger.current?.parentElement
-            : false
+          retirement.current.interactive ? trigger.current : false
         }
         side="top"
         padding="list"

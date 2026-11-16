@@ -20,6 +20,7 @@ import {
   type ChannelCreationInput,
 } from "../channel-templates/setup";
 import { createPresence } from "../presence/presence";
+import { createHostedAgents, withHostedAgents } from "../presence/hosted";
 import { createAgentMemories } from "../agents/memory";
 import type { PresenceActivity } from "../presence/activity";
 import { bindNames, type IdentityNames } from "../identity-names/service";
@@ -84,7 +85,10 @@ import type {
   ChannelSummary,
 } from "./contracts";
 import { createChannelActivity } from "./channel-activity";
-import { readSidebarPreferences } from "./sidebar-preferences";
+import {
+  readSidebarPreferences,
+  SIDEBAR_COORDINATES,
+} from "./sidebar-preferences";
 import { sidebarSortNeedsActivity } from "./sidebar-sort";
 import { createSidebarPreferencesStore } from "./sidebar-preferences-store";
 import { createUserStatuses } from "./user-status";
@@ -122,7 +126,7 @@ import { browserThreadFollows } from "./thread-follows";
 import { createMessages } from "./messages";
 import { retryRead } from "./read-retry";
 import { messageAuthor } from "./fold";
-import { createThreadView } from "./threads";
+import { createThreadView, resumeAfter, type ThreadResume } from "./threads";
 import { ByteLru } from "./budget";
 import { createRelayProfiler } from "./profiling";
 import { liveRecoveryStatus } from "./live-recovery";
@@ -311,6 +315,9 @@ export function createRelaySession(
   const refreshers = new Set<() => Promise<void>>();
   const views = new Map<() => void, (clear?: boolean) => void>();
   const threads = new Set<ReturnType<typeof createThreadView>>();
+  /** Recently closed threads, so reopening one shows it at once. Memory only;
+   * dropped with any access change. */
+  const resumes = new ByteLru<ThreadResume>(32, 8 * 1024 * 1024);
   const writer = transport?.writer;
   const clock = new MessageClock();
   const uploadAttachment = transport?.uploadAttachment;
@@ -489,6 +496,7 @@ export function createRelaySession(
         .flatMap(([id, { event }]) => (!visible(event) ? [id] : []));
       // Purge before notifying: callbacks must not be able to reseed denied data.
       for (const id of revoked) recent.delete(id);
+      resumes.clear();
       channels.purgeAccess((events) => events.filter(visibility(events)));
       writes?.purgeConfirmed(visible);
       emoji.clear();
@@ -977,7 +985,7 @@ export function createRelaySession(
         timers.add(timer);
       });
   }
-  const presence = createPresence(
+  const observedPresence = createPresence(
     transport,
     options.presenceActivity,
     (status, signal) =>
@@ -997,6 +1005,18 @@ export function createRelaySession(
             traffic?.syncVerifiedProfiles?.(filter, sink),
         }
       : undefined,
+  );
+  const presence = withHostedAgents(
+    observedPresence,
+    createHostedAgents({
+      owner: (pubkey) => profiles.queries.owner?.(pubkey),
+      subscribeOwners: profiles.queries.subscribe,
+      limited: observedPresence.limited,
+      subscribeSelection: observedPresence.subscribeSelection,
+      activity: options.presenceActivity,
+      read: (filters, signal) => readVerified(filters, { signal }, false),
+      notify,
+    }),
   );
   const emoji = createEmojiDirectory(
     verified,
@@ -2809,6 +2829,12 @@ export function createRelaySession(
           return events.filter((event) => event.kind !== PRODUCT_FEEDBACK_KIND);
         },
       };
+      const seed = recent.peek(messageId)?.event ?? retainedEvent(messageId);
+      const retained = recent.entries().map(([, item]) => item.event);
+      const saved = options?.exact
+        ? undefined
+        : resumes.get(`${channelId}:${messageId}`);
+      const resume = saved && resumeAfter(saved, retained);
       const thread = createThreadView({
         channelId,
         messageId,
@@ -2821,7 +2847,8 @@ export function createRelaySession(
         exact: options?.exact ?? false,
         priority: options?.priority,
         admit: options?.exact ? (events) => accept(events, false) : undefined,
-        seed: recent.peek(messageId)?.event ?? retainedEvent(messageId),
+        seed,
+        resume,
         local: localViews,
         clock,
         canAccess: () => !closed && canAccess(channelId),
@@ -2832,11 +2859,28 @@ export function createRelaySession(
         now: storeNow,
       });
       threads.add(thread);
-      thread.receive(recent.entries().map(([, item]) => item.event));
+      // Without its root retained, a first open admits none of these; a view
+      // shown from a resume must not either, or a reply the relay no longer
+      // returns would outlive its refresh.
+      if (seed || !resume) thread.receive(retained);
       observations.add(thread.receive);
       const unsubscribe = localViews?.subscribe(thread.localChanged);
       const unsubscribeOwner = profiles.queries.subscribe(thread.ownersChanged);
+      let disposed = false;
       const dispose = () => {
+        // Navigation cancellation and effect cleanup may both dispose.
+        if (disposed) return;
+        disposed = true;
+        // Exact views neither use nor replace an ordinary thread's resume.
+        if (!options?.exact) {
+          const key = `${channelId}:${messageId}`;
+          const resume =
+            !closed && !cacheClearing && canAccess(channelId)
+              ? thread.resume()
+              : undefined;
+          if (typeof resume === "object") resumes.set(key, resume);
+          else if (!resume) resumes.delete(key);
+        }
         thread.view.dispose();
         unsubscribe?.();
         unsubscribeOwner();
@@ -3392,6 +3436,34 @@ export function createRelaySession(
     if (prefs.status === "idle" || prefs.status === "loading") return;
     channels.queries.warm?.(prefs.data?.starred ?? []);
   };
+  // Only five replaceable heads; live payloads are hints, never decoded authority.
+  const sidebarHeads = new Map<string, Pick<RelayEvent, "id" | "created_at">>();
+  const receiveSidebar = (events: readonly RelayEvent[]) => {
+    if (!transport?.decodeSidebarPreferences || cacheClearing) return;
+    for (const event of events) {
+      if (event.kind !== 30078 || event.pubkey !== transport.viewer) continue;
+      const coordinates = event.tags.filter(([name]) => name === "d");
+      const coordinate = coordinates[0]?.[1];
+      if (
+        coordinates.length !== 1 ||
+        !coordinate ||
+        !SIDEBAR_COORDINATES.some((value) => value === coordinate)
+      )
+        continue;
+      const head = sidebarHeads.get(coordinate);
+      if (
+        head &&
+        (head.created_at > event.created_at ||
+          (head.created_at === event.created_at && head.id <= event.id))
+      )
+        continue;
+      sidebarHeads.set(coordinate, {
+        id: event.id,
+        created_at: event.created_at,
+      });
+      sidebarPreferences.invalidate();
+    }
+  };
   const stopWarmPreferences = sidebarPreferences.queries.subscribe(warmRoster);
   // Starred-first warming needs the account preferences without waiting for
   // the sidebar page to mount and observe them.
@@ -3482,6 +3554,7 @@ export function createRelaySession(
         }
         return;
       }
+      sidebarPreferences.reconnect(continuous);
       repairUnread(continuous);
       // Only while this same connection is still up.
       if (generation === liveGeneration && memoryConnected)
@@ -3592,6 +3665,7 @@ export function createRelaySession(
     observer: (frame, generation) => activity.receive(frame, generation),
     receive(events, provenance) {
       if (closed) return;
+      receiveSidebar(events);
       reminders?.receive(events);
       const candidates = new Set(
         provenance?.phase === "live" && provenance.channelId
@@ -3938,6 +4012,7 @@ export function createRelaySession(
         channelActivity.clear();
         activityRosterKey = undefined;
         typing.clear();
+        sidebarHeads.clear();
         sidebarPreferences.clear();
         soloPreferences.clear();
         channelKit.clear();
@@ -3950,6 +4025,7 @@ export function createRelaySession(
         for (const clear of views.values()) clear(true);
         for (const view of artifactSyncs) view.restart();
         recent.clear();
+        resumes.clear();
         unread.clear();
         inboxFeed.clear();
         requests.invalidate();
@@ -3972,6 +4048,7 @@ export function createRelaySession(
     dispose() {
       stopSoloGroups();
       closed = true;
+      resumes.clear();
       stopLiveRecovery();
       recovery?.dispose();
       repositories.clearHomes();
@@ -3983,6 +4060,7 @@ export function createRelaySession(
       channelActivity.dispose();
       stopActivityRoster();
       stopActivityPreferences();
+      sidebarHeads.clear();
       sidebarPreferences.dispose();
       soloPreferences.dispose();
       // Before requests.dispose(): lifecycle rereads retired shared reads

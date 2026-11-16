@@ -134,6 +134,34 @@ function hostDeclarations(
       icon: GlobeIcon,
       details: <code className={styles.sourcePath}>{origin}</code>,
     })),
+    ...(manifest.host?.publicImages
+      ? [
+          {
+            key: "publicImages",
+            signature:
+              "Public images: any public HTTPS site · images returned only · no cookies",
+            title: t("u275f00.access.imagesTitle"),
+            label: t("u275f00.access.imagesLabel"),
+            hint: t("u275f00.access.imagesHint"),
+            icon: GlobeIcon,
+            details: <p className="m-0">{t("u275f00.access.imagesDetails")}</p>,
+          },
+        ]
+      : []),
+    ...(manifest.host?.publicPages
+      ? [
+          {
+            key: "publicPages",
+            signature:
+              "Public pages: any public HTTPS site · title, description and image only · no cookies",
+            title: t("u275f00.access.pagesTitle"),
+            label: t("u275f00.access.pagesLabel"),
+            hint: t("u275f00.access.pagesHint"),
+            icon: GlobeIcon,
+            details: <p className="m-0">{t("u275f00.access.pagesDetails")}</p>,
+          },
+        ]
+      : []),
     ...(manifest.host?.federatedIdentity?.operations ?? []).map(
       (operation) => ({
         key: `federated:${operation.method} ${operation.path}`,

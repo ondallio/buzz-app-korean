@@ -73,7 +73,10 @@ function fixture(seed?: ReadJournal) {
         return { update() {}, retry() {}, dispose() {} };
       },
     },
-    { readStateFloor: () => 0, readStateStorage: { update, close() {} } },
+    {
+      readStateFloor: () => 0,
+      readStateStorage: { update, capture: async () => undefined, close() {} },
+    },
   );
   let muted: readonly string[] = [];
   let muteGate: Promise<void> | undefined;

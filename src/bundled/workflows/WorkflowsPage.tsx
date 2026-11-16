@@ -65,7 +65,7 @@ export function WorkflowsPage({ relay }: { relay: RelayData }) {
         {connection.status === "error" && (
           <>
             <p role="alert">{connection.error}</p>
-            <Button onClick={() => relay.retry()}>
+            <Button onClick={() => relay.tryAgain()}>
               {t("workflowsList.retryConnection")}
             </Button>
           </>
@@ -96,6 +96,9 @@ export function WorkflowCommunity({
   const eligible = channels.channels.filter(
     (item) => !item.huddle && !item.metadataPending,
   );
+  // Archived channels stay eligible, so their workflows can still be found,
+  // turned off and deleted, and an open editor keeps its draft.
+  const creatable = eligible.filter((item) => !item.archived);
   const [selected, setSelected] = useState("");
   const [selectedDefinition, setSelectedDefinition] = useState<
     WorkflowDefinition | "new" | undefined
@@ -190,7 +193,11 @@ export function WorkflowCommunity({
     setSelectedDefinition(definition);
     setSelected(next);
   };
-  const beginCreate = () => setCreateOpen(true);
+  // The one owner of New workflow's availability, in the header and the landing.
+  const beginCreate =
+    capability.availability.save && creatable.length
+      ? () => setCreateOpen(true)
+      : undefined;
   const deleteWorkflow = (definition: WorkflowDefinition) => {
     if (deleting.current) return;
     const locked = workflowOperationLocked(
@@ -242,7 +249,7 @@ export function WorkflowCommunity({
                     aria-label={t("workflowsList.newWorkflow")}
                     title={t("workflowsList.newWorkflow")}
                     aria-haspopup="dialog"
-                    disabled={!capability.availability.save || !eligible.length}
+                    disabled={!beginCreate}
                     icon={<PlusIcon size="1rem" aria-hidden="true" />}
                     onClick={beginCreate}
                   />
@@ -383,7 +390,9 @@ export function WorkflowCommunity({
           onCancel={() => setCreateOpen(false)}
           scope={
             <WorkflowChannelPicker
-              channels={eligible}
+              channels={creatable}
+              profiles={session.profiles}
+              names={session.names}
               onSelect={(id) => {
                 setCreateOpen(false);
                 openChannel(id, "new");

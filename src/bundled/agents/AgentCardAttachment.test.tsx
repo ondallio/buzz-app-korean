@@ -128,11 +128,12 @@ it("shows a sent agent as its card, and adds it from there", async () => {
   );
   show();
   const button = await screen.findByRole("button", {
-    name: "Ada, shared agent",
+    name: "Add agent: Ada",
   });
   await vi.waitFor(() => expect(button).toBeEnabled());
   expect(fetch).toHaveBeenCalledWith("buzz-media://ada.png", expect.anything());
-  expect(within(button).getByText("echo-1")).toBeInTheDocument();
+  expect(within(button).getByText("Add agent")).toBeVisible();
+  expect(screen.queryByText("echo-1")).not.toBeInTheDocument();
   await user.click(button);
   const dialog = screen.getByRole("dialog", { name: "Ada" });
   // What it will follow can be changed before it is added.
@@ -187,7 +188,7 @@ it("names what it added, and opens it from there", async () => {
     { wrapper: ToastProvider },
   );
   const button = await screen.findByRole("button", {
-    name: "Ada, shared agent",
+    name: "Add agent: Ada",
   });
   await vi.waitFor(() => expect(button).toBeEnabled());
   await user.click(button);
@@ -239,7 +240,7 @@ it("reads a card again when chosen after its read failed", async () => {
   vi.stubGlobal("fetch", fetch);
   show();
   const button = await screen.findByRole("button", {
-    name: "Ada, shared agent. Couldn’t load. Try again",
+    name: "Try again: Ada",
   });
   expect(within(button).getByText("Couldn’t load. Try again")).toBeVisible();
   expect(screen.queryByRole("img", { name: "Ada" })).not.toBeInTheDocument();
@@ -257,13 +258,13 @@ it("retranslates a failed card without refetching or changing its source/name", 
   vi.stubGlobal("fetch", fetch);
   show({ ...card, name: "Message.agent.png" });
   const button = await screen.findByRole("button", {
-    name: "Message, shared agent. Couldn’t load. Try again",
+    name: "Try again: Message",
   });
   button.focus();
   act(() => setLanguage("ko"));
   expect(
     screen.getByRole("button", {
-      name: "Message, 공유된 에이전트. 불러오지 못했습니다. 다시 시도해 주세요",
+      name: "다시 시도: Message",
     }),
   ).toBe(button);
   expect(button).toHaveFocus();
@@ -272,7 +273,7 @@ it("retranslates a failed card without refetching or changing its source/name", 
   act(() => setLanguage("en"));
   expect(
     screen.getByRole("button", {
-      name: "Message, shared agent. Couldn’t load. Try again",
+      name: "Try again: Message",
     }),
   ).toBe(button);
   expect(fetch).toHaveBeenCalledOnce();
@@ -296,7 +297,7 @@ it("keeps an import toast live after the card unmounts without repeating the imp
     { wrapper: ToastProvider },
   );
   await user.click(
-    await screen.findByRole("button", { name: "Ada, shared agent" }),
+    await screen.findByRole("button", { name: "Add agent: Ada" }),
   );
   await user.click(
     within(screen.getByRole("dialog", { name: "Ada" })).getByRole("button", {
@@ -318,4 +319,30 @@ it("keeps an import toast live after the card unmounts without repeating the imp
   expect(navigator.open).toHaveBeenCalledExactlyOnceWith(
     agentTarget("e".repeat(64)),
   );
+});
+
+it("keeps Add agent disabled while loading and restores keyboard focus after cancel", async () => {
+  const user = userEvent.setup();
+  const bytes = new Uint8Array(await ada().arrayBuffer());
+  let respond!: (value: ReturnType<typeof stream>["response"]) => void;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      () =>
+        new Promise((resolve) => {
+          respond = resolve;
+        }),
+    ),
+  );
+  show();
+  const button = screen.getByRole("button", { name: "Add agent: Ada" });
+  expect(button).toBeDisabled();
+  respond(stream([bytes]).response);
+  await vi.waitFor(() => expect(button).toBeEnabled());
+  await user.tab();
+  expect(button).toHaveFocus();
+  await user.keyboard("{Enter}");
+  const dialog = await screen.findByRole("dialog", { name: "Ada" });
+  await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  await vi.waitFor(() => expect(button).toHaveFocus());
 });

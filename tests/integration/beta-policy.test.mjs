@@ -89,7 +89,7 @@ test("rejects retargeted, unpublished, foreign or incomplete official inputs", (
     { prerelease: false },
     { published_at: null },
     { published_at: "invalid" },
-    { tag_name: "v0.7.0-preview.259.1" },
+    { tag_name: "v0.7.0-preview.276.1" },
     { html_url: "https://example.org/release" },
     { assets: [] },
     { assets: [...release.assets, release.assets[0]] },
@@ -113,7 +113,7 @@ test("rejects retargeted, unpublished, foreign or incomplete official inputs", (
   assert.throws(() =>
     validate(release, channel.source.commit, `${channel.source.commit}\n`, {
       ...feed,
-      version: "0.7.0-preview.259.1",
+      version: "0.7.0-preview.276.1",
     }),
   );
 });

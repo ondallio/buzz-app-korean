@@ -136,7 +136,7 @@ it("keeps the real shared key form and masked pending draft across languages wit
       ),
     ).toBeVisible();
     const input = screen.getByLabelText("Anthropic API key");
-    const save = screen.getByRole("button", { name: "Save key" });
+    const save = screen.getByRole("button", { name: "Save" });
     expect(save).toHaveAttribute("aria-disabled", "true");
     fireEvent.change(input, { target: { value: `  ${DUMMY}  ` } });
     input.focus();
@@ -164,7 +164,7 @@ it("keeps the real shared key form and masked pending draft across languages wit
       ).toBe(input);
       expect(
         screen.getByRole("button", {
-          name: language === "ko" ? "키 저장" : "Save key",
+          name: language === "ko" ? "저장" : "Save",
         }),
       ).toBe(save);
       expect(input).toHaveValue(`  ${DUMMY}  `);
@@ -246,7 +246,7 @@ it("translates replacement guidance on the same field while preserving its maske
     const disabled = screen.getByLabelText("Anthropic API key");
     fireEvent.change(disabled, { target: { value: DUMMY } });
     fireEvent.keyDown(disabled, { key: "Enter" });
-    const button = screen.getByRole("button", { name: "Save key" });
+    const button = screen.getByRole("button", { name: "Save" });
     expect(button).toHaveAttribute("data-size", "sm");
     expect(button).toHaveAttribute("aria-disabled", "true");
     await userEvent.click(button);
@@ -280,7 +280,7 @@ it("keeps the actual inline Settings button and whole missing-key alternatives w
   );
   expect(
     screen.getByText(
-      "Claude is missing an API key. Add one in Settings → Agent setup.",
+      "Claude is missing an API key. Add one in Settings → Claude.",
     ),
   ).toBeVisible();
   button.focus();
@@ -292,7 +292,7 @@ it("keeps the actual inline Settings button and whole missing-key alternatives w
   );
   expect(
     screen.getByText(
-      "Claude API 키가 없습니다. 설정 → 에이전트 설정에서 키를 추가해 주세요.",
+      "Claude API 키가 없습니다. 설정 → Claude에서 키를 추가해 주세요.",
     ),
   ).toBeVisible();
   expect(button).toHaveFocus();
@@ -313,8 +313,8 @@ it("keeps the actual inline Settings button and whole missing-key alternatives w
 it.each([
   {
     name: "Error matching a translated caption",
-    error: new Error("Save key"),
-    text: "Save key",
+    error: new Error("Save"),
+    text: "Save",
   },
   {
     name: "string matching a translated sentence",
@@ -331,7 +331,7 @@ it.each([
       render(<SignIn setup={f.setup} onSaved={onSaved} />);
       const input = screen.getByLabelText("Anthropic API key");
       fireEvent.change(input, { target: { value: DUMMY } });
-      await userEvent.click(screen.getByRole("button", { name: "Save key" }));
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
       await waitFor(() => expect(f.saves).toHaveLength(1));
       await act(async () => f.saves[0]?.resolve({ ok: false, error }));
       const alert = await screen.findByRole("alert");
@@ -345,7 +345,7 @@ it.each([
       expect(f.check).not.toHaveBeenCalled();
       expect(onSaved).not.toHaveBeenCalled();
       expect(f.save).toHaveBeenCalledTimes(1);
-      await userEvent.click(screen.getByRole("button", { name: "키 저장" }));
+      await userEvent.click(screen.getByRole("button", { name: "저장" }));
       await waitFor(() => expect(f.saves).toHaveLength(2));
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
       act(() => setLanguage("en"));
@@ -369,7 +369,7 @@ it("aborts the existing form signal on unmount and suppresses a late refusal wit
     fireEvent.change(screen.getByLabelText("Anthropic API key"), {
       target: { value: DUMMY },
     });
-    await userEvent.click(screen.getByRole("button", { name: "Save key" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(f.saves).toHaveLength(1));
     const signal = f.save.mock.calls[0]?.[1];
     expect(signal?.aborted).toBe(false);

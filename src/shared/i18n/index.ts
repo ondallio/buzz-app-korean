@@ -238,6 +238,14 @@ import {
   en as githubPullLinksEn,
   ko as githubPullLinksKo,
 } from "./catalogs/github-pull-links";
+import { en as u275AEn, ko as u275AKo } from "./catalogs/upstream275-a";
+import { en as u275BEn, ko as u275BKo } from "./catalogs/upstream275-b";
+import { en as u275CEn, ko as u275CKo } from "./catalogs/upstream275-c";
+import { en as u275DEn, ko as u275DKo } from "./catalogs/upstream275-D";
+import { en as u275EEn, ko as u275EKo } from "./catalogs/upstream275-e";
+import { en as u275f00En, ko as u275f00Ko } from "./catalogs/upstream275-f00";
+import { en as u275f01En, ko as u275f01Ko } from "./catalogs/upstream275-f01";
+import { en as u275f02En, ko as u275f02Ko } from "./catalogs/upstream275-f02";
 import {
   en as pluginRequestsEn,
   ko as pluginRequestsKo,
@@ -294,6 +302,14 @@ export const english = {
   ...channelFormsEn,
   ...sharedUiEn,
   ...githubPullLinksEn,
+  ...u275AEn,
+  ...u275BEn,
+  ...u275CEn,
+  ...u275DEn,
+  ...u275EEn,
+  ...u275f00En,
+  ...u275f01En,
+  ...u275f02En,
   ...emojiPickerEn,
   ...customEmojiEn,
   ...resourcePickerEn,
@@ -375,6 +391,14 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...channelFormsKo,
   ...sharedUiKo,
   ...githubPullLinksKo,
+  ...u275AKo,
+  ...u275BKo,
+  ...u275CKo,
+  ...u275DKo,
+  ...u275EKo,
+  ...u275f00Ko,
+  ...u275f01Ko,
+  ...u275f02Ko,
   ...emojiPickerKo,
   ...customEmojiKo,
   ...resourcePickerKo,

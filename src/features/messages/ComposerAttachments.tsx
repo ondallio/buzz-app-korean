@@ -293,6 +293,7 @@ function AttachmentItem({
               ...item.voice,
             }}
             source={source}
+            placement="composer"
             onRemove={disabled ? undefined : () => remove(item.id)}
             fallback={
               <div>

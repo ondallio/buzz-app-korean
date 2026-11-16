@@ -94,6 +94,7 @@ import {
   MenuPopup,
   MenuRadioGroup,
   MenuRadioItem,
+  MenuSeparator,
 } from "../../shared/design-system/ui/Menu";
 import { ChoiceRow } from "../../shared/design-system/ui/ChoiceRow";
 import { SearchField } from "../../shared/design-system/ui/SearchField";
@@ -111,7 +112,12 @@ import {
   InfoIcon,
   UsersIcon,
 } from "../../shared/design-system/icons";
-import { MemberRow, useMemberAdministration } from "./MemberAdministration";
+import {
+  MemberRow,
+  useMemberAdministration,
+  memberAccessLabel,
+} from "./MemberAdministration";
+import type { MemberRole } from "../../features/channel-members/administration-protocol";
 import { useMemberSearch } from "./useMemberSearch";
 import { useMemberOwners } from "./useMemberOwners";
 import { useSoloShare } from "./useSoloShare";
@@ -123,6 +129,21 @@ import { writeClipboardText } from "../../shared/clipboard";
 
 const INVITATION_GROUP_SIZE = 4;
 const MEMBER_PAGE_SIZE = 50;
+const accessFilterNames = (["owner", "admin", "member", "guest"] as const).map(
+  memberAccessLabel,
+);
+const accessFilterLabel = (role: MemberRole | undefined) =>
+  role === undefined || role === "unknown"
+    ? undefined
+    : memberAccessLabel(role);
+
+// The access filter's values are the canonical labels; only the display is localized.
+function accessFilterDisplay(name: string) {
+  const role = (["owner", "admin", "member", "guest"] as const).find(
+    (item) => memberAccessLabel(item) === name,
+  );
+  return role ? t(`channelForms.members.role.${role}`) : name;
+}
 
 const additionRoles = [
   { role: "member" },
@@ -131,6 +152,7 @@ const additionRoles = [
 ] as const;
 
 const memberGroupKeys = {
+  Archived: "u275e.members.archived",
   All: "channelForms.members.group.All",
   People: "channelForms.members.group.People",
   Agents: "channelForms.members.group.Agents",
@@ -398,6 +420,11 @@ const MemberIdentityRow = memo(function MemberIdentityRow({
             {qualified && keyLabel && (
               <span className="shrink-0 text-caption text-subtle">
                 {keyLabel}
+              </span>
+            )}
+            {!adding && archived && (
+              <span className="shrink-0 text-caption text-subtle">
+                {t("u275e.members.archived")}
               </span>
             )}
           </span>
@@ -669,6 +696,12 @@ function TeamRow({
   );
 }
 
+/** Whether removing `control` took the focus with it. Removal emits no blur and
+ * leaves the body focused, so focus anywhere else was moved there since. */
+function lostFocus(control: HTMLElement) {
+  return !control.isConnected && document.activeElement === document.body;
+}
+
 /** The one access dialog. Any conversation lists and adds members; a Solo chat
  * adds people under its share rule and can also be shared to a channel. */
 export function ChannelMembersDialog({
@@ -719,31 +752,112 @@ export function ChannelMembersDialog({
     session: RelaySession;
     channelId: string;
     change: MemberChange;
+    /** The list's offset when the change was chosen; the step replaces it. */
+    scrollTop: number;
   }>();
-  const selection =
+  const shownIntent =
     intent?.session === session && intent.channelId === channelId
-      ? intent.change
+      ? intent
       : undefined;
+  const selection = shownIntent?.change;
+  const scrollport = useRef<HTMLElement>(null);
+  // Set when the step is left by confirming. That member's Actions are then
+  // watched until its row leaves and until the change settles.
+  const confirmed = useRef(false);
+  const handOff = useRef<{
+    button: HTMLElement;
+    at: number;
+    /** The members beside it in the whole list, not only the shown page. */
+    next?: string | undefined;
+    before?: string | undefined;
+  }>(undefined);
+  // Every listed member in order, across pages, for a removal's hand-off.
+  const listedMembers = useRef<readonly string[]>([]);
+  const keepInView = useRef<{ button: HTMLElement; scrollTop: number }>(
+    undefined,
+  );
   const chooseChange = useCallback(
     (change: MemberChange) => {
       setChangeError(undefined);
-      setIntent({ session, channelId, change });
+      confirmed.current = false;
+      setIntent({
+        session,
+        channelId,
+        change,
+        scrollTop: scrollport.current?.scrollTop ?? 0,
+      });
     },
     [session, channelId],
   );
-  const previousSelection = useRef(selection);
+  const lastShown = useRef(shownIntent);
+  // Before paint: the returning list keeps its offset and focuses the
+  // member's Actions. An addition's person has no member row, so it returns
+  // to Search, as does another session's or channel's list.
   useLayoutEffect(() => {
-    if (selection !== previousSelection.current)
+    const previous = lastShown.current;
+    if (shownIntent === previous) return;
+    lastShown.current = shownIntent;
+    if (shownIntent) {
       // Enter confirms reversible changes; removal starts on Cancel.
-      (selection
-        ? selection.role !== "remove" && !apply.current?.disabled
-          ? apply.current
-          : cancel.current
-        : input.current
+      (shownIntent.change.role !== "remove" && !apply.current?.disabled
+        ? apply.current
+        : cancel.current
       )?.focus();
-    previousSelection.current = selection;
-  }, [selection]);
-  const scrollport = useRef<HTMLElement>(null);
+      return;
+    }
+    const list = scrollport.current;
+    if (
+      !list ||
+      previous?.session !== session ||
+      previous.channelId !== channelId
+    ) {
+      input.current?.focus();
+      return;
+    }
+    list.scrollTop = previous.scrollTop;
+    const actions = [...list.querySelectorAll<HTMLElement>("[data-member]")];
+    const at = actions.findIndex(
+      (item) => item.dataset.member === previous.change.pubkey,
+    );
+    const button = actions[at];
+    (button ?? input.current)?.focus();
+    if (button && confirmed.current) {
+      const order = listedMembers.current;
+      const index = order.indexOf(previous.change.pubkey);
+      handOff.current = {
+        button,
+        at,
+        next: index < 0 ? undefined : order[index + 1],
+        before: index < 0 ? undefined : order[index - 1],
+      };
+      keepInView.current = { button, scrollTop: list.scrollTop };
+    }
+  }, [shownIntent, session, channelId]);
+  // A removed row takes its focused Actions with it. Hand off to the member
+  // after it, the one before, or Search. Neighbours are found by identity, so
+  // a removal that empties the last page lands on the previous page's last
+  // member rather than its first; index is the fallback for unlisted rows.
+  useLayoutEffect(() => {
+    const previous = handOff.current;
+    if (!previous || previous.button.isConnected) return;
+    handOff.current = undefined;
+    if (!lostFocus(previous.button)) return;
+    const actions = [
+      ...(scrollport.current?.querySelectorAll<HTMLElement>("[data-member]") ??
+        []),
+    ];
+    const shown = (pubkey: string | undefined) =>
+      pubkey === undefined
+        ? undefined
+        : actions.find((item) => item.dataset.member === pubkey);
+    (
+      shown(previous.next) ??
+      shown(previous.before) ??
+      actions[previous.at] ??
+      actions[previous.at - 1] ??
+      input.current
+    )?.focus();
+  });
   const focusedAdd = useRef<{ key: string; button: HTMLButtonElement } | null>(
     null,
   );
@@ -756,20 +870,33 @@ export function ChannelMembersDialog({
   useLayoutEffect(() => {
     const previous = expandedFocus.current;
     expandedFocus.current = null;
-    if (
-      previous &&
-      !previous.button.isConnected &&
-      (document.activeElement === previous.button ||
-        document.activeElement === document.body)
-    )
+    if (previous && lostFocus(previous.button))
       document
         .getElementById(previous.rowId)
         ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
         ?.focus();
   });
+  // A late archive list moves archived members to the Archived group, which
+  // remounts a focused row. Its control leaves without a blur, so focus falls
+  // to the dialog or the body. Hand off to its group's heading, as a page
+  // change does, or Search, unless focus has moved on to another control.
+  const listFocus = useRef<{ control: HTMLElement; group: string }>(undefined);
+  useLayoutEffect(() => {
+    const previous = listFocus.current;
+    const list = scrollport.current;
+    if (!previous || previous.control.isConnected) return;
+    listFocus.current = undefined;
+    const active = document.activeElement;
+    if (!list || (active && !active.contains(list))) return;
+    (
+      document.getElementById(`${presenceId}-${previous.group}-page`) ??
+      input.current
+    )?.focus({ preventScroll: true });
+  });
   const lifetime = useRef<AbortController>(undefined);
   const [query, setQuery] = useState("");
-  const [selectedRole, setSelectedRole] = useState("All");
+  const [selectedIdentity, setSelectedIdentity] = useState("All");
+  const [selectedAccess, setSelectedAccess] = useState("All");
   const [soloAdditions, setSoloAdditions] = useState<
     Record<string, { pending: boolean; error?: DisplayMessage }>
   >({});
@@ -1046,7 +1173,6 @@ export function ChannelMembersDialog({
     searchPeople.map((person) => [person.pubkey, person]),
   );
   const members = new Set(channel?.members ?? []);
-  const archived = new Set(archives.archived);
   const verifiedOf = (key: string): VerifiedProfile | undefined =>
     profiles.get(key)?.verified ?? searchVerified.get(key);
   const pageLabel = (verified: VerifiedProfile | undefined) =>
@@ -1095,10 +1221,38 @@ export function ChannelMembersDialog({
   // to repeat for every member of a large roster on each render.
   const memberLabels = new Map([...members].map((key) => [key, label(key)]));
   const memberLabel = (key: string) => memberLabels.get(key) ?? label(key);
-  const currentMembers = [...members].sort(
-    (a, b) =>
-      memberLabel(a).localeCompare(memberLabel(b)) || a.localeCompare(b),
+  // Sort again only when a member or label changes, not on every render (each
+  // filter keystroke), which would re-sort a large roster. The serialized
+  // pairs are the memo key, since they change whenever either does.
+  const labelList = JSON.stringify([...memberLabels]);
+  const currentMembers = useMemo(
+    () =>
+      (JSON.parse(labelList) as [string, string][])
+        .sort(([a, x], [b, y]) => x.localeCompare(y) || a.localeCompare(b))
+        .map(([key]) => key),
+    [labelList],
   );
+  const accessOf = (key: string) =>
+    accessFilterLabel(administration.authority.roles[key]);
+  const accessGroups = accessFilterNames
+    .map((name) => ({
+      name,
+      count: currentMembers.filter((key) => accessOf(key) === name).length,
+    }))
+    .filter((group) => group.count > 0);
+  const accessFilter =
+    query.length === 0 &&
+    (administration.status === "loading" ||
+      (accessGroups.length > 1 &&
+        accessGroups.some((group) => group.name === selectedAccess)))
+      ? selectedAccess
+      : "All";
+  if (
+    !initialLoading &&
+    administration.status !== "loading" &&
+    selectedAccess !== accessFilter
+  )
+    setSelectedAccess(accessFilter);
   const currentGroups = ["People", "Agents"].map((name) => {
     const keys = currentMembers.filter((key) => {
       const group =
@@ -1154,35 +1308,76 @@ export function ChannelMembersDialog({
       initialLoading,
       groups: orderedGroups,
     });
-  const groups = (largeRoster ? orderedGroups : currentGroups).map((group) => ({
-    ...group,
-    keys: group.keys.filter((key) => matches(key, memberLabel(key))),
+  // Known-archived members leave People and Agents for an Archived group
+  // after them, each keeping the order above, so archives that arrive late or
+  // members who join later still list there.
+  const isArchived = (key: string) =>
+    archiveHides(session.archives, key, session.viewer);
+  const baseGroups = largeRoster ? orderedGroups : currentGroups;
+  const groups = [
+    ...baseGroups.map((group) => ({
+      name: group.name,
+      keys: group.keys.filter((key) => !isArchived(key)),
+    })),
+    {
+      name: "Archived",
+      keys: baseGroups.flatMap((group) => group.keys.filter(isArchived)),
+    },
+  ].map((group) => ({
+    name: group.name,
+    count: group.keys.length,
+    keys: group.keys.filter(
+      (key) =>
+        matches(key, memberLabel(key)) &&
+        (accessFilter === "All" || accessOf(key) === accessFilter),
+    ),
   }));
+  const narrowed = text.length > 0 || accessFilter !== "All";
   const presentGroups = groups.filter((group) => group.count > 0);
-  const roleFilter =
+  const identityFilter =
     query.length === 0 &&
     presentGroups.length > 1 &&
-    presentGroups.some((group) => group.name === selectedRole)
-      ? selectedRole
+    presentGroups.some((group) => group.name === selectedIdentity)
+      ? selectedIdentity
       : "All";
   if (
     !initialLoading &&
     administration.status !== "loading" &&
-    selectedRole !== roleFilter
+    selectedIdentity !== identityFilter
   )
-    setSelectedRole(roleFilter);
+    setSelectedIdentity(identityFilter);
+  const identityChoices = presentGroups.length > 1;
+  const accessChoices = rolesSettled && accessGroups.length > 1;
+  const filterSummary =
+    [identityFilter, accessFilter]
+      .filter((name) => name !== "All")
+      .join(", ") || "All";
+  const filterSummaryLabel =
+    [
+      identityFilter === "All" ? undefined : memberGroupLabel(identityFilter),
+      accessFilter === "All" ? undefined : accessFilterDisplay(accessFilter),
+    ]
+      .filter(Boolean)
+      .join(", ") || memberGroupLabel("All");
   const filteredGroups = groups.filter(
     (group) =>
-      (roleFilter === "All" || group.name === roleFilter) &&
+      (identityFilter === "All" || group.name === identityFilter) &&
       group.keys.length > 0,
   );
+  const listedOrder = filteredGroups.flatMap((group) => group.keys).join("\n");
+  useLayoutEffect(() => {
+    listedMembers.current = listedOrder ? listedOrder.split("\n") : [];
+  }, [listedOrder]);
   const [memberPages, setMemberPages] = useState({
     text,
-    roleFilter,
+    identityFilter,
+    accessFilter,
     pages: {} as Record<string, number>,
   });
   let pages =
-    memberPages.text === text && memberPages.roleFilter === roleFilter
+    memberPages.text === text &&
+    memberPages.identityFilter === identityFilter &&
+    memberPages.accessFilter === accessFilter
       ? memberPages.pages
       : {};
   for (const group of groups) {
@@ -1193,7 +1388,8 @@ export function ChannelMembersDialog({
     if ((pages[group.name] ?? 0) > lastPage)
       pages = { ...pages, [group.name]: lastPage };
   }
-  if (pages !== memberPages.pages) setMemberPages({ text, roleFilter, pages });
+  if (pages !== memberPages.pages)
+    setMemberPages({ text, identityFilter, accessFilter, pages });
   const pendingMemberPage = useRef<string | null>(null);
   useLayoutEffect(() => {
     const group = pendingMemberPage.current;
@@ -1207,7 +1403,8 @@ export function ChannelMembersDialog({
     pendingMemberPage.current = group;
     setMemberPages({
       text,
-      roleFilter,
+      identityFilter,
+      accessFilter,
       pages: { ...pages, [group]: page },
     });
   };
@@ -1319,7 +1516,7 @@ export function ChannelMembersDialog({
   const offering =
     !initialLoading &&
     canAdd &&
-    roleFilter === "All" &&
+    identityFilter === "All" &&
     (!!text ||
       (members.size === 1 &&
         members.has(session.viewer ?? "") &&
@@ -1331,7 +1528,7 @@ export function ChannelMembersDialog({
     "Your other agents",
   ].map((name, index) => {
     const people =
-      roleFilter === "All"
+      identityFilter === "All"
         ? available.filter((person) => candidateGroup(person) === index)
         : [];
     const ranked = rankPeople(
@@ -1446,6 +1643,21 @@ export function ChannelMembersDialog({
       (changeError?.session === session &&
         changeError.channelId === channelId &&
         changeError.message));
+  // A confirmed change's own error appears above the list and shortens it.
+  // When the change settles, keep its member's Actions in view, unless focus
+  // or the list has moved since the return.
+  const operationStatus = administration.operation?.status;
+  useLayoutEffect(() => {
+    const kept = keepInView.current;
+    if (!kept || operationStatus === "pending") return;
+    keepInView.current = undefined;
+    if (
+      administrationError &&
+      document.activeElement === kept.button &&
+      scrollport.current?.scrollTop === kept.scrollTop
+    )
+      kept.button.scrollIntoView({ block: "nearest" });
+  }, [administrationError, operationStatus]);
   const refreshMembers = () => {
     if (refreshing || mutationPending) return;
     setChangeError(undefined);
@@ -1558,7 +1770,8 @@ export function ChannelMembersDialog({
           if (direct) {
             setSoloAdditions((old) => ({ ...old, [key]: { pending: false } }));
             setQuery("");
-            setSelectedRole("All");
+            setSelectedIdentity("All");
+            setSelectedAccess("All");
           }
           setNotice(
             localMessage(
@@ -1753,7 +1966,7 @@ export function ChannelMembersDialog({
         adding={adding}
         picture={picture ?? profiles.get(key)?.picture}
         isAgent={isAgent}
-        archived={archived.has(key)}
+        archived={isArchived(key)}
         roleLabel={
           isAgent && role === "bot"
             ? "member"
@@ -1903,51 +2116,99 @@ export function ChannelMembersDialog({
         disabled={solo && share.busy}
         onValueChange={(value) => {
           setQuery(value);
-          if (value.length > 0) setSelectedRole("All");
+          if (value.length > 0) {
+            setSelectedIdentity("All");
+            setSelectedAccess("All");
+          }
         }}
         onKeyDown={(event) => {
           highlight.keyDown(event);
         }}
         trailing={
-          !initialLoading && presentGroups.length > 1 && query.length === 0 ? (
+          !initialLoading &&
+          query.length === 0 &&
+          (identityChoices || accessChoices) ? (
             <MenuRoot>
               <MenuTrigger
                 render={
                   <IconButton
-                    aria-label={t("channelForms.members.filter", {
-                      group: memberGroupLabel(roleFilter),
+                    aria-label={t("u275e.members.filter", {
+                      summary: filterSummaryLabel,
                     })}
-                    title={t("channelForms.members.filter", {
-                      group: memberGroupLabel(roleFilter),
+                    title={t("u275e.members.filter", {
+                      summary: filterSummaryLabel,
                     })}
-                    variant={roleFilter === "All" ? "ghost" : "prominent"}
+                    variant={filterSummary === "All" ? "ghost" : "prominent"}
                     icon={<Filter2Icon size={16} aria-hidden="true" />}
                   />
                 }
               />
               <MenuPopup align="end">
-                <MenuRadioGroup
-                  value={roleFilter}
-                  onValueChange={(value) => {
-                    setSelectedRole(value);
-                    if (scrollport.current) scrollport.current.scrollTop = 0;
-                  }}
-                >
-                  {[{ name: "All", count: members.size }, ...presentGroups].map(
-                    (group) => (
-                      <MenuRadioItem
-                        key={group.name}
-                        value={group.name}
-                        closeOnClick
-                      >
-                        {t("channelForms.members.groupCount", {
-                          group: memberGroupLabel(group.name),
-                          count: group.count,
-                        })}
-                      </MenuRadioItem>
-                    ),
-                  )}
-                </MenuRadioGroup>
+                {identityChoices && (
+                  <MenuGroup>
+                    <MenuGroupLabel>
+                      {t("u275e.members.peopleAndAgents")}
+                    </MenuGroupLabel>
+                    <MenuRadioGroup
+                      value={identityFilter}
+                      onValueChange={(value) => {
+                        setSelectedIdentity(value);
+                        if (scrollport.current)
+                          scrollport.current.scrollTop = 0;
+                      }}
+                    >
+                      {[
+                        { name: "All", count: members.size },
+                        ...presentGroups,
+                      ].map((group) => (
+                        <MenuRadioItem
+                          key={group.name}
+                          value={group.name}
+                          closeOnClick
+                        >
+                          {t("channelForms.members.groupCount", {
+                            group: memberGroupLabel(group.name),
+                            count: group.count,
+                          })}
+                        </MenuRadioItem>
+                      ))}
+                    </MenuRadioGroup>
+                  </MenuGroup>
+                )}
+                {identityChoices && accessChoices && <MenuSeparator />}
+                {accessChoices && (
+                  <MenuGroup>
+                    <MenuGroupLabel>{t("u275e.members.access")}</MenuGroupLabel>
+                    <MenuRadioGroup
+                      value={accessFilter}
+                      onValueChange={(value) => {
+                        setSelectedAccess(value);
+                        if (scrollport.current)
+                          scrollport.current.scrollTop = 0;
+                      }}
+                    >
+                      {[
+                        { name: "All", count: members.size },
+                        ...accessGroups,
+                      ].map((group) => (
+                        <MenuRadioItem
+                          key={group.name}
+                          value={group.name}
+                          closeOnClick
+                        >
+                          {group.name === "All"
+                            ? t("u275e.members.anyAccess", {
+                                count: group.count,
+                              })
+                            : t("channelForms.members.groupCount", {
+                                group: accessFilterDisplay(group.name),
+                                count: group.count,
+                              })}
+                        </MenuRadioItem>
+                      ))}
+                    </MenuRadioGroup>
+                  </MenuGroup>
+                )}
               </MenuPopup>
             </MenuRoot>
           ) : undefined
@@ -2059,6 +2320,7 @@ export function ChannelMembersDialog({
               disabled={!changePermitted}
               onClick={() => {
                 if (!changePermitted) return;
+                confirmed.current = true;
                 setIntent(undefined);
                 void session.memberAdministration
                   .run(channelId, selection)
@@ -2281,10 +2543,23 @@ export function ChannelMembersDialog({
                       >
                         {t("channelForms.members.groupCount", {
                           group: memberGroupLabel(group.name),
-                          count: text ? group.keys.length : group.count,
+                          count: narrowed ? group.keys.length : group.count,
                         })}
                       </h3>
-                      <ul aria-busy={refreshing}>
+                      <ul
+                        aria-busy={refreshing}
+                        onFocus={(event) => {
+                          // Portaled menus bubble here too; keep only rows.
+                          if (
+                            event.currentTarget.contains(event.target) &&
+                            event.target instanceof HTMLElement
+                          )
+                            listFocus.current = {
+                              control: event.target,
+                              group: group.name,
+                            };
+                        }}
+                      >
                         {group.keys
                           .slice(
                             page * MEMBER_PAGE_SIZE,
@@ -2350,7 +2625,9 @@ export function ChannelMembersDialog({
                     <p className="px-control-inset text-body-sm text-subtle">
                       {query
                         ? t("channelForms.members.noMatches")
-                        : t("channelForms.members.noMembers")}
+                        : accessFilter !== "All"
+                          ? t("u275e.members.noFilterMatches")
+                          : t("channelForms.members.noMembers")}
                     </p>
                   )}
               </>

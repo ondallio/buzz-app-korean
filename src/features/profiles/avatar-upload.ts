@@ -7,7 +7,7 @@ import { nativeIdentityEnabled } from "../identity/service";
 import { nativeMediaUrl } from "../relay/native";
 import { connectCommunityTransport } from "../communities/connection";
 import { communityDestination } from "../communities/destination";
-import { avatarSource } from "../../shared/avatar-source";
+import { avatarSource, legacyEmojiPicture } from "../../shared/avatar-source";
 
 /** Shared save policy; display-only inherited artwork may still fail validation. */
 export function avatarPictureError(value: string): string | undefined {
@@ -19,9 +19,18 @@ export function avatarPictureError(value: string): string | undefined {
   return "Use an HTTPS image URL without credentials (up to 2,048 characters), or remove the avatar.";
 }
 
+/** A personal profile also saves old Buzz's emoji SVG as-is: Buzz mobile still
+ * writes and reads it. Agents save HTTPS pictures only. */
+export const profilePictureError = (value: string) =>
+  legacyEmojiPicture(value.trim()) ? undefined : avatarPictureError(value);
+
 /** Localizes only the shared policy result for this input, leaving its canonical API unchanged. */
-export function avatarPictureErrorMessage(value: string): string | undefined {
-  return avatarPictureError(value) === undefined
+export function avatarPictureErrorMessage(
+  value: string,
+  personal = false,
+): string | undefined {
+  return (personal ? profilePictureError : avatarPictureError)(value) ===
+    undefined
     ? undefined
     : t("profileEditing.pictureError");
 }

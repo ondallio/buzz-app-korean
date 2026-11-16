@@ -31,6 +31,7 @@ import {
 import { ReadError } from "../../features/relay/errors";
 import type { LiveCallbacks } from "../../features/relay/live";
 import { entityTarget, type EntityRoute } from "../../features/repos/routes";
+import { buzzLinkTarget } from "../../features/navigation/buzz-links";
 import type { GitSnapshot } from "../../features/repos/git";
 import type { RelayData, RelaySnapshot } from "../../features/relay/service";
 import {
@@ -38,7 +39,7 @@ import {
   type RelaySession,
 } from "../../features/relay/session";
 import { matchesEvent } from "../../features/relay/projection";
-import { RepoPage } from "./RepoPage";
+import { Body, RepoPage } from "./RepoPage";
 import { setLanguage } from "../../shared/i18n/language";
 import * as clipboard from "../../shared/clipboard";
 import {
@@ -194,6 +195,7 @@ function setup(
       };
     },
     retry() {},
+    tryAgain() {},
     disconnect() {},
     async clearCache() {},
   };
@@ -808,4 +810,74 @@ it("keeps the loaded raw file and return action across language changes", async 
     await screen.findByRole("button", { name: "README.md" }),
   ).toBeVisible();
   expect(h.readGit.mock.calls.at(-1)?.[0].path).toBeUndefined();
+});
+
+it("routes each README's Buzz links in its own scope, and follows a changed scope", async () => {
+  const other = {
+    viewer: "e".repeat(64),
+    communityOrigin: "https://other.example",
+  };
+  const href = `buzz://repo?owner=${owner}&d=repo&tab=issues`;
+  const route = { type: "repo", owner, dtag: "repo", tab: "issues" } as const;
+  const opened: unknown[] = [];
+  const open = async (target: unknown) => {
+    opened.push(target);
+    return { status: "opened" } as const;
+  };
+  const readme = (name: string) => `[${name}](${href})`;
+  const view = render(
+    <>
+      <Body text={readme("First")} open={open} scope={scope} />
+      <Body text={readme("Second")} open={open} scope={other} />
+    </>,
+  );
+  await userEvent.click(screen.getByRole("link", { name: "First" }));
+  await userEvent.click(screen.getByRole("link", { name: "Second" }));
+  view.rerender(
+    <>
+      <Body text={readme("First")} open={open} scope={other} />
+      <Body text={readme("Second")} open={open} scope={other} />
+    </>,
+  );
+  await userEvent.click(screen.getByRole("link", { name: "First" }));
+  expect(opened).toEqual([
+    entityTarget(route, scope),
+    entityTarget(route, other),
+    entityTarget(route, other),
+  ]);
+});
+
+it("admits each README's Buzz links in its own scope, and follows a changed scope", () => {
+  // A plugin link that fits the target limit only in the shorter scope.
+  const plugin = "buzz://plugin?id=com.example.catalog";
+  const wide = {
+    ...scope,
+    communityOrigin: `https://${"c".repeat(200)}.example`,
+  };
+  const params = (last: number) =>
+    [...Array(7)].map((_, i) => `&route.p${i}=${"a".repeat(1024)}`).join("") +
+    `&route.last=${"a".repeat(last)}`;
+  let last = 1024;
+  while (!buzzLinkTarget(plugin + params(last), scope)) last -= 1;
+  const href = plugin + params(last);
+  expect(buzzLinkTarget(href, wide)).toBeNull();
+  const open = async () => ({ status: "opened" }) as const;
+  const hrefs = () =>
+    ["Narrow", "Wide"].map((name) =>
+      screen.getByText(name).closest("a")?.getAttribute("href"),
+    );
+  const view = render(
+    <>
+      <Body text={`[Narrow](${href})`} open={open} scope={scope} />
+      <Body text={`[Wide](${href})`} open={open} scope={wide} />
+    </>,
+  );
+  expect(hrefs()).toEqual([href, ""]);
+  view.rerender(
+    <>
+      <Body text={`[Narrow](${href})`} open={open} scope={wide} />
+      <Body text={`[Wide](${href})`} open={open} scope={scope} />
+    </>,
+  );
+  expect(hrefs()).toEqual(["", href]);
 });

@@ -1,30 +1,75 @@
 import { t, useLanguage } from "../../shared/i18n";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type SyntheticEvent,
+} from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Input } from "../../shared/design-system/ui/Input";
+import { FieldButton } from "../../shared/design-system/ui/FieldButton";
+import { InputGroup } from "../../shared/design-system/ui/InputGroup";
+import { IconButton } from "../../shared/design-system/ui/IconButton";
+import {
+  MenuGroup,
+  MenuGroupLabel,
+  MenuItem,
+  MenuPopup,
+  MenuRoot,
+  MenuTrigger,
+} from "../../shared/design-system/ui/Menu";
+import { CaretDownIcon } from "../../shared/design-system/icons";
+import { ToastNotice } from "../../shared/design-system/ui/Toast";
 import type { Identity } from "./service";
-import { writeClipboardText } from "../../shared/clipboard";
+import { writeClipboardSecret } from "../../shared/clipboard";
 
 // Mount only while Profile is active. Late native results must never repopulate a hidden key.
 export function PrivateKey({
   identity,
   onInteraction,
+  children,
+  presentation = "default",
 }: {
   identity: Identity;
   /** Called once the key was revealed or copied, e.g. to gate Sign out. */
   onInteraction?: () => void;
+  presentation?: "default" | "magnetic";
+  /** Place the existing field and controls without moving key access or state. */
+  children?: (parts: {
+    input: ReactNode;
+    warning: ReactNode;
+    actions: ReactNode;
+    feedback: ReactNode;
+  }) => ReactNode;
 }) {
   useLanguage();
+  const warningId = useId();
+  const fieldRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const focusReveal = useRef(false);
   const [secret, setSecret] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<
     | ""
-    | "identityMore.privateCopied"
+    | "u275b.identity.privateCopied"
     | "identityMore.privateCopyFailed"
     | "identityMore.privateRevealFailed"
   >("");
   const [failed, setFailed] = useState(false);
   const generation = useRef(0);
+  useLayoutEffect(() => {
+    // A late reveal replaces the trigger after the menu already returned focus.
+    if (
+      secret &&
+      focusReveal.current &&
+      document.activeElement === document.body
+    )
+      fieldRef.current?.focus();
+    focusReveal.current = false;
+  }, [secret]);
   useEffect(() => {
     const clear = () => {
       generation.current++;
@@ -35,12 +80,21 @@ export function PrivateKey({
     const visibility = () => {
       if (document.hidden) clear();
     };
+    const blur = (event: FocusEvent) => {
+      // Focus returning from a menu stays inside this document.
+      if (
+        event.relatedTarget instanceof Node &&
+        document.contains(event.relatedTarget)
+      )
+        return;
+      clear();
+    };
     document.addEventListener("visibilitychange", visibility);
-    window.addEventListener("blur", clear);
+    window.addEventListener("blur", blur);
     return () => {
       generation.current++;
       document.removeEventListener("visibilitychange", visibility);
-      window.removeEventListener("blur", clear);
+      window.removeEventListener("blur", blur);
     };
   }, []);
   function hide() {
@@ -58,10 +112,15 @@ export function PrivateKey({
       const value = secret || (await identity.exportKey());
       if (current !== generation.current) return;
       if (copy) {
-        await writeClipboardText(value);
+        await writeClipboardSecret(value);
         if (current === generation.current)
-          setMessage("identityMore.privateCopied");
-      } else setSecret(value);
+          setMessage("u275b.identity.privateCopied");
+      } else {
+        focusReveal.current =
+          presentation === "magnetic" &&
+          document.activeElement === triggerRef.current;
+        setSecret(value);
+      }
       if (current === generation.current) onInteraction?.();
     } catch {
       if (current === generation.current) {
@@ -76,28 +135,112 @@ export function PrivateKey({
       if (current === generation.current) setBusy(false);
     }
   }
-  return (
-    <div className="mt-6">
-      <label
-        className="mb-2 block text-label-sm"
-        htmlFor="identity-private-key"
-      >
-        {t("identityMore.privateKeyLabel")}
-      </label>
-      <p className="text-body-sm text-muted">
-        {t("identityMore.privateWarning")}
-      </p>
-      <Input
-        id="identity-private-key"
-        readOnly
-        value={secret || "••••••••••••••••"}
-        onFocus={(event) => {
-          if (secret) event.currentTarget.select();
-        }}
-      />
+  const preventEdit = (event: SyntheticEvent) => event.preventDefault();
+  const field = (
+    <Input
+      ref={fieldRef}
+      id="identity-private-key"
+      aria-label={t("identityMore.privateKeyLabel")}
+      aria-describedby={warningId}
+      readOnly={presentation !== "magnetic" || !secret}
+      aria-readonly="true"
+      spellCheck={false}
+      autoComplete="off"
+      autoCorrect="off"
+      autoCapitalize="off"
+      onBeforeInput={preventEdit}
+      onPaste={preventEdit}
+      onCut={preventEdit}
+      onDrop={preventEdit}
+      onValueChange={() => undefined}
+      value={secret || "••••••••••••••••"}
+      onFocus={(event) => {
+        if (secret && presentation === "default") event.currentTarget.select();
+      }}
+    />
+  );
+  const input =
+    presentation === "magnetic" ? (
+      <MenuRoot>
+        {!secret ? (
+          <MenuTrigger
+            render={
+              <FieldButton
+                ref={triggerRef}
+                appearance="masked"
+                prefix="nsec"
+                aria-label={t("u275b.identity.keyActions")}
+                aria-describedby={warningId}
+              />
+            }
+          >
+            <span aria-hidden="true">••••••••••••••••</span>
+          </MenuTrigger>
+        ) : (
+          <InputGroup
+            trailing={
+              <MenuTrigger
+                render={
+                  <IconButton
+                    ref={triggerRef}
+                    type="button"
+                    aria-label={t("u275b.identity.keyActions")}
+                    icon={<CaretDownIcon aria-hidden="true" />}
+                  />
+                }
+              />
+            }
+          >
+            {field}
+          </InputGroup>
+        )}
+        <MenuPopup
+          align="end"
+          size="compact"
+          finalFocus={secret ? fieldRef : triggerRef}
+        >
+          <MenuGroup>
+            <MenuGroupLabel>{t("u275b.identity.privateKey")}</MenuGroupLabel>
+            <MenuItem
+              aria-label={t("identityMore.copyPrivateKey")}
+              disabled={busy}
+              onClick={() => void access(true)}
+            >
+              {t("u275b.identity.copy")}
+            </MenuItem>
+            <MenuItem
+              aria-label={
+                secret
+                  ? t("identityMore.hidePrivateKey")
+                  : t("identityMore.revealPrivateKey")
+              }
+              disabled={busy && !secret}
+              onClick={() => (secret ? hide() : void access(false))}
+            >
+              {secret ? t("u275b.identity.hide") : t("u275b.identity.reveal")}
+            </MenuItem>
+            {busy && <MenuItem onClick={hide}>{t("identity.cancel")}</MenuItem>}
+          </MenuGroup>
+        </MenuPopup>
+      </MenuRoot>
+    ) : (
+      field
+    );
+  const warning = (
+    <p id={warningId} className="text-body-sm text-muted">
+      {t("identityMore.privateWarning")}
+    </p>
+  );
+  const actions =
+    presentation === "magnetic" ? null : (
       <div className="mt-3 flex flex-wrap gap-3">
         <Button
           type="button"
+          aria-label={
+            secret
+              ? t("identityMore.hidePrivateKey")
+              : t("identityMore.revealPrivateKey")
+          }
           disabled={busy && !secret}
           onClick={() => (secret ? hide() : void access(false))}
         >
@@ -105,7 +248,12 @@ export function PrivateKey({
             ? t("identityMore.hidePrivateKey")
             : t("identityMore.revealPrivateKey")}
         </Button>
-        <Button type="button" disabled={busy} onClick={() => void access(true)}>
+        <Button
+          type="button"
+          aria-label={t("identityMore.copyPrivateKey")}
+          disabled={busy}
+          onClick={() => void access(true)}
+        >
           {t("identityMore.copyPrivateKey")}
         </Button>
         {busy && (
@@ -114,7 +262,33 @@ export function PrivateKey({
           </Button>
         )}
       </div>
-      {message && <p role={failed ? "alert" : "status"}>{t(message)}</p>}
+    );
+  const feedback = message ? (
+    presentation === "magnetic" && !failed ? (
+      <ToastNotice
+        title={t("u275b.identity.copiedTitle")}
+        description={t("u275b.identity.copiedDescription")}
+        tone="success"
+        timeout={5000}
+        onDismiss={() => setMessage("")}
+      />
+    ) : (
+      <p role={failed ? "alert" : "status"}>{t(message)}</p>
+    )
+  ) : null;
+  if (children) return children({ input, warning, actions, feedback });
+  return (
+    <div>
+      <label
+        className="mb-2 block text-label-sm"
+        htmlFor="identity-private-key"
+      >
+        {t("identityMore.privateKeyLabel")}
+      </label>
+      {warning}
+      {input}
+      {actions}
+      {feedback}
     </div>
   );
 }

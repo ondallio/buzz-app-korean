@@ -94,6 +94,7 @@ it("releases unsent files on close while retaining the saved panel text draft", 
     snapshot: () => snapshot,
     subscribe: () => () => {},
     retry() {},
+    tryAgain() {},
     disconnect() {},
     async clearCache() {},
   };
@@ -197,6 +198,7 @@ it("keeps a Huddle panel's composer, selection and canonical saved draft across 
     snapshot: () => snapshot,
     subscribe: () => () => {},
     retry() {},
+    tryAgain() {},
     disconnect() {},
     async clearCache() {},
   };
@@ -276,6 +278,7 @@ it("keeps the unavailable Huddle panel message live without opening a discussion
     snapshot: () => snapshot,
     subscribe: () => () => {},
     retry() {},
+    tryAgain() {},
     disconnect() {},
     async clearCache() {},
   };

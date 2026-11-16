@@ -325,6 +325,8 @@ function DraftMedia({
         registry={renderers}
         attachment={attachment}
         source={source}
+        placement="composer"
+        FileCard={FileAttachment}
         fallback={fallback}
       />
     </AttachmentDownloadContext>

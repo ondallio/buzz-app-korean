@@ -88,6 +88,7 @@ export function WorkflowEditor({
   onLocalDraftRiskChange,
   readOnly = false,
   blocked,
+  enableBlocked,
   busy = false,
   locked = false,
   onCancel,
@@ -108,6 +109,8 @@ export function WorkflowEditor({
   onLocalDraftRiskChange?: (atRisk: boolean) => void;
   readOnly?: boolean;
   blocked?: string | undefined;
+  /** Why a draft that is off can't be turned on; turning off stays available. */
+  enableBlocked?: string | undefined;
   busy?: boolean;
   locked?: boolean;
   onCancel?: () => void;
@@ -223,16 +226,18 @@ export function WorkflowEditor({
           : !fields.editable
             ? t("workflowForm.correctYaml")
             : undefined));
+  const enableReason = fields.enabled === false ? enableBlocked : undefined;
   const enableSwitch = fields.editable ? (
     <SwitchPreferenceRow
       label={t("workflowsList.enabledConfig")}
       description={
+        enableReason ??
         // In YAML view the status line directly below already shows the reason.
         (mode === "form" || readOnly ? controlReason : undefined) ??
         t("workflowForm.configApplies")
       }
       checked={fields.enabled !== false}
-      disabled={disabled}
+      disabled={disabled || !!enableReason}
       onCheckedChange={(enabled) =>
         changeHeader(yamlWithWorkflowEnabled(yaml, enabled), { enabled })
       }

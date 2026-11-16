@@ -19,6 +19,9 @@ import { publicKeyLabels } from "../../shared/identity/public-key";
 import { allowedActions, membersFromSnapshot } from "./api";
 import { CommunityAdmin } from "./CommunityAdmin";
 
+// Exercise the retained direct-add implementation while its shipping UI is hidden.
+vi.mock("./features", () => ({ DIRECT_MEMBER_ADD_ENABLED: true }));
+
 const relayKey = "f".repeat(64);
 const owner = "0".repeat(64);
 const admin = "1".repeat(64);
@@ -91,8 +94,17 @@ function relay(
   people: { pubkey: string; name: string }[] = [],
 ) {
   const read = vi.fn(async () => events);
+  const live = new Set<
+    (batch: { events: ReturnType<typeof snapshot>[] }) => void
+  >();
   const session = {
     relayAuthor: relayKey,
+    subscribeLive: (
+      listener: (batch: { events: ReturnType<typeof snapshot>[] }) => void,
+    ) => {
+      live.add(listener);
+      return () => live.delete(listener);
+    },
     read,
     viewer,
     // The real sizing rewrite behind a pass-through proxy, as the session applies it.
@@ -115,6 +127,9 @@ function relay(
     session,
   };
   return {
+    emit: () => {
+      for (const listener of live) listener({ events });
+    },
     read,
     relay: {
       snapshot: () => value,
@@ -155,7 +170,7 @@ it("gates administration to owners and admins by the verified roster", async () 
     [{ kinds: [13534], authors: [relayKey], limit: 1 }],
     expect.objectContaining({ fresh: true }),
   );
-  expect(screen.queryByRole("button", { name: "Invite members" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
 });
 
 it("treats a roster signed by anyone else as unavailable", async () => {
@@ -187,9 +202,7 @@ it("mints a bounded invite and surfaces relay refusals", async () => {
   });
   const { relay: data } = relay(admin);
   render(<CommunityAdmin relay={data} active={() => true} />);
-  await user.click(
-    await screen.findByRole("button", { name: "Invite members" }),
-  );
+  await user.click(await screen.findByRole("tab", { name: "Invite" }));
   // Opening the dialog creates the link with the default settings.
   expect(
     await screen.findByDisplayValue("https://primary.example/invite/abc"),
@@ -197,7 +210,10 @@ it("mints a bounded invite and surfaces relay refusals", async () => {
   expect(calls.filter((c) => c.route === "invite")).toEqual([
     { route: "invite", body: { ttl_secs: 3 * 24 * 60 * 60, max_uses: null } },
   ]);
+  // QR codes come from the native renderer; the browser host has none.
+  expect(screen.queryByRole("img")).toBeNull();
   // Admins cannot grant admin, so direct addition has no role choice.
+  await user.click(screen.getByRole("tab", { name: "Add directly" }));
   await user.type(
     screen.getByRole("textbox", { name: "Public identity" }),
     "3".repeat(64),
@@ -206,6 +222,7 @@ it("mints a bounded invite and surfaces relay refusals", async () => {
   expect(
     screen.queryByRole("button", { name: "Choose member role" }),
   ).toBeNull();
+  await user.click(screen.getByRole("tab", { name: "Invite" }));
   refuse = true;
   await user.click(
     screen.getByRole("button", { name: "Choose maximum invite uses" }),
@@ -288,7 +305,7 @@ it("keeps an accepted removal when the refresh fails and retries read-only", asy
   expect(screen.queryAllByRole("button", { name: /^Actions for / })).toEqual(
     [],
   );
-  expect(screen.queryByRole("button", { name: "Invite members" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
   read.mockResolvedValueOnce([
     snapshot([
       ["member", owner, "owner"],
@@ -303,10 +320,9 @@ it("keeps an accepted removal when the refresh fails and retries read-only", asy
   expect(calls.filter((c) => c.route === "member")).toHaveLength(1);
 });
 
-it("picks up a promotion made elsewhere when refreshed", async () => {
-  const user = userEvent.setup();
+it("picks up a promotion made elsewhere from the live roster stream", async () => {
   broker({});
-  const { relay: data, read } = relay(member);
+  const { relay: data, read, emit } = relay(member);
   render(<CommunityAdmin relay={data} active={() => true} />);
   await screen.findByText(
     "Only community owners and admins can invite people or manage members.",
@@ -317,10 +333,8 @@ it("picks up a promotion made elsewhere when refreshed", async () => {
       ["member", member, "admin"],
     ]),
   ]);
-  await user.click(screen.getByRole("button", { name: "Refresh" }));
-  expect(
-    await screen.findByRole("button", { name: "Invite members" }),
-  ).toBeVisible();
+  act(() => emit());
+  expect(await screen.findByRole("tab", { name: "Invite" })).toBeVisible();
 });
 
 it("recovers from an initial read failure on retry", async () => {
@@ -333,9 +347,7 @@ it("recovers from an initial read failure on retry", async () => {
     "Could not load members: offline",
   );
   await user.click(screen.getByRole("button", { name: "Retry" }));
-  expect(
-    await screen.findByRole("button", { name: "Invite members" }),
-  ).toBeVisible();
+  expect(await screen.findByRole("tab", { name: "Invite" })).toBeVisible();
   expect(screen.queryByRole("alert")).toBeNull();
 });
 
@@ -354,7 +366,7 @@ it("disables an open confirmation when a pending refresh fails", async () => {
   const calls = broker({
     member: () => Response.json({ accepted: true, message: "" }),
   });
-  const { relay: data, read } = relay(owner);
+  const { relay: data, read, emit } = relay(owner);
   render(<CommunityAdmin relay={data} active={() => true} />);
   const menus = await screen.findAllByRole("button", { name: /^Actions for / });
   await user.click(menus[1] as HTMLElement);
@@ -365,7 +377,7 @@ it("disables an open confirmation when a pending refresh fails", async () => {
   const held = deferred<ReturnType<typeof snapshot>[]>();
   read.mockReturnValueOnce(held.promise);
   // Refresh stays reachable behind the modal in the browser; drive it directly.
-  screen.getByRole("button", { name: "Refresh", hidden: true }).click();
+  act(() => emit());
   await waitFor(() => expect(confirm).toBeDisabled());
   held.reject(new Error("relay unavailable"));
   expect(
@@ -383,7 +395,7 @@ it("disables an open confirmation when a pending refresh fails", async () => {
   expect(calls.filter((c) => c.route === "member")).toHaveLength(0);
 });
 
-it("locks an open invite dialog after an accepted add whose refresh fails", async () => {
+it("locks sharing tabs after an accepted add whose refresh fails", async () => {
   const user = userEvent.setup();
   const calls = broker({
     member: () => Response.json({ accepted: true, message: "" }),
@@ -398,11 +410,10 @@ it("locks an open invite dialog after an accepted add whose refresh fails", asyn
   });
   const { relay: data, read } = relay(owner);
   render(<CommunityAdmin relay={data} active={() => true} />);
-  await user.click(
-    await screen.findByRole("button", { name: "Invite members" }),
-  );
-  const dialog = await screen.findByRole("dialog");
+  await user.click(await screen.findByRole("tab", { name: "Invite" }));
+  const dialog = screen.getByRole("region", { name: "Membership" });
   await within(dialog).findByDisplayValue("https://primary.example/invite/abc");
+  await user.click(screen.getByRole("tab", { name: "Add directly" }));
   read.mockRejectedValueOnce(new Error("relay unavailable"));
   // The field resets after a confirmed direct addition.
   const search = () =>
@@ -423,9 +434,11 @@ it("locks an open invite dialog after an accepted add whose refresh fails", asyn
   expect(
     within(dialog).getByRole("button", { name: "Add member" }),
   ).toBeDisabled();
+  await user.click(screen.getByRole("tab", { name: "Invite" }));
   expect(
     within(dialog).getByRole("button", { name: "Choose maximum invite uses" }),
   ).toBeDisabled();
+  await user.click(screen.getByRole("tab", { name: "Add directly" }));
   expect(calls.filter((c) => c.route === "member")).toHaveLength(1);
   expect(calls.filter((c) => c.route === "invite")).toHaveLength(1);
   // Read-only recovery inside the modal re-enables new writes.
@@ -528,12 +541,8 @@ it("accepts only an exact identity and never searches the people directory", asy
     }
   ).people = people;
   render(<CommunityAdmin relay={data} active={() => true} />);
-  await user.click(
-    await screen.findByRole("button", { name: "Invite members" }),
-  );
-  const dialog = await screen.findByRole("dialog", {
-    name: "Add or invite people",
-  });
+  await user.click(await screen.findByRole("tab", { name: "Add directly" }));
+  const dialog = screen.getByRole("tabpanel");
   const identity = within(dialog).getByRole("textbox", {
     name: "Public identity",
   });
@@ -561,12 +570,8 @@ it("adds a member by a nostr: npub and refuses an npub that is not a 32-byte key
     member: () => Response.json({ accepted: true, message: "" }),
   });
   render(<CommunityAdmin relay={relay(owner).relay} active={() => true} />);
-  await user.click(
-    await screen.findByRole("button", { name: "Invite members" }),
-  );
-  const dialog = await screen.findByRole("dialog", {
-    name: "Add or invite people",
-  });
+  await user.click(await screen.findByRole("tab", { name: "Add directly" }));
+  const dialog = screen.getByRole("tabpanel");
   const identity = within(dialog).getByRole("textbox", {
     name: "Public identity",
   });
@@ -666,7 +671,7 @@ it.each([owner, admin, member])(
         ),
       ).toBeVisible();
       expect(
-        screen.queryByRole("button", { name: "멤버 초대" }),
+        screen.queryByRole("tab", { name: "초대" }),
       ).not.toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /작업$/ }),
@@ -677,7 +682,7 @@ it.each([owner, admin, member])(
       });
       expect(actions).toHaveLength(viewer === owner ? 2 : 1);
       act(() => setLanguage("ko"));
-      expect(screen.getByRole("button", { name: "멤버 초대" })).toBeVisible();
+      expect(screen.getByRole("tab", { name: "초대" })).toBeVisible();
       expect(screen.getAllByRole("button", { name: /작업$/ })).toHaveLength(
         viewer === owner ? 2 : 1,
       );
@@ -752,10 +757,8 @@ it("membership localization retains an exact removal target and accepted result 
   read.mockReturnValueOnce(held.promise);
   await user.click(retry);
   try {
-    expect(screen.getByRole("button", { name: "새로고침" })).toBe(retry);
+    await waitFor(() => expect(retry).not.toBeInTheDocument());
     act(() => setLanguage("en"));
-    expect(screen.getByRole("button", { name: "Refresh" })).toBe(retry);
-    expect(retry).toBeDisabled();
   } finally {
     held.resolve([snapshot(roster)]);
   }
@@ -788,50 +791,40 @@ it("membership localization retains a held invite, raw identity, settings choice
   });
   render(<CommunityAdmin relay={relay(owner).relay} active={() => true} />);
   const user = userEvent.setup();
-  await user.click(
-    await screen.findByRole("button", { name: "Invite members" }),
-  );
-  const dialog = screen.getByRole("dialog", { name: "Add or invite people" });
-  const identity = within(dialog).getByRole("textbox", {
-    name: "Public identity",
-  });
+  const invite = await screen.findByRole("tab", { name: "Invite" });
+  await user.click(screen.getByRole("tab", { name: "Add directly" }));
+  const identity = screen.getByRole("textbox", { name: "Public identity" });
   if (!(identity instanceof HTMLInputElement))
     throw new Error("Expected identity input");
   const rawIdentity = `nostr:${npubEncode("3".repeat(64))}`;
   fireEvent.change(identity, { target: { value: rawIdentity } });
   identity.focus();
   identity.setSelectionRange(3, 9);
+  act(() => setLanguage("ko"));
+  expect(screen.getByRole("tab", { name: "초대" })).toBe(invite);
+  expect(screen.getByRole("textbox", { name: "공개 신원" })).toBe(identity);
+  expect(identity).toHaveValue(rawIdentity);
+  expect(identity).toHaveFocus();
+  expect([identity.selectionStart, identity.selectionEnd]).toEqual([3, 9]);
+  act(() => setLanguage("en"));
+  await user.click(invite);
   try {
     await waitFor(() =>
       expect(calls.filter((call) => call.route === "invite")).toHaveLength(1),
     );
     act(() => setLanguage("ko"));
-    expect(screen.getByRole("dialog", { name: "사람 추가 또는 초대" })).toBe(
-      dialog,
-    );
-    expect(within(dialog).getByRole("textbox", { name: "공개 신원" })).toBe(
-      identity,
-    );
-    expect(identity).toHaveValue(rawIdentity);
-    expect(identity).toHaveFocus();
-    expect([identity.selectionStart, identity.selectionEnd]).toEqual([3, 9]);
-    expect(
-      within(dialog).getByRole("button", { name: "초대 만료 기간 선택" }),
-    ).toBeDisabled();
-    expect(within(dialog).getByLabelText("커뮤니티 초대 링크")).toHaveAttribute(
+    expect(screen.getByLabelText("커뮤니티 초대 링크")).toHaveAttribute(
       "placeholder",
       "초대 링크를 만드는 중…",
     );
   } finally {
     held.resolve(inviteReply());
   }
-  const link = await within(dialog).findByDisplayValue(rawInviteUrl);
+  const link = await screen.findByDisplayValue(rawInviteUrl);
   expect(calls.filter((call) => call.route === "invite")).toEqual([
     { route: "invite", body: { ttl_secs: 259200, max_uses: null } },
   ]);
-  await user.click(
-    within(dialog).getByRole("button", { name: "초대 만료 기간 선택" }),
-  );
+  await user.click(screen.getByRole("button", { name: "초대 만료 기간 선택" }));
   const expiry = await screen.findByRole("menuitemradio", { name: "30일" });
   const menu = await screen.findByRole("menu");
   act(() => setLanguage("en"));
@@ -843,13 +836,11 @@ it("membership localization retains a held invite, raw identity, settings choice
   );
   await waitFor(() =>
     expect(
-      within(dialog).getByRole("button", {
-        name: "Choose maximum invite uses",
-      }),
+      screen.getByRole("button", { name: "Choose maximum invite uses" }),
     ).toBeEnabled(),
   );
   await user.click(
-    within(dialog).getByRole("button", { name: "Choose maximum invite uses" }),
+    screen.getByRole("button", { name: "Choose maximum invite uses" }),
   );
   await user.click(
     await screen.findByRole("menuitemradio", { name: "5 uses" }),
@@ -865,8 +856,11 @@ it("membership localization retains a held invite, raw identity, settings choice
     { ttl_secs: 2592000, max_uses: 5 },
   ]);
   act(() => setLanguage("ko"));
-  expect(within(dialog).getByDisplayValue(rawInviteUrl)).toBe(link);
-  expect(identity).toHaveValue(rawIdentity);
+  expect(screen.getByDisplayValue(rawInviteUrl)).toBe(link);
+  await user.click(screen.getByRole("tab", { name: "직접 추가" }));
+  expect(screen.getByRole("textbox", { name: "공개 신원" })).toHaveValue(
+    rawIdentity,
+  );
   expect(calls.filter((call) => call.route === "invite")).toHaveLength(3);
 });
 
@@ -876,65 +870,54 @@ it("membership localization distinguishes local identity validation from identic
     invite: () => Response.json({ error: raw }, { status: 400 }),
   });
   render(<CommunityAdmin relay={relay(owner).relay} active={() => true} />);
-  await userEvent
-    .setup()
-    .click(await screen.findByRole("button", { name: "Invite members" }));
-  const dialog = screen.getByRole("dialog");
-  await within(dialog).findByText(raw);
-  const identity = within(dialog).getByRole("textbox", {
-    name: "Public identity",
-  });
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("tab", { name: "Invite" }));
+  await screen.findByText(raw);
+  act(() => setLanguage("ko"));
+  expect(screen.getByText(raw)).toBeVisible();
+  act(() => setLanguage("en"));
+  await user.click(screen.getByRole("tab", { name: "Add directly" }));
+  const identity = screen.getByRole("textbox", { name: "Public identity" });
   fireEvent.change(identity, { target: { value: "Carol {raw} 한글" } });
   act(() => setLanguage("ko"));
-  expect(within(dialog).getByText(raw)).toBeVisible();
   expect(
-    within(dialog).getByText("npub 또는 64자리 16진수 공개 키를 입력하세요."),
+    screen.getByText("npub 또는 64자리 16진수 공개 키를 입력하세요."),
   ).toBeVisible();
   expect(identity).toHaveValue("Carol {raw} 한글");
-  expect(
-    within(dialog).getByRole("button", { name: "멤버 추가" }),
-  ).toBeDisabled();
+  expect(screen.getByRole("button", { name: "멤버 추가" })).toBeDisabled();
   expect(calls.filter((call) => call.route === "member")).toHaveLength(0);
   fireEvent.change(identity, { target: { value: member } });
-  expect(
-    within(dialog).getByText("이미 커뮤니티 멤버인 사람입니다."),
-  ).toBeVisible();
+  expect(screen.getByText("이미 커뮤니티 멤버인 사람입니다.")).toBeVisible();
 });
 
 it("membership localization keeps the copied timer and raw clipboard value across locales", async () => {
   const user = userEvent.setup();
   broker({ invite: inviteReply });
   render(<CommunityAdmin relay={relay(owner).relay} active={() => true} />);
-  await user.click(
-    await screen.findByRole("button", { name: "Invite members" }),
-  );
-  const dialog = screen.getByRole("dialog");
-  await within(dialog).findByDisplayValue(rawInviteUrl);
+  await user.click(await screen.findByRole("tab", { name: "Invite" }));
+  await screen.findByDisplayValue(rawInviteUrl);
   const copied = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
   vi.useFakeTimers();
   try {
-    const copy = within(dialog).getByRole("button", { name: "Copy link" });
+    const copy = screen.getByRole("button", { name: "Copy link" });
     fireEvent.click(copy);
     await act(async () => Promise.resolve());
     expect(copied).toHaveBeenCalledExactlyOnceWith(rawInviteUrl);
-    expect(within(dialog).getByRole("button", { name: "Copied" })).toBe(copy);
+    expect(screen.getByRole("button", { name: "Copied" })).toBe(copy);
     act(() => setLanguage("ko"));
-    expect(within(dialog).getByRole("button", { name: "복사됨" })).toBe(copy);
-    expect(within(dialog).getByText("초대 링크를 복사했습니다.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "복사됨" })).toBe(copy);
     act(() => vi.advanceTimersByTime(1999));
-    expect(within(dialog).getByRole("button", { name: "복사됨" })).toBe(copy);
+    expect(screen.getByRole("button", { name: "복사됨" })).toBe(copy);
     act(() => setLanguage("en"));
     act(() => vi.advanceTimersByTime(1));
-    expect(within(dialog).getByRole("button", { name: "Copy link" })).toBe(
-      copy,
-    );
+    expect(screen.getByRole("button", { name: "Copy link" })).toBe(copy);
     copied.mockRejectedValueOnce(new Error("opaque clipboard failure"));
     fireEvent.click(copy);
     await act(async () => Promise.resolve());
-    const alert = within(dialog).getByRole("alert");
+    const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent("Could not copy the invite link.");
     act(() => setLanguage("ko"));
-    expect(within(dialog).getByRole("alert")).toBe(alert);
+    expect(screen.getByRole("alert")).toBe(alert);
     expect(alert).toHaveTextContent("초대 링크를 복사하지 못했습니다.");
   } finally {
     copied.mockRestore();
@@ -947,27 +930,19 @@ it("membership localization keeps a direct-add write, role and identity while pe
   const calls = broker({ invite: inviteReply, member: () => held.promise });
   render(<CommunityAdmin relay={relay(owner).relay} active={() => true} />);
   const user = userEvent.setup();
-  await user.click(
-    await screen.findByRole("button", { name: "Invite members" }),
-  );
-  const dialog = screen.getByRole("dialog");
-  await within(dialog).findByDisplayValue(rawInviteUrl);
-  const identity = within(dialog).getByRole("textbox", {
-    name: "Public identity",
-  });
+  await user.click(await screen.findByRole("tab", { name: "Add directly" }));
+  const identity = screen.getByRole("textbox", { name: "Public identity" });
   fireEvent.change(identity, { target: { value: "3".repeat(64) } });
-  await user.click(
-    within(dialog).getByRole("button", { name: "Choose member role" }),
-  );
+  await user.click(screen.getByRole("button", { name: "Choose member role" }));
   await user.click(await screen.findByRole("menuitemradio", { name: "Admin" }));
-  const add = within(dialog).getByRole("button", { name: "Add member" });
+  const add = screen.getByRole("button", { name: "Add member" });
   await user.click(add);
   try {
     await waitFor(() =>
       expect(calls.filter((call) => call.route === "member")).toHaveLength(1),
     );
     act(() => setLanguage("ko"));
-    expect(within(dialog).getByRole("button", { name: "멤버 추가" })).toBe(add);
+    expect(screen.getByRole("button", { name: "멤버 추가" })).toBe(add);
     expect(add).toBeDisabled();
     expect(identity).toBeDisabled();
     expect(identity).toHaveValue("3".repeat(64));
@@ -980,9 +955,124 @@ it("membership localization keeps a direct-add write, role and identity while pe
   } finally {
     held.resolve(Response.json({ accepted: true, message: "" }));
   }
-  await within(dialog).findByText("멤버를 직접 추가했습니다.");
+  await screen.findByText("멤버를 직접 추가했습니다.");
   expect(identity).toHaveValue("");
   act(() => setLanguage("en"));
-  expect(within(dialog).getByText("Member added directly.")).toBeVisible();
+  expect(screen.getByText("Member added directly.")).toBeVisible();
   expect(calls.filter((call) => call.route === "member")).toHaveLength(1);
+});
+
+it("clears an unsubmitted confirmation when history leaves Members", async () => {
+  const user = userEvent.setup();
+  const calls = broker({});
+  const { relay: data } = relay(owner);
+  const view = render(
+    <CommunityAdmin
+      relay={data}
+      active={() => true}
+      selectedMethod="members"
+    />,
+  );
+  const menus = await screen.findAllByRole("button", { name: /^Actions for / });
+  await user.click(menus[1] as HTMLElement);
+  await user.click(await screen.findByRole("menuitem", { name: "Remove" }));
+  expect(await screen.findByRole("alertdialog")).toBeVisible();
+  view.rerender(
+    <CommunityAdmin relay={data} active={() => true} selectedMethod="invite" />,
+  );
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  expect(screen.getByRole("tab", { name: "Members" })).toBeEnabled();
+  view.rerender(
+    <CommunityAdmin
+      relay={data}
+      active={() => true}
+      selectedMethod="members"
+    />,
+  );
+  expect(screen.queryByRole("alertdialog")).toBeNull();
+  expect(calls.some((call) => call.route === "member")).toBe(false);
+});
+
+it("creates a fresh invite with unchanged limits after leaving the tab", async () => {
+  const user = userEvent.setup();
+  let minted = 0;
+  const calls = broker({
+    invite: (body) =>
+      Response.json({
+        code: String(++minted),
+        url: `https://primary.example/invite/${minted}`,
+        expires_at: 1700003600,
+        max_uses: (body as { max_uses: number | null }).max_uses,
+        uses_remaining: (body as { max_uses: number | null }).max_uses,
+      }),
+  });
+  const { relay: data } = relay(owner);
+  render(<CommunityAdmin relay={data} active={() => true} />);
+  await user.click(await screen.findByRole("tab", { name: "Invite" }));
+  await screen.findByDisplayValue("https://primary.example/invite/1");
+  await user.click(
+    screen.getByRole("button", { name: "Choose maximum invite uses" }),
+  );
+  await user.click(
+    await screen.findByRole("menuitemradio", { name: /^1 use$/ }),
+  );
+  await screen.findByDisplayValue("https://primary.example/invite/2");
+  await user.click(screen.getByRole("tab", { name: "Members" }));
+  await user.click(screen.getByRole("tab", { name: "Invite" }));
+  expect(
+    await screen.findByDisplayValue("https://primary.example/invite/3"),
+  ).toBeVisible();
+  expect(
+    calls
+      .filter((call) => call.route === "invite")
+      .slice(-2)
+      .map((call) => call.body),
+  ).toEqual([
+    { ttl_secs: 3 * 24 * 60 * 60, max_uses: 1 },
+    { ttl_secs: 3 * 24 * 60 * 60, max_uses: 1 },
+  ]);
+});
+
+it("ignores a late mint from a previous Invite visit", async () => {
+  let finish!: (response: Response) => void;
+  const held = new Promise<Response>((resolve) => {
+    finish = resolve;
+  });
+  let count = 0;
+  const response = (code: string) =>
+    Response.json({
+      code,
+      url: `https://primary.example/invite/${code}`,
+      expires_at: 1700003600,
+      max_uses: null,
+      uses_remaining: null,
+    });
+  const calls = broker({
+    invite: () => (++count === 1 ? held : response("new")),
+  });
+  const { relay: data } = relay(owner);
+  const active = () => true;
+  const view = render(
+    <CommunityAdmin relay={data} active={active} selectedMethod="invite" />,
+  );
+  await waitFor(() =>
+    expect(calls.filter((call) => call.route === "invite")).toHaveLength(1),
+  );
+  view.rerender(
+    <CommunityAdmin relay={data} active={active} selectedMethod="members" />,
+  );
+  view.rerender(
+    <CommunityAdmin relay={data} active={active} selectedMethod="invite" />,
+  );
+  await screen.findByDisplayValue("https://primary.example/invite/new");
+  await act(async () => {
+    finish(response("old"));
+    await held;
+  });
+  expect(
+    screen.getByDisplayValue("https://primary.example/invite/new"),
+  ).toBeVisible();
+  expect(
+    screen.queryByDisplayValue("https://primary.example/invite/old"),
+  ).toBeNull();
 });

@@ -123,7 +123,12 @@ function fixture(
     },
     {
       readStateFloor: () => 0,
-      readStateStorage: { update, read: async () => journal, close() {} },
+      readStateStorage: {
+        update,
+        read: async () => journal,
+        capture: async () => journal,
+        close() {},
+      },
       readPublisherLock: async (_signal, work) => work(),
     },
   );

@@ -14,6 +14,7 @@ import { InlineHeader } from "../shared/design-system/ui/Header";
 import { PreferenceRow } from "../shared/design-system/ui/PreferenceRow";
 import { SettingsGroup } from "../shared/design-system/ui/SettingsGroup";
 import { Switch } from "../shared/design-system/ui/Switch";
+import { gitScope } from "../plugins/git-scope";
 import type { PluginManager } from "../plugins/manager";
 import type {
   Catalog,
@@ -59,6 +60,15 @@ export function ManagedPlugins({
   useLanguage();
   const [reviewingId, setReviewingId] = useState<string>();
   const trigger = useRef<HTMLElement | null>(null);
+  // Opening Settings after a failed first fetch retries once, so restored
+  // connectivity shows up without waiting for the next scheduled attempt.
+  const retried = useRef(false);
+  const unavailable = !!plugins.imports && managed?.status === "unavailable";
+  useEffect(() => {
+    if (!unavailable || busy || retried.current) return;
+    retried.current = true;
+    void plugins.refreshManaged();
+  }, [unavailable, busy, plugins]);
   if (!plugins.imports || !managed) return null;
   // Rendered outside the group: installing the last pending row empties the group.
   const review = reviewingId ? (
@@ -83,7 +93,46 @@ export function ManagedPlugins({
       ? managed.plugins.filter(({ state }) => state !== "current")
       : [];
   const section =
-    managed.status === "invalid" ? (
+    managed.status === "loading" ? (
+      <section
+        aria-labelledby="managed-plugins-title"
+        className={styles.pluginCoreSection}
+      >
+        <InlineHeader
+          id="managed-plugins-title"
+          title={t("pluginManagement.managed.recommended")}
+        />
+        <p role="status" className="m-0 text-body-sm text-muted break-words">
+          {t("u275a.plugins.loadingRecommended")}
+        </p>
+      </section>
+    ) : managed.status === "unavailable" ? (
+      <section
+        aria-labelledby="managed-plugins-title"
+        className={styles.pluginCoreSection}
+      >
+        <InlineHeader
+          id="managed-plugins-title"
+          title={t("pluginManagement.managed.unavailable")}
+          actions={
+            <Button
+              size="sm"
+              variant="subtle"
+              disabled={busy}
+              onClick={() => void plugins.refreshManaged()}
+            >
+              {t("pluginManagement.retry")}
+            </Button>
+          }
+        />
+        <p role="status" className="m-0 text-body-sm text-muted break-words">
+          {t("u275a.plugins.recommendedLoadFailed", {
+            url: managed.url,
+            reason: managed.reason,
+          })}
+        </p>
+      </section>
+    ) : managed.status === "invalid" ? (
       <section
         aria-labelledby="managed-plugins-title"
         className={styles.pluginCoreSection}
@@ -264,10 +313,12 @@ export function ManagedPluginReview({
   authorizeGit,
   holdReview,
   requestedBy,
+  refusal,
   recheck,
   confirm,
   returnFocus,
   onInstalled,
+  onOpen,
   onClose,
 }: {
   plugins: PluginManager;
@@ -280,12 +331,17 @@ export function ManagedPluginReview({
   holdReview?: (() => () => void) | undefined;
   /** An agent's request, reviewed in place of a recommendation. */
   requestedBy?: Readonly<{ name: string; reason: string }> | undefined;
+  /** Refuses the install as the review opens, before downloading anything. */
+  refusal?: string | undefined;
   /** Run as the owner confirms; a returned reason refuses the install. */
   recheck?: (() => DisplayMessage | undefined) | undefined;
   /** Marks the install as confirmed until the returned function runs. */
   confirm?: (() => () => void) | undefined;
   returnFocus: () => HTMLElement | null;
-  onInstalled?: () => void;
+  /** Reports whether the install added the plugin or replaced one present as it started. */
+  onInstalled?: (outcome: "installed" | "updated") => void;
+  /** Shows the installed plugin a refusal names. */
+  onOpen?: (() => void) | undefined;
   onClose: () => void;
 }) {
   useLanguage();
@@ -296,6 +352,9 @@ export function ManagedPluginReview({
   const [attempt, setAttempt] = useState(0);
   const [review, setReview] = useState<Review>({ status: "loading" });
   const [installing, setInstalling] = useState(false);
+  // Open plugin shows the named plugin at once and lets this dialog finish
+  // closing before it unmounts, so focus returns to the details it opened.
+  const [opened, setOpened] = useState(false);
   const [enable, setEnable] = useState(true);
   // Installing refreshes the catalog before enabling; the dialog keeps what it started with.
   const [frozen, setFrozen] = useState<PluginInfo | null>();
@@ -347,7 +406,7 @@ export function ManagedPluginReview({
           signed?.repository ?? wanted.repository,
           wanted.reference,
           signed?.token,
-          wanted.commit,
+          ...gitScope(wanted.commit, wanted.path),
         );
         if (!preview) throw localError("pluginManagement.managed.noSource");
         if (!current.active) {
@@ -405,7 +464,7 @@ export function ManagedPluginReview({
     },
   );
   const close = useEffectEvent(() => onClose());
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a retry is a new attempt, and a changed recommendation is a new entry.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a retry is a new attempt, a changed recommendation is a new entry, and a refused one downloads nothing.
   useEffect(() => {
     if (working.current) return;
     const wanted = latest.current.entry;
@@ -413,6 +472,7 @@ export function ManagedPluginReview({
       close();
       return;
     }
+    if (refusal) return;
     const current = { active: true };
     setReview({ status: "loading" });
     // Deferred so Strict Mode's retired mount never acquires the import slot.
@@ -424,7 +484,7 @@ export function ManagedPluginReview({
       if (token.current && !working.current) discard(token.current);
       if (!working.current) token.current = "";
     };
-  }, [attempt, key]);
+  }, [attempt, key, refusal]);
 
   const ready = review.status === "ready" && review.key === key;
   const candidate = ready
@@ -480,7 +540,7 @@ export function ManagedPluginReview({
       await imports?.discard(value).catch(() => {});
       if (!alreadyInstalled && enable)
         await plugins.change("enable", wanted.id);
-      onInstalled?.();
+      onInstalled?.(alreadyInstalled ? "updated" : "installed");
       onClose();
     } finally {
       unconfirm?.();
@@ -492,6 +552,42 @@ export function ManagedPluginReview({
   const busy = installing || managing || !ready;
   const name =
     candidate?.manifest.name ?? entry?.id ?? t("pluginManagement.plugin");
+  if ((refusal || opened) && !installing)
+    return (
+      <Dialog
+        open={!opened}
+        onOpenChange={(next) => {
+          if (!next) onClose();
+        }}
+        onOpenChangeComplete={(open) => {
+          if (!open && opened) onClose();
+        }}
+        initialFocus={cancel}
+        title={t("pluginManagement.import.alreadyInstalled")}
+        description={refusal}
+        size="compact"
+        dismissOnOutsideClick
+        finalFocus={returnFocus}
+        actions={
+          <>
+            <Button ref={cancel} onClick={onClose}>
+              {t("pluginManagement.close")}
+            </Button>
+            {onOpen && (
+              <Button
+                variant="prominent"
+                onClick={() => {
+                  setOpened(true);
+                  onOpen();
+                }}
+              >
+                {t("u275a.plugins.openPlugin")}
+              </Button>
+            )}
+          </>
+        }
+      />
+    );
   return (
     <Dialog
       open
@@ -589,6 +685,14 @@ export function ManagedPluginReview({
               {requestedBy.reason}
             </p>
           )}
+          {"url" in entry &&
+            existing?.source === "external" &&
+            existing.updateSource &&
+            "repository" in existing.updateSource && (
+              <p className="mb-4 mt-0 break-words">
+                {t("u275a.plugins.gitToPackage")}
+              </p>
+            )}
           <code className={`${importStyles.sourcePath} break-all`}>
             {location(entry)}
           </code>
@@ -640,6 +744,7 @@ export function UrlPluginInstallReview({
   holdReview,
   request,
   returnFocus,
+  onOpenInstalled,
   onClose,
 }: {
   plugins: PluginManager;
@@ -659,15 +764,13 @@ export function UrlPluginInstallReview({
       }>
     | undefined;
   returnFocus: () => HTMLElement | null;
+  /** Shows the installed plugin when a different source already holds it. */
+  onOpenInstalled?: ((id: string) => void) | undefined;
   onClose?: (() => void) | undefined;
 }) {
+  useLanguage();
   const [claimed, setClaimed] = useState(!request);
   const [closed, setClosed] = useState(false);
-  const latest = useRef(catalog);
-  latest.current = catalog;
-  const [updating] = useState(() =>
-    catalog.plugins.some((plugin) => plugin.manifest.id === source.id),
-  );
   const mounted = useRef(false);
   const claimOnce = useEffectEvent(() => {
     if (request && !claimed && request.claim(request.id)) setClaimed(true);
@@ -684,49 +787,49 @@ export function UrlPluginInstallReview({
     };
   }, []);
   if (!claimed || closed || !plugins.imports) return null;
+  const current = catalog.plugins.find(
+    (plugin) => plugin.manifest.id === source.id,
+  );
+  const saved = current?.updateSource;
+  const conflict =
+    current?.source !== "external" ||
+    (saved && ("url" in saved || "repository" in saved))
+      ? undefined
+      : saved
+        ? t("pluginManagement.conflictKnown", {
+            name: current.manifest.name,
+            source: saved.root,
+            destination: source.url,
+          })
+        : t("pluginManagement.conflictUnknown", {
+            name: current.manifest.name,
+            destination: source.url,
+          });
+  const close = () => {
+    setClosed(true);
+    if (request) request.end(request.id);
+    onClose?.();
+  };
   return (
     <ManagedPluginReview
       plugins={plugins}
       catalog={catalog}
       busy={busy}
       source={requester}
-      entry={{ ...source, state: updating ? "outdated" : "missing" }}
+      entry={{ ...source, state: current ? "outdated" : "missing" }}
       holdReview={holdReview}
       requestedBy={{ name: requester, reason: "" }}
-      recheck={() => {
-        const current = latest.current.plugins.find(
-          (plugin) => plugin.manifest.id === source.id,
-        );
-        const saved = current?.updateSource;
-        if (current?.source !== "external" || (saved && "url" in saved))
-          return undefined;
-        const previousSource =
-          saved && "repository" in saved
-            ? saved.repository
-            : saved
-              ? saved.root
-              : undefined;
-        return previousSource === undefined
-          ? localMessage("pluginManagement.conflictUnknown", {
-              name: current.manifest.name,
-              destination: source.url,
-            })
-          : localMessage("pluginManagement.conflictKnown", {
-              name: current.manifest.name,
-              source: previousSource,
-              destination: source.url,
-            });
-      }}
+      // A link's refusal stands alone; a plugin's request says who asked.
+      refusal={
+        conflict && request
+          ? t("u275a.plugins.requestedConflict", { requester, conflict })
+          : conflict
+      }
       confirm={request && (() => request.confirm(request.id))}
       returnFocus={returnFocus}
-      onInstalled={() =>
-        request?.settle(request.id, updating ? "updated" : "installed")
-      }
-      onClose={() => {
-        setClosed(true);
-        if (request) request.end(request.id);
-        onClose?.();
-      }}
+      onInstalled={(outcome) => request?.settle(request.id, outcome)}
+      onOpen={onOpenInstalled && (() => onOpenInstalled(source.id))}
+      onClose={close}
     />
   );
 }

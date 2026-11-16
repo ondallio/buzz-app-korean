@@ -82,6 +82,7 @@ it.each([
     <WelcomeBack
       key="WelcomeBack"
       npub={npub}
+      onDevice
       onImport={vi.fn()}
       onSwitchAccount={vi.fn()}
     />,
@@ -439,6 +440,7 @@ it("preserves user names, email addresses and community hosts that resemble Engl
   const view = render(
     <WelcomeBack
       npub={npub}
+      onDevice
       email="Continue"
       profile={{ name: "Saved key", picture: "" }}
       onImport={vi.fn()}
