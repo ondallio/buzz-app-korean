@@ -1206,7 +1206,7 @@ for (const rejected of [false, true]) {
     await expect(list).toHaveAttribute("data-refreshing", "false");
     const pages = list.getByRole("navigation", { name: "Agents member pages" });
     await pages.getByRole("button", { name: "Next", exact: true }).click();
-    await expect(pages.getByText("2 of 2")).toBeVisible();
+    await expect(pages.getByText("2 of 2", { exact: true })).toBeVisible();
     const agents = list
       .getByRole("region", { name: "Agents", exact: true })
       .getByRole("button", { name: /^Actions for / });
@@ -1296,7 +1296,7 @@ for (const rejected of [false, true]) {
         // Sub-pixel: the scale divides out of a transformed rectangle.
         expect(frame.top).toBeCloseTo(place.top, 0);
       }
-      await expect(pages.getByText("2 of 2")).toBeVisible();
+      await expect(pages.getByText("2 of 2", { exact: true })).toBeVisible();
     };
     await leave("Viewing only", "Cancel");
     // A removal keeps focus on its member until the row leaves.
@@ -1355,7 +1355,7 @@ test("removing the last page's only member focuses the member before it", async 
   await expect(agents).toHaveCount(50);
   const previous = await agents.last().getAttribute("aria-label");
   await pages.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(pages.getByText("2 of 2")).toBeVisible();
+  await expect(pages.getByText("2 of 2", { exact: true })).toBeVisible();
   await expect(agents).toHaveCount(1);
   const target = await agents.first().getAttribute("aria-label");
   await members.getByRole("button", { name: target, exact: true }).click();

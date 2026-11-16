@@ -3863,7 +3863,7 @@ it("keeps the current member page through live removals and clamps a shortened r
       .map((row) => row.textContent);
   await t.user.click(within(pages()).getByRole("button", { name: "Next" }));
   expect(within(pages()).getByText("2 of 3")).toBeVisible();
-  expect(within(pages()).getByText("Page")).toHaveClass("sr-only");
+  expect(within(pages()).getByText("Page 2 of 3")).toHaveClass("sr-only");
   await act(async () => t.replaceRoster([t.viewer.pubkey, ...keys.slice(1)]));
   expect(within(pages()).getByText("2 of 3")).toBeVisible();
   await t.user.click(within(pages()).getByRole("button", { name: "Next" }));
