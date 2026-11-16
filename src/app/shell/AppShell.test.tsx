@@ -1087,9 +1087,9 @@ it("projects frozen page metadata live while preserving dock selection, sidebar 
         placement: "dock" as const,
       },
       {
-        id: "inbox",
-        pluginId: "buzz.inbox",
-        title: "Activity",
+        id: "bestie",
+        pluginId: "buzz.bestie",
+        title: "Bestie",
         placement: "dock" as const,
       },
       {
@@ -1136,7 +1136,7 @@ it("projects frozen page metadata live while preserving dock selection, sidebar 
   expect(screen.getByRole("navigation", { name: "앱 독" })).toBe(dock);
   expect(within(dock).getByRole("tab", { name: "메시지" })).toBe(messages);
   expect(messages).toHaveAttribute("aria-selected", "true");
-  expect(within(dock).getByRole("tab", { name: "활동" })).toBeVisible();
+  expect(within(dock).getByRole("tab", { name: "Bestie" })).toBeVisible();
   expect(screen.getByRole("navigation", { name: "페이지" })).toContainElement(
     screen.getByRole("button", { name: "Activity" }),
   );

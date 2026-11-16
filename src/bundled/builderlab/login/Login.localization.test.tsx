@@ -6,6 +6,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode, useState } from "react";
@@ -92,7 +93,7 @@ it.each(["native", "broker"] as const)(
         screen.getByRole("button", {
           name:
             language === "ko"
-              ? "Builderlab으로 로그인"
+              ? "Builderlab(으)로 로그인"
               : "Sign in with Builderlab",
         }),
       ).toBe(button);
@@ -221,10 +222,12 @@ it.each(["complete", "cancel", "abandon", "observe"] as const)(
     } finally {
       await act(async () => held.resolve(credential));
     }
-    expect(session.snapshot().status).toBe(
-      outcome === "cancel" || outcome === "abandon"
-        ? "signed-out"
-        : "signed-in",
+    await waitFor(() =>
+      expect(session.snapshot().status).toBe(
+        outcome === "cancel" || outcome === "abandon"
+          ? "signed-out"
+          : "signed-in",
+      ),
     );
     expect(acquire).toHaveBeenCalledOnce();
     session.dispose();
@@ -251,34 +254,31 @@ it.each([true, false])(
     const draft = input();
     draft.setSelectionRange(1, 6);
     const sentence = screen.getByText(
-      /Builderlab uses your organization sign-in/,
-    );
+      /Uses your Builderlab sign-in/,
+    ).parentElement;
     const link = hasAction
-      ? screen.getByRole("button", { name: "Identity → Organization sign-in" })
+      ? screen.getByRole("button", { name: "Manage account" })
       : sentence;
     if (hasAction) link.focus();
     for (const language of ["ko", "en"] as const) {
       act(() => setLanguage(language));
-      const label =
-        language === "ko"
-          ? "신원 → 조직 로그인"
-          : "Identity → Organization sign-in";
+      const label = language === "ko" ? "계정 관리" : "Manage account";
       expect(
         hasAction
           ? screen.getByRole("button", { name: label })
           : screen.getByText(
               language === "ko"
-                ? /Builderlab은 조직 로그인을 사용합니다/
-                : /Builderlab uses your organization sign-in/,
-            ),
+                ? /Builderlab 로그인을 사용합니다/
+                : /Uses your Builderlab sign-in/,
+            ).parentElement,
       ).toBe(link);
       expect(link.closest("p")).toBe(sentence);
       expect(sentence?.textContent).toBe(
         language === "ko"
-          ? "Builderlab은 조직 로그인을 사용합니다. 로그아웃하려면 신원 → 조직 로그인으로 이동하세요."
-          : "Builderlab uses your organization sign-in. To sign out, go to Identity → Organization sign-in.",
+          ? `Builderlab 로그인을 사용합니다.${hasAction ? label : "신원에서 계정 관리"}`
+          : `Uses your Builderlab sign-in.${hasAction ? label : "Manage account in Identity"}`,
       );
-      expect(sentence?.textContent?.split(label).length).toBe(2);
+      if (hasAction) expect(sentence?.textContent?.split(label).length).toBe(2);
       expect(input()).toBe(draft);
       expect(draft).toHaveValue(rawDraft);
       expect([draft.selectionStart, draft.selectionEnd]).toEqual([1, 6]);
