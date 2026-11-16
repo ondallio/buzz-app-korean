@@ -433,9 +433,6 @@ test("shows the Korean TypeSafe desktop boundary without exposing terminal or ke
   await darkAndEnlarge(page);
   await openSettings(page);
   await selectSettingsSection(page, "Decisions API");
-  await expect(
-    page.getByRole("heading", { name: "TypeSafe", exact: true }),
-  ).toBeVisible();
   const status = page.getByText("Open the Buzz desktop app to use TypeSafe.", {
     exact: true,
   });

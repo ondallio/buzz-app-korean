@@ -491,13 +491,8 @@ test.describe("Korean administration host", () => {
       await expect(
         page.getByRole("button", { name: "멤버 검색 지우기", exact: true }),
       ).toBeVisible();
-      await page
-        .getByRole("button", { name: "멤버 초대", exact: true })
-        .click();
-      const dialog = page.getByRole("dialog", {
-        name: "사람 추가 또는 초대",
-        exact: true,
-      });
+      const dialog = page.getByRole("dialog", { name: "설정", exact: true });
+      await page.getByRole("tab", { name: "초대", exact: true }).click();
       await settleDialogMotion(dialog);
       const link = dialog.getByRole("textbox", {
         name: "커뮤니티 초대 링크",
@@ -517,7 +512,7 @@ test.describe("Korean administration host", () => {
       const dialogNode = await dialog.elementHandle();
       await driver.set(page, "en");
       const enDialog = page.getByRole("dialog", {
-        name: "Add or invite people",
+        name: "Settings",
         exact: true,
       });
       await sameNode(enDialog, dialogNode);
@@ -542,7 +537,7 @@ test.describe("Korean administration host", () => {
       await page.setViewportSize({ width: 480, height: 760 });
       await capture(page, info, "membership-korean-invite-narrow", dialog);
       expect(requests).toEqual([{ ttl_secs: 259200, max_uses: null }]);
-      await dialog.getByRole("button", { name: "닫기", exact: true }).click();
+      await page.getByRole("tab", { name: "멤버", exact: true }).click();
       await expect(
         page.getByRole("searchbox", { name: "멤버 검색", exact: true }),
       ).toHaveValue("Fixture");
