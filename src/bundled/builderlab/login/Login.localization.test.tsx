@@ -171,6 +171,7 @@ it.each(["complete", "cancel", "abandon", "observe"] as const)(
     const held = deferred<Credential>(),
       acquire = vi.fn((_signal: AbortSignal) => held.promise),
       session = createTestSession(acquire),
+      signIn = vi.spyOn(session, "signIn"),
       cancel = vi.spyOn(session, "cancel"),
       abandon = vi.spyOn(session, "abandon");
     const user = userEvent.setup();
@@ -219,8 +220,14 @@ it.each(["complete", "cancel", "abandon", "observe"] as const)(
       expect(cancel).toHaveBeenCalledTimes(outcome === "cancel" ? 1 : 0);
       expect(abandon).toHaveBeenCalledTimes(outcome === "abandon" ? 1 : 0);
     } finally {
-      await act(async () => held.resolve(credential));
+      await act(async () => {
+        held.resolve(credential);
+        // Acquisition is followed by asynchronous account-storage derivation.
+        // Join the actual click-started attempt, including cancellation cleanup.
+        await signIn.mock.results[0]?.value;
+      });
     }
+    expect(signIn).toHaveBeenCalledOnce();
     expect(session.snapshot().status).toBe(
       outcome === "cancel" || outcome === "abandon"
         ? "signed-out"

@@ -519,13 +519,18 @@ test.describe("workflow attribution from explicit relay authority", () => {
         });
         await expect(popup).toBeVisible();
         const popupNode = await popup.elementHandle();
+        // Base UI schedules initial focus after the popup mounts. Visibility
+        // alone does not establish that boundary; sample the live active element.
+        await expect
+          .poll(() =>
+            popup.evaluate(
+              (node) =>
+                node === document.activeElement ||
+                node.contains(document.activeElement),
+            ),
+          )
+          .toBe(true);
         const focused = await page.evaluateHandle(() => document.activeElement);
-        expect(
-          await popup.evaluate(
-            (node, active) => node === active || node.contains(active),
-            focused,
-          ),
-        ).toBe(true);
         for (const locale of ["ko", "en"]) {
           await language.language(page, locale);
           const korean = locale === "ko";
