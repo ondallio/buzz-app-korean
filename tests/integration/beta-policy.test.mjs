@@ -12,6 +12,9 @@ import { betaReleaseConfig } from "../../scripts/beta/config.mjs";
 const channel = JSON.parse(
   await readFile(new URL("../../beta-channel.json", import.meta.url), "utf8"),
 );
+// Keep comparative test coordinates stable when the shipped pin advances.
+channel.version = "0.7.0-korean.1";
+channel.source.tag = "v0.7.0-preview.258.1";
 const tag = channel.source.tag;
 const version = tag.slice(1);
 const base = `https://github.com/block/buzz-app/releases/download/${tag}`;

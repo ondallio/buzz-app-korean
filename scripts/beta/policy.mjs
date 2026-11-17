@@ -9,7 +9,7 @@ const endpoint = `https://github.com/${destination}/releases/download/korean-bet
 const officialFeed = `https://github.com/${sourceRepo}/releases/download/preview-feed/latest.json`;
 const number = "(0|[1-9][0-9]*)";
 const previewPattern = new RegExp(
-  `^v${number}\\.${number}\\.${number}-preview\\.${number}\\.${number}$`,
+  `^v${number}\\.${number}\\.${number}-preview\\.${number}(?:\\.${number})?$`,
 );
 const koreanPattern = new RegExp(
   `^${number}\\.${number}\\.${number}-korean\\.${number}$`,
@@ -117,7 +117,7 @@ export function previewParts(tag) {
   const match =
     typeof tag === "string" && tag.length <= 128 && previewPattern.exec(tag);
   assert.ok(match, "Unsupported official preview version");
-  return match.slice(1).map(BigInt);
+  return match.slice(1).map((part) => BigInt(part ?? "0"));
 }
 
 /** Validate an official coordinate independently of the Korean build's base version. */

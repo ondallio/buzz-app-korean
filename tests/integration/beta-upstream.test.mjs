@@ -6,6 +6,9 @@ import { discoverUpstream } from "../../scripts/beta/upstream.mjs";
 const channel = JSON.parse(
   await readFile(new URL("../../beta-channel.json", import.meta.url), "utf8"),
 );
+// Keep comparative test coordinates stable when the shipped pin advances.
+channel.version = "0.7.0-korean.1";
+channel.source.tag = "v0.7.0-preview.258.1";
 function fixture({
   tag = channel.source.tag,
   commit = channel.source.commit,
@@ -119,4 +122,17 @@ test("compares large numeric preview components without Number rounding", async 
   );
   const older = fixture({ tag: "v0.7.0-preview.9007199254740991.9" });
   await assert.rejects(discoverUpstream(pin, older.download), /backward/);
+});
+
+test("accepts new one-component preview format and still verifies provenance", async () => {
+  const f = fixture({ tag: "v1.0.5-preview.1", commit: "b".repeat(40) });
+  const result = await discoverUpstream(channel, f.download);
+  assert.equal(result.updateAvailable, true);
+  assert.equal(result.available.tag, "v1.0.5-preview.1");
+  await assert.rejects(
+    discoverUpstream(
+      channel,
+      fixture({ tag: "v1.0.5-preview.1", source: "a".repeat(40) }).download,
+    ),
+  );
 });

@@ -1,0 +1,153 @@
+name: Korean upstream proposal
+
+on:
+  schedule:
+    - cron: "17 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: korean-upstream-proposal
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    if: github.repository == 'ondallio/buzz-app-korean' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      prepared: ${{ steps.prepare.outputs.prepared }}
+      branch: ${{ steps.discover.outputs.branch }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24.18.0"
+      - name: Configure proposal attribution
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - name: Discover verified official update
+        id: discover
+        run: node scripts/beta/proposal.mjs discover
+      - name: Check existing work
+        if: steps.discover.outputs.available == 'true'
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.discover.outputs.branch }}
+        run: |
+          gh api --paginate --slurp 'repos/ondallio/buzz-app-korean/pulls?state=all&per_page=100' | jq 'add' > "$RUNNER_TEMP/upstream-pulls.json"
+          git ls-remote --heads origin "refs/heads/$BRANCH" > "$RUNNER_TEMP/upstream-branch.txt"
+          node scripts/beta/proposal.mjs gate
+      - name: Fetch verified source and prepare candidate
+        if: steps.gate.outputs.proceed == 'true'
+        id: prepare
+        env:
+          SOURCE_SHA: ${{ steps.discover.outputs.sha }}
+        run: |
+          git fetch --no-tags https://github.com/block/buzz-app.git "$SOURCE_SHA"
+          node scripts/beta/proposal.mjs prepare
+      # No write token or release/signing secrets are available to candidate code.
+      - uses: ./.github/actions/setup
+        if: steps.prepare.outputs.prepared == 'true'
+      - name: Check candidate (no publishing on failure)
+        if: steps.prepare.outputs.prepared == 'true'
+        run: |
+          ./bin/pnpm check
+          ./bin/pnpm exec vite build
+          ./bin/node --test tests/integration/beta-*.test.mjs
+          ./bin/pnpm exec vitest run --no-cache src/shared/i18n
+          git diff --check
+      - name: Package checked proposal
+        if: steps.prepare.outputs.prepared == 'true'
+        env:
+          BRANCH: ${{ steps.discover.outputs.branch }}
+        run: |
+          # Do not include changes made by tests/builds. Index is the prepared merge.
+          test -z "$(git diff --name-only)" || { echo 'Checks changed tracked files; stopping'; exit 1; }
+          git commit --signoff -m 'chore: propose verified official Buzz update'
+          git branch "$BRANCH" HEAD
+          mkdir -p "$RUNNER_TEMP/upstream-proposal"
+          base=$(jq -r .base "$RUNNER_TEMP/proposal.json")
+          git bundle create "$RUNNER_TEMP/upstream-proposal/candidate.bundle" "$BRANCH" "^$base"
+          cp "$RUNNER_TEMP/proposal.json" "$RUNNER_TEMP/upstream-proposal/proposal.json"
+          printf 'Candidate checks passed. Native build, browser journeys, visual translation review and full PR CI are NOT verified.\n' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: steps.prepare.outputs.prepared == 'true'
+        with:
+          name: checked-upstream-proposal
+          path: ${{ runner.temp }}/upstream-proposal/
+          if-no-files-found: error
+          retention-days: 7
+
+  proposal:
+    needs: candidate
+    if: needs.candidate.result == 'success' && needs.candidate.outputs.prepared == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # Fresh runner. Never execute candidate code in this write-capable job.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: checked-upstream-proposal
+          path: proposal-artifact
+      - name: Validate and publish draft only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ needs.candidate.outputs.branch }}
+        run: |
+          set -euo pipefail
+          [[ "$BRANCH" =~ ^automation/upstream-v[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+(\.[0-9]+)?-[a-f0-9]{12}$ ]]
+          base=$(jq -r .base proposal-artifact/proposal.json)
+          [[ "$base" =~ ^[a-f0-9]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$base" || { echo 'Base changed; wait for next run'; exit 1; }
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$base" || { echo 'Remote main changed; stopping'; exit 1; }
+          git bundle verify proposal-artifact/candidate.bundle
+          git fetch proposal-artifact/candidate.bundle "refs/heads/$BRANCH"
+          candidate=$(git rev-parse FETCH_HEAD)
+          git merge-base --is-ancestor "$base" "$candidate"
+          # Upstream cannot change workflow/agent/automation policy through this job.
+          if git diff --name-only "$base" "$candidate" -- .github .agents AGENTS.md scripts/beta | grep -q .; then
+            echo 'Protected automation files changed; stopping'; exit 1
+          fi
+          # Recheck races with human work immediately before publishing.
+          pulls=$(gh api --paginate --slurp 'repos/ondallio/buzz-app-korean/pulls?state=all&per_page=100')
+          test "$(printf '%s' "$pulls" | jq '[.[][] | select(.state == "open") | select(.head.ref | test("^(claude/upstream-|automation/upstream-)"))] | length')" = 0 || { echo 'Another upstream PR exists; stopping'; exit 1; }
+          test -z "$(git ls-remote --heads origin "refs/heads/$BRANCH")" || { echo 'Proposal branch exists; stopping'; exit 1; }
+          test "$(printf '%s' "$pulls" | jq --arg branch "$BRANCH" '[.[][] | select(.head.ref == $branch)] | length')" = 0 || { echo 'Previously reviewed proposal exists; stopping'; exit 1; }
+          gh auth setup-git
+          # Empty lease means create only, even if another writer races this check.
+          git push --force-with-lease="refs/heads/$BRANCH:" origin "$candidate:refs/heads/$BRANCH"
+          test "$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)" = "$candidate"
+          tag=$(jq -r .tag proposal-artifact/proposal.json)
+          cat > "$RUNNER_TEMP/body.md" <<BODY
+          ## 자동 준비된 공식 업데이트 제안
+          공식 버전: $tag
+          기준 main: $base
+          검사한 커밋: $candidate
+          검사 실행: https://github.com/ondallio/buzz-app-korean/actions/runs/$GITHUB_RUN_ID
+
+          통과: lint/types/design checks, frontend build, beta integration tests, i18n unit tests.
+          미검증: 전체 브라우저/Rust CI, macOS 빌드·서명, 새 화면·번역 검토.
+          자동 병합·릴리스·업데이트 피드 변경은 하지 않습니다. 사람이 검토하고 결정해야 합니다.
+
+          GITHUB_TOKEN으로 만든 PR은 일반 pull_request CI를 자동 시작하지 않습니다.
+          위 검사 실행이 이번 자동 검증 기록입니다. 병합 전 전체 CI를 별도로 실행하고 확인해야 합니다.
+          BODY
+          gh pr create --repo ondallio/buzz-app-korean --base main --head "$BRANCH" --draft --title "chore: upstream $tag 검토 제안" --body-file "$RUNNER_TEMP/body.md"
