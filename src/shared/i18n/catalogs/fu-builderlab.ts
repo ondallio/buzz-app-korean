@@ -345,7 +345,7 @@ export const ko: Record<keyof typeof en, string> = {
     "삭제 요청을 보내지 않았습니다. 이 기기에 {npub}의 삭제 요청이 이미 대기 중입니다.",
   "fubuilderlab.hc.notSentRecovery":
     "복구 기록을 저장하지 못해 삭제 요청을 보내지 않았습니다.",
-  "fubuilderlab.hc.thisCommunity": "이름 없는",
+  "fubuilderlab.hc.thisCommunity": "이",
   "fubuilderlab.hc.recipientLimit": "받는 사람이 커뮤니티 한도에 도달했습니다.",
   "fubuilderlab.hc.transferFailed": "소유권을 이전하지 못했습니다.",
   "fubuilderlab.hc.deleteTitle": "{name} 커뮤니티를 영구 삭제할까요?",
