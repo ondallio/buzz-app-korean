@@ -1,4 +1,9 @@
-import { localMessage } from "../../shared/i18n/deferred-message";
+import {
+  errorMessage,
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { t, useLanguage } from "../../shared/i18n";
 import { rich } from "../../shared/i18n/rich";
 import { ko, enUS } from "react-day-picker/locale";
@@ -137,6 +142,7 @@ function conversationName(
   channel: ChannelSummary,
   profiles: ReadonlyMap<string, Profile>,
   resolveName: ReturnType<typeof useIdentityNames>,
+  notesSelf: string,
 ) {
   if (channel.channelType !== "dm" || !channel.participants)
     return channel.name;
@@ -149,7 +155,7 @@ function conversationName(
           channel.participants,
         ),
       ),
-    ).join(", ") || t("search.notesSelf")
+    ).join(", ") || notesSelf
   );
 }
 
@@ -549,15 +555,16 @@ export function SearchResults({
     };
   });
   // Every keystroke renders; DM names only change with their inputs.
+  const notesSelf = t("search.notesSelf");
   const names = useMemo(
     () =>
       new Map(
         channels.map((channel) => [
           channel.id,
-          conversationName(channel, profiles, resolveName),
+          conversationName(channel, profiles, resolveName, notesSelf),
         ]),
       ),
-    [channels, profiles, resolveName],
+    [channels, profiles, resolveName, notesSelf],
   );
   const operatorChannel = parsed.in ? normalizeInChannel(parsed.in) : "";
   // `in:@person` names your direct message with them, by key, `me` or name.
@@ -1435,7 +1442,7 @@ export function SearchResults({
   // Choosing a person opens your DM with them, or a draft until the first send.
   const [personOpen, setPersonOpen] = useState<{
     name: string;
-    error?: string;
+    error?: DisplayMessage;
   }>();
   const personAttempt = useRef<
     { key: string; controller: AbortController } | undefined
@@ -1483,8 +1490,8 @@ export function SearchResults({
       setPersonOpen({
         name,
         error: agentUnavailable(session, pubkey)
-          ? t("v1shell.search.identityArchived")
-          : t("search.agentNotReady"),
+          ? localMessage("v1shell.search.identityArchived")
+          : localMessage("search.agentNotReady"),
       });
       return;
     }
@@ -1506,7 +1513,9 @@ export function SearchResults({
         setPersonOpen({
           name,
           error:
-            reason instanceof Error ? reason.message : t("search.openFailed"),
+            reason instanceof Error
+              ? errorMessage(reason)
+              : localMessage("search.openFailed"),
         });
     } finally {
       if (personAttempt.current?.controller === controller)
@@ -2425,7 +2434,7 @@ export function SearchResults({
           )}
           {personOpen && (
             <p role={personOpen.error ? "alert" : undefined}>
-              {personOpen.error ??
+              {resolveMessage(personOpen.error) ??
                 t("search.openingConversation", { name: personOpen.name })}
             </p>
           )}

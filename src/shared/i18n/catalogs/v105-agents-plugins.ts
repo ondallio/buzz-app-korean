@@ -103,9 +103,9 @@ export const ko: Record<keyof typeof en, string> = {
   "v105agent.bestie.onlyBestie": "정기 확인은 내 베스티만 합니다.",
   "v105agent.bestie.turnOnFirst": "먼저 {feature} 기능을 켜세요.",
   "v105agent.bestie.pausedInAttention":
-    "관심 탭에서 일시 중지되었습니다. 다시 시작하려면 {feature} 기능을 껐다가 다시 켜세요.",
+    "지켜보기 탭에서 일시 중지되었습니다. 다시 시작하려면 {feature} 기능을 껐다가 다시 켜세요.",
   "v105agent.bestie.pausedNoWatches":
-    "일시 중지됨: 이 기기에서 지켜보기가 실행되지 않고 있습니다. Attention 플러그인을 켜세요.",
+    "일시 중지됨: 이 기기에서 지켜보기가 실행되지 않고 있습니다. 지켜보기 플러그인을 켜세요.",
   "v105agent.bestie.partlySaved": "{feature} 기능이 일부만 저장되었습니다",
   "v105agent.bestie.partlySavedHint":
     "일부가 빠져 있어 꺼진 것으로 표시됩니다. 제거하면 나머지를 정리합니다.",
@@ -114,9 +114,9 @@ export const ko: Record<keyof typeof en, string> = {
     "베스티 지침에 기억 규칙을 추가합니다. 끄면 규칙을 제거합니다. 베스티가 기억한 내용은 삭제되지 않으며, 핵심 기억은 계속 모든 프롬프트에 들어갑니다. 기억을 지우려면 베스티에게 잊어 달라고 요청하세요.",
   "v105agent.bestie.feature.hourlyNotes": "매시간 메모",
   "v105agent.bestie.feature.hourlyNotesDescription":
-    "베스티가 한 시간에 한 번 깨어나 참여한 채널의 새 내용을 읽고 중요한 점을 기록합니다. 요청한 후속 조치 시점이 되었을 때만 알려 줍니다. 새 내용이 없으면 아무것도 쓰거나 보내지 않지만, 깨어날 때마다 토큰은 사용됩니다. Buzz가 열려 있고 Attention(지켜보기) 플러그인이 켜져 있을 때 실행됩니다.",
+    "베스티가 한 시간에 한 번 깨어나 참여한 채널의 새 내용을 읽고 중요한 점을 기록합니다. 요청한 후속 조치 시점이 되었을 때만 알려 줍니다. 새 내용이 없으면 아무것도 쓰거나 보내지 않지만, 깨어날 때마다 토큰은 사용됩니다. Buzz가 열려 있고 지켜보기 플러그인이 켜져 있을 때 실행됩니다.",
   "v105agent.bestie.feature.nightlyReview": "야간 정리",
   "v105agent.bestie.feature.nightlyReviewDescription":
-    "새벽 3시쯤 베스티가 기억을 정리합니다. 메모를 메시지와 대조하고, 아는 내용을 분류하고, 짧은 회고를 씁니다. 메시지는 절대 보내지 않습니다. '나를 기억하기'만 켜져 있으면 됩니다. Buzz가 열려 있고 Attention(지켜보기) 플러그인이 켜져 있을 때 실행되며, 토큰을 사용합니다.",
+    "새벽 3시쯤 베스티가 기억을 정리합니다. 메모를 메시지와 대조하고, 아는 내용을 분류하고, 짧은 회고를 씁니다. 메시지는 절대 보내지 않습니다. '나를 기억하기'만 켜져 있으면 됩니다. Buzz가 열려 있고 지켜보기 플러그인이 켜져 있을 때 실행되며, 토큰을 사용합니다.",
   "v105agent.bestie.feature.everyHour": "매시간",
 };

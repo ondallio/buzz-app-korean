@@ -1183,10 +1183,10 @@ export const ko: Record<keyof typeof en, string> = {
   "v1wf.watch.noActivity": "아직 활동이 없습니다",
   "v1wf.watch.activityFor": "{label} 활동",
   "v1wf.watch.startWatching": "지켜보기 시작",
-  "v1wf.watch.attention": "주의",
+  "v1wf.watch.attention": "지켜보기",
   "v1wf.watch.emptyDescription":
-    "주의 기능을 켜면 {name} 님이 Buzz 전반의 메시지와 업데이트를 지켜보다가 지시에 따라 행동하거나 알려 줍니다. 시작하려면 {name} 님에게 메시지를 보내세요.",
-  "v1wf.watch.statusFor": "{name}의 주의 상태",
+    "지켜보기 기능을 켜면 {name} 님이 Buzz 전반의 메시지와 업데이트를 지켜보다가 지시에 따라 행동하거나 알려 줍니다. 시작하려면 {name} 님에게 메시지를 보내세요.",
+  "v1wf.watch.statusFor": "지켜보기 상태: {name}",
   "v1wf.watch.active": "활성",
   "v1wf.watch.paused": "일시 중지됨",
   "v1wf.watch.pause": "일시 중지",
@@ -1210,7 +1210,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1wf.watch.watchesOf": "{label} 지켜보기",
   "v1wf.watch.instructions": "지침",
   "v1wf.watch.channelFallback": "채널 {id}",
-  "v1wf.watch.settings": "주의 설정",
+  "v1wf.watch.settings": "지켜보기 설정",
   "v1wf.watch.settingsSubtitle":
     "{name} 님이 업데이트를 지켜보고 일정에 따라 확인하게 합니다. 이 기기에서 Buzz가 열려 있는 동안 실행됩니다.",
   "v1wf.watch.removeUnreadable": "읽을 수 없는 {slug} 제거",

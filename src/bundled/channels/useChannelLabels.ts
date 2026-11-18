@@ -66,9 +66,11 @@ export function useChannelLabels(
         profiles: typeof profiles;
         resolveName: typeof resolveName;
         nameCandidates: typeof nameCandidates;
+        notesSelf: string;
       }
     >(),
   );
+  const notesSelf = t("inbox.notesSelf");
   const labelledChannels = useMemo(
     () =>
       channels.map((channel) => {
@@ -79,7 +81,8 @@ export function useChannelLabels(
         if (
           previous?.profiles === profiles &&
           previous.resolveName === resolveName &&
-          previous.nameCandidates === nameCandidates
+          previous.nameCandidates === nameCandidates &&
+          previous.notesSelf === notesSelf
         )
           return previous.channel;
         const name = channel.participants.length
@@ -92,7 +95,7 @@ export function useChannelLabels(
                 ),
               ),
             ).join(", ")
-          : t("inbox.notesSelf");
+          : notesSelf;
         const result =
           previous?.name === name ? previous.channel : { ...channel, name };
         labelled.current.set(channel, {
@@ -101,10 +104,11 @@ export function useChannelLabels(
           profiles,
           resolveName,
           nameCandidates,
+          notesSelf,
         });
         return result;
       }),
-    [channels, profiles, resolveName, nameCandidates],
+    [channels, profiles, resolveName, nameCandidates, notesSelf],
   );
   return { channels: labelledChannels, profiles };
 }

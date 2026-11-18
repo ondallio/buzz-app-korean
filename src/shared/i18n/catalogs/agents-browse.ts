@@ -270,7 +270,7 @@ export const ko: Record<keyof typeof en, string> = {
     "이름, 유형과 지침·모델·작업 공간을 포함한 설정은 커뮤니티 간에 공유됩니다.",
   "agentsBrowse.memoriesStay": "기억은 각 커뮤니티에 보관됩니다",
   "agentsBrowse.separateDetails":
-    "사진, 주의 대상, 저장된 기억과 대화는 각 커뮤니티에 별도로 보관됩니다.",
+    "사진, 지켜보기, 저장된 기억과 대화는 각 커뮤니티에 별도로 보관됩니다.",
   "agentsBrowse.dontRemind": "다시 알리지 않기",
   "agentsBrowse.thisCommunity": "이 커뮤니티",
   "agentsBrowse.imported": "가져옴",

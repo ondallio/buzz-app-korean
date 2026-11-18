@@ -1,5 +1,4 @@
 import { t, useLanguage } from "../shared/i18n";
-import { en as notificationEnglish } from "../shared/i18n/catalogs/notifications";
 import { SettingsGroup } from "../shared/design-system/ui/SettingsGroup";
 import { Header, InlineHeader } from "../shared/design-system/ui/Header";
 import { ToastNotice } from "../shared/design-system/ui/Toast";
@@ -11,7 +10,10 @@ import { UnreadIndicatorSettings } from "./UnreadIndicatorSettings";
 import { usePermissionCheck } from "./usePermissionCheck";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import type { NotificationsService } from "../features/notifications/service";
-import type { NotificationCategory } from "../features/notifications/preferences";
+import {
+  preferencesErrorText,
+  type NotificationCategory,
+} from "../features/notifications/preferences";
 import {
   CATEGORY_SOUND_LABELS,
   RECOMMENDED_SOUND_BY_CATEGORY,
@@ -154,13 +156,7 @@ export function NotificationSettings({
   }, [active, preferences, stopPreview]);
   const desktopAlertsEnabled = !state.developmentPaused && preferences.enabled;
   const preferenceError =
-    state.preferencesError ===
-    notificationEnglish["notifications.error.restoreDetails"]
-      ? t("notifications.error.restoreDetails")
-      : state.preferencesError ===
-          notificationEnglish["notifications.error.saveDetails"]
-        ? t("notifications.error.saveDetails")
-        : state.preferencesError;
+    state.preferencesError && preferencesErrorText(state.preferencesError);
   const permissionStatus = state.developmentPaused
     ? t("notifications.permission.development")
     : state.requesting

@@ -1,3 +1,5 @@
+import { t } from "../../shared/i18n";
+import { en as notificationEnglish } from "../../shared/i18n/catalogs/notifications";
 import {
   DEFAULT_CATEGORY_SOUNDS,
   isSoundName,
@@ -82,6 +84,14 @@ export function parsePreferences(raw: unknown): NotificationPreferences {
     categories: Object.freeze(Object.fromEntries(categories)),
   });
 }
+/** The stored English error, in the current language when it is one of ours. */
+export function preferencesErrorText(error: string): string {
+  if (error === notificationEnglish["notifications.error.restoreDetails"])
+    return t("notifications.error.restoreDetails");
+  if (error === notificationEnglish["notifications.error.saveDetails"])
+    return t("notifications.error.saveDetails");
+  return error;
+}
 export function createNotificationPreferences(
   host: Window | undefined = typeof window === "undefined" ? undefined : window,
 ) {
@@ -109,8 +119,7 @@ export function createNotificationPreferences(
       // Never turn alerts on because stored off intent could not be read.
       state = {
         preferences: { ...DEFAULT_NOTIFICATION_PREFERENCES, enabled: false },
-        error:
-          "Notification preferences could not be restored. Alerts are paused; retry loading your settings.",
+        error: notificationEnglish["notifications.error.restoreDetails"],
       };
     }
     notify();
@@ -149,8 +158,7 @@ export function createNotificationPreferences(
         if (!host) throw new Error("No browser storage");
         host.localStorage.setItem(key(), JSON.stringify(preferences));
       } catch {
-        error =
-          "These notification choices are active, but could not be saved on this device. Retry saving.";
+        error = notificationEnglish["notifications.error.saveDetails"];
       }
       // An off action takes effect even if persistence fails. Permission completion never changes it.
       state = { preferences, error };

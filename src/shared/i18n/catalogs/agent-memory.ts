@@ -71,5 +71,5 @@ export const ko: Record<keyof typeof en, string> = {
   "agentMemory.weekMany": "{count}주 전",
   "agentMemory.month": "1개월 전",
   "agentMemory.activity": "활동",
-  "agentMemory.attention": "관심",
+  "agentMemory.attention": "지켜보기",
 };

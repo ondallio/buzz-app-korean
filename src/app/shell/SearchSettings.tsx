@@ -11,6 +11,7 @@ import type { AppServices } from "../services";
 import type { SearchDestination, SearchGroup } from "./SearchChoices";
 import { MatchRank, matchName, matchRank } from "../../features/search/match";
 import { settingsSections } from "../settings-sections";
+import { preferencesErrorText } from "../../features/notifications/preferences";
 import { PreferenceRow } from "../../shared/design-system/ui/PreferenceRow";
 import { SwitchPreferenceRow } from "../../shared/design-system/ui/SwitchPreferenceRow";
 import { Select } from "../../shared/design-system/ui/Select";
@@ -459,7 +460,7 @@ function NotificationPreference({
       />
       {state.preferencesError && (
         <p role="alert" className="text-body-sm text-subtle">
-          {state.preferencesError}{" "}
+          {preferencesErrorText(state.preferencesError)}{" "}
           <Button size="sm" onClick={() => notifications.updatePreferences({})}>
             {t("search.retrySaving")}
           </Button>

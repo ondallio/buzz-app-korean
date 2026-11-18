@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import type { Agent, RegisteredAgentType } from "./service";
 
 export type AgentExecutionLocation = "remote" | "local";
@@ -19,9 +20,11 @@ export function remoteWorkDetail(
   runtime?: string,
 ) {
   if (execution !== "remote") return undefined;
-  return runtime === "block.builderlab/builderlab"
-    ? "Running remotely on Builderlab…"
-    : "Running on a remote machine…";
+  return t(
+    runtime === "block.builderlab/builderlab"
+      ? "activityAccessory.remoteBuilderlab"
+      : "activityAccessory.remoteMachine",
+  );
 }
 
 /** Execution location is independent of presence, model and ownership. */

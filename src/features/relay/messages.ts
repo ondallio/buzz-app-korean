@@ -20,6 +20,12 @@ import { safeMessageUrl } from "./message-content";
 import type { EventData } from "./events";
 import type { Outbox, OutboxRecovery } from "./outbox";
 import { signedMessageTokenTags } from "../messages/message-tokens";
+import {
+  errorMessage,
+  localError,
+  localMessage,
+  resolveMessage,
+} from "../../shared/i18n/deferred-message";
 
 /** Owner authorization is supplied only after the agent's signed profile is verified. */
 export type AgentOwnerAuthorization = Readonly<{
@@ -319,7 +325,7 @@ export function createMessages(
       row.channelId !== original.tags.find(([name]) => name === "h")?.[1] ||
       (row.delivery && !["accepted", "seen"].includes(row.delivery))
     )
-      throw new Error("Reload the message before forwarding it.");
+      throw localError("futerms.forward.reloadMessage");
     const attachmentSource = find(row.attachmentSourceId ?? row.id);
     if (
       !attachmentSource ||
@@ -333,7 +339,7 @@ export function createMessages(
             ([name, id]) => name === "h" && id !== row.channelId,
           )))
     )
-      throw new Error("Reload the message attachments before forwarding it.");
+      throw localError("futerms.forward.reloadAttachments");
     const snapshot = snapshotMessage(row, authorName, profiles?.snapshot());
     const sourceAttachments = snapshotAttachments(row);
     const sourceUrls = new Set(
@@ -389,9 +395,7 @@ export function createMessages(
         return hash && !sharedHashes.has(hash);
       })
     )
-      throw new Error(
-        "This message contains an attachment that can’t be forwarded. Copy its link instead.",
-      );
+      throw localError("futerms.forward.attachmentNotForwardable");
     const event = {
       kind: 9,
       content: forwardBody(snapshot, note),
@@ -410,9 +414,7 @@ export function createMessages(
     };
     // Reserve the outbox's client-id and millisecond tags as well.
     if (byteSize(event) + 160 > OUTBOX_INPUT_MAX_BYTES)
-      throw new Error(
-        "This message is too long to forward. Copy its link instead.",
-      );
+      throw localError("futerms.forward.tooLong");
     return event;
   };
   return Object.freeze({
@@ -427,8 +429,8 @@ export function createMessages(
         return undefined;
       } catch (error) {
         return error instanceof Error
-          ? error.message
-          : "This message cannot be forwarded.";
+          ? resolveMessage(errorMessage(error))
+          : resolveMessage(localMessage("futerms.forward.cannotForward"));
       }
     },
     send(
