@@ -1,5 +1,3 @@
-import { t } from "../../shared/i18n";
-import { localError } from "../../shared/i18n/deferred-message";
 import { prepareAttachment } from "../messages/prepare-attachment";
 import { mediaUrl } from "../relay/transport";
 import type { UploadProgress } from "../relay/attachments";
@@ -23,16 +21,6 @@ export function avatarPictureError(value: string): string | undefined {
  * writes and reads it. Agents save HTTPS pictures only. */
 export const profilePictureError = (value: string) =>
   legacyEmojiPicture(value.trim()) ? undefined : avatarPictureError(value);
-
-/** Localizes only the shared policy result for this input, leaving its canonical API unchanged. */
-export function avatarPictureErrorMessage(
-  value: string,
-  policy: (value: string) => string | undefined = avatarPictureError,
-): string | undefined {
-  return policy(value) === undefined
-    ? undefined
-    : t("profileEditing.pictureError");
-}
 
 export function avatarPreview(
   value: string,
@@ -62,20 +50,20 @@ export async function uploadAvatar(
   progress?: UploadProgress,
 ): Promise<string> {
   if (!/^image\/(png|jpeg|gif|webp|heic|heif)$/.test(file.type))
-    throw localError("profileEditing.unsupportedFormat");
+    throw new Error("Choose a PNG, JPEG, GIF, WebP or HEIC image.");
   if (!file.size || file.size > 50 * 1024 * 1024)
-    throw localError("profileEditing.imageSize");
+    throw new Error("Choose an image smaller than 50 MiB.");
   const transport = await connectCommunityTransport(
     communityDestination(community).id,
     signal,
   );
   if (!transport.uploadAttachment)
-    throw localError("profileEditing.uploadUnavailable");
+    throw new Error("Image uploads are unavailable on this connection.");
   const prepared = await prepareAttachment(file, signal, true);
   const result = await transport.uploadAttachment(prepared, signal, progress);
   signal.throwIfAborted();
   if (!result.type.startsWith("image/") || !avatarSource(result.url))
-    throw localError("profileEditing.invalidImageResponse");
+    throw new Error("The server did not return an avatar image.");
   return result.url;
 }
 
@@ -83,20 +71,23 @@ export async function uploadAvatar(
  * inscribed in a circular avatar, so clipping never crops it. */
 export const emojiAvatarScale = 0.7;
 
-/** Fit painted pixels: emoji font metrics differ between browser engines. */
+/** Fit painted pixels: emoji font metrics differ between browser engines.
+ * `offset` and `x` move the emoji down and right, in image widths. */
 export function paintEmojiAvatar(
   canvas: HTMLCanvasElement,
   emoji: string,
   color?: string,
   scale = emojiAvatarScale,
   offset = 0,
+  x = 0,
 ) {
   canvas.width = canvas.height = 512;
   const context = canvas.getContext("2d");
   const probe = document.createElement("canvas").getContext("2d", {
     willReadFrequently: true,
   });
-  if (!context || !probe) throw localError("profileEditing.emojiUnavailable");
+  if (!context || !probe)
+    throw new Error("Emoji images are unavailable in this browser.");
   // Measure the artwork once, then paint it at the font size that fits, so
   // even a zoomed emoji is drawn at full resolution.
   const paint = (
@@ -137,28 +128,83 @@ export function paintEmojiAvatar(
   paint(
     context,
     516 * fit,
-    256 - ((left + right + 1) / 2 - 512) * fit,
+    256 + 512 * x - ((left + right + 1) / 2 - 512) * fit,
     256 + 512 * offset - ((top + bottom + 1) / 2 - 512) * fit,
   );
 }
 
-/** Persist ordinary square artwork; Avatar owns human/agent clipping. */
+/** Persist ordinary square artwork; Avatar owns human/agent clipping. A
+ * `transparent` color leaves the background clear. */
 export async function emojiAvatar(
   emoji: string,
   color: string,
   scale = emojiAvatarScale,
   offset = 0,
+  x = 0,
 ): Promise<File> {
-  if (!emoji || emoji.length > 64 || !/^#[0-9a-f]{6}$/i.test(color))
-    throw localError("profileEditing.chooseEmojiColor");
+  if (
+    !emoji ||
+    emoji.length > 64 ||
+    (color !== "transparent" && !/^#[0-9a-f]{6}$/i.test(color))
+  )
+    throw new Error("Choose an emoji and a background color.");
   const canvas = document.createElement("canvas");
-  paintEmojiAvatar(canvas, emoji, color, scale, offset);
+  paintEmojiAvatar(canvas, emoji, color, scale, offset, x);
   const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob(
       (value) =>
         value
           ? resolve(value)
-          : reject(localError("profileEditing.emojiPrepareFailed")),
+          : reject(new Error("Could not prepare the emoji image.")),
+      "image/png",
+    ),
+  );
+  return new File([blob], "avatar.png", { type: "image/png" });
+}
+
+/** Pan and zoom over a square frame. `x` and `y` move the image center, in
+ * frame widths; `zoom` 1 covers the frame, as an uncropped avatar does. */
+export type AvatarCrop = { zoom: number; x: number; y: number };
+
+export const uncropped: AvatarCrop = { zoom: 1, x: 0, y: 0 };
+
+/** The image's box in frame widths, keeping the frame covered. `aspect` is
+ * the image's width over its height. */
+export function avatarCropBox(aspect: number, { zoom, x, y }: AvatarCrop) {
+  const width = zoom * Math.max(1, aspect);
+  const height = zoom * Math.max(1, 1 / aspect);
+  const clamp = (value: number, size: number) =>
+    Math.min((size - 1) / 2, Math.max((1 - size) / 2, value));
+  const crop = { zoom, x: clamp(x, width), y: clamp(y, height) };
+  return {
+    crop,
+    width,
+    height,
+    left: (1 - width) / 2 + crop.x,
+    top: (1 - height) / 2 + crop.y,
+  };
+}
+
+/** Paint the framed part of an image as square PNG artwork. */
+export async function croppedAvatar(
+  image: HTMLImageElement,
+  crop: AvatarCrop,
+): Promise<File> {
+  const { width, height, left, top } = avatarCropBox(
+    image.naturalWidth / image.naturalHeight,
+    crop,
+  );
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 512;
+  const context = canvas.getContext("2d");
+  if (!context)
+    throw new Error("Image cropping is unavailable in this browser.");
+  context.imageSmoothingQuality = "high";
+  context.drawImage(image, left * 512, top * 512, width * 512, height * 512);
+  const blob = await new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob(
+      (value) =>
+        value ? resolve(value) : reject(new Error("Could not crop the image.")),
       "image/png",
     ),
   );

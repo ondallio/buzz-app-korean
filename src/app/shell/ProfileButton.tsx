@@ -1,4 +1,3 @@
-import { t, useLanguage } from "../../shared/i18n";
 import { PluginUpdatesMenu } from "../PluginUpdates";
 import { formatPublicKey } from "../../shared/identity/public-key";
 import { usePresenceStatus } from "../../features/presence/react";
@@ -66,12 +65,12 @@ import {
 const noSubscription = () => () => {};
 // The parent row retains the icon for the saved appearance preference.
 const colorModes = {
-  light: { labelKey: "shell.profile.light", Icon: SunIcon },
-  dark: { labelKey: "shell.profile.dark", Icon: MoonIcon },
-  system: { labelKey: "shell.profile.system", Icon: MonitorIcon },
+  light: { label: "Light", Icon: SunIcon },
+  dark: { label: "Dark", Icon: MoonIcon },
+  system: { label: "System", Icon: MonitorIcon },
 } as const satisfies Record<
   ColorModePreference,
-  { labelKey: string; Icon: typeof SunIcon }
+  { label: string; Icon: typeof SunIcon }
 >;
 
 export function ProfileButton({
@@ -90,7 +89,6 @@ export function ProfileButton({
   /** Opens Settings, optionally at one of its own sections. */
   onSettings(section?: "profile" | "plugins"): void;
 }) {
-  useLanguage();
   const {
     profile: localProfile,
     viewer,
@@ -112,13 +110,15 @@ export function ProfileButton({
     selected && connection.viewer === viewer ? session?.presence : undefined,
     viewer ?? undefined,
   );
-  const presenceLabels = {
-    online: "shell.profile.online",
-    away: "shell.profile.away",
-    offline: "shell.profile.offline",
-    unknown: "shell.profile.unknown",
-  } as const;
-  const label = t(presenceLabels[observed]);
+  const label = {
+    online: "Online",
+    away: "Away",
+    offline: "Offline",
+    unknown: "Availability unknown",
+  }[observed];
+  // The unknown label already names the control.
+  const availabilityName =
+    observed === "unknown" ? label : `Availability: ${label}`;
   const [statusChange, setStatusChange] = useState<{
     target: "online" | "away" | "offline";
     session: typeof session;
@@ -132,14 +132,6 @@ export function ProfileButton({
     statusChange?.community === selected
       ? statusChange
       : undefined;
-  const targetLabels = {
-    online: "shell.profile.targetOnline",
-    away: "shell.profile.targetAway",
-    offline: "shell.profile.targetOffline",
-  } as const;
-  const targetLabel = currentChange
-    ? t(targetLabels[currentChange.target])
-    : "";
   const pending =
     currentChange && !currentChange.failed && observed !== currentChange.target;
   useEffect(() => {
@@ -231,7 +223,7 @@ export function ProfileButton({
   const name =
     displayName ||
     (viewer ? formatPublicKey(viewer) : undefined) ||
-    t("shell.profile.label");
+    "Your profile";
   const source = avatarSource(profile?.picture);
   const picture = selected ? avatarMedia(source, session?.media) : source;
   const status = useUserStatus(session?.statuses, viewer ?? "");
@@ -314,7 +306,7 @@ export function ProfileButton({
           render={
             <IconButton
               type="button"
-              aria-label={t("shell.profile.label")}
+              aria-label="Your profile"
               ref={profileTrigger}
               title={name}
               variant="avatar"
@@ -326,9 +318,9 @@ export function ProfileButton({
                   aria-label={
                     viewer
                       ? observed === "unknown"
-                        ? t("shell.profile.statusUnavailable")
-                        : t("shell.profile.status", { status: label })
-                      : t("shell.profile.avatar")
+                        ? "Your availability is unknown"
+                        : `Your status: ${label}`
+                      : "Your avatar"
                   }
                 >
                   {avatar}
@@ -360,7 +352,7 @@ export function ProfileButton({
                 render={
                   <IconButton
                     type="button"
-                    aria-label={t("shell.profile.edit", { name })}
+                    aria-label={`${name}, edit profile`}
                     variant="avatar"
                     shape="round"
                     icon={avatar}
@@ -374,16 +366,7 @@ export function ProfileButton({
                 <MenuRoot modal={false}>
                   <span className={styles.availability} data-status={observed}>
                     <MenuTrigger
-                      aria-label={
-                        pending
-                          ? t("shell.profile.availabilityUpdating", {
-                              status: label,
-                              target: targetLabel,
-                            })
-                          : t("shell.profile.availabilityLabel", {
-                              status: label,
-                            })
-                      }
+                      aria-label={`${availabilityName}${pending ? `, updating to ${currentChange.target}` : ""}`}
                       render={
                         <Button variant="subtle" size="xs">
                           {pending && (
@@ -396,9 +379,7 @@ export function ProfileButton({
                           {label}
                           {pending && (
                             <span role="status" className="sr-only">
-                              {t("shell.profile.updating", {
-                                target: targetLabel,
-                              })}
+                              Updating to {currentChange?.target}…
                             </span>
                           )}
                         </Button>
@@ -423,13 +404,13 @@ export function ProfileButton({
                         });
                         communities.presence.setPreference(value);
                       }}
-                      aria-label={t("shell.profile.availability")}
+                      aria-label="Availability"
                     >
                       {(
                         [
-                          ["online", "shell.profile.online"],
-                          ["away", "shell.profile.away"],
-                          ["offline", "shell.profile.offline"],
+                          ["online", "Online"],
+                          ["away", "Away"],
+                          ["offline", "Offline"],
                         ] as const
                       ).map(([value, name]) => (
                         <MenuRadioItem
@@ -437,7 +418,7 @@ export function ProfileButton({
                           value={value}
                           closeOnClick={false}
                         >
-                          {t(name)}
+                          {name}
                         </MenuRadioItem>
                       ))}
                     </MenuRadioGroup>
@@ -451,7 +432,7 @@ export function ProfileButton({
               role="alert"
               className="mx-3 my-2 max-w-56 text-body-sm text-danger"
             >
-              {t("shell.profile.confirmFailed")}
+              Could not confirm your availability. Try again.
             </p>
           )}
           {presence.error && (
@@ -467,12 +448,8 @@ export function ProfileButton({
               <MenuItem
                 aria-label={
                   status
-                    ? t("shell.profile.setStatusLabel", {
-                        status: [status.emoji, status.text]
-                          .filter(Boolean)
-                          .join(" "),
-                      })
-                    : t("shell.profile.setStatus")
+                    ? `Set a status: ${[status.emoji, status.text].filter(Boolean).join(" ")}`
+                    : "Set a status"
                 }
                 aria-describedby={
                   !session.statuses.writable ? statusUnavailable : undefined
@@ -503,7 +480,7 @@ export function ProfileButton({
                     <MenuIcon>
                       <SmileyIcon size={16} aria-hidden="true" />
                     </MenuIcon>
-                    {t("shell.profile.setStatus")}
+                    Set a status
                   </>
                 )}
               </MenuItem>
@@ -514,7 +491,7 @@ export function ProfileButton({
               id={statusUnavailable}
               className="mx-3 my-2 max-w-56 text-body-sm text-muted"
             >
-              {t("shell.profile.updatesUnavailable")}
+              Status updates are unavailable in this community.
             </p>
           )}
           <MenuSeparator />
@@ -523,10 +500,10 @@ export function ProfileButton({
               <MenuIcon>
                 <ColorModeIcon size={16} aria-hidden="true" />
               </MenuIcon>
-              {t("shell.profile.appearance")}
+              Appearance
             </MenuSubmenuTrigger>
             <MenuSubmenuPopup
-              aria-label={t("shell.profile.appearance")}
+              aria-label="Appearance"
               finalFocus={appearanceTrigger}
             >
               <MenuRadioGroup
@@ -541,7 +518,7 @@ export function ProfileButton({
                 }}
               >
                 {(["light", "dark", "system"] as const).map((value) => {
-                  const { labelKey, Icon } = colorModes[value];
+                  const { label, Icon } = colorModes[value];
                   return (
                     <MenuRadioItem
                       key={value}
@@ -551,7 +528,7 @@ export function ProfileButton({
                       <MenuIcon>
                         <Icon size={16} aria-hidden="true" />
                       </MenuIcon>
-                      {t(labelKey)}
+                      {label}
                     </MenuRadioItem>
                   );
                 })}
@@ -581,7 +558,7 @@ export function ProfileButton({
             <MenuIcon>
               <GearIcon aria-hidden="true" size={16} />
             </MenuIcon>
-            {t("shell.profile.settings")}
+            Settings
             {settingsSelected && (
               <MenuTrailing>
                 <CheckIcon aria-hidden="true" size={14} />

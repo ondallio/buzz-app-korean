@@ -1,4 +1,4 @@
-import { t } from "../../shared/i18n";
+import { plainText } from "../../features/notifications/content";
 import { workflowOwner } from "../../features/relay/workflow-attribution";
 import {
   useCallback,
@@ -46,7 +46,26 @@ export type SearchMessage = Readonly<{
   workflowOwnerId?: string | undefined;
   createdAt: number;
   preview: string;
+  /** The searchable text, whitespace kept, for snippets and previews. */
+  text: string;
 }>;
+
+/** Message kinds search returns: chat, agent and diff messages. Ranked
+ * search resolves hit channels only for these (see the relay session). */
+export const SEARCH_KINDS = [9, 40002, 40008];
+
+/** An indexed event's readable text. */
+export function eventText(event: { kind: number; content: string }) {
+  if (event.kind !== 40002) return event.content;
+  const body = objectBody(event.content);
+  return typeof body?.content === "string" ? body.content : "Agent message";
+}
+
+/** An indexed event's text as it reads, without Markdown syntax and with
+ * spoilers hidden, for snippets and previews. */
+export function searchText(event: { kind: number; content: string }) {
+  return plainText(eventText(event), { limit: 4000 });
+}
 type Result = {
   owner: object;
   messages: readonly SearchMessage[];
@@ -85,7 +104,7 @@ async function readPage(
     const hitChannelId = destinations[0]?.[1];
     const hitChannel = hitChannelId && session.channels.get?.(hitChannelId);
     if (
-      ![9, 40002, 40008].includes(event.kind) ||
+      !SEARCH_KINDS.includes(event.kind) ||
       destinations.length !== 1 ||
       !hitChannelId ||
       (channelId && hitChannelId !== channelId) ||
@@ -95,13 +114,7 @@ async function readPage(
       return [];
     // Search returns original indexed events, not an auxiliary edit fold.
     // Exact navigation owns current content/deletion checks when opened.
-    const body = event.kind === 40002 ? objectBody(event.content) : undefined;
-    const text =
-      event.kind === 40002
-        ? typeof body?.content === "string"
-          ? body.content
-          : "Agent message"
-        : event.content;
+    const text = searchText(event);
     return [
       {
         id: event.id,
@@ -110,6 +123,7 @@ async function readPage(
         workflowOwnerId: workflowOwner(event, session.workflowAuthority),
         createdAt: event.created_at,
         preview: text.replace(/\s+/g, " ").trim().slice(0, 240) || "Attachment",
+        text,
       },
     ];
   });
@@ -450,7 +464,7 @@ export function useSearchMessages(
           }
         }
         const filter: ReadFilter = {
-          kinds: [9, 40002, 40008],
+          kinds: SEARCH_KINDS,
           ...(parsed.text
             ? {
                 search: parsed.text,
@@ -492,19 +506,7 @@ export function useSearchMessages(
             replace({
               owner,
               messages: [],
-              error:
-                error instanceof Error && error.message
-                  ? t(
-                      scopedChannelId
-                        ? "v1shell.search.messagesFailedDetailScoped"
-                        : "v1shell.search.messagesFailedDetail",
-                      { error: error.message.slice(0, 240) },
-                    )
-                  : t(
-                      scopedChannelId
-                        ? "v1shell.search.messagesFailedScoped"
-                        : "v1shell.search.messagesFailed",
-                    ),
+              error: `Message search couldn’t finish${error instanceof Error && error.message ? `: ${error.message.slice(0, 240)}` : "."}${scopedChannelId ? " Try again." : " Pages and conversations are still available."}`,
             });
         });
     });
@@ -552,12 +554,7 @@ export function useSearchMessages(
         const { loadingMore: _, ...rest } = previous;
         replace({
           ...rest,
-          moreError:
-            error instanceof Error && error.message
-              ? t("v1shell.search.moreFailedDetail", {
-                  error: error.message.slice(0, 240),
-                })
-              : t("v1shell.search.moreFailed"),
+          moreError: `More messages couldn’t load${error instanceof Error && error.message ? `: ${error.message.slice(0, 240)}` : "."}`,
         });
       });
   }, [owner, replace, session, channelId, newestFirst]);

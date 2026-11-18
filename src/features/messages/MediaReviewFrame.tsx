@@ -8,6 +8,7 @@ import {
 import { IconButton } from "../../shared/design-system/ui/IconButton";
 import { XIcon } from "../../shared/design-system/icons";
 import { useModalBoundary } from "./useModalBoundary";
+import { MediaActionAnnouncements } from "./MediaActionAnnouncements";
 import {
   type readReviewOrigin,
   useReviewEntrance,
@@ -170,7 +171,7 @@ export function MediaReviewFrame({
           data-color-mode="dark"
           data-review-stage=""
         >
-          {children}
+          <MediaActionAnnouncements>{children}</MediaActionAnnouncements>
         </div>
         {sidebar}
       </section>

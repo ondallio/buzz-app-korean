@@ -1,7 +1,11 @@
-import { t, translate, useLanguage } from "../../shared/i18n";
 import { ActivityNavigationProvider } from "./ActivityNavigation";
 import { PageNavigation } from "./PageNavigation";
-import { navigationOwner, orderPages, pagePlacement } from "./presentation";
+import {
+  navigationOwner,
+  orderPages,
+  pagePlacement,
+  legacySidebarAvailable,
+} from "./presentation";
 import {
   useCallback,
   useEffect,
@@ -22,9 +26,10 @@ import type { SettingsCards } from "../../features/settings/service";
 import type { RegisteredPage } from "../../features/pages/service";
 import type { AccountActionsService } from "../../features/account-actions/service";
 import type { Communities } from "../../features/communities/service";
+import type { CommunityUnreads } from "../../features/notifications/community-unread";
 import type { FederatedIdentity } from "../../features/federated-identity/service";
-import { ResizableSidebar } from "../../features/channel-navigation/ResizableSidebar";
 import type { JoinRequest } from "../../features/communities/invite-intent";
+import type { JoinReports } from "../../features/communities/CommunityDialog";
 import type { OpenTarget } from "../../features/navigation/targets";
 import {
   CommunityPicker,
@@ -71,8 +76,13 @@ function AppShellContent({
   workspace,
   workspaceRef,
   sidebar,
+  sidebarAvailable,
   communities,
+  communityUnreads,
   invite,
+  joinVisit,
+  onJoin,
+  joinReports,
   onInviteClose,
   settingsCards,
   federatedIdentity,
@@ -102,9 +112,16 @@ function AppShellContent({
   /** Centered modal frame below window chrome. */
   workspaceRef?: Ref<HTMLDivElement>;
   sidebar?: (pages: ReactNode, creationAction: ReactNode) => ReactNode;
+  sidebarAvailable?: boolean;
   communities: Communities;
-  invite?: (JoinRequest & { requestId: number }) | undefined;
-  onInviteClose?: ((requestId: number) => void) | undefined;
+  /** Unread for communities other than the selected one, on the switcher. */
+  communityUnreads?: CommunityUnreads | undefined;
+  invite?: (JoinRequest & { requestId: string }) | undefined;
+  joinVisit?: string | undefined;
+  onJoin?: (() => void) | undefined;
+  /** The open join dialog's reports to the app: writes and the typed address. */
+  joinReports?: JoinReports | undefined;
+  onInviteClose?: ((requestId: string) => void) | undefined;
   settingsCards?: SettingsCards | undefined;
   federatedIdentity?: FederatedIdentity | undefined;
   accountActions: AccountActionsService;
@@ -128,7 +145,6 @@ function AppShellContent({
   creationInSidebar?: boolean;
   children: ReactNode;
 }) {
-  const language = useLanguage();
   const header = useRef<HTMLElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -184,12 +200,9 @@ function AppShellContent({
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const openSwitcher = useCallback(() => setSwitcherOpen(true), []);
   const connection = useRelayConnection(communities.relay);
-  const sidebarScope = connection.scope ?? "disconnected";
   const owner = navigationOwner(pages, selected);
-  const channelsNavigation = owner === "buzz.channels/channels";
   const hasNavigation =
-    channelsNavigation ||
-    pages.some((page) => page.key === selected && !!page.sidebar);
+    sidebarAvailable ?? legacySidebarAvailable(pages, selected);
   const [narrow, setNarrow] = useState(
     () => window.matchMedia("(max-width: 650px)").matches,
   );
@@ -201,7 +214,7 @@ function AppShellContent({
     return () => query.removeEventListener("change", update);
   }, []);
   const collapsibleSidebar =
-    channelsNavigation ||
+    hasNavigation ||
     selected === "settings" ||
     pages.some(
       (page) => page.key === selected && (page.primary || !!page.sidebar),
@@ -235,12 +248,10 @@ function AppShellContent({
     [searchServices, creationAction, creationContainer, hasNavigation],
   );
   const toggleLabel = narrow
-    ? t(
-        navigationOpen
-          ? "navigation.hideNavigation"
-          : "navigation.showNavigation",
-      )
-    : t(sidebarOpen ? "navigation.hideSidebar" : "navigation.showSidebar");
+    ? navigationOpen
+      ? "Hide navigation"
+      : "Show navigation"
+    : `${sidebarOpen ? "Hide" : "Show"} sidebar`;
   // biome-ignore lint/correctness/useExhaustiveDependencies: Only a navigation attempt closes the drawer.
   useEffect(() => {
     if (navigationOpen && navigationToggle.current?.getClientRects().length) {
@@ -252,16 +263,10 @@ function AppShellContent({
   // navigation element stable across those renders so React skips the whole
   // sidebar subtree instead of re-rendering every row on each click.
   const navigation = useMemo(() => {
-    const selectedPageHasSidebar = pages.some(
-      (page) => page.key === selected && !!page.sidebar,
-    );
     // Sidebars retain their documented app-link and creation slots.
     const content = sidebar
       ? sidebar(
-          <nav
-            aria-label={translate(language, "navigation.pages")}
-            className="shell-pages"
-          >
+          <nav aria-label="Pages" className="shell-pages">
             <PageNavigation
               pages={orderPages(
                 pages.filter((page) => pagePlacement(page) === "sidebar"),
@@ -274,22 +279,8 @@ function AppShellContent({
           creationInNavigation ? <div ref={setCreationContainer} /> : null,
         )
       : null;
-    return selectedPageHasSidebar ? (
-      <ResizableSidebar scope={sidebarScope} className="shell-sidebar">
-        {content}
-      </ResizableSidebar>
-    ) : (
-      content
-    );
-  }, [
-    pages,
-    selected,
-    sidebar,
-    sidebarScope,
-    onSelect,
-    creationInNavigation,
-    language,
-  ]);
+    return content;
+  }, [pages, selected, sidebar, onSelect, creationInNavigation]);
   const dockPages = orderPages(
     pages.filter((page) => page.primary && pagePlacement(page) !== "sidebar"),
     "dock",
@@ -311,7 +302,7 @@ function AppShellContent({
         }}
         className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:rounded-lg focus:bg-surface focus:p-3"
       >
-        {t("v1shell.skipToContent")}
+        Skip to content
       </a>
       <header
         ref={header}
@@ -374,7 +365,7 @@ function AppShellContent({
       </header>
 
       <div className="shell-workspace">
-        <nav className="shell-side-dock" aria-label={t("navigation.dock")}>
+        <nav className="shell-side-dock" aria-label="Apps dock">
           <div className="shell-dock-pages">
             <PageNavigation
               pages={dockPages}
@@ -388,7 +379,11 @@ function AppShellContent({
           <div className="shell-community-switcher">
             <CommunityPicker
               communities={communities}
+              unreads={communityUnreads}
               invite={invite}
+              joinVisit={joinVisit}
+              onJoin={onJoin}
+              joinReports={joinReports}
               onInviteClose={onInviteClose}
               settingsCards={settingsCards}
               federatedIdentity={federatedIdentity}

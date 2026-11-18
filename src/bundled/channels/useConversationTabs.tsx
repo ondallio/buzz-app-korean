@@ -20,11 +20,11 @@ import {
   type Panels,
 } from "../../features/panels/service";
 import { useTabDrag } from "../../features/panels/useTabDrag";
-import { PanelCard } from "../../features/panels/PanelCard";
+import { PanelMediaCard } from "./PanelMediaCard";
 import type { MessageLinkOrigin } from "../../features/messages/MessageRow";
 import {
   BrowserIcon,
-  MessageReplyIcon,
+  ThreadIcon,
   InfoIcon,
 } from "../../shared/design-system/icons";
 import { parseBuzzLink } from "../../features/navigation/buzz-links";
@@ -672,6 +672,7 @@ export function useConversationTabs({
     messageId: string,
     rootId: string,
     intent?: "reply" | "reveal" | "focus",
+    unreadSince?: number,
   ) => {
     if (!currentVisit()) return;
     // Flat sessions keep their side-only host; channels support both panes.
@@ -681,6 +682,7 @@ export function useConversationTabs({
       rootId,
       intent,
       threadPane ?? (mainPane ? undefined : "side"),
+      unreadSince,
     );
     if (
       opening.current &&
@@ -866,7 +868,7 @@ export function useConversationTabs({
           : (target?.name ?? t("v1shell.tabs.unavailableName")),
       icon:
         tab.kind === "thread" ? (
-          <MessageReplyIcon size="1rem" />
+          <ThreadIcon size="1rem" />
         ) : target ? (
           conversationIcon(target)
         ) : (
@@ -928,7 +930,11 @@ export function useConversationTabs({
       instance: entry,
       label: entry.panel.title,
       ...(entry.channelContext && {
-        icon: <InfoIcon size="1rem" />,
+        icon: entry.panel.tabIcon ? (
+          <entry.panel.tabIcon />
+        ) : (
+          <InfoIcon size="1rem" />
+        ),
       }),
       close: () => closeTab(entry),
       // Panel tabs cross panes at the edge between them, never reorder.
@@ -940,7 +946,17 @@ export function useConversationTabs({
       }),
       content:
         !entry.panel.deferUntilShown || visitTab.shown.has(id) ? (
-          <PanelCard
+          <PanelMediaCard
+            session={queries}
+            scope={scope}
+            channelId={entry.channelId}
+            channelName={
+              entry.channelContext?.channelName ?? current?.name ?? ""
+            }
+            extensions={extensions}
+            isActive={() =>
+              panelActive(entry) && (inMain(entry) || tabState.paneOpen)
+            }
             panel={entry.panel}
             contentKey={panelContentTarget(entry)}
             target={entry.target}

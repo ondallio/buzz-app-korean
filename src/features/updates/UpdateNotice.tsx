@@ -1,12 +1,10 @@
-import { t, useLanguage } from "../../shared/i18n";
 import { useSyncExternalStore } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 import { ToastNotice } from "../../shared/design-system/ui/Toast";
 import type { Updates } from "./updates";
 
-/** Offers restart once a downloaded update is ready, except while Settings shows it inline; dismissal lasts until it resolves. */
+/** Reports a failed install and its retry outside Settings; the top-bar action offers ready updates. */
 export function UpdateNotice({ updates }: { updates: Updates }) {
-  useLanguage();
   const status = useSyncExternalStore(
     updates.subscribe,
     updates.snapshot,
@@ -17,65 +15,42 @@ export function UpdateNotice({ updates }: { updates: Updates }) {
     updates.inlineVisible,
     updates.inlineVisible,
   );
-  const dismissed = useSyncExternalStore(
-    updates.subscribe,
-    updates.noticeDismissed,
-    updates.noticeDismissed,
-  );
   const recovery = useSyncExternalStore(
     updates.subscribe,
     updates.noticeRecovery,
     updates.noticeRecovery,
   );
+  if (!recovery || inline) return null;
   const { state } = status;
-  const visible = state === "ready" || state === "installing" || recovery;
-  if (!visible || dismissed || inline) return null;
-  const pending = [
-    "checking",
-    "available",
-    "downloading",
-    "installing",
-  ].includes(state);
   const descriptions = {
-    idle: t("settingsHost.clickUpdate"),
-    ready: t("settingsHost.clickUpdate"),
-    installing: t("settingsHost.updating"),
-    checking: t("settingsHost.noticeChecking"),
-    available: t("settingsHost.noticePreparing"),
-    downloading: t("settingsHost.noticeDownloading"),
-    "up-to-date": t("settingsHost.updateLatest"),
-    unavailable: t("settingsHost.updateUnavailable"),
+    idle: "",
+    ready: "",
+    installing: "",
+    checking: "Checking for updates...",
+    available: "Preparing update...",
+    downloading: "Downloading update...",
+    "up-to-date": "You're on the latest version.",
+    unavailable:
+      "Automatic updates aren't available on this build. Download the latest release manually.",
     error: "",
   };
   return (
     <ToastNotice
-      title={
-        state === "error"
-          ? t("settingsHost.updateFailed")
-          : recovery
-            ? t("settingsHost.updatesRecoveryTitle")
-            : t("settingsHost.readyToUpdate")
-      }
+      title={state === "error" ? "Update failed" : "Software Updates"}
       description={
         status.state === "error" ? status.message : descriptions[state]
       }
       tone={state === "error" ? "error" : "info"}
       onDismiss={updates.dismissNotice}
-      closeLabel={t("settingsHost.dismissUpdate")}
+      closeLabel="Dismiss update notification"
     >
       <Button
         type="button"
         size="sm"
-        loading={pending}
-        onClick={() =>
-          void (state === "ready"
-            ? updates.installAndRelaunch()
-            : updates.checkForUpdate())
-        }
+        loading={["checking", "available", "downloading"].includes(state)}
+        onClick={() => void updates.checkForUpdate()}
       >
-        {state === "ready" || state === "installing"
-          ? t("settingsHost.updateNow")
-          : t("settingsHost.retry")}
+        Retry
       </Button>
     </ToastNotice>
   );

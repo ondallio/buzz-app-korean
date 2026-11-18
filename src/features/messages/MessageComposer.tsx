@@ -1,13 +1,8 @@
+import { createPortal } from "react-dom";
+import { ForwardDisclosure } from "./ForwardDisclosure";
+import { pastedForward } from "./forward-clipboard";
+import { ComposerForward, useComposerForward } from "./ComposerForward";
 import { draftEditorId, traceDraft } from "../../shared/draft-diagnostics";
-import { TranslatedMessage } from "../../shared/i18n/Message";
-import {
-  localMessage,
-  localError,
-  errorMessage,
-  resolveMessage,
-  type DisplayMessage,
-} from "../../shared/i18n/deferred-message";
-import { t, useLanguage } from "../../shared/i18n";
 import {
   soloModelPicksKey,
   parseSoloModelPicks,
@@ -46,7 +41,10 @@ import {
 import { DraftMentionRoster } from "./draft-mention-roster";
 import {
   allowsOutsideMentions,
+  outsideMentionReferences,
+  pickedAgents,
   mentionAdmission,
+  mentionChannel,
   pastedMentionRecipient,
 } from "./mention-admission";
 import { rememberMention } from "./mention-history";
@@ -257,7 +255,11 @@ function notifyRecovered(
     listener(recovered);
 }
 function errorForRecovery(reason: unknown) {
-  return reason !== undefined ? errorMessage(reason) : undefined;
+  return reason instanceof Error
+    ? reason.message
+    : reason !== undefined
+      ? String(reason)
+      : undefined;
 }
 /** What `MentionRecipient` promises, checked where one arrives from a
  * contribution: a 64-hex pubkey and a non-empty name. */
@@ -275,10 +277,10 @@ function wellFormedRecipient(
 }
 /** Why a pending mention returned to prose, as the send it held tells it. */
 const pendingRefusals = {
-  unresolved: "messages.composer.mentionUnresolved",
-  unavailable: "messages.composer.mentionUnavailable",
-  limit: "messages.composer.mentionLimit",
-  length: "messages.composer.mentionLength",
+  unresolved: "could not be confirmed as one person or agent",
+  unavailable: "could not be tagged here",
+  limit: "could not be tagged: a message can tag at most 32 recipients",
+  length: "could not be tagged: the message would be too long",
 } as const;
 type PendingRefusal = { name: string; reason: keyof typeof pendingRefusals };
 function subscribeRecovery(
@@ -317,9 +319,8 @@ export type MessageComposerProps = {
   session: ComposerSession | RelaySession;
   channelId: string;
   channelName: string;
+  forwardAudience?: string;
   label?: string | undefined;
-  /** Names the new-message form without changing canonical channel metadata. */
-  formLabel?: string | undefined;
   placeholder?: string | undefined;
   soloConversation?: boolean | undefined;
   ownSoloConversation?: boolean | undefined;
@@ -503,7 +504,8 @@ function untouchedDraft(draft: MentionDraft) {
     !draft.text &&
     !draft.recipients.length &&
     !draft.chatCards?.length &&
-    !draft.gifs?.length
+    !draft.gifs?.length &&
+    !draft.forward
   );
 }
 
@@ -530,8 +532,8 @@ function Composer({
   scope,
   channelId,
   channelName,
+  forwardAudience,
   label: customLabel,
-  formLabel,
   placeholder,
   onSend,
   onCommand,
@@ -562,7 +564,6 @@ function Composer({
   trailingTool,
   workspace,
 }: MessageComposerProps) {
-  const language = useLanguage();
   const active = useConversationPresentation();
   // Previews replace the list on every message; subscribe to this channel's facts.
   const listed =
@@ -592,6 +593,7 @@ function Composer({
     [replyParentId, mediaTargetUrl],
   );
   const inputId = useId();
+  const forwardDisclosureId = useId();
   const draftKey =
     submission?.draftKey ??
     (threadRootId
@@ -742,6 +744,12 @@ function Composer({
     return caption;
   }, [value]);
   const draft = value.text;
+  const forwarded = useComposerForward(
+    session,
+    value.forward,
+    channelId,
+    draft,
+  );
   const recipientKey = JSON.stringify(
     value.recipients.map(({ pubkey, name }) => ({ pubkey, name })),
   );
@@ -975,11 +983,14 @@ function Composer({
           ]),
         ]
       : pubkeys;
-  // Read at send time: inline mentions win, else the toolbar's agents.
-  const sendRecipients = () =>
-    routing && !valueRef.current.recipients.length
-      ? routed
-      : valueRef.current.recipients;
+  // Read at send time: inline mentions win, else the toolbar's agents. A
+  // reference addresses nobody, so it goes along with the toolbar's agents.
+  const sendRecipients = () => {
+    const typed = valueRef.current.recipients;
+    return routing && typed.every((person) => referenced(person.pubkey))
+      ? [...routed, ...typed]
+      : typed;
+  };
   const compactingNow = (
     recipients = sendRecipients().map((item) => item.pubkey),
   ) =>
@@ -1121,6 +1132,16 @@ function Composer({
               chatCards: next.chatCards ?? valueRef.current.chatCards ?? [],
             }
           : {}),
+        ...((next.forward !== undefined
+          ? next.forward
+          : valueRef.current.forward) !== undefined
+          ? {
+              forward:
+                next.forward !== undefined
+                  ? next.forward
+                  : valueRef.current.forward,
+            }
+          : {}),
         ...((next.gifs ?? valueRef.current.gifs)
           ? { gifs: next.gifs ?? valueRef.current.gifs ?? [] }
           : {}),
@@ -1165,18 +1186,13 @@ function Composer({
     setStorageFailed(result === "failed");
     return result;
   }
-  const [error, setError] = useState<DisplayMessage | DisplayMessage[]>();
+  const [error, setError] = useState<string>();
   const [pasteTooLong, setPasteTooLong] = useState(false);
   const [attachmentError, setAttachmentError] =
-    useState<
-      Readonly<{ title: DisplayMessage; description: DisplayMessage }>
-    >();
+    useState<Readonly<{ title: string; description: string }>>();
   /** Nothing was attached, for this one reason. */
-  const refuseAttachment = (description: DisplayMessage) =>
-    setAttachmentError({
-      title: localMessage("messages.composer.attachFailed"),
-      description,
-    });
+  const refuseAttachment = (description: string) =>
+    setAttachmentError({ title: "Could not attach file", description });
   const focusRestoredDraft = useRef(false);
   const beforeEdit = useRef<
     { value: MentionDraft; restore(): void } | undefined
@@ -1212,9 +1228,28 @@ function Composer({
   // A member not yet known to be an agent (say, an unloaded profile) is a
   // person: routing stays off and mentions in the text decide.
   const routing = solo && !withPeople && agentsOnly && !editing.target;
+  /** A Solo chat only references a person outside it: that tag notifies
+   * nobody, so it neither replaces the toolbar's agents nor joins them. Until
+   * the session has read all its agents, an outside name may be the viewer's
+   * agent, so it is named, not a reference: the send reads again. */
+  function referenced(pubkey: string) {
+    if (!solo) return false;
+    const chat = mentionChannel(session, channelId);
+    const agents = pickedAgents(session.agentChoices);
+    return (
+      !!agents &&
+      !chat?.members?.includes(pubkey) &&
+      outsideMentionReferences(chat, agents, pubkey)
+    );
+  }
+  // Whether the text's tags name anyone is settled once agents are known.
+  const tagsSettled = !solo || !!pickedAgents(session.agentChoices);
+  const named = routing
+    ? recipients.filter((person) => !referenced(person.pubkey))
+    : recipients;
   /** Who hears this message: inline mentions win; without any, the toolbar's
    * agents stand in. */
-  const addressed = routing && !recipients.length ? routed : recipients;
+  const addressed = routing && !named.length ? routed : named;
   // The agents a send addresses: model, effort and session controls are
   // offered for each, so a one-to-one DM with an agent always has them.
   const addressedKeys = sessionTargets(addressed.map((item) => item.pubkey));
@@ -1236,22 +1271,30 @@ function Composer({
   const audience = routing
     ? {
         recipients: addressed,
-        named: recipients.length > 0,
+        named: named.length > 0,
         only(people: readonly MentionRecipient[]) {
           if (!people.length) return;
           const team = people.map(({ pubkey, name }) => ({ pubkey, name }));
           // While tags in the text decide, a team replaces those tags, as a
           // pick edits them.
-          if (!recipients.length) choose(team);
-          else if (!replaceRecipients(team)) return;
+          if (!named.length) choose(team);
+          else if (
+            !replaceRecipients([
+              ...team,
+              ...recipients.filter((person) => referenced(person.pubkey)),
+            ])
+          )
+            return;
           // Typing resumes in the draft, at its caret.
           input.current?.focus();
         },
         toggle({ pubkey, name }: MentionRecipient) {
+          // The menu offers agents only: a reference never joins the route.
+          if (referenced(pubkey)) return;
           // While tags in the text decide, a pick edits those tags, so it
           // always changes who gets the message. Focus and the caret stay
           // put, and only an added agent must be admissible.
-          if (recipients.length) {
+          if (named.length) {
             if (!recipients.some((person) => person.pubkey === pubkey))
               keepProseCaret(
                 (at) =>
@@ -1270,8 +1313,8 @@ function Composer({
             // An added agent replaces any the message can no longer reach,
             // which the menu cannot uncheck.
             const admitted = admits();
-            const reachable = routed.filter((person) =>
-              admitted(person.pubkey),
+            const reachable = routed.filter(
+              (person) => admitted(person.pubkey) && !referenced(person.pubkey),
             );
             if (reachable.length < 32) choose([...reachable, { pubkey, name }]);
           } else if (routed.length > 1)
@@ -1283,16 +1326,17 @@ function Composer({
   // agents are set aside for good; a draft that already has mentions when the
   // pill takes over (restored, or before its agents were known) starts so.
   useEffect(() => {
+    if (!tagsSettled) return;
     const before = mentionCount.current;
-    mentionCount.current = routing ? recipients.length : 0;
-    if (!routing || !recipients.length || before) return;
+    mentionCount.current = routing ? named.length : 0;
+    if (!routing || !named.length || before) return;
     // The composer's own prefill is withdrawn as the pill takes over, not
     // the viewer's choice.
     if (automaticTag.current === JSON.stringify(valueRef.current)) return;
     setReplacedKey(draftKey);
     setRouted([]);
     writeView(scope, pillKey, null);
-  }, [routing, recipients.length, draftKey, scope, pillKey]);
+  }, [tagsSettled, routing, named.length, draftKey, scope, pillKey]);
   const editLocked = useListedChannel(
     listed,
     channelId,
@@ -1325,12 +1369,10 @@ function Composer({
   const iconPlaceholder =
     channelLabel && placeholder === undefined && ChannelIcon !== ChatCircleIcon;
   const label = channelLabel
-    ? t("messages.composer.message", {
-        channel: `${ChannelIcon === LockIcon ? "" : "#"}${channelName}`,
-      })
+    ? `Message ${ChannelIcon === LockIcon ? "" : "#"}${channelName}`
     : editing.target
-      ? t("messages.composer.edit")
-      : (customLabel ?? t("messages.composer.reply"));
+      ? "Edit message"
+      : (customLabel ?? "Reply to thread");
   const gifPreview = useGifDraftPreview(extensions?.tools);
   const attachments = useAttachmentDraft(
     session,
@@ -1343,6 +1385,17 @@ function Composer({
     { ids: readonly string[]; owner: Element | null } | undefined
   >(undefined);
   const form = useRef<HTMLFormElement>(null);
+  const [announcementHost, setAnnouncementHost] = useState<Element | null>(
+    null,
+  );
+  useLayoutEffect(() => {
+    const node = form.current;
+    if (node)
+      setAnnouncementHost(
+        node.closest('[role="dialog"][aria-modal="true"]') ??
+          node.ownerDocument.body,
+      );
+  }, []);
   // Notices float above the composer, not over Send.
   useToastClearance(form);
   const notify = useToastNotification();
@@ -1354,46 +1407,20 @@ function Composer({
     const copy = async () => {
       try {
         await writeClipboardText(text);
-        notify(
-          <TranslatedMessage
-            value={localMessage("messages.composer.textCopied")}
-          />,
-          "success",
-        );
+        notify("Text copied", "success");
       } catch {
-        notify(
-          <TranslatedMessage
-            value={localMessage("messages.composer.textCopyFailed")}
-          />,
-          "error",
-          {
-            label: <TranslatedMessage value={localMessage("messages.retry")} />,
-            onClick: () => void copy(),
-            timeout: Infinity,
-          },
-        );
+        notify("Couldn’t copy text", "error", {
+          label: "Try again",
+          onClick: () => void copy(),
+          timeout: Infinity,
+        });
       }
     };
-    notify(
-      <TranslatedMessage
-        value={localMessage(
-          solo
-            ? "messages.composer.chatArchived"
-            : "messages.composer.channelArchived",
-          { name: channelName },
-        )}
-      />,
-      "info",
-      {
-        label: (
-          <TranslatedMessage
-            value={localMessage("messages.composer.copyText")}
-          />
-        ),
-        onClick: () => void copy(),
-        timeout: Infinity,
-      },
-    );
+    notify(`${solo ? "Chat" : "Channel"} archived: ${channelName}`, "info", {
+      label: "Copy text",
+      onClick: () => void copy(),
+      timeout: Infinity,
+    });
   });
   useLayoutEffect(() => () => handOffFocus(), []);
   const canAttach = submission
@@ -1454,14 +1481,14 @@ function Composer({
     )
       return;
     if (editing.target) {
-      refuseAttachment(localMessage("messages.composer.finishEditAttach"));
+      refuseAttachment("Finish editing before attaching new files.");
       return;
     }
     if (!canAttach) {
       refuseAttachment(
         submission
-          ? localMessage("messages.composer.createBeforeAttach")
-          : localMessage("messages.composer.uploadUnavailable"),
+          ? "Create this conversation before attaching files."
+          : "Uploads are unavailable on this connection.",
       );
       return;
     }
@@ -1477,13 +1504,8 @@ function Composer({
         left.length
           ? {
               title: added.length
-                ? localMessage("messages.composer.attachSomeFailed", {
-                    refused,
-                    count: files.length,
-                  })
-                : localMessage("messages.composer.attachCountFailed", {
-                    count: refused,
-                  }),
+                ? `Could not attach ${refused} of ${files.length} files`
+                : `Could not attach ${refused} files`,
               description: left.join(" "),
             }
           : undefined,
@@ -1491,9 +1513,7 @@ function Composer({
       return added;
     } catch (reason) {
       refuseAttachment(
-        reason instanceof Error
-          ? errorMessage(reason)
-          : localMessage("messages.composer.attachFilesFailed"),
+        reason instanceof Error ? reason.message : "Could not attach files.",
       );
     }
   }
@@ -1698,11 +1718,11 @@ function Composer({
       return;
     const current = editableRows().find((item) => item.id === row.id);
     if (!current || !lastEditableMessage(session, [current])) {
-      setError(localMessage("messages.composer.editUnavailable"));
+      setError("This message is no longer available to edit.");
       return;
     }
     if (editing.target) {
-      setError(localMessage("messages.composer.finishEdit"));
+      setError("Finish or cancel your current edit first.");
       input.current.focus();
       return;
     }
@@ -1736,7 +1756,7 @@ function Composer({
     )
       return;
     if (editing.target) {
-      setError(localMessage("messages.composer.finishEdit"));
+      setError("Finish or cancel your current edit first.");
       input.current.focus();
       return;
     }
@@ -1746,7 +1766,7 @@ function Composer({
         .snapshot()
         .find((entry) => entry.id === id && entry.channelId === channelId);
       if (!entry?.message)
-        throw localError("messages.composer.queuedEditUnavailable");
+        throw new Error("This queued message is no longer available to edit.");
       const lease = queue.edit(id);
       completion.invalidate();
       beforeEdit.current = {
@@ -1767,7 +1787,7 @@ function Composer({
       caret.current = next.text.length;
       setError(undefined);
     } catch (reason) {
-      setError(errorMessage(reason));
+      setError(reason instanceof Error ? reason.message : String(reason));
     }
   };
   useEffect(() => {
@@ -1809,16 +1829,18 @@ function Composer({
       terminator = undefined;
     }
     if (recipient && !admits()(recipient.pubkey)) {
-      setError(localMessage("messages.composer.recipientUnavailable"));
+      setError(
+        "This recipient is no longer available. Remove it or refresh choices.",
+      );
       return false;
     }
     if (recipient && valueRef.current.recipients.length >= 32) {
-      setError(localMessage("messages.composer.recipientLimit"));
+      setError("Choose at most 32 recipients");
       return false;
     }
     completion.invalidate();
     if (!field.insertText(text, recipient, range, terminator, focus)) {
-      setError(localMessage("messages.composer.insertTooLong"));
+      setError("Message is too long to insert text");
       return false;
     }
     if (recipient) rememberMention(session, channelId, recipient.pubkey);
@@ -1869,14 +1891,12 @@ function Composer({
     const current = valueRef.current.gifs ?? [];
     if (!current.includes(text)) {
       if (current.length >= MAX_DRAFT_GIFS) {
-        setError(
-          localMessage("messages.composer.gifLimit", { count: MAX_DRAFT_GIFS }),
-        );
+        setError(`Attach at most ${MAX_DRAFT_GIFS} GIFs per message.`);
         return false;
       }
       const next = { ...valueRef.current, gifs: [...current, text] };
       if (composerMarkdown(next).length > 16000) {
-        setError(localMessage("messages.composer.gifTooLong"));
+        setError("Message is too long to attach this GIF");
         return false;
       }
       saveDraft(next);
@@ -2129,7 +2149,7 @@ function Composer({
       ...new Map(recipients.map((person) => [person.pubkey, person])).values(),
     ];
     if (unique.length > 32) {
-      setError(localMessage("messages.composer.recipientLimit"));
+      setError("Choose at most 32 recipients");
       return false;
     }
     if (
@@ -2150,7 +2170,9 @@ function Composer({
       );
     const admitted = admits();
     if (unique.some((person) => !admitted(person.pubkey))) {
-      setError(localMessage("messages.composer.teamUnavailable"));
+      setError(
+        "A team member is no longer available. Refresh choices before trying again.",
+      );
       return false;
     }
     const text = unique.map((person) => `@${person.name} `).join("");
@@ -2162,7 +2184,9 @@ function Composer({
           )
         : input.current.insertText(text, unique, range))
     ) {
-      setError(localMessage("messages.composer.teamLimit"));
+      setError(
+        "The team would exceed the message length or 32-recipient limit. Nothing was added.",
+      );
       return false;
     }
     completion.invalidate();
@@ -2219,7 +2243,7 @@ function Composer({
       !outbox?.supports(9) ||
       !input.current?.isConnected
     )
-      return t("messages.composer.editNotReady");
+      return "The message can't be edited right now";
     completion.invalidate();
     return input.current.insertResource(resource);
   }
@@ -2325,12 +2349,18 @@ function Composer({
     )
       return undefined;
     // Once typed mentions replaced the remembered agents, the history is
-    // skipped.
+    // skipped. A reference is never a remembered agent.
+    const admitted = mentionAdmission(
+      session,
+      channelId,
+      agentChoices,
+      mentionRoster,
+    );
     return seedAgents(
       session,
       channelId,
       replaced ? [] : (history?.rows ?? []),
-      mentionAdmission(session, channelId, agentChoices, mentionRoster),
+      (key) => admitted(key) && !referenced(key),
       session.agentChoices
         .snapshot()
         .selectable.some((choice) => choice.pubkey === chosenAgent)
@@ -2394,7 +2424,7 @@ function Composer({
     // Alone with agents, the agent joins the toolbar, never the text. An empty
     // pill is always refilled, even after a send, so removed mentions fall back.
     if (routing) {
-      if (routed.length || recipients.length) return;
+      if (routed.length || named.length) return;
       // A saved pick is restored whole, however discovery stands; the send
       // checks each agent and asks the viewer about any it can't reach.
       const chosen = readView<unknown>(scope, pillKey, null);
@@ -2534,10 +2564,10 @@ function Composer({
   // Alone in a Solo chat, a send addresses agents; with people it is a conversation.
   const needsRecipient = (requireMention || solo) && !withPeople;
   const recipientHint = routing
-    ? "messages.composer.chooseAgent"
+    ? "Choose an agent to send"
     : submission
-      ? "messages.composer.tagAgent"
-      : "messages.composer.tagRecipient";
+      ? "Tag an agent to send"
+      : "Tag a person or agent to send";
   // A pending mention may yet become the recipient; sending waits for it.
   const untagged =
     needsRecipient &&
@@ -2550,7 +2580,7 @@ function Composer({
   ) {
     const channel = await session.channelWrites.refreshMembership(channelId);
     if (!currentAdmission())
-      throw localError("messages.composer.sessionChanged");
+      throw new Error("The session changed. Review its channel and retry.");
     // The pill stands in only while the chat is the viewer and agents; a
     // person who joined since needs the agents tagged by name.
     if (
@@ -2564,14 +2594,30 @@ function Composer({
         ),
       )
     )
-      throw localError("messages.composer.personJoined");
-    const recipients = [...explicit];
+      throw new Error("Someone joined this chat. Tag an agent to send.");
+    let references: readonly string[] = [];
+    if (explicit.some((key) => !channel.members?.includes(key))) {
+      // Only your agents join. Anyone else outside the chat is a reference,
+      // as in a DM; only a complete agent read can tell a name is not yours.
+      await session.agentChoices.refresh();
+      if (!currentAdmission())
+        throw new Error("The session changed. Review its channel and retry.");
+      const agents = session.agentChoices.snapshot();
+      references = explicit.filter(
+        (key) =>
+          !channel.members?.includes(key) &&
+          outsideMentionReferences(channel, agents.identities, key),
+      );
+      if (references.length && !agents.complete)
+        throw new Error("Could not load your agents. Retry.");
+    }
+    const recipients = explicit.filter((key) => !references.includes(key));
     if (!recipients.length) {
       // An untagged send relies on a person being present; confirm it against
       // the fresh roster and agent inventory, not the rendered snapshot.
       await session.agentChoices.refresh();
       if (!currentAdmission())
-        throw localError("messages.composer.sessionChanged");
+        throw new Error("The session changed. Review its channel and retry.");
       const profiles = session.profiles.snapshot();
       if (
         !soloHasPeople(
@@ -2581,14 +2627,10 @@ function Composer({
           knownAgentPubkeys(profiles, session.agentChoices.snapshot()),
         )
       )
-        throw localError("messages.composer.tagAgentSentence");
+        throw new Error("Tag an agent to send.");
     }
     const missing = recipients.filter((key) => !channel.members?.includes(key));
     if (missing.length) {
-      // Classification no longer depends on inventory; refresh before admission.
-      await session.agentChoices.refresh();
-      if (!currentAdmission())
-        throw localError("messages.composer.sessionChanged");
       if (
         missing.some(
           (key) =>
@@ -2597,19 +2639,21 @@ function Composer({
               .selectable.some((agent) => agent.pubkey === key),
         )
       )
-        throw localError("messages.composer.tagAvailable");
+        throw new Error(
+          "Tag a person already in this chat or one of your available agents.",
+        );
       await session.channelWrites.addAgents(
         channelId,
         missing,
         currentAdmission,
       );
       if (!currentAdmission())
-        throw localError("messages.composer.sessionChanged");
+        throw new Error("The session changed. Review its channel and retry.");
     }
-    return recipients;
+    return { recipients, references };
   }
   async function send() {
-    if (!permitted.current || voice.isCapturing()) return;
+    if (!permitted.current || voice.isCapturing() || forwarded.blocked) return;
     if (editing.target) {
       if (editDisabled || editing.locked) return;
       if ("saveDraft" in editing.target) {
@@ -2621,7 +2665,9 @@ function Composer({
         !valueRef.current.chatCards?.length
       ) {
         if (editing.target.attachments.length) {
-          setError(localMessage("messages.composer.keepAttachmentLinks"));
+          setError(
+            "Keep attachment links unchanged. To remove this message, use Delete message.",
+          );
           return;
         }
         if (requestDeletion && session.outbox?.supports(5)) {
@@ -2704,38 +2750,29 @@ function Composer({
             const names = prose
               .filter((chip) => chip.reason === reason)
               .map((chip) => `@${chip.name}`);
-            return names.length
-              ? [localMessage(says, { names: names.join(", ") })]
-              : [];
+            return names.length ? [`${names.join(", ")} ${says}.`] : [];
           },
         );
-        setError([
-          ...why,
-          needsRecipient && !sendRecipients().length
-            ? localMessage(
-                routing
-                  ? "messages.composer.chooseAgentSentence"
-                  : submission
-                    ? "messages.composer.tagAgentSentence"
-                    : "messages.composer.tagRecipientSentence",
-              )
-            : localMessage(
-                prose.length > 1
-                  ? "messages.composer.resendMany"
-                  : "messages.composer.resendOne",
-              ),
-        ]);
+        setError(
+          [
+            ...why,
+            needsRecipient && !sendRecipients().length
+              ? `${recipientHint}.`
+              : `Send again to send ${prose.length > 1 ? "them" : "it"} as text.`,
+          ].join(" "),
+        );
         return;
       }
     }
     const recipientsNow = sendRecipients();
     if (needsRecipient && !recipientsNow.length) {
-      setError(localMessage(recipientHint));
+      setError(recipientHint);
       return;
     }
     // Named conversations require text unless their owner explicitly permits files alone.
     if (
       !draft.trim() &&
+      !value.forward &&
       !chatCards?.length &&
       ((!!submission && !submission.allowAttachmentOnly) ||
         (!attachments.items.length && !gifs?.length))
@@ -2762,7 +2799,9 @@ function Composer({
     const picksNow = choicesNow?.source ?? committedPicks.current;
     if (pickReadFailed) return;
     if (pendingPickSaves.current || awaitingPickCommit.current) {
-      setError(localMessage("messages.composer.choicesSaving"));
+      setError(
+        "Model and effort choices are still saving. Try sending again shortly.",
+      );
       return;
     }
     // A failed save acknowledgement revokes Send before its error render commits.
@@ -2781,7 +2820,8 @@ function Composer({
         ))
     ) {
       setError(
-        choicesNow?.error ?? localMessage("messages.composer.choicesLoading"),
+        choicesNow?.error ??
+          "Saved model and effort choices are still loading. Try sending again shortly.",
       );
       return;
     }
@@ -2802,33 +2842,22 @@ function Composer({
       onCommand &&
       !captured.recipients.length &&
       !captured.pending?.length &&
+      !captured.forward &&
       !captured.chatCards?.length &&
       !captured.gifs?.length &&
       !capturedAttachments.length &&
       captured.text.trim().startsWith("/")
         ? captured.text.trim()
         : undefined;
-    // A send is an agent follow-up unless it addresses a confirmed person
-    // (a loaded, non-agent profile). Those, and untagged conversation in a
-    // shared chat, go out now; recipients still being classified keep the
-    // owner's queue preference.
-    const profileSnapshot = session.profiles.snapshot();
-    const agentKeys = knownAgentPubkeys(
-      profileSnapshot,
-      session.agentChoices.snapshot(),
-    );
-    const queueFollowUp =
+    // The toolbar's agents stand in when the text tags only references.
+    const fromPill =
+      routing &&
+      captured.recipients.every((person) => referenced(person.pubkey));
+    const queueable =
       !!host &&
       ownSoloConversation &&
       !threadRootId &&
-      followUpBehaviorPreference() === "queue" &&
-      capturedRecipients.length > 0 &&
-      !soloHasPeople(
-        capturedRecipients.map(({ pubkey }) => pubkey),
-        session.viewer,
-        profileSnapshot,
-        agentKeys,
-      );
+      followUpBehaviorPreference() === "queue";
     try {
       const tokens = draftTokens(captured);
       messageTokenTags(tokens);
@@ -2866,22 +2895,27 @@ function Composer({
           agentUnavailable(session, p.pubkey, bringable),
         )
       )
-        throw localError(
-          routing && !captured.recipients.length
-            ? "v1msg.composer.agentArchived"
-            : "v1msg.composer.recipientArchived",
+        throw new Error(
+          fromPill
+            ? "An agent you're sending to is archived or being deleted. Choose another agent to send."
+            : "A selected recipient is archived or being deleted. Remove it before sending.",
         );
+      // Until agents are known, the new chat's start reads them and decides.
       if (
         ownSoloConversation &&
         submission &&
+        pickedAgents(session.agentChoices) &&
         capturedRecipients.some(
           (person) =>
+            !referenced(person.pubkey) &&
             !session.agentChoices
               .snapshot()
               .selectable.some((agent) => agent.pubkey === person.pubkey),
         )
       )
-        throw localError("messages.composer.soloAvailableOnly");
+        throw new Error(
+          "Only your available agents can be mentioned in Solo chats. Remove the unavailable recipient and retry.",
+        );
       if (submission) {
         // SoloDraft filters the captured choices against its final recipient set.
         submission.submit(
@@ -2900,10 +2934,10 @@ function Composer({
       if (soloConversation || ownSoloConversation) {
         admission.current = true;
         setAdmitting(true);
-        recipients = await prepareRecipients(
+        ({ recipients, references } = await prepareRecipients(
           recipients,
-          routing && !captured.recipients.length,
-        );
+          fromPill,
+        ));
       } else if (recipients.length) {
         // An agent only an earlier Buzz runs would not answer; offer it here first.
         const lookup = oldAgents.find(captured.recipients);
@@ -3059,17 +3093,49 @@ function Composer({
         sender: ComposerSession,
       ) {
         if (compactingNow(recipients))
-          throw localError("messages.composer.waitCompaction");
+          throw new Error("Wait for compaction to finish, or interrupt it.");
         if (!tokens.length) return publishMessage(uploaded, sender);
         // A detached window's relay connection would drop the chips.
         const main = fullSession(sender);
-        if (!main) throw localError("v1msg.chips.mainWindow");
+        if (!main) throw new Error("Send chips from the main window.");
         return signMessageTokens(tokens, () => publishMessage(uploaded, main));
       }
       function publishMessage(
         uploaded: readonly UploadedAttachment[],
         sender: ComposerSession,
       ) {
+        if (captured.forward) {
+          const main = fullSession(sender);
+          if (!main && sender.forwarding)
+            return sender.forwarding.send(
+              captured.forward,
+              content,
+              recipients,
+              uploaded,
+              references,
+              sentPicks,
+            );
+          if (!main || !forwarded.row || forwarded.blocked)
+            throw new Error(
+              "Couldn't load this message. Remove it or try pasting again.",
+            );
+          return main.messages.forward(
+            channelId,
+            forwarded.row,
+            forwarded.name,
+            content,
+            undefined,
+            {
+              ...(threadRootId ? { rootId: threadRootId } : {}),
+              ...(replyParentId ? { parentId: replyParentId } : {}),
+              ...(mediaTargetUrl ? { mediaTargetUrl } : {}),
+              mentions: recipients,
+              references,
+              attachments: uploaded,
+              picks: sentPicks,
+            },
+          );
+        }
         return threadRootId
           ? sender.messages.reply(
               channelId,
@@ -3103,10 +3169,28 @@ function Composer({
         validated = false,
       ) => {
         if (compactingNow(recipients))
-          throw localError("messages.composer.waitCompaction");
-        if (!queueFollowUp || !host) return publishNow(uploaded, session);
+          throw new Error("Wait for compaction to finish, or interrupt it.");
+        // A send is an agent follow-up unless it addresses a confirmed person
+        // (a loaded, non-agent profile). Those, and untagged conversation in
+        // a shared chat, go out now; recipients still being classified keep
+        // the owner's queue preference. The recipients are the fresh ones,
+        // without references: someone may have joined or left since.
+        const profiles = session.profiles.snapshot();
+        if (
+          !queueable ||
+          !host ||
+          !recipients.length ||
+          soloHasPeople(
+            recipients,
+            session.viewer,
+            profiles,
+            knownAgentPubkeys(profiles, session.agentChoices.snapshot()),
+          )
+        )
+          return publishNow(uploaded, session);
         const message = {
           channelId,
+          ...(captured.forward ? { forward: captured.forward } : {}),
           text: content,
           recipients,
           attachments: uploaded,
@@ -3114,7 +3198,13 @@ function Composer({
           picks: sentPicks,
           ...(tokens.length ? { tokens } : {}),
         };
-        const send = followUpMessage(host, message);
+        const send = followUpMessage(
+          host,
+          message,
+          captured.forward && forwarded.row
+            ? { row: forwarded.row, name: forwarded.name }
+            : undefined,
+        );
         return followUpQueue(host).submit(
           {
             ...message,
@@ -3123,7 +3213,9 @@ function Composer({
             ready: send.ready,
             publish: (recovery) => {
               if (compactingNow(recipients))
-                throw localError("messages.composer.waitCompaction");
+                throw new Error(
+                  "Wait for compaction to finish, or interrupt it.",
+                );
               return send.publish(recovery);
             },
             onSend: (id) => {
@@ -3150,8 +3242,7 @@ function Composer({
           recoveryKey,
           channelId,
           {
-            name,
-            ...(threadRootId ? { thread: true as const } : {}),
+            name: threadRootId ? `thread in ${name}` : name,
             // A huddle opens from its entry point, never by its room's link.
             ...(listed?.huddle
               ? {}
@@ -3159,7 +3250,9 @@ function Composer({
           },
           capturedAttachments,
           async (uploaded) => {
-            const sent = await publish(uploaded);
+            // Report a synchronous publication before the new row can render.
+            const result = publish(uploaded);
+            const sent = typeof result === "string" ? result : await result;
             if (sent && live.current) onSend?.(sent);
           },
           (files, preparationError) => {
@@ -3174,6 +3267,7 @@ function Composer({
                 return (
                   !draft.text.trim() &&
                   !draft.recipients.length &&
+                  !draft.forward &&
                   !composerMarkdown(draft).trim()
                 );
               } catch {
@@ -3188,6 +3282,8 @@ function Composer({
                   JSON.stringify(next.recipients) ||
                 JSON.stringify(valueRef.current.chatCards ?? []) !==
                   JSON.stringify(next.chatCards ?? []) ||
+                JSON.stringify(valueRef.current.forward) !==
+                  JSON.stringify(next.forward) ||
                 JSON.stringify(valueRef.current.gifs ?? []) !==
                   JSON.stringify(next.gifs ?? [])) &&
               JSON.stringify(valueRef.current) !== capturedRevision
@@ -3209,6 +3305,8 @@ function Composer({
                   JSON.stringify(next.recipients) &&
                 JSON.stringify(valueRef.current.chatCards ?? []) ===
                   JSON.stringify(next.chatCards ?? []) &&
+                JSON.stringify(valueRef.current.forward) ===
+                  JSON.stringify(next.forward) &&
                 JSON.stringify(valueRef.current.gifs ?? []) ===
                   JSON.stringify(next.gifs ?? [])
               )
@@ -3254,9 +3352,14 @@ function Composer({
         JSON.stringify(followUp) !== JSON.stringify(valueRef.current);
       valueRef.current = followUp;
       updateDraft(followUp);
-      // The toolbar keeps whoever heard this message for the follow-up.
+      // The toolbar keeps whoever heard this message for the follow-up; a
+      // reference named only this message.
       if (routing) {
-        setRouted(capturedRecipients);
+        setRouted(
+          capturedRecipients.filter((person) =>
+            recipients.includes(person.pubkey),
+          ),
+        );
         setReplacedKey(undefined);
         keepPick(null);
       }
@@ -3287,7 +3390,7 @@ function Composer({
       finishDraft(pending);
     } catch (reason) {
       if (live.current && !attempt.signal.aborted)
-        setError(errorMessage(reason));
+        setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
       admission.current = false;
       if (sendAttempt.current === attempt) {
@@ -3349,7 +3452,7 @@ function Composer({
           <RecipientAvatars
             session={session}
             recipients={addressed}
-            mentions={!!recipients.length}
+            mentions={!!named.length}
             disabled={editingDisabled}
             remove={(pubkey) => {
               const person = addressed.find((item) => item.pubkey === pubkey);
@@ -3378,7 +3481,7 @@ function Composer({
             type="file"
             multiple
             hidden
-            aria-label={t("messages.composer.chooseAttachments")}
+            aria-label="Choose attachments"
             onChange={(event) => {
               const ids = attachFiles(
                 Array.from(event.currentTarget.files ?? []),
@@ -3392,8 +3495,8 @@ function Composer({
             hint="familiar"
             size="sm"
             type="button"
-            aria-label={t("messages.composer.attach")}
-            title={t("messages.composer.attach")}
+            aria-label="Attach files"
+            title="Attach files"
             disabled={editingDisabled || !!editing.target}
             onClick={() => picker.current?.click()}
             icon={<PaperclipIcon size={16} />}
@@ -3402,12 +3505,23 @@ function Composer({
       )}
     </>
   );
+  const disclosure =
+    !editing.target && forwarded.disclosure ? (
+      <ForwardDisclosure
+        audience={
+          forwardAudience ??
+          (channelType === "dm" || channelType === "solo" || solo
+            ? "The recipients"
+            : `Everyone in #${channelName}`)
+        }
+      />
+    ) : null;
   if (readingOnly)
     return (
       <>
         {context}
         <footer className={styles.composer} data-composer-surface="">
-          {t("messages.composer.readOnly")}
+          This relay connection supports reading only.
         </footer>
       </>
     );
@@ -3427,6 +3541,19 @@ function Composer({
           focusComposer={() => input.current?.focus()}
         />
       )}
+      {/* Stay inside a modal host, but outside workspace modal-isolation boundaries. */}
+      {announcementHost &&
+        createPortal(
+          <div
+            id={`${inputId}-forward-announcement`}
+            aria-live="polite"
+            aria-atomic="true"
+            className="sr-only"
+          >
+            {presented ? disclosure : null}
+          </div>,
+          announcementHost,
+        )}
       <form
         ref={form}
         className={styles.composer}
@@ -3464,11 +3591,10 @@ function Composer({
         }}
         aria-label={
           editing.target
-            ? t("messages.composer.edit")
+            ? "Edit message"
             : threadRootId
-              ? t("messages.composer.reply")
-              : formLabel ||
-                t("messages.composer.sendTo", { channel: channelName })
+              ? "Reply to thread"
+              : `Send a message to ${channelName}`
         }
         onSubmit={(event) => {
           event.preventDefault();
@@ -3539,8 +3665,8 @@ function Composer({
         {dragging && <FileDropOverlay composer={form} />}
         {attachmentError && (
           <ToastNotice
-            title={resolveMessage(attachmentError.title)}
-            description={resolveMessage(attachmentError.description)}
+            title={attachmentError.title}
+            description={attachmentError.description}
             onDismiss={() => setAttachmentError(undefined)}
           />
         )}
@@ -3548,15 +3674,11 @@ function Composer({
           {editing.target ? (
             <div className={styles.replyContext}>
               <PencilSimpleIcon size={18} aria-hidden="true" />
-              <div>{t("messages.composer.editing")}</div>
+              <div>Editing message</div>
               <IconButton
                 type="button"
                 size="sm"
-                aria-label={
-                  editing.locked
-                    ? t("messages.composer.closeEdit")
-                    : t("messages.composer.cancelEdit")
-                }
+                aria-label={editing.locked ? "Close edit" : "Cancel edit"}
                 disabled={editing.busy}
                 onClick={editing.close}
                 icon={<XIcon size={16} aria-hidden="true" />}
@@ -3567,6 +3689,18 @@ function Composer({
           )}
         </ComposerContext>
         <div className={styles.composerContent}>
+          {!editing.target && value.forward && (
+            <ComposerForward
+              session={host}
+              state={forwarded}
+              scope={scope}
+              onRemove={() => {
+                saveDraft({ ...valueRef.current, forward: null });
+                setError(undefined);
+                input.current?.focus();
+              }}
+            />
+          )}
           {!editing.target && (
             <ComposerAttachments
               media={session.media}
@@ -3638,6 +3772,28 @@ function Composer({
               channelId={channelId}
               extensions={extensions}
               emoji={emojiCatalog.entries}
+              onSemanticPaste={(data) => {
+                const reference = pastedForward(data);
+                if (reference) {
+                  if (editing.target || submission) {
+                    setError(
+                      "Finish this edit before pasting a forwarded message.",
+                    );
+                    return true;
+                  }
+                  if (valueRef.current.forward) {
+                    setError(
+                      "Only one forwarded message can be attached. Remove it before pasting another.",
+                    );
+                    return true;
+                  }
+                  const { note, ...source } = reference;
+                  if (note && !insert(note)) return true;
+                  saveDraft({ ...valueRef.current, forward: source });
+                  return true;
+                }
+                return false;
+              }}
               onPasteTooLong={() => setPasteTooLong(true)}
               aria-describedby={
                 pasteTooLong ? `${inputId}-paste-error` : undefined
@@ -3749,6 +3905,7 @@ function Composer({
                     automaticTag.current ===
                       JSON.stringify(valueRef.current)) &&
                   !valueRef.current.chatCards?.length &&
+                  !valueRef.current.forward &&
                   !valueRef.current.gifs?.length &&
                   !attachments.items.length
                 ) {
@@ -3810,14 +3967,8 @@ function Composer({
               <span
                 className={styles.channelPlaceholder}
                 aria-hidden="true"
-                data-lead={
-                  language === "en" ? t("messages.composer.messageLead") : ""
-                }
-                data-name={
-                  language === "en"
-                    ? channelName
-                    : t("messages.composer.message", { channel: channelName })
-                }
+                data-lead="Message"
+                data-name={channelName}
               >
                 <ChannelIcon className={channelIconClass(ChannelIcon)} />
               </span>
@@ -3829,20 +3980,21 @@ function Composer({
           mediaTimeSeconds !== undefined &&
           !hideMediaTimeIndicator && (
             <div className={styles.mediaComposerAnchor}>
-              <span>
-                {t("messages.composer.commentAt", {
-                  time: formatMediaTime(mediaTimeSeconds),
-                })}
-              </span>
+              <span>Commenting at {formatMediaTime(mediaTimeSeconds)}</span>
               <IconButton
                 size="compact"
                 type="button"
                 onClick={clearMediaTime}
-                aria-label={t("messages.composer.removeVideoTime")}
+                aria-label="Remove video time"
                 icon={<XIcon size={13} />}
               />
             </div>
           )}
+        {disclosure && (
+          <div id={forwardDisclosureId} className="text-subtle">
+            {disclosure}
+          </div>
+        )}
         {voice.element}
         <div className={styles.composerActions} hidden={voice.capturing}>
           <div className={styles.composerToolRow}>
@@ -3920,6 +4072,7 @@ function Composer({
             <IconButton
               variant={
                 draft.trim() ||
+                value.forward ||
                 chatCards?.length ||
                 gifs?.length ||
                 attachments.items.length
@@ -3929,19 +4082,20 @@ function Composer({
               size="toolbar"
               type="submit"
               style={editing.target ? undefined : accentButtonStyle}
-              aria-label={
-                editing.target
-                  ? t("messages.composer.saveChanges")
-                  : t("messages.composer.send")
+              aria-label={editing.target ? "Save changes" : "Send message"}
+              aria-describedby={
+                !editing.target && forwarded.disclosure
+                  ? forwardDisclosureId
+                  : undefined
               }
               title={
                 editing.target
-                  ? t("messages.composer.saveChanges")
+                  ? "Save changes"
                   : compacting
-                    ? t("messages.composer.waitCompaction")
+                    ? "Wait for compaction to finish, or interrupt it."
                     : untagged
-                      ? t(recipientHint)
-                      : t("messages.composer.send")
+                      ? recipientHint
+                      : "Send message"
               }
               focusableWhenDisabled={
                 untagged || (!editing.target && compacting) || undefined
@@ -3958,8 +4112,10 @@ function Composer({
                 admitting ||
                 sending ||
                 submission?.disabled ||
+                (!editing.target && forwarded.blocked) ||
                 (!editing.target && attachments.blocked) ||
                 (!draft.trim() &&
+                  !value.forward &&
                   !chatCards?.length &&
                   ((!!submission && !submission.allowAttachmentOnly) ||
                     (!attachments.items.length && !gifs?.length)) &&
@@ -3975,43 +4131,39 @@ function Composer({
         </div>
         {!editing.target && compacting && (
           <p className={styles.composerStatus} role="status">
-            {t("messages.composer.compacting")}
+            Compacting session…
           </p>
         )}
         {pasteTooLong && (
           <p id={`${inputId}-paste-error`} role="alert">
-            {t(
-              canAttach && !editing.target
-                ? "messages.composer.pasteTooLongAttach"
-                : "messages.composer.pasteTooLong",
-            )}
+            This paste would make your message too long.{" "}
+            {canAttach && !editing.target
+              ? "Shorten it or attach the text as a file."
+              : "Shorten the text and try again."}
           </p>
         )}
         {(error || editing.error) && (
-          <p role="alert">
-            {Array.isArray(error)
-              ? error.map((message) => resolveMessage(message)).join(" ")
-              : (resolveMessage(error) ?? editing.error)}
-          </p>
+          <p role="alert">{error ?? editing.error}</p>
         )}
         {stickyPicks && (pickReadPending || pickReadFailed) && (
           <div className={pickReadFailed ? undefined : "sr-only"}>
             <LoadingRegion
               pending={pickReadPending}
-              label={t("messages.composer.loadingChoices")}
+              label="Loading saved model and effort…"
               statusVisibility="screen-reader"
               feedback={
                 pickReadFailed ? (
                   <div>
                     <p role="alert">
-                      {t("messages.composer.readChoicesFailed")}
+                      Could not read saved model and effort for this chat on
+                      this device. Retry before sending.
                     </p>
                     <Button
                       type="button"
                       disabled={pickReadPending}
                       onClick={() => void refreshPicks()}
                     >
-                      {t("messages.composer.retryChoices")}
+                      Retry saved choices
                     </Button>
                   </div>
                 ) : undefined
@@ -4022,7 +4174,10 @@ function Composer({
           </div>
         )}
         {pickStorageFailed && (
-          <p role="alert">{t("messages.composer.saveChoicesFailed")}</p>
+          <p role="alert">
+            Could not save model and effort for this chat on this device. The
+            current choices remain until this composer closes.
+          </p>
         )}
         {!editing.target &&
           !submission &&
@@ -4030,40 +4185,40 @@ function Composer({
             <div>
               <p role="alert">
                 {accepted
-                  ? t("messages.composer.acceptedDraftFailed")
+                  ? "Message accepted. Could not update the saved draft. Retry cleanup before sending again."
                   : conflict
-                    ? t("messages.composer.draftConflict")
-                    : t("messages.composer.draftSaveFailed")}
+                    ? "This draft changed elsewhere. Your edits are kept here; choose which draft to keep."
+                    : "Could not save this draft on this device. Your edits are kept here."}
               </p>
               {accepted ? (
                 <Button type="button" onClick={() => finishDraft(accepted)}>
-                  {t("messages.composer.retryCleanup")}
+                  Retry draft cleanup
                 </Button>
               ) : conflict ? (
                 <>
                   <Button type="button" onClick={() => resolveDraft(false)}>
-                    {t("messages.composer.loadDraft")}
+                    Load saved draft
                   </Button>
                   <Button type="button" onClick={() => resolveDraft(true)}>
-                    {t("messages.composer.keepDraft")}
+                    Keep my draft
                   </Button>
                 </>
               ) : (
                 <Button type="button" onClick={() => persist(valueRef.current)}>
-                  {t("messages.composer.retryDraft")}
+                  Retry draft save
                 </Button>
               )}
             </div>
           )}
         {editing.retryable && (
           <>
-            <p role="status">{t("messages.composer.editOutbox")}</p>
+            <p role="status">Your edit is still in the outbox.</p>
             <Button
               type="button"
               disabled={editDisabled}
               onClick={editing.retry}
             >
-              {t("messages.composer.retryEdit")}
+              Retry edit
             </Button>
           </>
         )}
@@ -4083,7 +4238,7 @@ function Composer({
               });
             }}
           >
-            {t("messages.composer.retryPreparation")}
+            Retry message preparation
           </Button>
         )}
       </form>
@@ -4136,7 +4291,6 @@ function RecipientAvatars({
   disabled: boolean;
   remove(pubkey: string): void;
 }) {
-  useLanguage();
   const reduceMotion = useReducedMotion();
   const enter = useCallback(
     (node: HTMLButtonElement | null) => {
@@ -4167,11 +4321,7 @@ function RecipientAvatars({
   return (
     <section
       className={styles.mentionRecipients}
-      aria-label={
-        mentions
-          ? t("messages.composer.explicitMentions")
-          : t("messages.composer.sendingTo")
-      }
+      aria-label={mentions ? "Explicit mentions" : "Sending to"}
     >
       {unique.map((recipient) => {
         const profile = profiles.get(recipient.pubkey);
@@ -4185,18 +4335,8 @@ function RecipientAvatars({
             data-avatar-shape={
               agentPubkeys.has(recipient.pubkey) ? "squircle" : "circle"
             }
-            title={t(
-              mentions
-                ? "messages.composer.removeMentionTitle"
-                : "messages.composer.removeAgentTitle",
-              { name: recipient.name, key: recipient.pubkey.slice(0, 8) },
-            )}
-            aria-label={t(
-              mentions
-                ? "messages.composer.removeMention"
-                : "messages.composer.removeAgent",
-              { name: recipient.name, key: recipient.pubkey },
-            )}
+            title={`Remove ${mentions ? "explicit mention of " : ""}${recipient.name} (${recipient.pubkey.slice(0, 8)})`}
+            aria-label={`Remove ${mentions ? "mention" : "agent"} ${recipient.name} ${recipient.pubkey}`}
             disabled={disabled}
             onClick={() => remove(recipient.pubkey)}
             icon={

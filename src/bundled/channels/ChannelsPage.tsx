@@ -1,6 +1,3 @@
-import { t, useLanguage } from "../../shared/i18n";
-import { TranslatedMessage } from "../../shared/i18n/Message";
-import { localMessage, localError } from "../../shared/i18n/deferred-message";
 import { useChannelHistoryFocus } from "./useChannelHistoryFocus";
 import type { Conversation } from "../../features/conversation/service";
 import { StartLinkedChat, canStartLinkedChat } from "./StartLinkedChat";
@@ -29,6 +26,7 @@ import { useReturnHighlight } from "../../features/messages/use-return-highlight
 import { useMessageOpening } from "../../features/messages/use-message-opening";
 import { ChannelBody } from "./ChannelBody";
 import {
+  type ConversationTab,
   entryPane,
   panelTabId,
   rootOfTab,
@@ -39,6 +37,7 @@ import { ChannelMembersDialog } from "./ChannelMembersDialog";
 import { ChannelHeaderIdentity, memberAccess } from "./ChannelHeaderIdentity";
 import {
   matchesConversation,
+  newMessage,
   openEmptyChannels,
   soloDraft,
   soloDraftTarget,
@@ -102,6 +101,7 @@ import {
   GearIcon,
 } from "../../shared/design-system/icons/index";
 import { channelIcon, channelText } from "../../features/channels/channel-icon";
+import { communityRefusalTitle } from "../../features/federated-identity/CommunitySignIn";
 import type { RelayData } from "../../features/relay/service";
 import type { RelaySession } from "../../features/relay/session";
 import {
@@ -182,7 +182,6 @@ export function ChannelsPage({
   read?: ReadShortcut | undefined;
   companion?: ReactNode;
 }) {
-  useLanguage();
   const session = useRelayConnection(relay);
   const openSwitcher = useContext(OpenCommunitySwitcher);
   const sessionNavigation = navigation?.forSession(relay, session);
@@ -247,7 +246,7 @@ export function ChannelsPage({
     session.denied,
   ]);
   return (
-    <section className={styles.root} aria-label={t("channelPages.channels")}>
+    <section className={styles.root} aria-label="Channels">
       {session.status !== "ready" && !session.cached ? (
         <PanelFrame scope={session.scope} companion={companion}>
           {session.status === "disconnected" ? (
@@ -255,11 +254,14 @@ export function ChannelsPage({
               <div className={styles.connectIcon}>
                 <PlugIcon size={30} />
               </div>
-              <h1>{t("channelPages.welcome")}</h1>
-              <p>{t("v1shell.channels.welcomeDescription")}</p>
+              <h1>Your channels, one conversation.</h1>
+              <p>
+                Choose a community to see its channels, or join one. Your
+                profile and settings work without a community.
+              </p>
               {openSwitcher && (
                 <Button type="button" variant="primary" onClick={openSwitcher}>
-                  {t("draftsSent.page.chooseCommunity")}
+                  Choose a community
                 </Button>
               )}
             </div>
@@ -269,11 +271,7 @@ export function ChannelsPage({
             <div className={styles.failed}>
               <EmptyState
                 icon={<LockIcon />}
-                title={t(
-                  session.refusal === "sign-in"
-                    ? "accessDialogs.signInTitle"
-                    : "accessDialogs.noAccessTitle",
-                )}
+                title={communityRefusalTitle(session.refusal)}
               />
             </div>
           ) : session.status === "error" &&
@@ -283,11 +281,11 @@ export function ChannelsPage({
             <div role="alert" className={styles.failed}>
               <EmptyState
                 icon={<CloudOffIcon />}
-                title={t("channelPages.cannotConnect")}
+                title="Can’t connect"
                 description={
                   session.retrying
-                    ? t("channelPages.connectionRetrying")
-                    : t("channelPages.connectionRetry")
+                    ? "Check your connection. We’ll keep trying."
+                    : "Check your connection, then try again."
                 }
                 action={
                   <Button
@@ -295,7 +293,7 @@ export function ChannelsPage({
                     variant="primary"
                     onClick={() => relay.tryAgain()}
                   >
-                    {t("channelPages.retry")}
+                    Try again
                   </Button>
                 }
               />
@@ -308,7 +306,7 @@ export function ChannelsPage({
                 label={
                   <span className={styles.connecting}>
                     <TypingDots />
-                    {t("channelPages.connecting")}
+                    Connecting…
                   </span>
                 }
               >
@@ -385,10 +383,11 @@ function ChannelWorkspace({
   archive?: ArchiveShortcut | undefined;
   read?: ReadShortcut | undefined;
 }) {
-  useLanguage();
-  const composingMessage =
-    navigation?.target.kind === "page" &&
-    navigation.target.route?.params === "new-message";
+  const messageDraft =
+    navigation?.target.kind === "page"
+      ? newMessage(navigation.target.route?.params)
+      : undefined;
+  const composingMessage = messageDraft !== undefined;
   const draftTarget = navigation?.target;
   const draft = useMemo(
     () =>
@@ -950,9 +949,10 @@ function ChannelWorkspace({
       );
       signal.throwIfAborted();
       if (!permissions.canLeave)
-        throw permissions.leaveReason != null
-          ? new Error(permissions.leaveReason)
-          : localError("channelPages.leaveDenied");
+        throw new Error(
+          permissions.leaveReason ??
+            "You can’t leave this channel with your current permissions.",
+        );
       const trigger =
         document.activeElement instanceof HTMLElement
           ? document.activeElement
@@ -1042,12 +1042,7 @@ function ChannelWorkspace({
         try {
           await queries.unread.markChannelRead(readableId);
         } catch {
-          notifyLatest.current(
-            <TranslatedMessage
-              value={localMessage("channelPages.markReadFailed")}
-            />,
-            "error",
-          );
+          notifyLatest.current("Couldn’t mark as read.", "error");
         }
       },
     };
@@ -2019,6 +2014,16 @@ function ChannelWorkspace({
   const hasPanel = companion || hasChannelPanel;
   const showingChannelPanel = tabState.paneOpen && hasChannelPanel;
   const showingPanel = companion || showingChannelPanel;
+  const highlightedThread =
+    showingChannelPanel && !companion
+      ? tabState.tabs.find(
+          (tab): tab is Extract<ConversationTab, { kind: "thread" }> =>
+            tab.kind === "thread" &&
+            tabPane(tab) === "side" &&
+            tab.id === selectedTab &&
+            tab.channelId === currentId,
+        )
+      : undefined;
   // A plain channel visit reads its visible selected thread along with the
   // conversation that holds focus. A link to a message or thread, passive
   // restoration and another channel’s retained tab do not.
@@ -2126,28 +2131,20 @@ function ChannelWorkspace({
         diagnostics
       />
       <p>
-        {t(
-          list.coverage === "partial"
-            ? "channelPages.partialRoster"
-            : "channelPages.roster",
-          { count: channels.length },
-        )}
+        {list.coverage === "partial" ? "Partial roster" : "Roster"} ·{" "}
+        {channels.length} channels
       </p>
       <Button type="button" onClick={() => queries.channels.refreshList?.()}>
-        {t("channelPages.refreshChannels")}
+        Refresh channels
       </Button>
-      {preferences.error && (
-        <p>
-          {t("channelPages.preferencesError", { error: preferences.error })}
-        </p>
-      )}
+      {preferences.error && <p>Saved groups and stars: {preferences.error}</p>}
       {preferences.status !== "unsupported" && (
         <Button
           type="button"
           disabled={preferences.status === "loading"}
           onClick={preferences.reload}
         >
-          {t("channelPages.refreshGroups")}
+          Refresh groups and stars
         </Button>
       )}
       {current && (
@@ -2155,7 +2152,7 @@ function ChannelWorkspace({
           type="button"
           onClick={() => queries.channels.refresh?.(current.id)}
         >
-          {t("channelPages.refreshMessages")}
+          Refresh messages
         </Button>
       )}
       {queries.outbox ? (
@@ -2199,7 +2196,7 @@ function ChannelWorkspace({
         size="sm"
         onClick={() => backToChannels(removed.id)}
       >
-        {t("v1shell.channel.backToChannels")}
+        Back to channels
       </Button>
     </ChannelStateNotice>
   ) : archivedChannel ? (
@@ -2318,9 +2315,7 @@ function ChannelWorkspace({
       <section
         data-channel-history
         aria-label={
-          solo && current
-            ? t("channelPages.chatHistory", { name: current.name })
-            : t("channelPages.channelHistory")
+          solo && current ? `Chat ${current.name}` : "Channel history"
         }
         tabIndex={-1}
         ref={historyContainer}
@@ -2345,6 +2340,9 @@ function ChannelWorkspace({
             }
             holding={contextHolding}
             inlineTarget={contextTarget}
+            openThreadRootId={
+              highlightedThread ? rootOfTab(highlightedThread) : undefined
+            }
             onOpenThread={openThread}
             revealMessageId={
               sent?.channelId === current.id ? sent.id : undefined
@@ -2358,8 +2356,8 @@ function ChannelWorkspace({
             }
           >
             {resolving
-              ? t("channelPages.checkingAccess")
-              : t("channelPages.selectChannel")}
+              ? "Checking conversation access…"
+              : "Select a channel to read it."}
           </div>
         )}
         {current && channelNotice && (
@@ -2491,17 +2489,13 @@ function ChannelWorkspace({
           canOpenLink={canOpenLink}
           {...(agents ? { agents } : {})}
           onOpenLink={(url, returnFocus) => openLink(url, { returnFocus })}
-          onOpenConversation={
-            navigator && viewer
-              ? (id) => openLink(`buzz://channel/${encodeURIComponent(id)}`)
-              : undefined
-          }
+          onOpenMessage={navigator && viewer ? openLink : undefined}
         />
       )}
       <Panel
         as="article"
         ref={conversation}
-        aria-label={t("channelPages.conversation")}
+        aria-label="Conversation"
         data-overlay-boundary=""
         data-solo-focus-pane={solo ? "" : undefined}
         inert={covered}
@@ -2531,6 +2525,7 @@ function ChannelWorkspace({
         >
           {composingMessage ? (
             <LiveNewMessage
+              intent={messageDraft?.intent}
               host={{ relay, panels, navigation: navigator }}
               session={queries}
               scope={scope}
@@ -2548,8 +2543,8 @@ function ChannelWorkspace({
           ) : draft?.linked && !linkedSource ? (
             <EmptyState
               icon={<ChatCircleIcon />}
-              title={t("channelPages.draftUnavailable")}
-              description={t("channelPages.draftUnavailableDescription")}
+              title="Draft unavailable"
+              description="This linked chat draft is unavailable. Start again from its source."
             />
           ) : draft ? (
             <SoloDraft
@@ -2592,11 +2587,7 @@ function ChannelWorkspace({
                   "error",
                   retry
                     ? {
-                        label: (
-                          <TranslatedMessage
-                            value={localMessage("channelPages.retryRestore")}
-                          />
-                        ),
+                        label: "Retry restoring message",
                         onClick: () => void retry(),
                         timeout: Infinity,
                       }
@@ -2645,8 +2636,8 @@ function ChannelWorkspace({
                           ref={splitTrigger}
                           data-tab-pane-toggle=""
                           size="toolbar"
-                          aria-label={t("channelPages.togglePane")}
-                          title={t("channelPages.openPane")}
+                          aria-label="Toggle tab pane"
+                          title="Open tab pane"
                           aria-expanded={false}
                           icon={<SidebarRightIcon size="1rem" />}
                           onClick={() => tabState.setPaneOpen(true)}
@@ -2666,7 +2657,7 @@ function ChannelWorkspace({
                     main
                     tabMenu={tabMenu}
                     drag={secondary.drag.main}
-                    label={t("channelPages.channelTabs")}
+                    label="Channel tabs"
                     identity={
                       current && (
                         <ChannelHeaderIdentity
@@ -2695,7 +2686,7 @@ function ChannelWorkspace({
                           startChat={
                             navigator &&
                             current &&
-                            canStartLinkedChat(queries, current.id) ? (
+                            canStartLinkedChat(queries) ? (
                               <StartLinkedChat
                                 session={queries}
                                 navigation={navigator}
@@ -2772,11 +2763,11 @@ function ChannelWorkspace({
                               ref={splitTrigger}
                               data-tab-pane-toggle=""
                               size="toolbar"
-                              aria-label={t("channelPages.togglePane")}
+                              aria-label="Toggle tab pane"
                               title={
                                 showingChannelPanel
-                                  ? t("channelPages.closePane")
-                                  : t("channelPages.openPane")
+                                  ? "Close tab pane"
+                                  : "Open tab pane"
                               }
                               aria-expanded={!!showingChannelPanel}
                               onClick={() =>
@@ -2796,7 +2787,7 @@ function ChannelWorkspace({
                     items={[
                       {
                         id: "conversation",
-                        label: current?.name ?? t("channelPages.channels"),
+                        label: current?.name ?? "Channels",
                         icon: <CurrentChannelIcon size="1rem" />,
                         content: (
                           <div
@@ -2868,8 +2859,8 @@ function ChannelWorkspace({
                       data-highlight-expanded="false"
                       variant="subtle"
                       size="toolbar"
-                      aria-label={t("channelPages.togglePane")}
-                      title={t("channelPages.closePane")}
+                      aria-label="Toggle tab pane"
+                      title="Close tab pane"
                       aria-expanded={true}
                       onClick={secondary.closePane}
                       icon={<SidebarRightIcon size="1rem" aria-hidden="true" />}
@@ -2887,7 +2878,7 @@ function ChannelWorkspace({
                       ? [
                           {
                             id: "settings",
-                            label: t("channelPages.channelSettings"),
+                            label: "Channel settings",
                             icon: <GearIcon size="1rem" />,
                             close: closeSettings,
                             content: settingsContent,

@@ -29,7 +29,7 @@ import { channelIcon } from "../channels/channel-icon";
 import { avatarMedia } from "../../shared/avatar-source";
 import {
   ArrowsClockwiseIcon,
-  MessageReplyIcon,
+  ThreadIcon,
   SendIcon,
   CheckIcon,
   TrashIcon,
@@ -763,7 +763,7 @@ function ScopedPage({
                   title={status.detail}
                 >
                   {status.icon === "reply" ? (
-                    <MessageReplyIcon size={12} />
+                    <ThreadIcon size={12} />
                   ) : status.icon === "check" ? (
                     <CheckIcon size={12} />
                   ) : (

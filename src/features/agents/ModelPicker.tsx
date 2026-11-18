@@ -1,4 +1,3 @@
-import { t, useLanguage } from "../../shared/i18n";
 // A type's model choice, shared by agent types for the New agent dialog and
 // their settings. Each type decides whether its catalog accepts custom IDs.
 import {
@@ -92,7 +91,6 @@ export function CustomModelDialog({
   onClose(): void;
   finalFocus?: ComponentProps<typeof Dialog>["finalFocus"];
 }) {
-  useLanguage();
   const [model, setModel] = useState(initialValue);
   const input = useRef<HTMLInputElement>(null);
   const form = useId();
@@ -103,19 +101,19 @@ export function CustomModelDialog({
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
-      title={t("agentModel.custom")}
+      title="Custom model"
       initialFocus={input}
       finalFocus={finalFocus}
       actions={
         <>
-          <Button onClick={onClose}>{t("messages.cancel")}</Button>
+          <Button onClick={onClose}>Cancel</Button>
           <Button
             form={form}
             type="submit"
             variant="prominent"
             disabled={!model.trim()}
           >
-            {t("agentModel.useModel")}
+            Use model
           </Button>
         </>
       }
@@ -129,11 +127,11 @@ export function CustomModelDialog({
           if (value) onSubmit(value);
         }}
       >
-        <Field label={t("agentModel.modelID")} labelVisibility="hidden">
+        <Field label="Model ID" labelVisibility="hidden">
           <Input
             ref={input}
             value={model}
-            placeholder={t("agentModel.enterID")}
+            placeholder="Enter a model ID"
             required
             autoCorrect="off"
             autoCapitalize="none"
@@ -146,9 +144,9 @@ export function CustomModelDialog({
   );
 }
 
-/** `value` is a model ID, or "" for the type's default, `defaultLabel`. */
+/** `value` is a model ID, or "" to follow the type's default. */
 export function ModelPicker({
-  label = t("agentCreate.model"),
+  label = "Model",
   groupByFamily = false,
   leading,
   onConfigure,
@@ -189,6 +187,7 @@ export function ModelPicker({
   includeDefault?: boolean;
   value: string;
   defaultLabel: string;
+  /** A known inherited model ID, not a catalog recommendation or placeholder. */
   defaultModel?: string | undefined;
   defaultDescription?: string;
   onChange(value: string): void;
@@ -198,7 +197,6 @@ export function ModelPicker({
   disabled?: boolean;
   description?: string | undefined;
 }) {
-  useLanguage();
   const [customModel, setCustomModel] = useState<string | null>(null);
   const control = useRef<HTMLDivElement>(null);
   const defaultChoice = models.find((model) => model.id === defaultModel);
@@ -207,33 +205,33 @@ export function ModelPicker({
   )?.efforts;
   const fallback: ModelChoice = {
     id: "",
-    label: defaultChoice?.label ?? defaultLabel,
-    description: defaultChoice?.description ?? defaultDescription,
+    label: defaultModel ? (defaultChoice?.label ?? defaultLabel) : "Default",
   };
-  const listed: ModelChoice[] = includeDefault
-    ? models.filter((model) => model.id !== defaultModel || model.id === value)
-    : [...models];
+  // A named model is always a pin, even when it currently matches Default.
+  const listed: ModelChoice[] = [...models];
   if (value && !listed.some((model) => model.id === value))
     listed.push({
       id: value,
       label: value,
-      description: t(
-        allowCustomModel ? "agentModel.custom" : "agentModel.unavailable",
-      ),
+      description: allowCustomModel ? "Custom model" : "Unavailable model",
       unlisted: true,
     });
   // The default takes part in telling names apart, even when it is not a row.
-  const [shownDefault = fallback, ...shownListed] = formatModelChoices(
+  const [formattedDefault = fallback, ...shownListed] = formatModelChoices(
     [fallback, ...listed],
     modelLabelPrefixes,
   );
+  const shownDefault = {
+    ...formattedDefault,
+    description:
+      defaultDescription ??
+      (defaultModel ? `Currently ${formattedDefault.label}` : undefined),
+  };
   const shown = includeDefault ? [shownDefault, ...shownListed] : shownListed;
-  const selected =
-    shown.find((model) => model.id === (value || defaultModel)) ?? shownDefault;
+  const selected = shown.find((model) => model.id === value) ?? shownDefault;
   const inherited = value === "";
-  const selectedLabel = inherited
-    ? t("agentModel.modelDefault", { model: selected.label })
-    : selected.label;
+  const valueSuffix = inherited && defaultModel ? " · Default" : undefined;
+  const selectedLabel = `${selected.label}${valueSuffix ?? (inherited && selected.description ? ` · ${selected.description}` : "")}`;
   const discovering = loading && !pending;
   const choices =
     allowCustomModel && !compact ? [...shown, CUSTOM_MODEL_ACTION] : shown;
@@ -262,27 +260,15 @@ export function ModelPicker({
             resetLabel={resetLabel}
             effort={effort}
             effortLabel={effortLabel}
-            onEffortChange={
-              onEffortChange
-                ? (model, level) =>
-                    onEffortChange(
-                      inherited && model === defaultModel ? "" : model,
-                      level,
-                    )
-                : undefined
-            }
+            onEffortChange={onEffortChange}
             inherited={!discovering && inherited}
+            valueSuffix={discovering ? undefined : valueSuffix}
             label={label}
             compact={compact}
             onConfigure={onConfigure}
             models={shown.filter((model) => model.id !== "")}
             selected={
-              discovering
-                ? { ...selected, label: t("agentModel.loadingModels") }
-                : selected
-            }
-            selectionLabel={
-              discovering ? t("agentModel.loadingModels") : undefined
+              discovering ? { ...selected, label: "Loading models…" } : selected
             }
             defaultChoice={includeDefault ? shownDefault : undefined}
             disabled={disabled}
@@ -295,17 +281,9 @@ export function ModelPicker({
           <Select
             label={label}
             value={selected.id}
-            valueLabel={
-              discovering ? t("agentModel.loadingModels") : selected.label
-            }
-            valueSuffix={
-              !discovering && inherited
-                ? ` · ${t("agentModel.default")}`
-                : undefined
-            }
-            valueTitle={
-              discovering ? t("agentModel.loadingModels") : selectedLabel
-            }
+            valueLabel={discovering ? "Loading models…" : selected.label}
+            valueSuffix={discovering ? undefined : valueSuffix}
+            valueTitle={discovering ? "Loading models…" : selectedLabel}
             leading={modelLogo(`${selected.id} ${selected.label}`)}
             variant={compact ? "compact" : "preference"}
             appearance={appearance}
@@ -317,15 +295,8 @@ export function ModelPicker({
                 options: choices.map((model, index) => ({
                   value: model.id,
                   label:
-                    model === CUSTOM_MODEL_ACTION
-                      ? t("agentModel.custom")
-                      : includeDefault && model.id === ""
-                        ? t("agentModel.modelDefault", { model: model.label })
-                        : model.label,
-                  description:
-                    model === CUSTOM_MODEL_ACTION
-                      ? t("agentModel.enterID")
-                      : model.description,
+                    includeDefault && model.id === "" ? "Default" : model.label,
+                  description: model.description,
                   // The empty fragment reserves Select's icon column only in mixed lists.
                   leading: hasOptionLogos
                     ? (optionLogos[index] ?? <></>)
@@ -343,7 +314,7 @@ export function ModelPicker({
         )}
         {!groupByFamily && onEffortChange && efforts && efforts.length > 1 && (
           <Select
-            label={t("agentModel.thinkingEffort")}
+            label="Thinking effort"
             value={effort ?? ""}
             valueLabel={effortLabel}
             variant={compact ? "compact" : "preference"}

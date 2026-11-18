@@ -17,8 +17,10 @@ import type { RelaySession } from "../../features/relay/session";
 import {
   canManageMember,
   canRemoveMember,
+  canTransferOwnership,
   editableMemberRoles,
   type MemberChange,
+  transferRefusal,
 } from "../../features/channel-members/administration-protocol";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
 import {
@@ -27,6 +29,7 @@ import {
   createMenuHandle,
   type MenuHandle,
   MenuItem,
+  MenuNote,
   MenuPopup,
   MenuRoot,
   MenuTrigger,
@@ -262,6 +265,8 @@ export function MemberRow({
   channelId,
   pubkey,
   name,
+  agent,
+  profiled,
   verifiedOwner,
   onChange,
   returnFocus,
@@ -278,6 +283,9 @@ export function MemberRow({
   channelId: string;
   pubkey: string;
   name: string;
+  agent: boolean;
+  /** Only a loaded profile shows the heir isn't an agent. */
+  profiled: boolean;
   verifiedOwner?: string | undefined;
   onChange(change: MemberChange): void;
   returnFocus: React.RefObject<HTMLElement | null>;
@@ -286,7 +294,7 @@ export function MemberRow({
   onSendMessage?: (() => void) | undefined;
   messagePending?: boolean | undefined;
   /** Names the conversation in actions: Remove from chat or channel. */
-  place: "chat" | "channel";
+  place: "chat" | "channel" | "DM";
   invitationAction?: ReactNode;
   /** The search highlight, for rows a picker can choose with Enter. */
   highlight?:
@@ -308,6 +316,7 @@ export function MemberRow({
   const openingConfirmation = useRef(false);
   const [menuOpen, setMenuOpen] = useState<"button" | "context">();
   const rowId = useId();
+  const transferReason = useId();
   const menus = useContext(RowMenus);
   if (!menus) throw new Error("MemberRow renders inside MemberMenus");
   const openingProfile = useRef(false);
@@ -316,6 +325,9 @@ export function MemberRow({
     !invitationAction && capability.available && state.status === "ready";
   const canEdit =
     permitted && canManageMember(state.authority, session.viewer ?? "", pubkey);
+  const canTransfer =
+    permitted &&
+    canTransferOwnership(state.authority, session.viewer ?? "", pubkey, agent);
   const canRemove =
     permitted &&
     canRemoveMember(
@@ -361,7 +373,7 @@ export function MemberRow({
           {t("channelPages.members.sendMessage")}
         </MenuItem>
       )}
-      {(canEdit || canRemove) && !locked && (
+      {(canEdit || canTransfer || canRemove) && !locked && (
         <>
           <MenuSeparator />
           {canEdit && (
@@ -386,6 +398,21 @@ export function MemberRow({
             </MenuRadioGroup>
           )}
           {canEdit && <MenuSeparator />}
+          {canTransfer && (
+            <>
+              <MenuItem
+                disabled={!profiled}
+                aria-describedby={profiled ? undefined : transferReason}
+                onClick={() => choose("owner")}
+              >
+                Transfer ownership
+              </MenuItem>
+              {!profiled && (
+                <MenuNote id={transferReason}>{transferRefusal}</MenuNote>
+              )}
+              {canRemove && <MenuSeparator />}
+            </>
+          )}
           {canRemove && (
             <MenuItem tone="danger" onClick={() => choose("remove")}>
               {t(

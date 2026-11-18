@@ -1,9 +1,3 @@
-import { t, useLanguage } from "../../shared/i18n";
-import {
-  localMessage,
-  resolveMessage,
-  type DisplayMessage,
-} from "../../shared/i18n/deferred-message";
 import { useProfileGeneration } from "../../features/relay/react";
 import { TeamMentionAvatars } from "./TeamMentionAvatars";
 import {
@@ -28,10 +22,13 @@ import { useTeamMentions } from "./use-team-mentions";
 import { useMentionChoices } from "./use-mention-choices";
 import type { ComposerSession } from "../../features/messages/composer-session";
 import {
-  managedByDetail,
   outsideMentionDetail,
   remoteMentionDetail,
 } from "./mention-candidates";
+import {
+  allowsOutsideMentions,
+  outsideMentionReferences,
+} from "../../features/messages/mention-admission";
 import { matchPerson } from "../../features/search/person-match";
 import { MatchedLabel } from "../../features/search/MatchedLabel";
 import { useSearchHighlight } from "../../features/search/use-search-highlight";
@@ -40,56 +37,6 @@ import styles from "./Mentions.module.css";
 
 import type { ComposerToolProps } from "../../features/conversation/contracts";
 import { avatarMedia } from "../../shared/avatar-source";
-
-// Only canonical strings produced by the bundled mention helpers enter this map.
-const mentionTextKeys = {
-  "Channel membership changed. Reopen to review adding this recipient.":
-    "mentionPicker.changedRecipient",
-  Archived: "mentionPicker.archived",
-  "No longer available. Change your search to refresh choices.":
-    "mentionPicker.unavailableRecipient",
-  "Team changed or unavailable. Reopen to refresh.":
-    "mentionPicker.changedTeam",
-  "Channel membership changed. Reopen to review adding this team.":
-    "mentionPicker.changedTeamMembership",
-  "This team has no agents.": "mentionPicker.emptyTeam",
-  "Teams can mention at most 32 agents.": "mentionPicker.teamLimit",
-  "A team member is unavailable. Edit the team or refresh choices.":
-    "mentionPicker.unavailableTeamMember",
-  "Loading legacy teams…": "mentionPicker.loadingLegacyTeams",
-  "Could not load legacy teams. Retry to refresh.":
-    "mentionPicker.legacyTeamsFailed",
-  "Could not search community people. Retry to refresh.":
-    "mentionPicker.communityPeopleFailed",
-  Remote: "mentionPicker.remote",
-  "Not in DM · Will not be notified": "mentionPicker.outsideDm",
-  "Not in channel": "mentionPicker.outsideChannel",
-} as const;
-function knownMentionText(source: string | undefined): string | undefined {
-  const key = Object.entries(mentionTextKeys).find(
-    ([message]) => message === source,
-  )?.[1];
-  return key ? t(key) : source;
-}
-function teamCaption(
-  team: ReturnType<typeof useTeamMentions>["choices"][number],
-): string {
-  if (team.disabled) return knownMentionText(team.detail) ?? team.detail;
-  const display = team.presentation;
-  if (!display) return team.detail;
-  if (!display.outside)
-    return t("mentionPicker.savedTeam", { count: display.count });
-  return t(
-    display.destination === "dm"
-      ? "mentionPicker.teamOutsideDm"
-      : display.destination === "channel"
-        ? "mentionPicker.teamAddsChannel"
-        : display.destination === "chat"
-          ? "mentionPicker.teamAddsChat"
-          : "mentionPicker.teamOutsideChannel",
-    { count: display.count, outside: display.outside },
-  );
-}
 
 /** Select identities from the shared relay roster, never from display-name matching. */
 export function MentionPicker({
@@ -113,10 +60,9 @@ export function MentionPicker({
   /** Return typing to the draft when the agent menu closes. */
   focusDraft?: ComposerToolProps["focus"];
 }) {
-  useLanguage();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [error, setError] = useState<DisplayMessage>();
+  const [error, setError] = useState<string>();
   const trigger = useRef<HTMLButtonElement>(null);
   const controls = useRef<HTMLFieldSetElement>(null);
   const accepted = useRef(false);
@@ -135,6 +81,7 @@ export function MentionPicker({
     lifetime,
     open && !disabled,
     addressed,
+    !audience,
   );
   const {
     profiles,
@@ -165,7 +112,10 @@ export function MentionPicker({
     void session.profiles
       .ensure(memberKey.split(":"), "background")
       .catch(() => {
-        if (current) setError(localMessage("mentionPicker.namesUnavailable"));
+        if (current)
+          setError(
+            "Names unavailable. Exact public keys still identify recipients.",
+          );
       });
     return () => {
       current = false;
@@ -265,7 +215,7 @@ export function MentionPicker({
         ref={controls}
         disabled={disabled}
         className={styles.pickerControls}
-        aria-label={t("mentionPicker.controls")}
+        aria-label="Mention controls"
       >
         <PopoverTrigger
           disabled={disabled}
@@ -278,12 +228,10 @@ export function MentionPicker({
                 size="toolbar"
                 ref={trigger}
                 type="button"
-                aria-label={t("mentionPicker.sendingAgents", {
-                  names: audience.recipients
-                    .map((person) => person.name)
-                    .join(", "),
-                })}
-                title={t("mentionPicker.changeAgents")}
+                aria-label={`Sending to ${audience.recipients
+                  .map((person) => person.name)
+                  .join(", ")}. Change agents`}
+                title="Change agents"
                 icon={<CaretDownIcon size={16} aria-hidden="true" />}
               />
             ) : audience ? (
@@ -295,12 +243,10 @@ export function MentionPicker({
                 type="button"
                 aria-label={
                   audience.recipients.length
-                    ? t("mentionPicker.sendingAgents", {
-                        names: audience.recipients
-                          .map((person) => person.name)
-                          .join(", "),
-                      })
-                    : t("mentionPicker.chooseAgent")
+                    ? `Sending to ${audience.recipients
+                        .map((person) => person.name)
+                        .join(", ")}. Change agents`
+                    : "Choose agent"
                 }
               >
                 <AvatarStack
@@ -315,7 +261,7 @@ export function MentionPicker({
                     shape: "squircle",
                   }))}
                 />
-                {audience.recipients[0]?.name ?? t("mentionPicker.chooseAgent")}
+                {audience.recipients[0]?.name ?? "Choose agent"}
                 <CaretDownIcon size={12} aria-hidden="true" />
               </Button>
             ) : (
@@ -325,8 +271,8 @@ export function MentionPicker({
                 size="toolbar"
                 ref={trigger}
                 type="button"
-                aria-label={t("mentionPicker.mentionMember")}
-                title={t("mentionPicker.mentionMember")}
+                aria-label="Mention a member"
+                title="Mention a member"
                 icon={<AtIcon size={20} aria-hidden="true" />}
               />
             )
@@ -344,7 +290,7 @@ export function MentionPicker({
             overflow: "hidden",
             display: "flex",
           }}
-          aria-label={t("mentionPicker.popup")}
+          aria-label="Mention a member or agent"
           finalFocus={
             // The agent menu stays open across picks; closing it resumes
             // typing in the draft, unless focus went somewhere else. The
@@ -362,20 +308,13 @@ export function MentionPicker({
               variant="capsule"
               inputRef={searchInput}
               label={
-                draftRoster
-                  ? t("mentionPicker.searchRecipients")
-                  : inviteAgents
-                    ? t("mentionPicker.searchMembers")
-                    : t("mentionPicker.searchCommunity")
+                !audience &&
+                allowsOutsideMentions(channel, draftRoster, inviteAgents)
+                  ? "Search community people and agents"
+                  : draftRoster
+                    ? "Search recipients"
+                    : "Search members and agents"
               }
-              placeholder={t("mentionPicker.searchPlaceholder")}
-              clearLabel={t(
-                draftRoster
-                  ? "mentionPicker.clearRecipients"
-                  : inviteAgents
-                    ? "mentionPicker.clearMembers"
-                    : "mentionPicker.clearCommunity",
-              )}
               value={search}
               onValueChange={setSearch}
               disabled={disabled}
@@ -392,23 +331,23 @@ export function MentionPicker({
             {!draftRoster && inviteAgents && (
               <p>
                 {parentAdmission
-                  ? t("mentionPicker.inviteChannel")
-                  : t("mentionPicker.inviteChat")}
+                  ? "Agents you mention join this channel when you send, with access to its history."
+                  : "Agents you mention join this chat when you send, with access to its history."}
               </p>
             )}
             {model.directory.loading && (
-              <p role="status">{t("mentionPicker.searchingCommunity")}</p>
+              <p role="status">Searching community…</p>
             )}
             {model.directory.error && (
               <>
-                <p role="status">{knownMentionText(model.directory.error)}</p>
+                <p role="status">{model.directory.error}</p>
                 <Button type="button" onClick={model.directory.retry}>
-                  {t("mentionPicker.retryCommunity")}
+                  Retry community search
                 </Button>
               </>
             )}
             {agents.status === "loading" && !candidates.length && (
-              <p role="status">{t("mentionPicker.loadingAgents")}</p>
+              <p role="status">Loading agents…</p>
             )}
             {(agents.status === "error" || !!agents.error) && (
               <Button
@@ -419,7 +358,7 @@ export function MentionPicker({
                   )
                 }
               >
-                {t("mentionPicker.retryAgents")}
+                Retry agent list
               </Button>
             )}
             {model.archives.status === "error" && (
@@ -427,34 +366,32 @@ export function MentionPicker({
                 type="button"
                 onClick={() => void session.archives?.refresh()}
               >
-                {t("mentionPicker.retryArchives")}
+                Retry archive information
               </Button>
             )}
             {teams.status && (
               <p role="status">
-                {knownMentionText(teams.status)}{" "}
+                {teams.status}{" "}
                 {teams.canRetry && (
-                  <Button onClick={teams.retry}>
-                    {t("mentionPicker.retryLegacyTeams")}
-                  </Button>
+                  <Button onClick={teams.retry}>Retry legacy teams</Button>
                 )}
               </p>
             )}
-            {error && <p role="status">{resolveMessage(error)}</p>}
+            {error && <p role="status">{error}</p>}
             {!draftRoster && list.error && (
               <>
-                <p role="alert">{t("mentionPicker.membershipFailed")}</p>
+                <p role="alert">Could not refresh channel membership.</p>
                 <Button
                   disabled={disabled}
                   type="button"
                   onClick={() => session.channels.refreshList?.()}
                 >
-                  {t("mentionPicker.retryMembership")}
+                  Retry channel membership
                 </Button>
               </>
             )}
             {!draftRoster && (!inviteAgents || !!channel) && !members && (
-              <p role="status">{t("mentionPicker.membershipUnavailable")}</p>
+              <p role="status">Channel membership unavailable.</p>
             )}
             <div
               className={`${styles.mentionChoices} buzz-thin-scrollbar`}
@@ -472,20 +409,7 @@ export function MentionPicker({
                   execution,
                 }) => {
                   const managedBy = model.managedBy.get(recipient.pubkey);
-                  const remoteDetail = knownMentionText(
-                    remoteMentionDetail(execution),
-                  );
-                  const manager = session.profiles.owner?.(recipient.pubkey);
-                  const managerName = manager
-                    ? profiles.get(manager)?.name?.trim()
-                    : undefined;
-                  const managerCaption =
-                    managedBy &&
-                    managerName &&
-                    managedBy ===
-                      managedByDetail(manager, session.viewer, profiles)
-                      ? t("mentionPicker.managedBy", { name: managerName })
-                      : managedBy;
+                  const remoteDetail = remoteMentionDetail(execution);
                   // Each addressed agent's row shows a check; fill is only
                   // the keyboard and pointer highlight.
                   const addressed = !!audience?.recipients.some(
@@ -524,14 +448,9 @@ export function MentionPicker({
                                 <RobotIcon />
                               </span>
                             )}
-                            {agent && (
-                              <span className="sr-only">
-                                {" "}
-                                {t("mentionPicker.agent")}
-                              </span>
-                            )}
+                            {agent && <span className="sr-only"> Agent</span>}
                           </span>
-                          {reason && <small>{knownMentionText(reason)}</small>}
+                          {reason && <small>{reason}</small>}
                           {(remoteDetail ||
                             otherName ||
                             managedBy ||
@@ -541,23 +460,19 @@ export function MentionPicker({
                               {[
                                 otherName,
                                 remoteDetail,
-                                managerCaption,
+                                managedBy,
                                 members?.includes(recipient.pubkey)
                                   ? undefined
-                                  : inviteAgents
+                                  : inviteAgents &&
+                                      !outsideMentionReferences(
+                                        channel,
+                                        agents.identities,
+                                        recipient.pubkey,
+                                      )
                                     ? parentAdmission
-                                      ? t("mentionPicker.addsChannel")
-                                      : t("mentionPicker.addsChat")
-                                    : elsewhere
-                                      ? t("mentionPicker.inHost", {
-                                          host: elsewhere,
-                                        })
-                                      : knownMentionText(
-                                          outsideMentionDetail(
-                                            channel,
-                                            elsewhere,
-                                          ),
-                                        ),
+                                      ? "Adds to channel when you send"
+                                      : "Adds to chat when you send"
+                                    : outsideMentionDetail(channel, elsewhere),
                               ]
                                 .filter(Boolean)
                                 .join(" · ")}
@@ -580,11 +495,7 @@ export function MentionPicker({
                             session.media,
                           )}
                           size="large"
-                          shape={
-                            agent || !members?.includes(recipient.pubkey)
-                              ? "squircle"
-                              : "circle"
-                          }
+                          shape={agent ? "squircle" : "circle"}
                         />
                       }
                     />
@@ -615,36 +526,26 @@ export function MentionPicker({
                   }
                   trailing={
                     <span className="text-caption text-subtle">
-                      {teamCaption(team)}
+                      {team.detail}
                     </span>
                   }
-                  aria-label={t("mentionPicker.teamNameDetail", {
-                    name: team.name,
-                    detail: teamCaption(team),
-                  })}
+                  aria-label={`${team.name} · ${team.detail}`}
                   onClick={() => chooseTeam(team)}
                 />
               ))}
               {members && !candidates.length && !teams.choices.length && (
-                <p>{t("mentionPicker.noMembers")}</p>
+                <p>No matching channel members.</p>
               )}
               {audience?.named && (
                 <p className="text-caption text-subtle">
-                  {t("mentionPicker.namedTags", {
-                    names: audience.recipients
-                      .map((person) => person.name)
-                      .join(", "),
-                  })}
+                  Your message tags{" "}
+                  {audience.recipients.map((person) => person.name).join(", ")},
+                  so picks here add or remove tags.
                 </p>
               )}
               <p role="status" className="sr-only">
                 {highlightedLabel
-                  ? t(
-                      audience
-                        ? "mentionPicker.announceToggle"
-                        : "mentionPicker.announceMention",
-                      { name: highlightedLabel },
-                    )
+                  ? `${highlightedLabel}. Press Enter to ${audience ? "add or remove this agent" : "mention"}.`
                   : ""}
               </p>
             </div>

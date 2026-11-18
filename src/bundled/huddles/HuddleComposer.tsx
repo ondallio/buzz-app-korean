@@ -1,4 +1,3 @@
-import { t, useLanguage } from "../../shared/i18n";
 import { MentionModelsContext } from "../../features/agents/react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createHuddleComposerClient } from "../../features/huddle/composer-client";
@@ -24,7 +23,6 @@ function ConnectedComposer({
 }: {
   client: ReturnType<typeof createHuddleComposerClient>;
 }) {
-  useLanguage();
   useSyncExternalStore(client.subscribe, client.revision);
   const { session, data, error } = client.snapshot();
   const modelRevision = data?.modelRevision;
@@ -50,14 +48,14 @@ function ConnectedComposer({
         scope={data.scope}
         channelId={data.room}
         channelName="Huddle"
-        formLabel={t("huddleMain.form")}
-        label={t("huddleMain.message")}
-        placeholder={t("huddleMain.message")}
+        forwardAudience="Everyone in this Huddle"
+        label="Message this Huddle"
+        placeholder="Message this Huddle"
         disabled={!data.writable}
         editMessages={[]}
       />
     </MentionModelsContext.Provider>
   ) : (
-    <p role="status">{t("huddleDiscussion.loadingComposer")}</p>
+    <p role="status">Loading composer…</p>
   );
 }

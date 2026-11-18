@@ -1,5 +1,4 @@
 import { useMediaReadRecovery } from "./use-media-read-recovery";
-import { formattingLocale, t, useLanguage } from "../../shared/i18n";
 import { useConversationPresentation } from "../conversation/ConversationPresentation";
 import { prepareReviewEntrance } from "./use-review-entrance";
 import { useMediaCorners } from "./use-media-corners";
@@ -32,6 +31,8 @@ import {
 import styles from "./Messages.module.css";
 import { useModalBoundary } from "./useModalBoundary";
 import { useMediaElementSource } from "./use-media-element-source";
+import { MediaContextMenu } from "./MediaContextMenu";
+import { MediaActionAnnouncements } from "./MediaActionAnnouncements";
 
 export type MediaPlayback = Readonly<{
   attachmentUrl: string;
@@ -87,7 +88,7 @@ export function MediaAttachment({
   attachment,
   media,
   mode = "inline",
-  imageDescription = t("mediaViewing.image.preview"),
+  imageDescription = "Attachment preview",
   preload = "auto",
   seekTo,
   seekRequest,
@@ -95,9 +96,8 @@ export function MediaAttachment({
   onOpenReview,
   compact = false,
   overlayCount = 0,
-  label = t("attachmentMedia.videoOpenFullscreen"),
+  label = "Open video fullscreen",
 }: MediaAttachmentProps) {
-  const language = useLanguage();
   const active = useConversationPresentation();
   const corners = useMediaCorners();
   const source = media(attachment.url);
@@ -136,13 +136,18 @@ export function MediaAttachment({
     active ? videoSource : undefined,
     () => setFailed(true),
   );
+  const viewMedia = (seconds: number) => {
+    video.current?.pause();
+    if (onOpenReview) onOpenReview(attachment, seconds);
+    else setViewerOpen(true);
+  };
 
   if (!source && !compact)
     return (
       <span className={styles.attachmentUnavailable} role="status">
         {attachment.kind === "video"
-          ? t("attachmentMedia.videoUnavailable")
-          : t("mediaViewing.image.unavailable")}
+          ? "Video unavailable"
+          : "Image unavailable"}
       </span>
     );
 
@@ -150,62 +155,76 @@ export function MediaAttachment({
     return (
       <span className={styles.attachmentUnavailable} role="status">
         {attachment.kind === "video"
-          ? t("attachmentMedia.videoUnavailable")
-          : t("mediaViewing.image.unavailable")}
+          ? "Video unavailable"
+          : "Image unavailable"}
       </span>
     );
 
   if (attachment.kind === "image")
     return (
       <>
-        <button
-          ref={corners}
-          className={`${styles.mediaPreview} ${mode === "thread" ? styles.mediaPreviewThread : ""}`}
-          style={previewStyle}
-          type="button"
-          aria-label={t("attachmentMedia.imageOpenFullscreen")}
-          data-image-preview=""
-          data-media-preview=""
-          onClick={(event) => {
-            prepareReviewEntrance(event);
-            if (onOpenReview) onOpenReview(attachment, 0);
-            else setViewerOpen(true);
-          }}
+        <MediaContextMenu
+          kind="image"
+          url={attachment.url}
+          source={source}
+          name={attachment.name}
+          onView={() => viewMedia(0)}
         >
-          <span className={styles.mediaPreviewPixels}>
-            <img
-              src={source}
-              alt={imageDescription}
-              loading="lazy"
-              onLoad={(event) =>
-                setMeasuredDimensions({
-                  width: event.currentTarget.naturalWidth,
-                  height: event.currentTarget.naturalHeight,
-                })
-              }
-              onError={() => setFailed(true)}
-            />
-          </span>
-          <svg
-            className={styles.imageOutline}
-            data-image-outline=""
-            aria-hidden="true"
+          <button
+            ref={corners}
+            className={`${styles.mediaPreview} ${mode === "thread" ? styles.mediaPreviewThread : ""}`}
+            style={previewStyle}
+            type="button"
+            aria-label="Open image fullscreen"
+            data-image-preview=""
+            data-media-preview=""
+            onClick={(event) => {
+              prepareReviewEntrance(event);
+              viewMedia(0);
+            }}
           >
-            <path />
-          </svg>
-        </button>
+            <span className={styles.mediaPreviewPixels}>
+              <img
+                src={source}
+                alt={imageDescription}
+                loading="lazy"
+                onLoad={(event) =>
+                  setMeasuredDimensions({
+                    width: event.currentTarget.naturalWidth,
+                    height: event.currentTarget.naturalHeight,
+                  })
+                }
+                onError={() => setFailed(true)}
+              />
+            </span>
+            <svg
+              className={styles.imageOutline}
+              data-image-outline=""
+              aria-hidden="true"
+            >
+              <path />
+            </svg>
+          </button>
+        </MediaContextMenu>
         {active &&
           viewerOpen &&
           createPortal(
             <MediaViewer
-              title={t("attachmentMedia.imageTitle")}
+              title="Image attachment"
               close={() => setViewerOpen(false)}
             >
-              <img
-                className={styles.mediaViewerImage}
-                src={source}
-                alt={imageDescription}
-              />
+              <MediaContextMenu
+                kind="image"
+                url={attachment.url}
+                source={source}
+                name={attachment.name}
+              >
+                <img
+                  className={styles.mediaViewerImage}
+                  src={source}
+                  alt={imageDescription}
+                />
+              </MediaContextMenu>
             </MediaViewer>,
             document.body,
           )}
@@ -215,7 +234,7 @@ export function MediaAttachment({
   if (attachment.kind !== "video")
     return (
       <span className={styles.attachmentUnavailable} role="status">
-        {t("v1msg.attachment.unavailable")}
+        Attachment unavailable
       </span>
     );
 
@@ -337,107 +356,119 @@ export function MediaAttachment({
 
   if (compact)
     return (
-      <a
-        ref={corners}
-        className={styles.attachmentImage}
-        style={{
-          width: "100%",
-          height: 0,
-          paddingBottom: "100%",
-          aspectRatio: "auto",
-        }}
-        href={source ?? attachment.url}
-        aria-label={label}
-        data-media-preview=""
-        data-video-preview=""
-        onClick={(event) => {
-          event.preventDefault();
-          prepareReviewEntrance(event);
-          onOpenReview?.(attachment, 0);
-        }}
+      <MediaContextMenu
+        kind="video"
+        url={attachment.url}
+        source={source}
+        name={attachment.name}
+        onView={() => viewMedia(0)}
       >
-        <span className={styles.attachmentImagePixels}>
-          {source && !failed && !element.unavailable ? videoElement : null}
-          <span className={styles.mediaGridBadge} aria-hidden="true">
-            <PlayIcon size={24} />
-          </span>
-          {overlayCount > 0 && (
-            <span className={styles.imageOverflow} aria-hidden="true">
-              +
-              {new Intl.NumberFormat(formattingLocale(language)).format(
-                overlayCount,
-              )}
-            </span>
-          )}
-        </span>
-        <svg
-          className={styles.imageOutline}
-          data-image-outline=""
-          aria-hidden="true"
+        <a
+          ref={corners}
+          className={styles.attachmentImage}
+          style={{
+            width: "100%",
+            height: 0,
+            paddingBottom: "100%",
+            aspectRatio: "auto",
+          }}
+          href={source ?? attachment.url}
+          aria-label={label}
+          data-media-preview=""
+          data-video-preview=""
+          onClick={(event) => {
+            event.preventDefault();
+            prepareReviewEntrance(event);
+            onOpenReview?.(attachment, 0);
+          }}
         >
-          <path />
-        </svg>
-      </a>
+          <span className={styles.attachmentImagePixels}>
+            {source && !failed && !element.unavailable ? videoElement : null}
+            <span className={styles.mediaGridBadge} aria-hidden="true">
+              <PlayIcon size={24} />
+            </span>
+            {overlayCount > 0 && (
+              <span className={styles.imageOverflow} aria-hidden="true">
+                +{overlayCount}
+              </span>
+            )}
+          </span>
+          <svg
+            className={styles.imageOutline}
+            data-image-outline=""
+            aria-hidden="true"
+          >
+            <path />
+          </svg>
+        </a>
+      </MediaContextMenu>
     );
 
   return (
     <>
-      <div
-        ref={corners}
-        className={`${styles.mediaPreview} ${mode === "thread" ? styles.mediaPreviewThread : ""}`}
-        data-video-preview=""
-        data-media-preview=""
-        data-started={started || undefined}
-        data-playing={playing ? "true" : undefined}
-        style={previewStyle}
+      <MediaContextMenu
+        kind="video"
+        url={attachment.url}
+        source={source}
+        name={attachment.name}
+        onView={() => viewMedia(currentTime)}
       >
         <div
-          className={`${styles.mediaPreviewPixels} dark`}
-          data-color-mode="dark"
+          ref={corners}
+          className={`${styles.mediaPreview} ${mode === "thread" ? styles.mediaPreviewThread : ""}`}
+          data-video-preview=""
+          data-media-preview=""
+          data-started={started || undefined}
+          data-playing={playing ? "true" : undefined}
+          style={previewStyle}
         >
-          {visiblePreview && !started && (
-            <img
-              className={styles.mediaPoster}
-              src={visiblePreview}
-              alt=""
-              aria-hidden="true"
-            />
-          )}
-          {videoElement}
-          {active && <VideoControls videoRef={video} inline />}
-          <span className={styles.mediaExpand}>
-            <IconButton
-              size="compact"
-              variant="media"
-              type="button"
-              aria-label={t("attachmentMedia.videoOpenFullscreen")}
-              onClick={(event) => {
-                prepareReviewEntrance(event);
-                video.current?.pause();
-                if (onOpenReview) onOpenReview(attachment, currentTime);
-                else setViewerOpen(true);
-              }}
-              icon={<ArrowsOutIcon size={16} aria-hidden="true" />}
-            />
-          </span>
+          <div
+            className={`${styles.mediaPreviewPixels} dark`}
+            data-color-mode="dark"
+          >
+            {visiblePreview && !started && (
+              <img
+                className={styles.mediaPoster}
+                src={visiblePreview}
+                alt=""
+                aria-hidden="true"
+              />
+            )}
+            {videoElement}
+            {active && <VideoControls videoRef={video} inline />}
+            <span className={styles.mediaExpand}>
+              <IconButton
+                size="compact"
+                variant="media"
+                type="button"
+                aria-label="Open video fullscreen"
+                onClick={(event) => {
+                  prepareReviewEntrance(event);
+                  viewMedia(currentTime);
+                }}
+                icon={<ArrowsOutIcon size={16} aria-hidden="true" />}
+              />
+            </span>
+          </div>
+          <svg
+            className={styles.imageOutline}
+            data-image-outline=""
+            aria-hidden="true"
+          >
+            <path />
+          </svg>
         </div>
-        <svg
-          className={styles.imageOutline}
-          data-image-outline=""
-          aria-hidden="true"
-        >
-          <path />
-        </svg>
-      </div>
+      </MediaContextMenu>
       {source &&
         active &&
         viewerOpen &&
         createPortal(
           <MediaViewer
-            title={t("attachmentMedia.videoTitle")}
+            title="Video attachment"
             close={() => setViewerOpen(false)}
           >
             <VideoPlayer
+              attachmentUrl={attachment.url}
               downloadName={attachment.name ?? ""}
               source={source}
               poster={visiblePreview}
@@ -467,7 +498,6 @@ export function MediaViewer({
   close(): void;
   children: ReactNode;
 }) {
-  useLanguage();
   const backdrop = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   useModalBoundary(backdrop, closeButton, close);
@@ -496,14 +526,14 @@ export function MediaViewer({
                 size="compact"
                 ref={closeButton}
                 type="button"
-                aria-label={t("mediaViewing.review.close")}
+                aria-label="Close fullscreen viewer"
                 onClick={close}
                 icon={<XIcon size={20} aria-hidden="true" />}
               />
             }
           />
         </div>
-        {children}
+        <MediaActionAnnouncements>{children}</MediaActionAnnouncements>
       </section>
     </div>
   );

@@ -1,10 +1,3 @@
-import { t, useLanguage } from "../../shared/i18n";
-import {
-  localMessage,
-  errorMessage,
-  resolveMessage,
-  type DisplayMessage,
-} from "../../shared/i18n/deferred-message";
 import {
   useCallback,
   useEffect,
@@ -33,6 +26,7 @@ import {
 import styles from "./ChannelMembersDialog.module.css";
 import { privacyConsequence } from "./ChannelPrivacyConfirmation";
 import {
+  SOLO_ACCESS_DISCLOSURE,
   soloLabels,
   soloRetainedAccessWarning,
 } from "../../features/solo/labels";
@@ -42,6 +36,24 @@ import {
   generalAccessValue,
 } from "../../features/channels/general-access";
 
+/** Resource wording and participation policy; relay authorization remains authoritative. */
+export type GeneralAccessPolicy = {
+  subject: string;
+  /** False removes Public participation while retaining community View only. */
+  allowPublic?: boolean;
+  visibilityDescription(visibility: "private" | "public"): string;
+};
+
+export type ChannelGeneralAccessProps = {
+  capability: ChannelDetailsCapability;
+  recovery?: RelayRecovery | undefined;
+  channelId: string;
+  channel?: ChannelSummary;
+  /** False only when the signed member-role snapshot verifies no Guests. */
+  mayHaveGuestMembers?: boolean;
+  policy?: GeneralAccessPolicy;
+};
+
 /** General access uses the same signed save/readback owner as channel details.
  * Each policy is confirmed once, like the individual member roles. */
 export function ChannelGeneralAccess({
@@ -50,16 +62,10 @@ export function ChannelGeneralAccess({
   channelId,
   channel,
   mayHaveGuestMembers = true,
-}: {
-  capability: ChannelDetailsCapability;
-  recovery?: RelayRecovery | undefined;
-  channelId: string;
-  channel?: ChannelSummary;
-  /** False only when the signed member-role snapshot verifies no Guests. */
-  mayHaveGuestMembers?: boolean;
-}) {
-  useLanguage();
-  const place = channel?.channelType === "solo" ? "chat" : "channel";
+  policy,
+}: ChannelGeneralAccessProps) {
+  const place =
+    policy?.subject ?? (channel?.channelType === "solo" ? "chat" : "channel");
   const Icon =
     channel?.visibility === "public"
       ? channel.joinRole === "guest"
@@ -70,12 +76,9 @@ export function ChannelGeneralAccess({
   // calling the membership/write-gated channel-details capability.
   if (channel?.readOnly)
     return (
-      <section
-        aria-label={t("channelForms.general.title")}
-        className={styles.generalAccess}
-      >
+      <section aria-label="General access" className={styles.generalAccess}>
         <h3 className={`${styles.groupHeading} pb-2 text-caption text-subtle`}>
-          {t("channelForms.general.heading")}
+          General
         </h3>
         <div className={styles.accessRow}>
           <span className={styles.accessIcon} aria-hidden="true">
@@ -89,21 +92,17 @@ export function ChannelGeneralAccess({
           <div className={styles.accessAudience}>
             <p className="text-body-sm">
               {channel.visibility === "public"
-                ? t("channelForms.general.anyRead")
+                ? "Anyone in the community can read."
                 : channel.visibility === "private"
-                  ? t(
-                      place === "chat"
-                        ? "channelForms.general.chatRead"
-                        : "channelForms.general.channelRead",
-                    )
-                  : t("channelForms.general.readUnknown")}
+                  ? `Only ${place} members can read.`
+                  : "Reading access could not be confirmed."}
             </p>
             <p className="text-caption text-subtle">
               {channel.viewerRole === "guest" || channel.joinRole === "guest"
-                ? t("channelForms.general.onlyViewing")
+                ? "Viewing only. Ask an owner or admin to participate."
                 : channel.joinRole === "member"
-                  ? t("channelForms.general.newParticipateExisting")
-                  : t("channelForms.general.newUnknown")}
+                  ? `New people can participate. People already in the ${policy?.subject ?? "channel"} keep their access.`
+                  : "New people’s access could not be confirmed."}
             </p>
           </div>
         </div>
@@ -116,6 +115,7 @@ export function ChannelGeneralAccess({
       channelId={channelId}
       mayHaveGuestMembers={mayHaveGuestMembers}
       autoJoin={channel?.autoJoin ?? false}
+      policy={policy}
     />
   );
 }
@@ -126,14 +126,15 @@ function ChannelGeneralAccessEditor({
   channelId,
   mayHaveGuestMembers,
   autoJoin,
+  policy,
 }: {
   capability: ChannelDetailsCapability;
   recovery: RelayRecovery | undefined;
   channelId: string;
   mayHaveGuestMembers: boolean;
   autoJoin: boolean;
+  policy: GeneralAccessPolicy | undefined;
 }) {
-  useLanguage();
   const attempt = useSyncExternalStore(capability.subscribe, () =>
     capability.snapshot(channelId),
   );
@@ -141,8 +142,8 @@ function ChannelGeneralAccessEditor({
   const [choice, setChoice] = useState<ChannelDetailsDraft>();
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<DisplayMessage>("");
-  const [status, setStatus] = useState<DisplayMessage>("");
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
   const lifetime = useRef<AbortController | undefined>(undefined);
   const busy = useRef(false);
   const origin = useRef<HTMLElement | null>(null);
@@ -166,7 +167,7 @@ function ChannelGeneralAccessEditor({
       } catch (reason) {
         if (!signal.aborted) {
           setBase(undefined);
-          setError(errorMessage(reason));
+          setError(reason instanceof Error ? reason.message : String(reason));
           failed(reason);
         }
       } finally {
@@ -188,6 +189,12 @@ function ChannelGeneralAccessEditor({
   }, [load]);
   const locked = loading || pending || !!attempt || !base?.canEdit;
   const solo = soloLabels(base?.labels);
+  const place = policy?.subject ?? (solo ? "chat" : "channel");
+  const restrictPublic = solo || policy?.allowPublic === false;
+  const policyAllowsChoice =
+    !restrictPublic ||
+    choice?.visibility !== "public" ||
+    choice.joinRole === "guest";
   const access = base ? generalAccessValue(base) : "";
   const Icon =
     access === "public"
@@ -200,7 +207,8 @@ function ChannelGeneralAccessEditor({
     const option = Object.values(generalAccessOptions).find(
       (option) => option.value === value,
     );
-    if (value === access || !option || (solo && value === "public")) return;
+    if (value === access || !option || (restrictPublic && value === "public"))
+      return;
     origin.current =
       section.current?.querySelector<HTMLElement>('[role="combobox"]') ?? null;
     setError("");
@@ -213,7 +221,8 @@ function ChannelGeneralAccessEditor({
       signal.aborted ||
       !current?.canEdit ||
       generalAccessValue(current) === value ||
-      (soloLabels(current.labels) && value === "public")
+      ((soloLabels(current.labels) || policy?.allowPublic === false) &&
+        value === "public")
     )
       return;
     setChoice({
@@ -226,19 +235,15 @@ function ChannelGeneralAccessEditor({
     if (
       !controller ||
       busy.current ||
-      (check ? attempt?.status !== "unconfirmed" : !base || !choice || locked)
+      (check
+        ? attempt?.status !== "unconfirmed"
+        : !base || !choice || locked || !policyAllowsChoice)
     )
       return;
     if (check) section.current?.focus();
     busy.current = true;
     setPending(true);
-    setStatus(
-      localMessage(
-        check
-          ? "channelForms.general.checkingSave"
-          : "channelForms.general.saving",
-      ),
-    );
+    setStatus(check ? "Checking save status…" : "Saving access…");
     setError("");
     // The choices lock while saving; keep keyboard focus in the access region.
     origin.current = section.current;
@@ -248,13 +253,13 @@ function ChannelGeneralAccessEditor({
       else if (base && choice)
         await capability.save(base, choice, controller.signal);
       if (!controller.signal.aborted) {
-        setStatus(localMessage("channelForms.general.updated"));
+        setStatus("Access updated");
         await load(controller.signal);
       }
     } catch (reason) {
       if (!controller.signal.aborted) {
         setStatus("");
-        setError(errorMessage(reason));
+        setError(reason instanceof Error ? reason.message : String(reason));
       }
     } finally {
       if (!controller.signal.aborted) {
@@ -267,12 +272,12 @@ function ChannelGeneralAccessEditor({
     <>
       <section
         ref={section}
-        aria-label={t("channelForms.general.title")}
+        aria-label="General access"
         tabIndex={-1}
         className={styles.generalAccess}
       >
         <h3 className={`${styles.groupHeading} pb-2 text-caption text-subtle`}>
-          {t("channelForms.general.heading")}
+          General
         </h3>
         <div className={styles.accessControl}>
           <div className={styles.accessIdentity}>
@@ -296,21 +301,21 @@ function ChannelGeneralAccessEditor({
             <div className={styles.accessSummary}>
               <p className="text-body-sm">
                 {access === "private"
-                  ? t("channelForms.general.onlyAdded")
+                  ? "Only people you add"
                   : access
-                    ? t("channelForms.general.anyone")
-                    : t("channelForms.general.title")}
+                    ? "Anyone in the community"
+                    : "General access"}
               </p>
               <p className="text-caption text-subtle">
                 {access === "public"
-                  ? t("channelForms.general.newParticipate")
+                  ? "New people can participate."
                   : access === "view-only"
-                    ? t("channelForms.general.newView")
+                    ? "New people can only view."
                     : access === "private"
-                      ? t("channelForms.general.existing")
+                      ? "Existing members keep their access."
                       : loading
-                        ? t("channelForms.general.checking")
-                        : t("channelForms.general.unknown")}
+                        ? "Checking current access…"
+                        : "Current access could not be confirmed."}
               </p>
             </div>
           </div>
@@ -319,18 +324,12 @@ function ChannelGeneralAccessEditor({
               variant="compact"
               align="end"
               size="sm"
-              label={t("channelForms.general.title")}
+              label="General access"
               value={access}
               valueLabel={
-                solo && access === "public"
-                  ? t("channelForms.general.publicExisting")
-                  : undefined
+                restrictPublic && access === "public" ? "Public" : undefined
               }
-              placeholder={
-                loading
-                  ? t("channelForms.general.loading")
-                  : t("channelForms.general.unavailable")
-              }
+              placeholder={loading ? "Loading access…" : "Access unavailable"}
               disabled={locked}
               groups={[
                 {
@@ -338,17 +337,15 @@ function ChannelGeneralAccessEditor({
                   options: [
                     {
                       ...generalAccessOptions.public,
-                      label: t("channelForms.general.public"),
-                      description: t("channelForms.general.publicDescription"),
                       leading: <GlobeIcon size={20} />,
                     },
                     {
                       ...generalAccessOptions["view-only"],
-                      label: t("channelForms.general.viewOnly"),
-                      description: t("channelForms.general.anyRead"),
                       leading: <EyeIcon size={20} />,
                     },
-                  ].filter((option) => !solo || option.value !== "public"),
+                  ].filter(
+                    (option) => !restrictPublic || option.value !== "public",
+                  ),
                 },
                 {
                   label: "",
@@ -356,8 +353,6 @@ function ChannelGeneralAccessEditor({
                   options: [
                     {
                       ...generalAccessOptions.private,
-                      label: t("channelForms.general.private"),
-                      description: t("channelForms.general.privateDescription"),
                       leading: <LockIcon size={20} />,
                     },
                   ],
@@ -369,40 +364,39 @@ function ChannelGeneralAccessEditor({
         </div>
         {choice && base && (
           <AlertDialog
-            title={t("channelForms.general.confirm")}
+            title="Change general access?"
             description={[
               solo && choice.visibility === "public"
-                ? t("channelForms.general.soloDisclosure")
+                ? SOLO_ACCESS_DISCLOSURE
                 : choice.visibility !== base.visibility
-                  ? solo
-                    ? t("channelForms.access.chatOnly")
-                    : privacyConsequence(choice.visibility)
+                  ? policy
+                    ? policy.visibilityDescription(choice.visibility)
+                    : solo
+                      ? "Only chat members will have access."
+                      : privacyConsequence(choice.visibility)
                   : "",
-              solo && choice.visibility === "private"
-                ? soloRetainedAccessWarning(base, mayHaveGuestMembers)
-                  ? t(
-                      base.joinRole === "guest"
-                        ? "channelForms.general.retainedGuest"
-                        : "channelForms.general.retainedMember",
-                    )
-                  : ""
+              (solo || policy) && choice.visibility === "private"
+                ? soloRetainedAccessWarning(
+                    base,
+                    mayHaveGuestMembers,
+                    policy ? null : undefined,
+                  )
                 : "",
               solo &&
               access === "public" &&
               choice.visibility === "public" &&
               choice.joinRole === "guest"
-                ? t("channelForms.general.chatExisting")
+                ? "People already in the chat keep their access."
+                : "",
+              restrictPublic && access === "public"
+                ? "You won’t be able to switch back to Public here."
                 : "",
               // The relay keeps the flag but refuses changing it on a private channel.
               choice.visibility === "private" && autoJoin
-                ? t("channelForms.general.starterPrivate")
+                ? "It’s a starter channel, so new members will be added to it again if it’s made public. To stop that, turn off Starter channel for new members in Settings first."
                 : "",
               !solo && choice.visibility === "public"
-                ? t(
-                    choice.joinRole === "guest"
-                      ? "channelForms.general.channelNewView"
-                      : "channelForms.general.channelNewParticipate",
-                  )
+                ? `New people will ${choice.joinRole === "guest" ? "only be able to view" : "be able to participate"}. People already in the ${place} keep their access.`
                 : "",
             ]
               .filter(Boolean)
@@ -413,43 +407,44 @@ function ChannelGeneralAccessEditor({
             actions={
               <>
                 <Button ref={cancel} onClick={() => setChoice(undefined)}>
-                  {t("channelForms.cancel")}
+                  Cancel
                 </Button>
                 <Button
                   variant="prominent"
-                  disabled={locked}
+                  disabled={locked || !policyAllowsChoice}
                   onClick={() => void apply()}
                 >
-                  {t("channelForms.general.action")}
+                  Change access
                 </Button>
               </>
             }
           />
         )}
         <p role="status" aria-atomic="true" className="sr-only">
-          {resolveMessage(status)}
+          {status}
         </p>
       </section>
       {(error || attempt?.status === "unconfirmed") && (
         <fieldset
-          aria-label={t("channelForms.general.recovery")}
+          aria-label="General access recovery"
           className={styles.accessFeedback}
         >
           {error && (
             <p role="alert" className="text-body-sm text-danger">
-              {resolveMessage(error)}
+              {error}
             </p>
           )}
           {attempt?.status === "unconfirmed" ? (
             <>
               <p role="status" className="text-body-sm">
-                {t("channelForms.general.unconfirmed")}
+                The change may have been saved. Check its status before trying
+                again. Checking never resends it.
               </p>
               <Button
                 disabled={loading || pending}
                 onClick={() => void apply(true)}
               >
-                {t("channelForms.general.checkSave")}
+                Check save status
               </Button>
             </>
           ) : (
@@ -461,7 +456,7 @@ function ChannelGeneralAccessEditor({
                   if (lifetime.current) void load(lifetime.current.signal);
                 }}
               >
-                {t("channelForms.general.reload")}
+                Reload access
               </Button>
             )
           )}

@@ -1,24 +1,25 @@
-import { t, useLanguage } from "../../shared/i18n";
 import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
-import { EmojiArtwork } from "../../features/profiles/AvatarEditor";
+import { AvatarCropFrame } from "../../features/profiles/AvatarCrop";
+import { useAvatarPreview } from "../../features/profiles/use-avatar-preview";
 import { BuilderlabLogoIcon } from "../../shared/design-system/icons";
 import type { AvatarSelection } from "./AgentAvatarPicker";
 import { AgentPortrait } from "./AgentCard";
 import styles from "./AgentCreate.module.css";
+import { EmojiSwap } from "./EmojiSwap";
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const endings = [
-  "v1agent.remoteIntro.ending1",
-  "v1agent.remoteIntro.ending2",
-  "v1agent.remoteIntro.ending3",
-  "v1agent.remoteIntro.ending4",
-  "v1agent.remoteIntro.ending5",
-  "v1agent.remoteIntro.ending6",
-  "v1agent.remoteIntro.ending7",
-  "v1agent.remoteIntro.ending8",
-  "v1agent.remoteIntro.ending9",
-  "v1agent.remoteIntro.ending10",
+  "So… what are we getting into?",
+  "Got a weird idea? I’m listening.",
+  "Big plans? Tiny question? Hit me.",
+  "What’s our first side quest?",
+  "I’m new here. What should I know?",
+  "Tell me your most ‘hear me out’ idea.",
+  "Your next rabbit hole has a plus-one.",
+  "You bring the half-baked idea. We’ll figure out the rest.",
+  "Go on, I’m all ears. Metaphorically.",
+  "All right. What’s the plot?",
 ] as const;
 
 export function RemoteAgentIntroduction({
@@ -32,23 +33,30 @@ export function RemoteAgentIntroduction({
   community?: string | undefined;
   builderlab: boolean;
 }) {
-  useLanguage();
-  const [ending] = useState(
+  const [finish] = useState(
     () => endings[Math.floor(Math.random() * endings.length)] ?? endings[0],
   );
-  const finish = t(ending);
-  const hello = t("v1agent.remoteIntro.hello", { name });
+  // The picture is still the original upload; the crop is painted on save.
+  // If it fails to load, the portrait's own fallback and retries take over.
+  const [unframed, setUnframed] = useState(false);
+  const crop = avatar.kind === "image" && !unframed ? avatar.crop : undefined;
+  const framed = useAvatarPreview(
+    crop && avatar.kind === "image" ? avatar.picture : "",
+    community,
+    "small",
+  );
+  const hello = `Hi, I’m ${name}.`;
   const opening = builderlab
-    ? t("v1agent.remoteIntro.hostedBefore")
-    : t("v1agent.remoteIntro.elsewhere");
+    ? "Since I’m a remote agent hosted by "
+    : "I work on another computer";
   const provider = builderlab ? "Builderlab" : "";
-  const ready = builderlab
-    ? t("v1agent.remoteIntro.hostedAfter")
-    : t("v1agent.remoteIntro.elsewhereEnd");
+  const ready = builderlab ? ", I’m always ready for you." : ".";
   const online = builderlab
-    ? t("v1agent.remoteIntro.phone")
-    : t("v1agent.remoteIntro.availability");
-  const files = builderlab ? t("v1agent.remoteIntro.files") : "";
+    ? "You can chat with me from your phone, even when this computer is off. "
+    : "My availability and file access depend on that computer’s setup.";
+  const files = builderlab
+    ? "I just won’t be able to open files on this computer."
+    : "";
   const openingStart = hello.length;
   const providerStart = openingStart + opening.length;
   const readyStart = providerStart + provider.length;
@@ -146,7 +154,7 @@ export function RemoteAgentIntroduction({
       <motion.div
         className={styles.remotePortrait}
         role="img"
-        aria-label={t("v1agent.remoteIntro.avatar", { name })}
+        aria-label={`${name}’s avatar`}
         initial={reducedMotion ? false : { opacity: 0, scale: 0.75 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: reducedMotion ? 0 : 0.28, ease: "easeOut" }}
@@ -157,8 +165,19 @@ export function RemoteAgentIntroduction({
             className={styles.remoteEmoji}
             style={{ backgroundColor: avatar.color }}
           >
-            <EmojiArtwork emoji={avatar.emoji} animate={false} />
+            <EmojiSwap
+              emoji={avatar.emoji}
+              crop={avatar.crop}
+              animate={false}
+            />
           </div>
+        ) : crop && framed ? (
+          <AvatarCropFrame
+            src={framed}
+            shape="squircle"
+            crop={crop}
+            onError={() => setUnframed(true)}
+          />
         ) : (
           <AgentPortrait
             agent={{ name, picture: avatar.picture }}

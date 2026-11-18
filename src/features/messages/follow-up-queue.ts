@@ -1,4 +1,3 @@
-import { t } from "../../shared/i18n";
 import type { RelaySession } from "../relay/session";
 import type { OutboxRecovery, OutgoingEvent } from "../relay/outbox";
 import { followUpMessage } from "./follow-up-message";
@@ -462,7 +461,7 @@ function createQueue(session: RelaySession) {
           return;
         }
         if (!session.outbox)
-          throw new Error(t("v1msg.queue.deliveryUnavailable"));
+          throw new Error("Message delivery is unavailable.");
         await session.outbox.ready();
         const previous = await session.outbox.recovery(
           followUpRecovery(entry.id).key,
@@ -478,7 +477,9 @@ function createQueue(session: RelaySession) {
               .snapshot()
               .some((item) => item.event.id === previous.event.id)
           )
-            throw new Error(t("v1msg.queue.otherWindow"));
+            throw new Error(
+              "This message is owned by another window. Reload to recover its delivery.",
+            );
           if (storage.handoff(entry.channelId)?.id === entry.id) {
             const handoff = {
               id: entry.id,
@@ -501,7 +502,9 @@ function createQueue(session: RelaySession) {
           return;
         }
         if (storage.isSending(entry.id))
-          throw new Error(t("v1msg.queue.maybeSending"));
+          throw new Error(
+            "This message may already be sending in another window. Reload to recover its delivery. If it was interrupted before sending, check the conversation before removing this row and sending again.",
+          );
       }
       // This window owns the lock, but has not started an Outbox handoff.
       // Remove may cancel its own validation; other windows still need the lock.
@@ -547,7 +550,8 @@ function createQueue(session: RelaySession) {
                   ...item,
                   restored: true,
                   resumeCancelled: true,
-                  error: t("v1msg.queue.earlierOtherWindow"),
+                  error:
+                    "Another window may be handling an earlier queued message. Check the conversation, then Send when ready.",
                 }
               : item,
           );
@@ -592,7 +596,7 @@ function createQueue(session: RelaySession) {
       }
       if (storage && entry.message) {
         if (!session.outbox)
-          throw new Error(t("v1msg.queue.deliveryUnavailable"));
+          throw new Error("Message delivery is unavailable.");
         await session.outbox.recover(id, followUpRecovery(entry.id), () =>
           storage.remove(entry.id),
         );
@@ -857,10 +861,12 @@ function createQueue(session: RelaySession) {
               row.id === entry.channelId && (!row.readOnly || row.cached),
           )
       )
-        throw new Error(t("v1msg.queue.chatUnavailable"));
+        throw new Error("This chat is no longer available for sending.");
       if (entry.message) restore();
       if (entry.message && (!storage || storageError))
-        throw new Error(storageError ?? t("v1msg.queue.storageUnavailable"));
+        throw new Error(
+          storageError ?? "Queued message storage is unavailable.",
+        );
       watch();
       if (
         (validated || !entry.beforeRelease) &&
@@ -868,11 +874,14 @@ function createQueue(session: RelaySession) {
         !entries.some((item) => item.channelId === entry.channelId)
       )
         return sent(entry);
-      if (entries.length >= 50) throw new Error(t("v1msg.queue.full"));
+      if (entries.length >= 50)
+        throw new Error(
+          "The follow-up queue is full. Send or remove a queued message first.",
+        );
       const id = crypto.randomUUID();
       const createdAt = ++sequence;
       if (entry.message) {
-        if (!storage) throw new Error(t("v1msg.queue.storageUnavailable"));
+        if (!storage) throw new Error("Queued message storage is unavailable.");
         storage.save({ ...entry.message, id, createdAt });
       }
       entries = [...entries, { ...entry, id, createdAt, admitted: true }];
@@ -1029,7 +1038,7 @@ function createQueue(session: RelaySession) {
         publishing.has(id) ||
         edits.has(id)
       )
-        throw new Error(t("messages.composer.queuedEditUnavailable"));
+        throw new Error("This queued message is no longer available to edit.");
       const originalText = entry.text;
       edits.add(id);
       let closed = false;
@@ -1042,16 +1051,24 @@ function createQueue(session: RelaySession) {
       return {
         cancel,
         async save(text: string) {
-          if (closed) throw new Error(t("v1msg.queue.editClosed"));
-          if (!text.trim() && !entry.message?.attachments.length)
-            throw new Error(t("v1msg.queue.editEmpty"));
+          if (closed) throw new Error("This edit is no longer available.");
+          if (
+            !text.trim() &&
+            !entry.message?.attachments.length &&
+            !entry.message?.forward
+          )
+            throw new Error("Enter a message or keep an attachment.");
           await storage.lock(id, async () => {
-            if (closed) throw new Error(t("v1msg.queue.editClosed"));
+            if (closed) throw new Error("This edit is no longer available.");
             const saved = storage.load().find((row) => row.id === id);
             if (!saved || saved.sending || entry.deliveryId)
-              throw new Error(t("v1msg.queue.alreadySent"));
+              throw new Error(
+                "This message has already been sent or removed. Your edit has been kept.",
+              );
             if (saved.text !== originalText)
-              throw new Error(t("v1msg.queue.changedElsewhere"));
+              throw new Error(
+                "This message changed in another window. Your edit has been kept.",
+              );
             storage.save({ ...saved, text });
             entry.text = text;
             if (entry.message) entry.message.text = text;
@@ -1081,7 +1098,10 @@ function createQueue(session: RelaySession) {
       const current = () =>
         outbox?.snapshot().find((item) => item.event.id === id);
       const recovery = current()?.recovery;
-      const changed = () => new Error(t("messageActions.delete.changed"));
+      const changed = () =>
+        new Error(
+          "This message’s delivery changed. Cancel to see its current status.",
+        );
       if (!storage || !outbox || !recovery || !orphaned(current()))
         throw changed();
       await storage.lock(recovery.value, async () => {

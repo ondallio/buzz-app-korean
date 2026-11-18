@@ -1,4 +1,4 @@
-import { t } from "../../shared/i18n";
+import { forwardReference, type ForwardReference } from "./forward-clipboard";
 import {
   clearView,
   readView,
@@ -12,6 +12,7 @@ import { messageTokenTags } from "./message-tokens";
 
 export type FollowUpMessage = {
   channelId: string;
+  forward?: ForwardReference;
   text: string;
   recipients: readonly string[];
   attachments: readonly UploadedAttachment[];
@@ -89,7 +90,9 @@ export function followUpStorage(scope: string) {
           continue;
         const value = readView<unknown>(scope, pair[1], null);
         if (!valid(value) || pair[1] !== key(value.id))
-          throw new Error(t("v1msg.queue.unreadable"));
+          throw new Error(
+            "A saved queued message could not be read. Its saved copy has been kept.",
+          );
         records.push(value);
       }
       return records.sort(
@@ -99,16 +102,17 @@ export function followUpStorage(scope: string) {
     has(id: string) {
       const revision = viewRevision(scope, key(id));
       if (revision === undefined)
-        throw new Error(t("v1msg.queue.storageRetry"));
+        throw new Error("Queued message storage is unavailable. Try again.");
       return revision !== null;
     },
     sending(id: string, sending: boolean) {
       const saved = readView<unknown>(scope, key(id), null);
-      if (!valid(saved)) throw new Error(t("v1msg.queue.savedUnavailable"));
+      if (!valid(saved))
+        throw new Error("The saved queued message is unavailable.");
       if (
         !writeView(scope, key(id), { ...saved, sending: sending || undefined })
       )
-        throw new Error(t("v1msg.queue.saveDeliveryFailed"));
+        throw new Error("Could not save queued message delivery. Try again.");
     },
     isSending(id: string) {
       return (
@@ -117,7 +121,9 @@ export function followUpStorage(scope: string) {
     },
     save(value: SavedFollowUp) {
       if (!writeView(scope, key(value.id), value))
-        throw new Error(t("v1msg.queue.saveFailed"));
+        throw new Error(
+          "Could not save the queued message. Your draft has been kept.",
+        );
     },
     remove(id: string) {
       clearView(scope, key(id));
@@ -140,15 +146,18 @@ export function followUpStorage(scope: string) {
         ((value as FollowUpHandoff).complete !== undefined &&
           (value as FollowUpHandoff).complete !== true)
       )
-        throw new Error(t("v1msg.queue.orderUnavailable"));
+        throw new Error("Queued message ordering is unavailable. Try again.");
       return value as FollowUpHandoff;
     },
     claim(channelId: string, handoff: FollowUpHandoff) {
       if (!writeView(scope, `follow-up-handoff:${channelId}`, handoff))
-        throw new Error(t("v1msg.queue.orderSaveFailed"));
+        throw new Error("Could not save queued message ordering. Try again.");
     },
     async lockChat<T>(channelId: string, run: () => Promise<T>) {
-      if (!navigator.locks) throw new Error(t("v1msg.queue.browserUnsafe"));
+      if (!navigator.locks)
+        throw new Error(
+          "This browser cannot safely send saved queued messages.",
+        );
       return navigator.locks.request(
         `buzz-follow-up-chat:${scope}:${channelId}`,
         run,
@@ -165,7 +174,10 @@ export function followUpStorage(scope: string) {
       );
     },
     async lock<T>(id: string, run: () => Promise<T>) {
-      if (!navigator.locks) throw new Error(t("v1msg.queue.browserOutdated"));
+      if (!navigator.locks)
+        throw new Error(
+          "This browser cannot safely send saved queued messages. Use a current browser.",
+        );
       return navigator.locks.request(`buzz-follow-up:${scope}:${id}`, run);
     },
   };
@@ -192,6 +204,7 @@ function valid(value: unknown): value is SavedFollowUp {
     typeof v.id === "string" &&
     typeof v.channelId === "string" &&
     typeof v.text === "string" &&
+    (v.forward === undefined || !!forwardReference(v.forward)) &&
     (v.sending === undefined || v.sending === true) &&
     Number.isFinite(v.createdAt) &&
     strings(v.recipients) &&

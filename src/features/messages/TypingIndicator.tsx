@@ -1,4 +1,3 @@
-import { t, useLanguage } from "../../shared/i18n";
 import { useActivityFocusHandoff } from "./use-activity-focus-handoff";
 import messageStyles from "./Messages.module.css";
 import {
@@ -303,7 +302,6 @@ export function TypingIndicator({
     | ((target: string, origin?: MessageLinkOrigin) => boolean)
     | undefined;
 }) {
-  useLanguage();
   const {
     activity,
     details,
@@ -389,24 +387,24 @@ export function TypingIndicator({
     resolveName(pubkey, profiles.get(pubkey)?.name ?? pubkey.slice(0, 10));
   const scopeLabel = (pubkey: string, workRoot?: string) => {
     if (threadRootId) return undefined;
-    const roots = workRoot ? [workRoot] : (details.get(pubkey)?.roots ?? []);
+    // Work whose conversation is unknown has no scope to name.
+    const roots = (
+      workRoot ? [workRoot] : (details.get(pubkey)?.roots ?? [])
+    ).filter((root): root is string | null => root === null || !!root);
+    // The channel alone is the conversation already shown.
+    if (!roots.some(Boolean)) return undefined;
     const labels = roots.slice(0, 2).map((root) => {
-      if (root === null) return t("messageActions.typing.scopeChannel");
-      if (!root) return t("messageActions.typing.scopeUnknown");
+      if (root === null) return "Channel conversation";
       const text = rows
         .find((row) => row.id === root)
         ?.content.replace(/\s+/g, " ")
         .trim()
         .slice(0, 60);
-      return t("messageActions.typing.scopeThread", {
-        name: text || root.slice(0, 8),
-      });
+      return `Thread · ${text || root.slice(0, 8)}`;
     });
     return [
       ...labels,
-      ...(roots.length > 2
-        ? [t("messageActions.typing.scopeMore", { count: roots.length - 2 })]
-        : []),
+      ...(roots.length > 2 ? [`+${roots.length - 2} more`] : []),
     ].join(" / ");
   };
   // Unknown or multiple scopes open channel activity, never an inferred transcript.
@@ -465,18 +463,9 @@ export function TypingIndicator({
       : detail.detailAvailability === "available"
         ? detail.label
         : detail.detailAvailability === "no-current-step"
-          ? remoteDetail === undefined
-            ? t("messageActions.typing.noStep")
-            : t(
-                agent?.runtime === "block.builderlab/builderlab"
-                  ? "messageActions.typing.remoteBuilderlab"
-                  : "messageActions.typing.remote",
-              )
-          : t("messageActions.typing.onlyUpdates");
-    const scope =
-      detail.roots.length === 1 && detail.roots[0] === null
-        ? undefined
-        : scopeLabel(pubkey, workRoot);
+          ? (remoteDetail ?? "No current step details received.")
+          : "Only typing updates are reaching this app.";
+    const scope = scopeLabel(pubkey, workRoot);
     // The row is the way into an agent's transcript for this work.
     if (canOpen && target)
       return (
@@ -485,9 +474,7 @@ export function TypingIndicator({
           picture={avatarMedia(picture, session.media)}
           status={status}
           scope={scope}
-          openLabel={t("messageActions.typing.openActivity", {
-            name: name(pubkey),
-          })}
+          openLabel={`View ${name(pubkey)} activity`}
           onOpen={() =>
             navigate(
               target,
@@ -502,62 +489,22 @@ export function TypingIndicator({
         picture={avatarMedia(picture, session.media)}
         status={status}
         scope={scope}
-        openLabel={t(
-          conversationRoot
-            ? "messageActions.typing.openThread"
-            : "messageActions.typing.openConversation",
-          { name: name(pubkey) },
-        )}
+        openLabel={`Open ${conversationRoot ? "thread" : "conversation"} for ${name(pubkey)}`}
         onOpen={openActivity ? () => navigate(conversation) : undefined}
       />
     );
   };
-  const agentNames = activeAgents.map(name).join(", ");
-  const humanNames = humans
-    .slice(0, 2)
-    .map(({ pubkey }) => name(pubkey))
-    .join(", ");
   const workingText = activeAgents.length
-    ? t(
-        activeAgents.length === 1
-          ? "messageActions.typing.workingOne"
-          : "messageActions.typing.workingMany",
-        { names: agentNames },
-      )
+    ? `${activeAgents.map(name).join(", ")}${activeAgents.length === 1 ? " is working" : " are working"}`
     : "";
   const typingText = humans.length
-    ? humans.length > 2
-      ? t("messageActions.typing.humanMore", {
-          names: humanNames,
-          count: humans.length - 2,
-        })
-      : t(
-          humans.length === 1
-            ? "messageActions.typing.humanOne"
-            : "messageActions.typing.humanMany",
-          { names: humanNames },
-        )
+    ? `${humans
+        .slice(0, 2)
+        .map(({ pubkey }) => name(pubkey))
+        .join(
+          ", ",
+        )}${humans.length > 2 ? ` and ${humans.length - 2} others` : ""}${humans.length === 1 ? " is typing" : " are typing"}`
     : "";
-  const activityText =
-    activeAgents.length && humans.length
-      ? humans.length > 2
-        ? t(
-            activeAgents.length === 1
-              ? "messageActions.typing.combinedOneMore"
-              : "messageActions.typing.combinedManyMore",
-            { agents: agentNames, names: humanNames, count: humans.length - 2 },
-          )
-        : t(
-            activeAgents.length === 1
-              ? humans.length === 1
-                ? "messageActions.typing.combinedOneOne"
-                : "messageActions.typing.combinedOneMany"
-              : humans.length === 1
-                ? "messageActions.typing.combinedManyOne"
-                : "messageActions.typing.combinedManyMany",
-            { agents: agentNames, names: humanNames },
-          )
-      : workingText || typingText;
   const firstStep = firstAgent ? details.get(firstAgent)?.label : undefined;
   const previewText =
     (firstAgent && replaced.has(firstAgent)) ||
@@ -574,10 +521,10 @@ export function TypingIndicator({
         <span
           className="sr-only"
           role="status"
-          aria-label={t("messageActions.typing.region")}
+          aria-label="Conversation activity"
           data-agent-working-status=""
         >
-          {activityText}
+          {[workingText, typingText].filter(Boolean).join(". ")}
         </span>
       )}
       {(agents.length > 0 || humans.length > 0) && (
@@ -615,12 +562,8 @@ export function TypingIndicator({
                 label={
                   visibleStep ||
                   (agents.length === 1 && firstAgent
-                    ? t("messageActions.typing.activityOne", {
-                        name: name(firstAgent),
-                      })
-                    : t("messageActions.typing.activityMany", {
-                        count: agents.length,
-                      }))
+                    ? `Activity: ${name(firstAgent)} working`
+                    : `Activity: ${agents.length} agents working`)
                 }
                 content={
                   <ActivityStepPreview
@@ -675,16 +618,7 @@ export function TypingIndicator({
                             <Button
                               size="sm"
                               variant="plain"
-                              aria-label={
-                                root && !threadRootId
-                                  ? t("messageActions.typing.stopScope", {
-                                      name: name(pubkey),
-                                      scope: scopeLabel(pubkey, root) ?? "",
-                                    })
-                                  : t("messageActions.typing.stop", {
-                                      name: name(pubkey),
-                                    })
-                              }
+                              aria-label={`Stop ${name(pubkey)}${root && !threadRootId ? ` in ${scopeLabel(pubkey, root)}` : ""}`}
                               loading={pending.has(control.key)}
                               onClick={() => void stop(control, name(pubkey))}
                             >
@@ -692,11 +626,7 @@ export function TypingIndicator({
                                 className={styles.stopIcon}
                                 aria-hidden="true"
                               />
-                              {t(
-                                pending.has(control.key)
-                                  ? "messageActions.typing.stopping"
-                                  : "messageActions.typing.stopLabel",
-                              )}
+                              {pending.has(control.key) ? "Stopping…" : "Stop"}
                             </Button>
                           </span>
                         </NavigationCard>
@@ -740,7 +670,6 @@ function AgentChooser({
     navigate: (target: string, origin?: MessageLinkOrigin) => void,
   ): ReactNode;
 }) {
-  useLanguage();
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   useActivityFocusHandoff(trigger);
@@ -811,7 +740,9 @@ function AgentChooser({
             data-agent-activity-trigger=""
             aria-keyshortcuts={directTarget ? "ArrowDown" : undefined}
             aria-description={
-              directTarget ? t("messageActions.typing.keyboard") : undefined
+              directTarget
+                ? "Press Down Arrow for working agents and conversation actions."
+                : undefined
             }
             onKeyDown={(event) => {
               if (
@@ -843,11 +774,11 @@ function AgentChooser({
         padding="list"
         side="top"
         align="start"
-        aria-label={t("messageActions.typing.workingNow")}
+        aria-label="Working now"
       >
         <section
           className={activityStyles.activityList}
-          aria-label={t("messageActions.typing.agentsNow")}
+          aria-label="Agents working now"
         >
           <ChooserItems items={() => children(navigate)} />
         </section>

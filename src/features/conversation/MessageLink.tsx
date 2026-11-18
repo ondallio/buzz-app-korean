@@ -26,7 +26,7 @@ import {
   ChatCircleIcon,
   CopyIcon,
   CaretRightIcon,
-  MessageReplyIcon,
+  ThreadIcon,
   LockIcon,
 } from "../../shared/design-system/icons";
 import { ToastNotice } from "../../shared/design-system/ui/Toast";
@@ -487,7 +487,7 @@ export function MessageLink({
               }}
             >
               <MenuIcon>
-                <MessageReplyIcon size={16} />
+                <ThreadIcon size={16} />
               </MenuIcon>
               {t("v1msg.link.open")}
             </MenuItem>

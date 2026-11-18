@@ -1,4 +1,3 @@
-import { t, useLanguage } from "../../shared/i18n";
 import { useState, type ReactNode } from "react";
 import { modelLogo, type ModelChoice } from "./ModelPicker";
 import {
@@ -7,6 +6,7 @@ import {
   LightningIcon,
 } from "../../shared/design-system/icons";
 import { Button } from "../../shared/design-system/ui/Button";
+import { ChoiceRow } from "../../shared/design-system/ui/ChoiceRow";
 import { PreferenceRow } from "../../shared/design-system/ui/PreferenceRow";
 import styles from "./ModelFamilyMenu.module.css";
 import {
@@ -28,9 +28,9 @@ import {
  * screen readers and the trigger's accessible name. */
 function FastMark() {
   return (
-    <span className={styles.fast} title={t("agentModel.fast")}>
+    <span className={styles.fast} title="Fast">
       <LightningIcon size={14} aria-hidden="true" />
-      <span className="sr-only">{t("agentModel.fast")}</span>
+      <span className="sr-only">Fast</span>
     </span>
   );
 }
@@ -78,6 +78,7 @@ export function modelFamily(model: ModelChoice): string {
 export function ModelFamilyMenu({
   leading,
   inherited = false,
+  valueSuffix,
   appearance = "outlined",
   resetLabel,
   label,
@@ -88,7 +89,6 @@ export function ModelFamilyMenu({
   onConfigure,
   models,
   selected,
-  selectionLabel,
   defaultChoice,
   disabled,
   loading = false,
@@ -99,6 +99,7 @@ export function ModelFamilyMenu({
 }: {
   leading?: ReactNode;
   inherited?: boolean;
+  valueSuffix?: string | undefined;
   appearance?: "outlined" | "glass-ghost" | "inverted";
   resetLabel?: string | undefined;
   label: string;
@@ -109,8 +110,6 @@ export function ModelFamilyMenu({
   onConfigure?: (() => void) | undefined;
   models: readonly ModelChoice[];
   selected: ModelChoice;
-  /** Display-only caption; canonical selected model identity/artwork remains unchanged. */
-  selectionLabel?: string | undefined;
   defaultChoice?: ModelChoice | undefined;
   disabled: boolean;
   loading?: boolean;
@@ -119,7 +118,6 @@ export function ModelFamilyMenu({
   onChange(id: string): void;
   onCustom?: (() => void) | undefined;
 }) {
-  useLanguage();
   const families = new Map<string, ModelChoice[]>();
   for (const model of models) {
     const family = modelFamily(model);
@@ -134,21 +132,7 @@ export function ModelFamilyMenu({
   const fastModels = models.filter((model) => model.fast);
   const fastSection =
     fastModels.length > 0 && fastModels.length < models.length;
-  const name = selectionLabel ?? selected.label;
-  const selectedLabel = inherited
-    ? t(
-        selected.fast
-          ? "agentModel.modelFastDefault"
-          : "agentModel.modelDefault",
-        { model: name },
-      )
-    : selected.fast
-      ? t("agentModel.modelFast", { model: name })
-      : name;
-  const familyLabel = (family: string, choices: readonly ModelChoice[]) =>
-    family === "Other" && choices.every((model) => !model.family)
-      ? t("agentModel.otherFamily")
-      : family;
+  const selectedLabel = `${selected.label}${selected.fast ? " · Fast" : ""}${valueSuffix ?? (inherited && selected.description ? ` · ${selected.description}` : "")}`;
   const choiceRow = (model: ModelChoice, inFastSection: boolean) => {
     const leading = inFastSection && hasFamilyLogos && (
       <span className="buzz-select-leading" aria-hidden="true">
@@ -173,10 +157,7 @@ export function ModelFamilyMenu({
           mark={!inFastSection}
           label={
             model.unlisted && model.description
-              ? t("agentModel.describedModel", {
-                  model: model.label,
-                  description: model.description,
-                })
+              ? `${model.label} · ${model.description}`
               : model.label
           }
         />
@@ -196,18 +177,7 @@ export function ModelFamilyMenu({
             variant={appearance === "outlined" ? "outline" : appearance}
             shape="control"
             size={appearance === "glass-ghost" ? "xs" : "sm"}
-            aria-label={
-              effortLabel
-                ? t("agentModel.controlEffortName", {
-                    field: label,
-                    selection: selectedLabel,
-                    effort: effortLabel,
-                  })
-                : t("agentModel.controlName", {
-                    field: label,
-                    selection: selectedLabel,
-                  })
-            }
+            aria-label={`${label}: ${selectedLabel}${effortLabel ? `, ${effortLabel}` : ""}`}
             title={selectedLabel}
           >
             {leading && (
@@ -216,16 +186,14 @@ export function ModelFamilyMenu({
               </span>
             )}
             {modelLogo(modelFamily(selected), "buzz-select-leading")}
-            {/* Card labels keep Default accessible without crowding the model. */}
             <span className={styles.value}>
               <span className={`buzz-select-value ${styles.model}`}>
-                {name}
+                {selected.label}
               </span>
               {selected.fast && <FastMark />}
-              {inherited && appearance !== "glass-ghost" && (
+              {valueSuffix && (
                 <span className="buzz-select-value-suffix text-subtle">
-                  {" · "}
-                  {t("agentModel.default")}
+                  {valueSuffix}
                 </span>
               )}
               {effortLabel && (
@@ -244,11 +212,19 @@ export function ModelFamilyMenu({
             value={inherited ? "" : selected.id}
             onValueChange={(id) => onChange(id)}
           >
-            <MenuRadioItem value="" closeOnClick>
+            <MenuRadioItem
+              value=""
+              aria-label="Default"
+              aria-description={defaultChoice.description}
+              closeOnClick
+            >
               {hasFamilyLogos && (
                 <span className="buzz-select-leading" aria-hidden="true" />
               )}
-              {t("agentModel.modelDefault", { model: defaultChoice.label })}
+              <ChoiceRow
+                label="Default"
+                description={defaultChoice.description}
+              />
             </MenuRadioItem>
           </MenuRadioGroup>
         )}
@@ -258,7 +234,7 @@ export function ModelFamilyMenu({
               <MenuGroupLabel emphasis="quiet">
                 <span className={styles.name}>
                   <LightningIcon size={14} aria-hidden="true" />
-                  {t("agentModel.fast")}
+                  Fast
                 </span>
               </MenuGroupLabel>
               <MenuRadioGroup
@@ -283,13 +259,9 @@ export function ModelFamilyMenu({
                     {modelLogo(family)}
                   </span>
                 )}
-                {familyLabel(family, choices)}
+                {family}
               </MenuSubmenuTrigger>
-              <MenuSubmenuPopup
-                aria-label={t("agentModel.familyModels", {
-                  family: familyLabel(family, choices),
-                })}
-              >
+              <MenuSubmenuPopup aria-label={`${family} models`}>
                 <MenuRadioGroup
                   value={selected.id}
                   onValueChange={(id) => onChange(id)}
@@ -303,13 +275,9 @@ export function ModelFamilyMenu({
           <MenuItem onClick={() => onChange("")}>{resetLabel}</MenuItem>
         )}
         {onConfigure && (
-          <MenuItem onClick={onConfigure}>
-            {t("agentProviderHost.edit")}
-          </MenuItem>
+          <MenuItem onClick={onConfigure}>Edit configuration</MenuItem>
         )}
-        {onCustom && (
-          <MenuItem onClick={onCustom}>{t("agentModel.custom")}</MenuItem>
-        )}
+        {onCustom && <MenuItem onClick={onCustom}>Custom model</MenuItem>}
       </MenuPopup>
     </MenuRoot>
   );
@@ -362,17 +330,11 @@ function EffortMenu({
         <ModelName model={model} label={model.label} mark={mark} />
         {selected && <CheckIcon size={16} aria-hidden="true" />}
       </MenuSubmenuTrigger>
-      <MenuSubmenuPopup
-        aria-label={t("agentModel.effortName", { model: model.label })}
-      >
-        {loading && (
-          <MenuItem disabled>{t("agentModel.loadingEfforts")}</MenuItem>
-        )}
-        {error && <MenuItem disabled>{t("agentModel.effortsFailed")}</MenuItem>}
+      <MenuSubmenuPopup aria-label={`${model.label} thinking effort`}>
+        {loading && <MenuItem disabled>Loading thinking levels…</MenuItem>}
+        {error && <MenuItem disabled>Could not load thinking levels</MenuItem>}
         {(!levels?.length || error) && (
-          <MenuItem onClick={() => onChange(model.id, "")}>
-            {t("agentModel.useModel")}
-          </MenuItem>
+          <MenuItem onClick={() => onChange(model.id, "")}>Use model</MenuItem>
         )}
         <MenuRadioGroup
           value={selected ? effort : null}

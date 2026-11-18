@@ -1,4 +1,9 @@
 import type { AgentExecutionBinding } from "../../features/agents/execution";
+import {
+  readModelSettings,
+  type AgentModelResolution,
+  type AgentModelSettingsContext,
+} from "../../features/agents/model-settings";
 import type { AgentKey } from "../../features/agents/membership";
 import activityStyles from "../../features/agents/ActivityLayout.module.css";
 import { formatItemTimestamp } from "../../shared/datetime";
@@ -57,6 +62,7 @@ import {
   config as readConfig,
   defaults,
   resolveModel,
+  resolveEffort,
   effortName,
   validWorkspace,
   type Config,
@@ -66,14 +72,9 @@ import { AppServer, listModels, needsSignIn, type Spawn } from "./rpc";
 import type { CodexRuntime, SavedConversation } from "./runtime";
 import type { CodexSetup } from "./setup";
 import { readTranscript, TURN_LIMIT } from "./transcript";
-import { t, useLanguage } from "../../shared/i18n";
 
 const label = ({ channelId, name, root }: SavedConversation) =>
-  `${name || channelId.slice(0, 8)} · ${
-    root
-      ? t("v1agent.claudeTabs.threadId", { id: root.slice(0, 8) })
-      : t("v1agent.claudeTabs.channel")
-  }`;
+  `${name || channelId.slice(0, 8)} · ${root ? `thread ${root.slice(0, 8)}` : "channel"}`;
 
 type Catalog = {
   models: Model[];
@@ -89,13 +90,6 @@ type ProviderState = AgentProviderSnapshot &
 const STORAGE_KEY = "buzz.codex.provider-defaults.v1";
 const SIGN_IN_ERROR = "Codex needs you to sign in.";
 const NOT_INSTALLED = "The Codex integration isn't installed yet.";
-/** The provider's error as the viewer reads it. */
-const errorText = (error: string) =>
-  error === NOT_INSTALLED
-    ? t("v1agent.codex.notInstalled")
-    : error === SIGN_IN_ERROR
-      ? t("v1agent.codex.signInNeeded")
-      : error;
 const CONVERSATION_LIMIT = 30;
 /** Read-only setup/catalog discovery uses the same declared native transport. */
 async function catalog(spawn: Spawn, signal: AbortSignal) {
@@ -199,10 +193,10 @@ export class CodexProvider {
           readiness: "attention",
           attentionLabel:
             reason === NOT_INSTALLED
-              ? t("v1agent.codex.installIntegration")
+              ? "Install Codex integration"
               : reason === SIGN_IN_ERROR
-                ? t("v1agent.codex.logIn")
-                : t("v1agent.codex.needsAttention"),
+                ? "Log in to Codex"
+                : "Codex needs attention",
           checking: false,
           data: undefined,
           error: reason,
@@ -291,6 +285,70 @@ export class CodexProvider {
           : (selected?.defaultReasoningEffort ?? "");
     return { ...explicit, model, effort };
   }
+  /** Read the same next-turn selection without refreshing the catalog. */
+  readModelSettings(
+    raw: unknown,
+    { execution = "local", synced }: Partial<AgentModelSettingsContext> = {},
+  ) {
+    const saved = readConfig(raw);
+    const recommended = onRecommended(raw);
+    const settings = this.resolve(raw, execution !== "local");
+    const candidate = recommended ? this.recommended() : null;
+    const source = (field: "model" | "effort") =>
+      saved[field]
+        ? ("configured" as const)
+        : candidate
+          ? ("recommended" as const)
+          : field === "effort" && settings.effort !== this.state.defaults.effort
+            ? ("provider" as const)
+            : ("device" as const);
+    const unavailable =
+      execution === "unavailable"
+        ? "execution-unavailable"
+        : execution === "remote"
+          ? "remote"
+          : recommended && candidate === undefined
+            ? "not-loaded"
+            : undefined;
+    const data = this.state.data;
+    const model = resolveModel(settings.model, data?.models ?? []);
+    const selected = data?.models.find((row) => row.model === model);
+    const missing = data
+      ? "unknown"
+      : this.state.readiness === "attention"
+        ? "unknown"
+        : "not-loaded";
+    const modelResolution: AgentModelResolution = unavailable
+      ? { unavailable }
+      : data && !selected
+        ? { unavailable: "unknown" }
+        : model
+          ? {
+              value: model,
+              source: settings.model ? source("model") : "provider",
+            }
+          : { unavailable: missing };
+    const effort = selected
+      ? resolveEffort(selected, settings.effort)
+      : candidate?.effort;
+    return readModelSettings(saved, {
+      recommended,
+      resolved: {
+        model: modelResolution,
+        effort: unavailable
+          ? { unavailable }
+          : synced?.effort && effort && effort !== synced.effort
+            ? { unavailable: "unsupported" }
+            : effort
+              ? {
+                  value: effort,
+                  source:
+                    effort === settings.effort ? source("effort") : "provider",
+                }
+              : { unavailable: missing },
+      },
+    });
+  }
   dispose() {
     this.offSetup?.();
     this.abort?.abort();
@@ -325,12 +383,12 @@ export class CodexProvider {
 const message = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
-const scopes = () => [
+const SCOPES = [
   {
     label: "",
     options: [
-      { value: "thread", label: t("v1agent.claudeTabs.perThread") },
-      { value: "channel", label: t("v1agent.claudeTabs.perChannel") },
+      { value: "thread", label: "One session per thread" },
+      { value: "channel", label: "One session per channel" },
     ],
   },
 ];
@@ -360,11 +418,11 @@ const offers = (data: Catalog, { model, effort }: RecommendedCandidate) =>
 const providerDefaultLabel = (model: string, data?: Catalog) => {
   const selected = catalogModel(model, data);
   const name = selected?.displayName || selected?.model;
-  return name || model || t("v1agent.codex.recommended");
+  return name || model || "Recommended";
 };
 const codexDefaultEffortLabel = (effort: string, model?: Model) => {
   const resolved = effort || model?.defaultReasoningEffort;
-  return resolved ? effortName(resolved) : t("codexCreate.automatic");
+  return resolved ? effortName(resolved) : "Automatic";
 };
 const thinkingOptions = (
   effort: string,
@@ -377,9 +435,7 @@ const thinkingOptions = (
   return [
     {
       value: "",
-      label: t("codexCreate.defaultOption", {
-        effort: codexDefaultEffortLabel(effectiveEffort, selected),
-      }),
+      label: `${codexDefaultEffortLabel(effectiveEffort, selected)} · Default`,
     },
     ...(effort &&
     !supported.some((candidate) => candidate.reasoningEffort === effort)
@@ -388,9 +444,7 @@ const thinkingOptions = (
             value: effort,
             label:
               catalog || showUnavailableWithoutCatalog
-                ? t("codexCreate.unavailableOption", {
-                    effort: effortName(effort),
-                  })
+                ? `${effortName(effort)} (unavailable)`
                 : effortName(effort),
           },
         ]
@@ -428,16 +482,12 @@ function CodexSignIn({
   check(): void;
   disabled: boolean;
 }) {
-  useLanguage();
   const [open, setOpen] = useState(false);
   const { running, output } = useSyncExternalStore(
     login.subscribe,
     login.snapshot,
   );
-  const action =
-    step === "install"
-      ? t("v1agent.claudeTabs.installIntegration")
-      : t("accessDialogs.signIn");
+  const action = step === "install" ? "Install integration" : "Sign in";
   // A step's process ends before the check that follows it, which may still
   // find the step needed; until it answers, neither button starts another.
   return (
@@ -457,14 +507,8 @@ function CodexSignIn({
       </Button>
       <Dialog
         open={open}
-        title={
-          step === "install"
-            ? t("v1agent.codex.integration")
-            : t("codexAuthUi.signInTitle")
-        }
-        description={
-          step === "login" ? t("codexAuthUi.continueBrowser") : undefined
-        }
+        title={step === "install" ? "Codex integration" : "Sign in to Codex"}
+        description={step === "login" ? "Continue in your browser." : undefined}
         onOpenChange={(next) => {
           setOpen(next);
           if (!next) void login.cancel();
@@ -473,9 +517,7 @@ function CodexSignIn({
         <section className="grid gap-2">
           {step === "install" && (
             <p role="status" className="m-0">
-              {checking && !running
-                ? t("codexAuthUi.checking")
-                : t("v1agent.codex.notInstalled")}
+              {checking && !running ? "Checking Codex…" : NOT_INSTALLED}
             </p>
           )}
           {/* One button per slot, so focus stays put as Install becomes
@@ -497,15 +539,15 @@ function CodexSignIn({
                 focusableWhenDisabled
                 onClick={() => void (running ? login.cancel() : check())}
               >
-                {running
-                  ? t("channelForms.cancel")
-                  : t("accessDialogs.checkAgain")}
+                {running ? "Cancel" : "Check again"}
               </Button>
             )}
           </div>
           {step === "install" && (
             <p className="m-0 text-body-sm text-subtle">
-              {t("v1agent.codex.download")}
+              Downloads Buzz's own copy of Codex (about 130 MB) and keeps it on
+              the latest release. Your own installation of Codex will be
+              unaffected, and uses the same sign-in and settings.
             </p>
           )}
           {output && (
@@ -513,11 +555,11 @@ function CodexSignIn({
               items={[
                 {
                   value: "details",
-                  title: t("codexAuthUi.details"),
+                  title: "Setup details",
                   content: (
                     <pre
                       role="log"
-                      aria-label={t("codexAuthUi.output")}
+                      aria-label="Setup output"
                       className="m-0 max-h-60 overflow-auto whitespace-pre-wrap break-all text-caption"
                     >
                       {output}
@@ -704,11 +746,11 @@ export function createTabs(
         <Button
           variant={props.modelAppearance ?? "ghost"}
           size="xs"
-          aria-label={t("codexCreate.modelSettings")}
+          aria-label="Model settings"
           disabled={props.disabled || !openSettings}
           onClick={openSettings}
         >
-          {current.model || t("codexCreate.defaultModel")}
+          {current.model || "Codex default"}
         </Button>
       );
     if (step)
@@ -729,9 +771,8 @@ export function createTabs(
           value={current.model}
           defaultModel={catalogModel(providerDefaults.model, data)?.model ?? ""}
           defaultLabel={providerDefaultLabel(providerDefaults.model, data)}
-          defaultDescription={t("codexCreate.followDefault")}
           loading={checking}
-          error={error && errorText(error)}
+          error={error}
           retry={retry}
           onChange={(model) =>
             onChange(readConfig({ ...current, ...modelChange(model, data) }))
@@ -744,7 +785,7 @@ export function createTabs(
           current.model &&
           !catalogModel(current.model, data) && (
             <p role="status" className="m-0 text-body-sm text-subtle">
-              {t("codexCreate.modelUnavailable")}
+              This model isn’t available. Choose another model to continue.
             </p>
           )}
       </div>
@@ -757,7 +798,6 @@ export function createTabs(
     onChange,
     disabled,
   }: AgentCreateProps<Config>) {
-    useLanguage();
     const current = readConfig(config);
     const { data, checking, bound } = useProvider(agent);
     const { effort } = current;
@@ -794,46 +834,19 @@ export function createTabs(
       selected,
       data,
     );
-    const effortLabels = new Map<string, string>([
-      ["none", t("codexCreate.none")],
-      ["minimal", t("codexCreate.minimal")],
-      ["low", t("codexCreate.low")],
-      ["medium", t("codexCreate.medium")],
-      ["high", t("codexCreate.high")],
-      ["xhigh", t("codexCreate.extraHigh")],
-      ["max", t("codexCreate.maximum")],
-      ["ultra", t("codexCreate.ultra")],
-    ]);
-    const displayEffort = (value: string) =>
-      effortLabels.get(value) ?? effortName(value);
-    const defaultEffort = effective.effort || selected?.defaultReasoningEffort;
-    const resting = defaultEffort
-      ? displayEffort(defaultEffort)
-      : t("codexCreate.automatic");
-    const displayedEfforts = efforts.map((option) => ({
-      ...option,
-      label: !option.value
-        ? t("codexCreate.defaultOption", { effort: resting })
-        : data &&
-            !selected?.supportedReasoningEfforts.some(
-              (choice) => choice.reasoningEffort === option.value,
-            )
-          ? t("codexCreate.unavailableOption", {
-              effort: displayEffort(option.value),
-            })
-          : displayEffort(option.value),
-    }));
     return (
       <Select
         key={current.model || "inherited"}
-        label={t("codexCreate.thinking")}
-        valueLabel={current.effort ? undefined : resting}
-        valueSuffix={
-          current.effort ? undefined : t("codexCreate.defaultSuffix")
+        label="Thinking"
+        valueLabel={
+          current.effort
+            ? undefined
+            : codexDefaultEffortLabel(effective.effort, selected)
         }
+        valueSuffix={current.effort ? undefined : " · Default"}
         variant="compact"
         value={current.effort}
-        groups={[{ label: "", options: displayedEfforts }]}
+        groups={[{ label: "", options: efforts }]}
         disabled={disabled || checking || !selected}
         onValueChange={(effort) => onChange(readConfig({ ...current, effort }))}
       />
@@ -841,22 +854,21 @@ export function createTabs(
   }
 
   function DefaultControl({ onConfigure }: { onConfigure(): void }) {
-    useLanguage();
     const state = useProvider();
     const [error, setError] = useState("");
     return (
       <>
         <ModelPicker
           includeDefault={false}
-          resetLabel={t("v1agent.codex.useRecommended")}
+          resetLabel="Use Codex recommended"
           compact
           groupByFamily
-          label={t("v1agent.codex.defaultModel")}
+          label="Codex default model"
           loading={state.checking}
           models={choices(state.data).map((choice) => ({
             ...choice,
             efforts: [
-              { id: "", label: t("codexCreate.automatic") },
+              { id: "", label: "Automatic" },
               ...(
                 catalogModel(choice.id, state.data)
                   ?.supportedReasoningEfforts ?? []
@@ -870,7 +882,7 @@ export function createTabs(
           effortLabel={
             state.defaults.effort
               ? effortName(state.defaults.effort)
-              : t("codexCreate.automatic")
+              : "Automatic"
           }
           onEffortChange={(model, effort) => {
             provider.saveDefaults({ model, effort }).then(
@@ -895,7 +907,6 @@ export function createTabs(
   }
 
   function ProviderDialogBody({ onClose }: { onClose(): void }) {
-    useLanguage();
     const defaultsForm = useId();
     const state = useProvider();
     const { data, error, checking } = state;
@@ -909,21 +920,16 @@ export function createTabs(
     const [savingDefaults, setSavingDefaults] = useState(false);
     const action =
       error === NOT_INSTALLED
-        ? ({
-            step: "install",
-            label: t("v1agent.claudeTabs.installIntegration"),
-          } as const)
+        ? ({ step: "install", label: "Install integration" } as const)
         : error === SIGN_IN_ERROR
-          ? ({ step: "login", label: t("accessDialogs.signIn") } as const)
+          ? ({ step: "login", label: "Sign in" } as const)
           : undefined;
     useEffect(() => setDraft(state.defaults), [state.defaults]);
     const selected = catalogModel(draft.model, data);
     const efforts = [
       {
         value: "",
-        label: t("codexCreate.defaultOption", {
-          effort: codexDefaultEffortLabel("", selected),
-        }),
+        label: `${codexDefaultEffortLabel("", selected)} · Default`,
       },
       ...(draft.effort &&
       !selected?.supportedReasoningEfforts.some(
@@ -932,9 +938,7 @@ export function createTabs(
         ? [
             {
               value: draft.effort,
-              label: t("codexCreate.unavailableOption", {
-                effort: effortName(draft.effort),
-              }),
+              label: `${effortName(draft.effort)} (unavailable)`,
             },
           ]
         : []),
@@ -967,13 +971,11 @@ export function createTabs(
           }}
         >
           <Select
-            label={t("v1agent.codex.defaultThinking")}
+            label="Default thinking"
             valueLabel={
               draft.effort ? undefined : codexDefaultEffortLabel("", selected)
             }
-            valueSuffix={
-              draft.effort ? undefined : t("codexCreate.defaultSuffix")
-            }
+            valueSuffix={draft.effort ? undefined : " · Default"}
             variant="preference"
             value={draft.effort}
             groups={[{ label: "", options: efforts }]}
@@ -991,28 +993,30 @@ export function createTabs(
             <div className="flex flex-wrap items-center gap-2">
               <p role="status" className="m-0 text-body-sm">
                 {installing.running === "login"
-                  ? t("v1agent.codex.waitingSignIn")
-                  : t("v1agent.codex.installing")}
+                  ? "Waiting for Codex sign-in…"
+                  : "Installing Codex…"}
               </p>
             </div>
           ) : checking ? (
             <p role="status" className="m-0">
-              {t("codexAuthUi.checking")}
+              Checking Codex…
             </p>
           ) : error ? (
             <p role="alert" className="m-0 text-body-sm text-primary">
-              <strong>{errorText(error)}</strong>
+              <strong>{error}</strong>
             </p>
           ) : null}
           {action?.step === "install" && !installing.running && (
             <p className="m-0 text-body-sm text-subtle">
-              {t("v1agent.codex.download")}
+              Downloads Buzz's own copy of Codex (about 130 MB) and keeps it on
+              the latest release. Your own installation of Codex will be
+              unaffected, and uses the same sign-in and settings.
             </p>
           )}
           {installing.output && (
             <div
               role="log"
-              aria-label={t("codexAuthUi.output")}
+              aria-label="Setup output"
               className="m-0 max-h-60 overflow-auto whitespace-pre-wrap text-body-sm text-subtle"
             >
               {installing.output}
@@ -1025,7 +1029,7 @@ export function createTabs(
               installing.running ? void setup.cancel() : onClose()
             }
           >
-            {t("channelForms.cancel")}
+            Cancel
           </Button>
           {state.readiness === "ready" ? (
             <Button
@@ -1038,7 +1042,7 @@ export function createTabs(
               }
               focusableWhenDisabled
             >
-              {t("v1agent.codex.saveDefaults")}
+              Save defaults
             </Button>
           ) : action && !installing.running && !checking ? (
             <Button
@@ -1079,7 +1083,6 @@ export function createTabs(
     conversation: SavedConversation;
     working: boolean;
   }) {
-    useLanguage();
     return (
       <TranscriptPanel
         agent={agent}
@@ -1103,17 +1106,18 @@ export function createTabs(
         }}
         readKey={conversation.key}
         working={working}
-        reading={t("v1agent.session.reading", { harness: "Codex" })}
-        failed={t("v1agent.session.readFailed", { harness: "Codex" })}
+        reading="Reading the Codex session…"
+        failed="Could not read the Codex session"
         missing={
           <p className="m-0 text-body-sm text-subtle">
-            {t("v1agent.codex.noHistory")}
+            Codex has no history for this conversation on this computer. Its
+            session may have been deleted.
           </p>
         }
         notes={(transcript) =>
           transcript.more && (
             <p className="m-0 text-body-sm text-subtle">
-              {t("v1agent.session.latestTurns", { count: TURN_LIMIT })}
+              Showing the latest {TURN_LIMIT} turns.
             </p>
           )
         }
@@ -1124,7 +1128,6 @@ export function createTabs(
   /** The agent's sessions: the one it was opened from, recent ones, and their
    * transcripts. */
   function ActivityTab(props: Parameters<typeof ActivityContent>[0]) {
-    useLanguage();
     const agent = props.agent.key;
     const revision = useSyncExternalStore(
       runtime.subscribe,
@@ -1151,14 +1154,12 @@ export function createTabs(
       };
     }, [agent, revision, attempt]);
     if (read?.agent !== agent)
-      return <p role="status">{t("v1agent.session.loadingSaved")}</p>;
+      return <p role="status">Loading saved conversations…</p>;
     if ("error" in read)
       return (
         <div className="grid gap-2">
           <p role="alert">{read.error}</p>
-          <Button onClick={() => retry((value) => value + 1)}>
-            {t("agentsBrowse.tryAgain")}
-          </Button>
+          <Button onClick={() => retry((value) => value + 1)}>Try again</Button>
         </div>
       );
     return <ActivityContent {...props} listed={read.rows} />;
@@ -1177,7 +1178,6 @@ export function createTabs(
     listed?: SavedConversation[];
   }) {
     useClockFormat();
-    useLanguage();
     const sessions = useSyncExternalStore(runtime.subscribe, () =>
       runtime.sessions(agent.key),
     );
@@ -1215,7 +1215,7 @@ export function createTabs(
         <details className={activityStyles.details}>
           <summary className="text-body-sm text-subtle">
             <CaretRightIcon size={14} aria-hidden="true" />
-            <span>{t("v1agent.session.latestActivity")}</span>
+            <span>Latest activity</span>
           </summary>
           <pre className={`${activityStyles.detail} text-mono`}>{text}</pre>
         </details>
@@ -1235,7 +1235,7 @@ export function createTabs(
           />
         )}
         <section className={activityStyles.section}>
-          <InlineHeader title={t("v1agent.session.recent")} />
+          <InlineHeader title="Recent conversations" />
           <SettingsGroup layout="form">
             {recent.length || unbound.length ? (
               <ul className={activityStyles.list}>
@@ -1262,10 +1262,8 @@ export function createTabs(
                           <p className="m-0 text-body-sm text-subtle">
                             {[
                               conversation.root
-                                ? t("v1agent.transcript.thread", {
-                                    id: conversation.root.slice(0, 8),
-                                  })
-                                : t("v1agent.transcript.channel"),
+                                ? `Thread ${conversation.root.slice(0, 8)}`
+                                : "Channel",
                               view?.status,
                               conversation.at
                                 ? formatItemTimestamp(conversation.at / 1000, {
@@ -1281,12 +1279,10 @@ export function createTabs(
                           type="button"
                           variant="subtle"
                           size="sm"
-                          aria-label={t("v1agent.opened.viewTranscriptNamed", {
-                            name: label(conversation),
-                          })}
+                          aria-label={`View transcript: ${label(conversation)}`}
                           onClick={() => show(conversation)}
                         >
-                          {t("messageRow.viewTranscript")}
+                          View transcript
                         </Button>
                       </div>
                       {view?.detail && detail(view.detail, view.status)}
@@ -1296,7 +1292,7 @@ export function createTabs(
               </ul>
             ) : (
               <p className="m-0 text-body-sm text-subtle">
-                {t("v1agent.session.noOthers")}
+                No other conversations saved in this app yet.
               </p>
             )}
           </SettingsGroup>
@@ -1304,7 +1300,7 @@ export function createTabs(
         {open && (
           <PanelSubview
             title={label(open)}
-            backLabel={t("v1agent.session.backToProfile")}
+            backLabel="Back to profile"
             onBack={back}
           >
             <TranscriptView
@@ -1327,7 +1323,6 @@ export function createTabs(
     settingsSection,
     settingsContent,
   }: AgentViewProps<Config>) {
-    useLanguage();
     const form = useId();
     const saved = readConfig(agent.config);
     const [draft, setDraft] = useState(saved);
@@ -1372,7 +1367,7 @@ export function createTabs(
           workspace: draft.workspace,
         });
         if (!validWorkspace(settings.workspace))
-          throw new Error(t("v1agent.settings.absoluteWorkspace"));
+          throw new Error("Enter an absolute or ~/… workspace path.");
         // A Custom agent's save drops a mark left from before, which a later
         // blank synced model would otherwise turn back on.
         await save(
@@ -1389,7 +1384,7 @@ export function createTabs(
         {catalogError && (
           <div className="grid justify-items-start gap-2">
             <p role="alert" className="m-0">
-              {errorText(catalogError)}
+              {catalogError}
             </p>
             <Button
               variant="ghost"
@@ -1397,7 +1392,7 @@ export function createTabs(
               focusableWhenDisabled
               onClick={check}
             >
-              {t("accessDialogs.checkAgain")}
+              Check again
             </Button>
           </div>
         )}
@@ -1405,17 +1400,19 @@ export function createTabs(
           allowCustomModel={!!bound}
           models={choices(data)}
           value={draft.model}
-          defaultModel={catalogModel(providerDefaults.model, data)?.model ?? ""}
+          defaultModel={
+            bound
+              ? undefined
+              : catalogModel(providerDefaults.model, data)?.model
+          }
           defaultLabel={
             bound
-              ? t("v1agent.codex.default")
+              ? "Codex default"
               : providerDefaultLabel(providerDefaults.model, data)
           }
-          defaultDescription={
-            bound
-              ? t("v1agent.codex.targetDefault")
-              : t("codexCreate.followDefault")
-          }
+          {...(bound && {
+            defaultDescription: "Follows the target computer's settings",
+          })}
           loading={checking}
           disabled={saving}
           // A manual choice, even of the default, is never Recommended.
@@ -1424,15 +1421,13 @@ export function createTabs(
           }
         />
         <Select
-          label={t("codexCreate.thinking")}
+          label="Thinking"
           valueLabel={
             draft.effort
               ? undefined
               : codexDefaultEffortLabel(effective.effort, selected)
           }
-          valueSuffix={
-            draft.effort ? undefined : t("codexCreate.defaultSuffix")
-          }
+          valueSuffix={draft.effort ? undefined : " · Default"}
           variant="preference"
           value={draft.effort}
           groups={[{ label: "", options: efforts }]}
@@ -1505,16 +1500,16 @@ export function createTabs(
         {settingsSection !== "identity" && (
           <>
             <Field
-              label={t("v1agent.settings.workspace")}
+              label="Workspace"
               description={
                 bound
-                  ? t("v1agent.codex.adapterWorkspace")
-                  : t("v1agent.codex.workspaceHint")
+                  ? "The adapter selects a workspace for each conversation session."
+                  : "Codex starts here with full access to your files and network. Buzz tools run inside the app. Inherited MCP tools are disabled."
               }
             >
               <Input
                 value={
-                  bound ? t("v1agent.codex.selectedAtStart") : draft.workspace
+                  bound ? "Selected when the session starts" : draft.workspace
                 }
                 readOnly={!!bound}
                 placeholder="~/.buzz"
@@ -1523,10 +1518,10 @@ export function createTabs(
               />
             </Field>
             <Select
-              label={t("v1agent.settings.sessions")}
+              label="Sessions"
               variant="preference"
               value={draft.scope}
-              groups={scopes()}
+              groups={SCOPES}
               disabled={saving}
               onValueChange={(value) =>
                 setDraft({
@@ -1537,7 +1532,7 @@ export function createTabs(
             />
             {!bound && (
               <SwitchPreferenceRow
-                label={t("v1agent.codex.appsAndPlugins")}
+                label="Codex apps and plugins"
                 description={
                   agent.protection
                     ? "Protected agents never use Codex apps or plugins."

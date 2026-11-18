@@ -21,7 +21,7 @@ import {
 } from "react";
 import {
   HashArrowInIcon,
-  MessageReplyIcon,
+  ThreadIcon,
   CopyIcon,
   DotsThreeIcon,
   LinkIcon,
@@ -339,7 +339,7 @@ function MessageActionBarControls({
             }}
           >
             <MenuIcon>
-              <MessageReplyIcon />
+              <ThreadIcon />
             </MenuIcon>
             {t("messages.action.reply")}
           </MenuItem>
@@ -509,7 +509,7 @@ function MessageActionBarControls({
                 }
                 size="sm"
                 disabled={replyDisabled}
-                icon={<MessageReplyIcon />}
+                icon={<ThreadIcon />}
                 onClick={(event) => {
                   event.currentTarget.focus();
                   onReply();

@@ -1,6 +1,7 @@
 import { t } from "../../shared/i18n";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { canMessageAgent } from "../agents/choices";
+import { messagePersonLink } from "../direct-messages/message-person";
 import type { RelaySession } from "../relay/session";
 
 const noSubscribe = () => () => {};
@@ -19,7 +20,8 @@ export function useProfileMessage({
   viewer: string | undefined;
   agent: boolean;
   enabled: boolean;
-  onOpened(channelId: string): void;
+  /** Receives your DM's link, or a New message draft's before the first send. */
+  onOpened(link: string): void;
 }) {
   const attempt = useRef<AbortController | null>(null);
   const [opening, setOpening] = useState(false);
@@ -61,11 +63,8 @@ export function useProfileMessage({
     setOpening(true);
     setError("");
     try {
-      const channelId = await session.directMessages.open(
-        [pubkey],
-        controller.signal,
-      );
-      if (!controller.signal.aborted) onOpened(channelId);
+      const link = await messagePersonLink(session, pubkey, controller.signal);
+      if (!controller.signal.aborted) onOpened(link);
     } catch (reason) {
       if (!controller.signal.aborted)
         setError(

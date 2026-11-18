@@ -1,4 +1,3 @@
-import { t, useLanguage } from "../../shared/i18n";
 import {
   createContext,
   useEffect,
@@ -29,7 +28,7 @@ import {
   type DepartureIntent,
   leaveUnsettled,
 } from "./departure";
-import { CommunityDialog } from "./CommunityDialog";
+import { CommunityDialog, type JoinReports } from "./CommunityDialog";
 import type { FederatedIdentity } from "../federated-identity/service";
 import type { JoinRequest } from "./invite-intent";
 import { CommunityPickerItem, MEMBERSHIP_SECTION } from "./CommunityPickerItem";
@@ -48,6 +47,12 @@ import {
   communityActionLabel,
 } from "./names";
 import { useCommunityRole } from "./useCommunityRole";
+import type {
+  CommunityUnread,
+  CommunityUnreads,
+} from "../notifications/community-unread";
+
+const noUnreads: ReadonlyMap<string, CommunityUnread> = new Map();
 
 const noSubscription = () => () => {};
 
@@ -66,8 +71,12 @@ type SwitcherState =
 /** Shell navigation only: selecting a community remains owned by Communities. */
 export function CommunityPicker({
   communities,
+  unreads,
   federatedIdentity,
   invite,
+  joinVisit,
+  onJoin,
+  joinReports,
   onInviteClose,
   onSelect,
   onOpenTarget,
@@ -76,20 +85,28 @@ export function CommunityPicker({
   onOpenChange,
 }: {
   communities: Communities;
+  /** Badges communities other than the selected one; absent shows none. */
+  unreads?: Pick<CommunityUnreads, "snapshot" | "subscribe"> | undefined;
   federatedIdentity?: FederatedIdentity | undefined;
-  invite?: (JoinRequest & { requestId: number }) | undefined;
-  onInviteClose?: ((requestId: number) => void) | undefined;
+  invite?: (JoinRequest & { requestId: string }) | undefined;
+  /** An open join visit with no address yet: the manual Join a community. */
+  joinVisit?: string | undefined;
+  /** Opens Join a community as a navigation visit; without it, local state. */
+  onJoin?: (() => void) | undefined;
+  /** The open join dialog's reports to the app: writes and the typed address. */
+  joinReports?: JoinReports | undefined;
+  onInviteClose?: ((requestId: string) => void) | undefined;
   settingsCards?: Pick<SettingsCards, "subscribe" | "has"> | undefined;
   onSelect?: ((id: string | null) => void) | undefined;
   /** Menu destinations (Invites, hosting) open through the host's navigation. */
   onOpenTarget?: ((target: OpenTarget) => void) | undefined;
 } & SwitcherState) {
-  useLanguage();
   const [localOpen, setLocalOpen] = useState(false);
   const switcherOpen = open ?? localOpen;
   const setSwitcherOpen = onOpenChange ?? setLocalOpen;
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const [joining, setJoining] = useState(false);
+  const [joiningHere, setJoining] = useState(false);
+  const joining = joiningHere || !!joinVisit;
   const navigated = useRef(false);
   // However it opened, a fresh switcher returns focus to its trigger until a
   // choice navigates.
@@ -207,9 +224,17 @@ export function CommunityPicker({
   const active = client.memberships.find(
     (membership) => membership.id === client.selected,
   );
+  const unread = useSyncExternalStore(
+    unreads?.subscribe ?? noSubscription,
+    () => unreads?.snapshot() ?? noUnreads,
+  );
+  const elsewhere = client.memberships.some(
+    (membership) =>
+      membership.id !== client.selected && unread.get(membership.id)?.unread,
+  );
   return (
     <>
-      <nav aria-label={t("v1id.picker.communities")} className={styles.picker}>
+      <nav aria-label="Communities" className={styles.picker}>
         <PopoverRoot open={switcherOpen} onOpenChange={setSwitcherOpen}>
           <PopoverTrigger
             render={
@@ -218,38 +243,37 @@ export function CommunityPicker({
                 size="md"
                 variant="avatar"
                 shape="round"
-                aria-label={t("v1id.picker.switcher", {
-                  name: active
-                    ? communityName(active)
-                    : client.memberships.length === 0
-                      ? t("v1id.picker.communities")
-                      : t("v1id.picker.personalSpace"),
-                })}
+                aria-label={`Community switcher: ${active ? communityName(active) : client.memberships.length === 0 ? "Communities" : "Personal space"}${elsewhere ? ", unread in other communities" : ""}`}
                 title={
                   active
                     ? communityName(active)
                     : client.memberships.length === 0
-                      ? t("v1id.picker.communities")
-                      : t("v1id.picker.personalSpace")
+                      ? "Communities"
+                      : "Personal space"
                 }
                 icon={
-                  active ? (
-                    <Avatar
-                      size="small"
-                      shape="squircle"
-                      alt=""
-                      fallback={communityName(active)}
-                      src={active.publishedIcon ?? active.icon}
-                    />
-                  ) : (
-                    <GlobeIcon size={22} aria-hidden="true" />
-                  )
+                  <span className={styles.trigger}>
+                    {active ? (
+                      <Avatar
+                        size="small"
+                        shape="squircle"
+                        alt=""
+                        fallback={communityName(active)}
+                        src={active.publishedIcon ?? active.icon}
+                      />
+                    ) : (
+                      <GlobeIcon size={22} aria-hidden="true" />
+                    )}
+                    {elsewhere && (
+                      <span className={styles.triggerDot} aria-hidden="true" />
+                    )}
+                  </span>
                 }
               />
             }
           />
           <PopoverPopup
-            aria-label={t("v1id.picker.switchCommunity")}
+            aria-label="Switch community"
             onKeyDown={(event) => {
               if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key))
                 return;
@@ -285,7 +309,7 @@ export function CommunityPicker({
             }
           >
             <NavigationItem
-              label={t("v1id.picker.personalSpace")}
+              label="Personal space"
               selected={client.selected === null}
               aria-current={client.selected === null ? "true" : undefined}
               icon={<GlobeIcon size={20} />}
@@ -301,6 +325,7 @@ export function CommunityPicker({
                   selected={selected}
                   viewer={client.viewer}
                   session={selected ? session : undefined}
+                  unread={selected ? undefined : unread.get(membership.id)}
                   manager={selected && invites && role.manager}
                   leaving={
                     leaving?.membership.id === membership.id && leaving.pending
@@ -330,16 +355,17 @@ export function CommunityPicker({
               );
             })}
             <NavigationItem
-              label={t("v1id.picker.joinCommunity")}
+              label="Join a community"
               icon={<UsersPlusIcon size={20} />}
               onClick={() => {
                 setSwitcherOpen(false);
-                setJoining(true);
+                if (onJoin) onJoin();
+                else setJoining(true);
               }}
             />
             {onOpenTarget && hostedAvailable && (
               <NavigationItem
-                label={t("v1id.picker.createCommunity")}
+                label="Create community"
                 icon={<PlusIcon size={20} />}
                 onClick={() => {
                   navigated.current = true;
@@ -358,16 +384,18 @@ export function CommunityPicker({
       </nav>
       {(joining || invite) && (
         <CommunityDialog
-          key={invite ? invite.requestId : "manual"}
+          key={invite ? invite.requestId : (joinVisit ?? "manual")}
           communities={communities}
           federatedIdentity={federatedIdentity}
           mode="join"
           invite={invite}
+          {...joinReports}
           submittedDestination={invite?.submitted === true}
           onJoined={(id) => select(id)}
           close={() => {
             setJoining(false);
-            if (invite) onInviteClose?.(invite.requestId);
+            const visit = invite?.requestId ?? joinVisit;
+            if (visit) onInviteClose?.(visit);
           }}
         />
       )}
@@ -375,21 +403,13 @@ export function CommunityPicker({
         <AlertDialog
           title={
             leaving.intent === "leave"
-              ? t("v1id.picker.leaveTitle", {
-                  name: communityDefaultName(leaving.membership),
-                })
-              : t("v1id.picker.leaveFailedTitle", {
-                  name: communityDefaultName(leaving.membership),
-                })
+              ? `Leave ${communityDefaultName(leaving.membership)}?`
+              : `Couldn’t leave ${communityDefaultName(leaving.membership)}`
           }
           description={
             leaving.intent === "leave"
-              ? t("v1id.picker.leaveDescription", {
-                  name: communityDefaultName(leaving.membership),
-                })
-              : t("v1id.picker.removeDescription", {
-                  name: communityDefaultName(leaving.membership),
-                })
+              ? `This sends a leave request to the community’s relay, then removes ${communityDefaultName(leaving.membership)} from this device along with its saved drafts and reading positions. Rejoining may need a new invite.`
+              : `Its relay didn’t confirm the leave, so you may still be a member. You can remove ${communityDefaultName(leaving.membership)} from this device instead, along with its saved drafts and reading positions. This doesn’t change your membership.`
           }
           pending={leaving.pending}
           onClose={() => setLeaving(null)}
@@ -402,7 +422,7 @@ export function CommunityPicker({
                 disabled={leaving.pending}
                 onClick={() => setLeaving(null)}
               >
-                {t("settings.cancel")}
+                Cancel
               </Button>
               <Button
                 variant={
@@ -412,8 +432,8 @@ export function CommunityPicker({
                 onClick={() => void depart()}
               >
                 {leaving.intent === "leave"
-                  ? t("v1id.picker.leaveCommunity")
-                  : t("v1id.picker.removeFromThisDevice")}
+                  ? "Leave community"
+                  : "Remove from this device"}
               </Button>
             </>
           }
@@ -423,9 +443,7 @@ export function CommunityPicker({
               leaving.membership.localName !==
                 communityDefaultName(leaving.membership) && (
                 <p className="text-muted">
-                  {t("v1id.picker.shownAs", {
-                    name: leaving.membership.localName,
-                  })}
+                  Shown as {leaving.membership.localName} on this device
                 </p>
               )}
             <p className="break-all">

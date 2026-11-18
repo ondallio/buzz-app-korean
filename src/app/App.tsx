@@ -1,5 +1,6 @@
+import { navigationOwner } from "./shell/presentation";
+import { resolveSidebarContext } from "../features/sidebar/contracts";
 // FOUNDATION: Startup, navigation, contributed pages, and built-in Settings.
-import { t, useLanguage } from "../shared/i18n";
 import { AgentAvatarArtworkProvider } from "../features/agents/AgentAvatarArtworkProvider";
 import { Welcome } from "../features/identity/Welcome";
 import { NewMenu } from "./shell/NewMenu";
@@ -25,6 +26,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { PairingPrompt } from "../features/credential-pairing/PairingPrompt";
 import { Dialog } from "../shared/design-system/ui/Dialog";
 import { UpdateNotice } from "../features/updates/UpdateNotice";
+import { UpdateAction } from "../features/updates/UpdateAction";
 import { PluginUpdates } from "./PluginUpdates";
 import { RejectedLinkNotice } from "../features/navigation/RejectedLinkNotice";
 import { ExternalAuthorizationDialog } from "../features/agents/ExternalAuthorizationDialog";
@@ -51,9 +53,6 @@ import { SettingsSidebar } from "./SettingsSidebar";
 import { pendingManaged } from "../plugins/managed";
 import { RecoveryScreen } from "./RecoveryScreen";
 import { PageView } from "../features/pages/PageView";
-import { OwnedContribution } from "../plugins/OwnedContribution";
-import { SidebarFrame } from "../features/channel-navigation/SidebarFrame";
-import { SidebarList } from "../features/channel-navigation/SidebarList";
 import { useAppNavigation, type PendingSettingsDeparture } from "./navigation";
 import { NavigationControls } from "./shell/NavigationControls";
 import { registerNavigationShortcuts } from "./shortcuts";
@@ -69,6 +68,10 @@ import { ShellBackdrops } from "../features/backdrops/ShellBackdrops";
 import { PanelCard } from "../features/panels/PanelCard";
 import { targetKey } from "../features/navigation/targets";
 import { communityDestination } from "../features/communities/destination";
+import {
+  joinOpening,
+  type JoinForm,
+} from "../features/communities/invite-intent";
 import { CommunityLanding } from "../features/communities/CommunityLanding";
 import { LegacyCommunityImport } from "../features/communities/LegacyCommunityImport";
 import {
@@ -120,10 +123,8 @@ export function App({ services }: { services: AppServices }) {
 }
 
 function ConnectedApp({ services }: { services: AppServices }) {
-  useLanguage();
   return (
     <ToastProvider
-      labels={{ region: t("toast.region"), dismiss: t("toast.dismiss") }}
       portalContainer={document.getElementById("buzz-toast-root") ?? undefined}
     >
       <AgentCompletionNotifications services={services} />
@@ -161,7 +162,6 @@ function Presented({
 }
 
 function ConnectedAppContent({ services }: { services: AppServices }) {
-  useLanguage();
   const { plugins } = services;
   const [workspaceElement, setWorkspaceElement] =
     useState<HTMLDivElement | null>(null);
@@ -186,9 +186,23 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
   );
   const discardSettings = useRef(false);
   const settingsEditorScope = useRef<string | undefined>(undefined);
+  // The join dialog cannot be closed while it writes; Back cannot leave it
+  // either. A finished join clears this before it navigates.
+  const [joinWriting, setJoinWriting] = useState(false);
+  const joinWrites = useRef(false);
+  const reportJoinWriting = (writing: boolean) => {
+    joinWrites.current = writing;
+    setJoinWriting(writing);
+  };
+  // One departure guard slot: the join dialog's writes, then Settings drafts.
   useLayoutEffect(() => {
-    if (!settingsUnsaved) return;
+    if (!settingsUnsaved && !joinWriting) return;
     return services.navigationHost.guardDeparture((next, decide) => {
+      if (joinWrites.current) {
+        decide(false);
+        return true;
+      }
+      if (!settingsUnsaved) return false;
       if (discardSettings.current) {
         discardSettings.current = false;
         return false;
@@ -206,7 +220,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
       setConfirmSettingsDiscard(true);
       return true;
     });
-  }, [services, settingsUnsaved]);
+  }, [services, settingsUnsaved, joinWriting]);
   const keepSettings = () => {
     settingsTraversal.current?.(false);
     settingsTraversal.current = undefined;
@@ -217,21 +231,61 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
     services.communities.subscribe,
     services.communities.snapshot,
   );
-  const invite = useSyncExternalStore(
-    services.invites.subscribe,
-    services.invites.snapshot,
+  // The join dialog is presentation over the current visit, for the viewer it
+  // was opened for only; its code and one-use connect live in memory.
+  const joinVisit = route.state.entry.target;
+  const join = joinVisit.join;
+  const joinState = useSyncExternalStore(services.invites.subscribe, () =>
+    services.invites.state(joinVisit, client.viewer),
   );
-  // A queued link cannot be presented under a different identity.
+  // Over Settings, the join waits for Settings to take focus: Settings opens
+  // only after launch, and a modal hides every surface already open when it
+  // takes the top layer, including a join restored with it.
+  const [settingsFocused, setSettingsFocused] = useState(false);
+  const joinShown =
+    !!join &&
+    join.viewer === client.viewer &&
+    (route.target.kind !== "settings" || settingsFocused);
+  // The opening's form as last edited (address, code, profile) survives Back
+  // and Forward; an emptied address still shows the dialog.
+  const joinForm = joinShown
+    ? joinOpening(joinState, join.community)
+    : undefined;
+  const invite = joinForm
+    ? {
+        ...joinForm,
+        submitted: joinState?.connect === true,
+        requestId: route.state.entry.id,
+      }
+    : undefined;
+  // Join a community from the picker: a visit with no address chosen yet.
+  const addresslessJoin =
+    joinShown && !joinForm ? route.state.entry.id : undefined;
+  const joinReports = {
+    onWritingChange: reportJoinWriting,
+    onFormChange: (form: JoinForm) => services.invites.edit(joinVisit, form),
+  };
+  // A failed link waiting for Retry has no visit of its own: a join visit
+  // would replace it, so Join a community opens in place there.
+  const joinViewer = client.viewer;
+  const startJoin =
+    joinViewer && !(route.state.ingress && route.state.retryable)
+      ? () => services.invites.start(joinViewer)
+      : undefined;
+  // Connecting is an opening instruction: it runs once, after the dialog's own
+  // mount started it, never again on Forward or a later presentation.
   useEffect(() => {
-    if (invite && client.viewer && invite.viewer !== client.viewer)
-      services.invites.clear();
-  }, [invite, client.viewer, services.invites]);
+    if (invite?.submitted) services.invites.consume(joinVisit);
+  }, [invite?.submitted, joinVisit, services.invites]);
+  const closeJoin = () => services.invites.close(joinVisit);
   const connection = useSyncExternalStore(
     services.relay.subscribe,
     services.relay.snapshot,
   );
   const restoring = client.status === "loading" || !!connection.restoring;
   const settings = route.target.kind === "settings";
+  // Settings must take focus again each time it opens.
+  if (settingsFocused && (!settings || launching)) setSettingsFocused(false);
   // Someone without a community starts by joining one. Having had one this
   // run keeps the shell; Personal space with memberships is unchanged.
   const [hadCommunity, setHadCommunity] = useState(false);
@@ -391,78 +445,63 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
     () => sidebarTarget(workspace.target),
     [conversationKey],
   );
+  const sidebarContexts = useSyncExternalStore(
+    services.sidebarSections.contextSubscribe,
+    services.sidebarSections.contextSnapshot,
+  );
+  const sidebarOwner = navigationOwner(route.pages, workspace.selected);
+  const sidebarAvailable =
+    !!workspace.page?.sidebar ||
+    !!resolveSidebarContext(sidebarContexts, conversationTarget, sidebarOwner);
   const sidebar = useCallback(
-    (pageNavigation: ReactNode, creationAction: ReactNode) =>
-      ownSidebar ? (
+    (pageNavigation: ReactNode, creationAction: ReactNode) => {
+      const common = {
+        registry: services.sidebarSections,
+        owner: sidebarOwner,
+        scope: connection.scope ?? "disconnected",
+        children: pageNavigation,
+        creationAction,
+      };
+      return ownSidebar ? (
         <Presented store={route.presented} resolve={ownSidebar.resolve}>
-          {(request) =>
-            workspace.page && (
-              <OwnedContribution
-                entry={workspace.page}
-                registry={services.pages}
-                resetIdentity={request}
-                fallback={
-                  <div className="shell-sidebar-default">
-                    <SidebarFrame
-                      label={t("app.sidebar", { page: workspace.page.title })}
-                    >
-                      <SidebarList>
-                        <p role="alert">{t("app.sidebarUnavailable")}</p>
-                        {pageNavigation}
-                      </SidebarList>
-                    </SidebarFrame>
-                  </div>
-                }
-              >
-                {(entry) => {
-                  const Sidebar = entry.sidebar;
-                  return Sidebar ? (
-                    <Sidebar target={ownSidebar.target}>
-                      {pageNavigation}
-                    </Sidebar>
-                  ) : null;
-                }}
-              </OwnedContribution>
-            )
-          }
+          {(request) => (
+            <PrimarySidebar
+              {...common}
+              target={ownSidebar.target}
+              replacement={
+                workspace.page
+                  ? {
+                      page: workspace.page,
+                      registry: services.pages,
+                      resetIdentity: request,
+                    }
+                  : undefined
+              }
+            />
+          )}
         </Presented>
-      ) : workspace.page?.sidebar ? (
-        <div className="shell-sidebar-default">
-          <SidebarFrame label={t("app.navigation")}>
-            <SidebarList>{pageNavigation}</SidebarList>
-          </SidebarFrame>
-        </div>
       ) : (
         <PrimarySidebar
-          creationAction={creationAction}
-          federatedIdentity={services.federatedIdentity}
-          memberships={client.memberships}
-          relay={services.relay}
-          navigator={services.navigation}
-          agents={services.agents}
-          chatIcons={services.conversation.chatIcons}
-          chatMenus={services.conversation.chatMenus}
-          sidebarSections={services.sidebarSections}
-          sidebarScope={services.sidebarScope}
-          sidebarRows={services.sidebarRows}
+          {...common}
           target={conversationTarget}
-        >
-          {pageNavigation}
-        </PrimarySidebar>
-      ),
+          pendingReplacement={!!workspace.page?.sidebar}
+        />
+      );
+    },
     [
       ownSidebar,
       workspace.page,
       route.presented,
       conversationTarget,
-      client.memberships,
+      sidebarOwner,
+      connection.scope,
       services,
     ],
   );
   // Keep the parser launch surface through local bootstrap, not network refresh.
   if (!settings && restoring)
     return document.getElementById("buzz-launch") ? null : (
-      <div className="buzz-launch" role="status" aria-label={t("app.opening")}>
+      <div className="buzz-launch" role="status" aria-label="Opening Buzz">
         <LoadingWindowHeader />
         <picture>
           <source
@@ -474,19 +513,30 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
       </div>
     );
   const selectCommunity = (id: string | null) => {
-    const recovering =
-      services.navigation.snapshot().ingress &&
-      services.navigation.snapshot().retryable;
+    joinWrites.current = false;
+    const { entry, ingress, retryable } = services.navigation.snapshot();
+    const joined = id === null ? undefined : communityDestination(id).url;
+    const recovering = ingress && retryable;
     services.communities.select(id);
-    if (!recovering) select("buzz.channels/channels");
+    // The joined community's page replaces the finished join's visit, so
+    // Back returns to the view beneath the dialog. Replacing is synchronous;
+    // a native Back would land after the page opened.
+    if (!recovering)
+      select(
+        "buzz.channels/channels",
+        entry.target.join ? { replace: true } : undefined,
+      );
+    // Then no other visit may present that community's join again.
+    services.invites.complete(entry.target, joined);
   };
   if (firstRun)
     return (
       <CommunityLanding
         communities={services.communities}
         federatedIdentity={services.federatedIdentity}
-        invite={invite?.viewer === client.viewer ? invite : undefined}
-        onInviteClose={services.invites.clear}
+        invite={invite}
+        onInviteClose={closeJoin}
+        joinReports={joinReports}
         settingsCards={services.settingsCards}
         onJoined={selectCommunity}
         onCreate={() =>
@@ -561,7 +611,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
         retryFocus.current = focused && after !== before ? after : undefined;
       }}
     >
-      {t("app.retry")}
+      Try again
     </Button>
   );
   // The way out must lead elsewhere: Messages itself may be what failed. A
@@ -583,7 +633,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
         variant={variant}
         onClick={() => select("buzz.channels/channels")}
       >
-        {t("app.messages")}
+        Go to Messages
       </Button>
     ) : null;
   // A link or access failure returns to where the person came from; opened
@@ -601,7 +651,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
             : services.navigation.back()
         }
       >
-        {t("app.back")}
+        Go back
       </Button>
     ) : (
       messagesButton("primary")
@@ -611,29 +661,29 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
       {failureKind === "denied" ? (
         <EmptyState
           icon={<LockIcon />}
-          title={t("app.denied")}
-          description={t("app.deniedHelp")}
+          title="You don’t have access to this"
+          description="It belongs to another account or a community you haven’t joined."
           action={leaveFailure}
         />
       ) : failureKind === "link" ? (
         <EmptyState
           icon={<LinkBreakIcon />}
-          title={t("app.badLink")}
-          description={t("app.badLinkHelp")}
+          title="This link doesn’t work"
+          description="It may be incomplete or out of date. Ask whoever shared it for a new link."
           action={leaveFailure}
         />
       ) : failureKind === "offline" ? (
         <EmptyState
           icon={<CloudOffIcon />}
-          title={t("app.offline")}
+          title="Can’t connect"
           description={
             retriedEntry === route.state.entry.id
               ? keepTrying
-                ? t("app.stillRetry")
-                : t("app.stillOffline")
+                ? "Still can’t connect. We’ll keep trying."
+                : "Still can’t connect. Check your connection, then try again."
               : keepTrying
-                ? t("app.retrying")
-                : t("app.checkConnection")
+                ? "Check your connection. We’ll keep trying."
+                : "Check your connection, then try again."
           }
           action={
             <>
@@ -646,10 +696,8 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
         // Its details' Enable owns every restriction and admin gate.
         <EmptyState
           icon={<WarningCircleIcon />}
-          title={t("app.pluginOff", { name: route.turnedOff.name })}
-          description={t(
-            settings ? "v1shell.app.pluginHelpSection" : "app.pluginHelp",
-          )}
+          title={`${route.turnedOff.name} is turned off`}
+          description={`Turn it on in Manage plugins to open this ${settings ? "section" : "page"}.`}
           action={
             <>
               <Button
@@ -659,7 +707,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
                   openSettingsSection("plugins", route.turnedOff?.id)
                 }
               >
-                {t("app.plugins")}
+                Manage plugins
               </Button>
               {messagesButton("quiet")}
             </>
@@ -668,8 +716,8 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
       ) : route.failure || failureReason === "not-found" ? (
         <EmptyState
           icon={<WarningCircleIcon />}
-          title={t("app.unavailable")}
-          description={t("app.removedHelp")}
+          title="This page isn’t available"
+          description="It may have been removed, or you may need to update Buzz."
           action={
             <>
               {messagesButton("primary")}
@@ -680,8 +728,8 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
       ) : (
         <EmptyState
           icon={<WarningCircleIcon />}
-          title={t("app.unavailable")}
-          description={t("app.loadHelp")}
+          title="This page isn’t available"
+          description="It didn’t load this time. Try again in a moment."
           action={
             <>
               {retryButton("primary")}
@@ -699,7 +747,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
         label={
           <span className="page-status-label">
             <TypingDots />
-            {t("app.loading")}
+            Loading…
           </span>
         }
       >
@@ -718,6 +766,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
       )}
       <ChannelNavigationProvider relay={services.relay}>
         <AppShell
+          sidebarAvailable={sidebarAvailable}
           creationInSidebar={!workspace.page?.sidebar}
           creationAction={(open, onOpenChange, triggerContainer) => (
             <NewMenu
@@ -738,20 +787,27 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
           // A scoped Settings target selects its community on the way.
           onOpenTarget={(target) => void services.navigation.open(target)}
           communities={services.communities}
+          communityUnreads={services.communityUnreads}
           federatedIdentity={services.federatedIdentity}
-          invite={invite?.viewer === client.viewer ? invite : undefined}
-          onInviteClose={services.invites.clear}
+          invite={invite}
+          joinVisit={addresslessJoin}
+          onJoin={startJoin}
+          joinReports={joinReports}
+          onInviteClose={closeJoin}
           settingsCards={services.settingsCards}
           accountActions={services.accountActions}
           appearance={services.appearance}
           pluginRecommendations={pluginRecommendations}
           searchServices={services}
           launchers={
-            <PanelLaunchers
-              panels={launcher.available}
-              selected={selectedPanel}
-              launch={launcher.launch}
-            />
+            <>
+              <UpdateAction updates={services.updates} />
+              <PanelLaunchers
+                panels={launcher.available}
+                selected={selectedPanel}
+                launch={launcher.launch}
+              />
+            </>
           }
           backdrop={<ShellBackdrops backdrops={services.backdrops} />}
           companion={pageOwnsCompanion ? undefined : companion}
@@ -811,13 +867,13 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
         <Dialog
           // The inert launch surface would swallow the modal's initial focus.
           open={settings && !launching}
-          title={t("app.settings")}
+          title="Settings"
           visit
-          closeLabel={t("app.closeSettings")}
+          closeLabel="Close Settings"
           size="expanded"
           container={workspaceElement}
           navigation={{
-            label: t("app.settingsSections"),
+            label: "Settings sections",
             content: (
               <SettingsSidebar
                 cards={services.settingsCards}
@@ -831,11 +887,15 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
             ),
           }}
           onOpenChange={(open) => {
-            if (open) return;
+            // A join dialog over Settings holds it while the join writes,
+            // as it holds Back and its own Close.
+            if (open || joinWrites.current) return;
             if (settingsUnsaved) setConfirmSettingsDiscard(true);
             else route.leaveSettings();
           }}
           initialFocus={() => {
+            // Settings has hidden the page beneath it; a join may now open.
+            setSettingsFocused(true);
             // A destination that already focused a setting keeps it.
             const active = document.activeElement;
             return active instanceof HTMLElement &&
@@ -921,12 +981,12 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
           </div>
           {confirmSettingsDiscard && settings && settingsUnsaved && (
             <AlertDialog
-              title={t("app.discardTitle")}
-              description={t("app.discardHelp")}
+              title="Discard changes?"
+              description="Your profile has unsaved changes."
               onClose={keepSettings}
               actions={
                 <>
-                  <Button onClick={keepSettings}>{t("app.keepEditing")}</Button>
+                  <Button onClick={keepSettings}>Keep editing</Button>
                   <Button
                     variant="destructive"
                     onClick={() => {
@@ -940,7 +1000,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
                       }
                     }}
                   >
-                    {t("app.discard")}
+                    Discard changes
                   </Button>
                 </>
               }

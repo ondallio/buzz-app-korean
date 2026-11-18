@@ -1,4 +1,3 @@
-import { t, useLanguage } from "../../shared/i18n";
 import {
   useCallback,
   useEffect,
@@ -11,6 +10,7 @@ import {
 } from "react";
 import type { OpenTarget } from "../navigation/targets";
 import type { UnreadCapability } from "../relay/unread";
+import type { CommunityUnread } from "../notifications/community-unread";
 import {
   ChecksIcon,
   LinkIcon,
@@ -19,6 +19,7 @@ import {
 } from "../../shared/design-system/icons/index";
 import { Avatar } from "../../shared/design-system/ui/Avatar";
 import { NavigationItem } from "../../shared/design-system/ui/NavigationItem";
+import { CountBadge } from "../../shared/design-system/ui/CountBadge";
 import {
   ContextMenuRoot,
   ContextMenuTrigger,
@@ -56,8 +57,8 @@ export function markAllRead(
   notify: ReturnType<typeof useToastNotification>,
 ) {
   return unread.markAllChannelsRead().then(
-    () => notify(t("v1id.picker.markedAllRead"), "success"),
-    () => notify(t("v1id.picker.markAllReadFailed"), "error"),
+    () => notify("Marked all as read.", "success"),
+    () => notify("Couldn’t mark everything as read.", "error"),
   );
 }
 
@@ -68,6 +69,7 @@ export function CommunityPickerItem({
   selected,
   viewer,
   session,
+  unread,
   manager,
   leaving,
   onSelect,
@@ -81,6 +83,8 @@ export function CommunityPickerItem({
   viewer: string | undefined;
   /** The selected community's session once it is ready; never another community's. */
   session: SelectedSession | undefined;
+  /** This community's unread, once known; never the selected community's. */
+  unread?: CommunityUnread | undefined;
   /** The viewer is an owner or admin of this community, and this build can mint invites. */
   manager: boolean;
   /** A leave request for this community is in flight. */
@@ -91,7 +95,6 @@ export function CommunityPickerItem({
   /** Asks the picker to confirm and run a leave; the picker owns the dialog. */
   onLeave: (membership: Membership) => void;
 }) {
-  useLanguage();
   // A keyboard open anchors to the picker item; a pointer open leaves the anchor
   // to Base UI's cursor point.
   const [menu, setMenu] = useState<{
@@ -145,8 +148,8 @@ export function CommunityPickerItem({
   };
   const copy = () =>
     writeClipboardText(origin).then(
-      () => notify(t("v1id.picker.urlCopied"), "success"),
-      () => notify(t("v1id.picker.urlCopyFailed"), "error"),
+      () => notify("Community URL copied.", "success"),
+      () => notify("Couldn’t copy the community URL.", "error"),
     );
   return (
     <ContextMenuRoot
@@ -167,9 +170,10 @@ export function CommunityPickerItem({
           }}
           label={name}
           title={`${name} — ${origin}`}
-          aria-label={t("v1id.picker.switchTo", { name })}
+          aria-label={`Switch to ${name}${unread ? unreadLabel(unread) : ""}`}
           aria-current={selected ? "true" : undefined}
           selected={selected}
+          trailing={unread && <UnreadBadge unread={unread} />}
           icon={
             <Avatar
               size="small"
@@ -183,7 +187,7 @@ export function CommunityPickerItem({
         />
       </ContextMenuTrigger>
       <MenuPopup
-        aria-label={t("communityAdmin.actionsFor", { name })}
+        aria-label={`Actions for ${name}`}
         size="compact"
         anchor={menu?.anchor}
         side={menu?.anchor ? "right" : "bottom"}
@@ -216,7 +220,7 @@ export function CommunityPickerItem({
           <MenuIcon>
             <LinkIcon size={14} />
           </MenuIcon>
-          {t("v1id.picker.copyUrl")}
+          Copy community URL
         </MenuItem>
         {selected && manager && scope && onOpenTarget && (
           <MenuItem
@@ -232,7 +236,7 @@ export function CommunityPickerItem({
             <MenuIcon>
               <TicketIcon size={14} />
             </MenuIcon>
-            {t("v1id.picker.invite")}
+            Invite to community
           </MenuItem>
         )}
         <MenuSeparator />
@@ -246,11 +250,34 @@ export function CommunityPickerItem({
           <MenuIcon>
             <SignOutIcon size={14} />
           </MenuIcon>
-          {leaving ? t("v1id.picker.leaving") : t("v1id.picker.leaveCommunity")}
+          {leaving ? "Leaving…" : "Leave community"}
         </MenuItem>
       </MenuPopup>
     </ContextMenuRoot>
   );
+}
+
+/** The row's spoken badge; empty when nothing is unread. */
+const unreadLabel = ({ unread, attention }: CommunityUnread) =>
+  attention > 0
+    ? `, ${attention} ${attention === 1 ? "item needs" : "items need"} you`
+    : unread
+      ? ", unread"
+      : "";
+
+/** Items that need you as a count, otherwise a dot for any unread. The row's
+ * label speaks it. */
+function UnreadBadge({ unread }: { unread: CommunityUnread }) {
+  if (unread.attention > 0)
+    return (
+      <CountBadge
+        count={unread.attention}
+        label={unreadLabel(unread).slice(2)}
+      />
+    );
+  return unread.unread ? (
+    <span className={styles.unreadDot} aria-hidden="true" />
+  ) : null;
 }
 
 /** Mounted only while the menu is open, so the read-state subscription is too. */
@@ -265,7 +292,6 @@ function MarkAllReadItem({
   session: SelectedSession | undefined;
   notify: ReturnType<typeof useToastNotification>;
 }) {
-  useLanguage();
   const noteId = useId();
   const unread = session?.unread;
   const subscribe = useCallback(
@@ -281,11 +307,11 @@ function MarkAllReadItem({
   // Read state is session-bound and validated against the relay snapshot, so an
   // inactive community cannot be marked without acquiring it.
   const reason = !selected
-    ? t("v1id.picker.onlySelected")
+    ? "Only the selected community can be marked as read."
     : !unread
-      ? t("v1id.picker.waitingFor", { name })
+      ? `Waiting for ${name} to connect.`
       : capability !== "frontier-sync"
-        ? t("v1id.picker.cantSync")
+        ? "Read state can’t sync on this connection."
         : undefined;
   return (
     <>
@@ -300,7 +326,7 @@ function MarkAllReadItem({
         <MenuIcon>
           <ChecksIcon size={14} />
         </MenuIcon>
-        {t("v1id.picker.markAllRead")}
+        Mark all as read
       </MenuItem>
       {reason && <MenuNote id={noteId}>{reason}</MenuNote>}
     </>

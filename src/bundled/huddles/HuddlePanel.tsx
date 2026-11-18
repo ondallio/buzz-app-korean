@@ -1,4 +1,3 @@
-import { t, useLanguage } from "../../shared/i18n";
 import type { ConversationExtensions } from "../../features/conversation/contracts";
 import { clearAttachmentDraft } from "../../features/messages/attachment-draft";
 import { MessageComposer } from "../../features/messages/MessageComposer";
@@ -25,7 +24,6 @@ export function HuddlePanel({
   openLink?: ((url: string) => boolean) | undefined;
   extensions?: ConversationExtensions | undefined;
 }) {
-  useLanguage();
   const connection = useRelayConnection(relay);
   const parsed = parseHuddleTarget(target);
   const room = parsed?.room;
@@ -67,9 +65,9 @@ export function HuddlePanel({
           scope={connection.scope ?? ""}
           channelId={room}
           channelName="Huddle"
-          formLabel={t("huddleMain.form")}
-          label={t("huddleMain.message")}
-          placeholder={t("huddleMain.message")}
+          forwardAudience="Everyone in this Huddle"
+          label="Message this Huddle"
+          placeholder="Message this Huddle"
           disabled={!discussion.writable}
         />
       }
@@ -80,8 +78,8 @@ export function HuddlePanel({
   ) : (
     <p className="p-4 text-secondary">
       {valid
-        ? t("huddleMain.loadingConversation")
-        : t("huddleMain.conversationUnavailable")}
+        ? "Loading conversation…"
+        : "This Huddle conversation is unavailable."}
     </p>
   );
 }

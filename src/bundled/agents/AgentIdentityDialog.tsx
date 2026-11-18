@@ -9,6 +9,7 @@ import {
   AgentCommunityScope,
   useAgentScopeCommunity,
 } from "../../features/agents/AgentCommunityScope";
+import { uncropped } from "../../features/profiles/avatar-upload";
 import { AgentAvatarPicker, type AvatarSelection } from "./AgentAvatarPicker";
 import styles from "./AgentCreate.module.css";
 
@@ -42,8 +43,13 @@ export function AgentIdentityDialog({
   const [error, setError] = useState("");
   const [avatarBusy, setAvatarBusy] = useState(false);
   const avatarRef = useRef<{ prepare(): Promise<string> }>(null);
+  const { zoom, x, y } = (avatar.kind === "image" && avatar.crop) || uncropped;
   const changed =
-    avatar.kind === "emoji" || avatar.picture !== (agent.picture ?? "");
+    avatar.kind === "emoji" ||
+    zoom !== 1 ||
+    !!x ||
+    !!y ||
+    avatar.picture !== (agent.picture ?? "");
   const form = useId();
   const save = async () => {
     const picker = avatarRef.current;

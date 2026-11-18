@@ -1,9 +1,3 @@
-import {
-  t,
-  translate,
-  useLanguage,
-  languagePreference,
-} from "../../shared/i18n";
 import { pluginCategoryDefinitions } from "../plugin-categories";
 import { GearIcon, SquaresFourIcon } from "../../shared/design-system/icons";
 import { useEffect, useSyncExternalStore } from "react";
@@ -100,7 +94,6 @@ export function useSearchSettings({
   appearance?: AppServices["appearance"] | undefined;
   notifications?: AppServices["notifications"] | undefined;
 }): SearchGroup[] {
-  const language = useLanguage();
   const pluginState = useSyncExternalStore(
     plugins?.subscribe ?? noSubscribe,
     plugins?.snapshot ?? noSnapshot,
@@ -125,37 +118,19 @@ export function useSearchSettings({
     () => adminAccess?.status("buzz.relay-staff") ?? "unavailable",
   );
   const needle = query.trim().toLowerCase();
-  const community = cards
-    ? client?.memberships.find(({ id }) => id === client.selected)
-    : undefined;
-  const english = cards ? settingsSections(cards, community, "en") : undefined;
-  const korean = cards ? settingsSections(cards, community, "ko") : undefined;
   if (!needle) return [];
   // The same sections as the Settings sidebar, ahead of their own controls.
   const sections: SearchDestination[] = cards
-    ? settingsSections(cards, community, language).groups.flatMap((group) =>
+    ? settingsSections(
+        cards,
+        client?.memberships.find(({ id }) => id === client.selected),
+      ).groups.flatMap((group) =>
         group.sections.flatMap((section) => {
           const match = matchSection(section.label, needle);
           // A group label such as "Buzz" or "Community" names many sections,
           // so it ranks a step behind a section's own label, as a plugin's
           // category does.
-          const sectionAliases = [english, korean].flatMap(
-            (projection) =>
-              projection?.sections.find((item) => item.id === section.id)
-                ?.label ?? [],
-          );
-          const groupAliases = [english, korean].flatMap(
-            (projection) =>
-              projection?.groups.find((item) => item.id === group.id)?.label ??
-              [],
-          );
           const rank = Math.min(
-            ...sectionAliases.map(
-              (label) => matchSection(label, needle)?.rank ?? Infinity,
-            ),
-            ...groupAliases.map(
-              (label) => (matchSection(label, needle)?.rank ?? Infinity) + 1,
-            ),
             match?.rank ?? Infinity,
             (matchSection(group.label, needle)?.rank ?? Infinity) + 1,
           );
@@ -178,16 +153,6 @@ export function useSearchSettings({
     if (!(entry.id === "mode" ? appearance : notifications)) return [];
     const rank = Math.min(
       matchRank(entry.label, needle) ?? Infinity,
-      matchRank(entryLabel(entry.id, "ko"), needle) ?? Infinity,
-      matchRank(
-        translate(
-          "ko",
-          entry.id === "mode"
-            ? "navigation.appearance"
-            : "navigation.notifications",
-        ),
-        needle,
-      ) ?? Infinity,
       matchRank(entry.section, needle) ?? Infinity,
       (matchRank(entry.keywords + " settings", needle) ?? Infinity) + 1,
     );
@@ -197,13 +162,8 @@ export function useSearchSettings({
       {
         ...controlDestination(
           key,
-          translate(
-            language,
-            entry.id === "mode"
-              ? "navigation.appearance"
-              : "navigation.notifications",
-          ),
-          entryLabel(entry.id, language),
+          entry.section,
+          entry.label,
           entry.id === "mode" && appearance ? (
             <ColorMode appearance={appearance} />
           ) : notifications && entry.id !== "mode" ? (
@@ -263,8 +223,6 @@ export function useSearchSettings({
             const rank = Math.min(
               matchRank(plugin.manifest.name, needle) ?? Infinity,
               (matchRank(category, needle) ?? Infinity) + 1,
-              (matchRank(categoryLabel(category, "ko"), needle) ?? Infinity) +
-                1,
               (matchRank("plugins " + plugin.manifest.description, needle) ??
                 Infinity) + 2,
             );
@@ -290,18 +248,18 @@ export function useSearchSettings({
             return [
               controlDestination(
                 key,
-                categoryLabel(category, language),
+                category,
                 plugin.manifest.name,
                 <>
                   {plugin.manifest.id === "buzz.channels" ? (
                     <PreferenceRow
                       variant="search"
                       icon={<SquaresFourIcon size={21} />}
-                      title={categoryLabel(category, language)}
+                      title={category}
                       subtitle={plugin.manifest.name}
                       trailing={
                         <span className="text-body-sm text-subtle">
-                          {t("search.required")}
+                          Required
                         </span>
                       }
                     />
@@ -309,11 +267,9 @@ export function useSearchSettings({
                     <SwitchPreferenceRow
                       variant="search"
                       icon={<SquaresFourIcon size={21} />}
-                      label={categoryLabel(category, language)}
+                      label={category}
                       description={plugin.manifest.name}
-                      aria-label={t("search.enablePlugin", {
-                        name: plugin.manifest.name,
-                      })}
+                      aria-label={`Enable ${plugin.manifest.name}`}
                       checked={plugin.enabled}
                       readOnly={blocked}
                       aria-disabled={blocked}
@@ -348,14 +304,14 @@ export function useSearchSettings({
   // generic: "plugins" leads with Manage plugins, not the Plugins switches.
   return [
     {
-      id: "Settings",
-      label: t("shell.profile.settings"),
+      label: "Settings",
+      tone: "page",
       rank: settings[0]?.rank ?? Infinity,
       destinations: settings,
     },
     {
-      id: "Plugins",
-      label: t("navigation.plugins"),
+      label: "Plugins",
+      tone: "plugin",
       rank: pluginRows[0]?.rank ?? Infinity,
       destinations: pluginRows,
       notice: (
@@ -368,7 +324,7 @@ export function useSearchSettings({
           {pluginState?.configuration.status === "ready" &&
             pluginState.configuration.externalPluginsPaused && (
               <p className="text-body-sm text-subtle">
-                {t("search.externalPaused")}
+                External plugins are paused in safe mode.
               </p>
             )}
         </>
@@ -378,27 +334,26 @@ export function useSearchSettings({
 }
 
 function ColorMode({ appearance }: { appearance: AppServices["appearance"] }) {
-  useLanguage();
   const state = useSyncExternalStore(appearance.subscribe, appearance.snapshot);
   return (
     <>
       <PreferenceRow
         variant="search"
         icon={<GearIcon size={21} />}
-        title={t("shell.profile.appearance")}
-        subtitle={t("search.colorMode")}
+        title="Appearance"
+        subtitle="Color mode"
         trailing={
           <Select
-            label={t("search.colorMode")}
+            label="Color mode"
             variant="compact"
             value={state.preference}
             groups={[
               {
                 label: "",
                 options: [
-                  { value: "system", label: t("shell.profile.system") },
-                  { value: "light", label: t("shell.profile.light") },
-                  { value: "dark", label: t("shell.profile.dark") },
+                  { value: "system", label: "System" },
+                  { value: "light", label: "Light" },
+                  { value: "dark", label: "Dark" },
                 ],
               },
             ]}
@@ -416,7 +371,7 @@ function ColorMode({ appearance }: { appearance: AppServices["appearance"] }) {
             size="sm"
             onClick={() => appearance.setMode(state.preference)}
           >
-            {t("search.retrySaving")}
+            Retry saving
           </Button>
         </p>
       )}
@@ -431,7 +386,6 @@ function NotificationPreference({
   notifications: AppServices["notifications"];
   entry: (typeof entries)[1] | (typeof entries)[2];
 }) {
-  useLanguage();
   const state = useSyncExternalStore(
     notifications.subscribe,
     notifications.snapshot,
@@ -442,12 +396,12 @@ function NotificationPreference({
       <SwitchPreferenceRow
         variant="search"
         icon={<GearIcon size={21} />}
-        label={t("navigation.notifications")}
-        aria-label={entryLabel(entry.id)}
+        label="Notifications"
+        aria-label={entry.label}
         description={
           state.developmentPaused
-            ? t("search.pausedPreference", { label: entryLabel(entry.id) })
-            : entryLabel(entry.id)
+            ? entry.label + " · Paused in this development build"
+            : entry.label
         }
         checked={state.preferences[key]}
         disabled={state.developmentPaused || !state.preferences.enabled}
@@ -459,42 +413,10 @@ function NotificationPreference({
         <p role="alert" className="text-body-sm text-subtle">
           {state.preferencesError}{" "}
           <Button size="sm" onClick={() => notifications.updatePreferences({})}>
-            {t("search.retrySaving")}
+            Retry saving
           </Button>
         </p>
       )}
     </>
   );
-}
-
-function entryLabel(
-  id: (typeof entries)[number]["id"],
-  language = languagePreference(),
-): string {
-  return translate(
-    language,
-    id === "mode"
-      ? "search.colorMode"
-      : id === "sound"
-        ? "search.sound"
-        : "search.notifyViewing",
-  );
-}
-function categoryLabel(
-  source: string,
-  language = languagePreference(),
-): string {
-  const keys = {
-    Communication: "search.communication",
-    Agents: "search.agents",
-    "Agent tools": "search.agentTools",
-    "Developer tools & integrations": "search.developerTools",
-    "People & communities": "search.peopleCommunities",
-    Productivity: "search.productivity",
-    Other: "search.other",
-  } as const;
-  const key = Object.hasOwn(keys, source)
-    ? keys[source as keyof typeof keys]
-    : undefined;
-  return key ? translate(language, key) : source;
 }

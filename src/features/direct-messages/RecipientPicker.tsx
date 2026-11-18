@@ -1,4 +1,3 @@
-import { t, useLanguage } from "../../shared/i18n";
 import { Virtualizer } from "virtua";
 import { Popover } from "@base-ui/react/popover";
 import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
@@ -37,6 +36,12 @@ import { useChipRemoval } from "./useChipRemoval";
 import styles from "./NewMessage.module.css";
 import { avatarMedia } from "../../shared/avatar-source";
 
+export type RecipientChannel = Readonly<{
+  id: string;
+  name: string;
+  private?: boolean;
+}>;
+const noChannels: readonly RecipientChannel[] = [];
 const noExclusions: readonly string[] = [];
 const personKey = (pubkey: string) => `person:${pubkey}`;
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
@@ -59,8 +64,12 @@ export function RecipientPicker({
   disabled,
   excludedPubkeys = noExclusions,
   initiallyOpen = true,
+  searchOnly = false,
   maxRecipients = 8,
   appearance = "header",
+  channelOptions = noChannels,
+  selectedChannel,
+  onChannelChange,
   onChange,
   onComplete,
   onTyped,
@@ -75,15 +84,19 @@ export function RecipientPicker({
   excludedPubkeys?: readonly string[];
   /** Share dialogs keep the people list closed until the To field is used. */
   initiallyOpen?: boolean;
+  /** Keep results closed until a search is typed. */
+  searchOnly?: boolean;
   maxRecipients?: number;
   /** A panel's header row, or a filled control inside a dialog form. */
   appearance?: "header" | "field";
+  channelOptions?: readonly RecipientChannel[];
+  selectedChannel?: RecipientChannel | undefined;
+  onChannelChange?(channel: RecipientChannel | undefined): void;
   onChange(people: Recipient[]): void;
   onComplete(): void;
   /** Whether the To field holds text that is not a recipient yet. */
   onTyped(typed: boolean): void;
 }) {
-  useLanguage();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(initiallyOpen);
   const input = useRef<HTMLInputElement>(null);
@@ -104,7 +117,7 @@ export function RecipientPicker({
   });
   const agents = useAgentChoices(session, false, true);
   const removal = useChipRemoval();
-  const atLimit = selected.length >= maxRecipients;
+  const atLimit = !!selectedChannel || selected.length >= maxRecipients;
   const needle = query.trim().toLowerCase();
   const typed = pickerText("dm", needle);
   const invalid = !open && !!needle && selected.length > 0;
@@ -128,9 +141,9 @@ export function RecipientPicker({
     namesOf,
     byPubkey,
     raw,
-    candidates,
+    candidates: allCandidates,
     identities,
-    keys,
+    keys: peopleKeys,
   } = useMemo(() => {
     const controlled = new Set(
       agents.selectable.filter(canMessageAgent).map((agent) => agent.pubkey),
@@ -322,6 +335,8 @@ export function RecipientPicker({
     excludedPubkeys,
     session,
   ]);
+  const candidates =
+    channelOptions.length && query.trim().startsWith("#") ? [] : allCandidates;
   const discriminator = (person: Recipient) => identities.get(person.pubkey);
   // Only a community-verified identity supplies the detail beside the name.
   const verifiedDetail = (person: VerifiedPerson<Recipient>) =>
@@ -336,14 +351,40 @@ export function RecipientPicker({
       : undefined;
   const label = (person: Recipient) =>
     [person.name, discriminator(person)].filter(Boolean).join(" ");
-  const listed = open && !disabled && !atLimit;
+  const matchingChannels =
+    selected.length || selectedChannel
+      ? []
+      : channelOptions.filter(
+          (channel) =>
+            !query.trim().replace(/^#/, "") ||
+            matchPerson(channel.name, query.replace(/^#/, "")) !== undefined,
+        );
+  const keys = [
+    ...matchingChannels.map((channel) => `channel:${channel.id}`),
+    ...(candidates.length ? peopleKeys : []),
+  ];
+  const chooseKey = (key: string) => {
+    const channel = matchingChannels.find(
+      (item) => `channel:${item.id}` === key,
+    );
+    if (channel && !disabled) {
+      onChannelChange?.(channel);
+      setQuery("");
+      onTyped(false);
+      setOpen(false);
+      input.current?.focus();
+    } else {
+      const person = byPubkey.get(key);
+      if (person) choose(person);
+    }
+  };
+  const visible = open && !disabled && (!searchOnly || !!needle);
+  const listed = visible && !atLimit;
+  const channelsOnly = channelOptions.length > 0 && needle.startsWith("#");
   const highlight = useSearchHighlight({
     query,
     keys,
-    onChoose: (pubkey) => {
-      const person = byPubkey.get(pubkey);
-      if (person) choose(person);
-    },
+    onChoose: chooseKey,
     open: listed,
     onOpen: () => setOpen(true),
   });
@@ -439,13 +480,13 @@ export function RecipientPicker({
       query={needle}
       media={session.media}
       position={index + 1}
-      count={candidates.length}
+      count={keys.length}
     />
   );
   return (
     <Popover.Root
       modal={false}
-      open={open && !disabled}
+      open={visible}
       onOpenChange={(next, details) => {
         // The editable To field is the anchor, rather than a toggle button.
         const target =
@@ -464,7 +505,7 @@ export function RecipientPicker({
       }}
     >
       <fieldset
-        aria-label={t("mentionPicker.recipients")}
+        aria-label="Recipients"
         className={styles.recipientHeader}
         data-appearance={appearance}
         ref={field}
@@ -484,21 +525,35 @@ export function RecipientPicker({
           onClick={focus}
           onKeyDown={(event) => {
             // Escape closes an open list; otherwise it is the host's.
-            if (event.key === "Escape" && open && !disabled) {
+            if (event.key === "Escape" && visible) {
               event.stopPropagation();
               setOpen(false);
             }
           }}
         >
-          <label htmlFor={id}>{t("mentionPicker.to")}</label>
+          <label htmlFor={id}>To:</label>
+          {selectedChannel && (
+            <span className={styles.chip}>
+              <Button
+                size="inline"
+                disabled={disabled}
+                aria-label={`Remove ${selectedChannel.name}`}
+                onClick={() => {
+                  onChannelChange?.(undefined);
+                  focus();
+                }}
+              >
+                <XIcon size={12} aria-hidden="true" />
+              </Button>
+              <span className={styles.chipName}>#{selectedChannel.name}</span>
+            </span>
+          )}
           {labels.map((person) => (
             <span className={styles.chip} key={person.pubkey}>
               <button
                 type="button"
                 className={styles.remove}
-                aria-label={t("mentionPicker.removeName", {
-                  name: label(person),
-                })}
+                aria-label={`Remove ${label(person)}`}
                 disabled={disabled}
                 ref={(element) => {
                   if (element) controls.current.set(person.pubkey, element);
@@ -526,13 +581,9 @@ export function RecipientPicker({
               {discriminator(person) && (
                 <span className={styles.agent}>{discriminator(person)}</span>
               )}
-              {person.isAgent && (
-                <span className={styles.agent}>{t("mentionPicker.agent")}</span>
-              )}
+              {person.isAgent && <span className={styles.agent}>Agent</span>}
               {agentUnavailable(session, person.pubkey) && (
-                <span className={styles.agent}>
-                  {t("v1msg.recipient.unavailable")}
-                </span>
+                <span className={styles.agent}>Unavailable</span>
               )}
             </span>
           ))}
@@ -540,9 +591,9 @@ export function RecipientPicker({
             id={id}
             ref={input}
             className={styles.toInput}
-            aria-label={t("mentionPicker.messageRecipients")}
+            aria-label="Message recipients"
             role="combobox"
-            aria-expanded={open && !disabled}
+            aria-expanded={visible}
             aria-controls={listed ? highlight.listId : undefined}
             aria-autocomplete="list"
             aria-describedby={invalid ? errorId : undefined}
@@ -550,14 +601,11 @@ export function RecipientPicker({
             placeholder={
               selected.length
                 ? atLimit
-                  ? t(
-                      maxRecipients === 1
-                        ? "mentionPicker.oneSelected"
-                        : "mentionPicker.manySelected",
-                      { count: maxRecipients },
-                    )
-                  : t("mentionPicker.addPerson")
-                : t("mentionPicker.findPerson")
+                  ? `${maxRecipients} ${maxRecipients === 1 ? "person" : "people"} selected`
+                  : "Add another person…"
+                : channelOptions.length
+                  ? "Find a person or channel…"
+                  : "Find a person…"
             }
             value={query}
             disabled={disabled}
@@ -583,12 +631,19 @@ export function RecipientPicker({
                 event.altKey
               )
                 return;
-              if (event.key === "Backspace" && !query && selected.length) {
+              if (event.key === "Backspace" && !query && selectedChannel) {
+                event.preventDefault();
+                onChannelChange?.(undefined);
+              } else if (
+                event.key === "Backspace" &&
+                !query &&
+                selected.length
+              ) {
                 event.preventDefault();
                 const last = selected.at(-1);
                 if (last) remove(last.pubkey);
               } else if (event.key === "Escape") {
-                if (open && !disabled) {
+                if (visible) {
                   event.preventDefault();
                   event.stopPropagation();
                   setOpen(false);
@@ -613,12 +668,9 @@ export function RecipientPicker({
               } else if (event.key === "Tab" && !event.shiftKey) {
                 // Tab picks the highlighted row, as in @ mentions. With no
                 // highlight it moves focus as usual.
-                const person = listed
-                  ? byPubkey.get(highlight.active)
-                  : undefined;
-                if (person) {
+                if (listed && keys.includes(highlight.active)) {
                   event.preventDefault();
-                  choose(person);
+                  chooseKey(highlight.active);
                 }
               } else if (
                 !highlight.keyDown(event) &&
@@ -642,9 +694,7 @@ export function RecipientPicker({
             role="status"
             className="mt-1 text-body-sm text-danger"
           >
-            {t("mentionPicker.invalidRecipient", {
-              query: shortened(query.trim()),
-            })}
+            “{shortened(query.trim())}” is not a valid recipient
           </p>
         )}
         <Popover.Portal>
@@ -669,16 +719,20 @@ export function RecipientPicker({
                   limit rather than asking for a choice already made. */}
               {atLimit ? (
                 <p role="status">
-                  {maxRecipients === 1
-                    ? t("mentionPicker.oneAtATime")
-                    : t("mentionPicker.maxPeople", { count: maxRecipients })}
+                  {selectedChannel
+                    ? "Remove this channel to choose another destination."
+                    : maxRecipients === 1
+                      ? "One person at a time. Remove them to choose someone else."
+                      : `You can message up to ${maxRecipients} people at once.`}
                 </p>
               ) : (
                 <div
                   className={styles.people}
                   id={highlight.listId}
                   role="listbox"
-                  aria-label={t("mentionPicker.people")}
+                  aria-label={
+                    channelOptions.length ? "People and channels" : "People"
+                  }
                   onPointerMove={(event) => {
                     const key = optionKey(event.target);
                     if (key) highlight.rowProps(key).onPointerMove(event);
@@ -694,14 +748,15 @@ export function RecipientPicker({
                     if (key) highlight.rowProps(key).onKeyDown(event);
                   }}
                   onClick={(event) => {
-                    const person = byPubkey.get(optionKey(event.target) ?? "");
-                    if (person) choose(person);
+                    const key = optionKey(event.target);
+                    if (key) chooseKey(key);
                   }}
                   onScroll={(event) => {
                     const list = event.currentTarget;
                     if (
                       list.scrollHeight - list.scrollTop - list.clientHeight <
                         80 &&
+                      !channelsOnly &&
                       !directory.loading &&
                       !directory.error
                     )
@@ -709,30 +764,58 @@ export function RecipientPicker({
                   }}
                 >
                   <Virtualizer
-                    data={candidates}
+                    data={keys}
                     keepMounted={
-                      highlight.active ? [keys.indexOf(highlight.active)] : []
+                      keys.includes(highlight.active)
+                        ? [keys.indexOf(highlight.active)]
+                        : []
                     }
                   >
-                    {renderOption}
+                    {(key, index) => {
+                      const channel = matchingChannels.find(
+                        (item) => `channel:${item.id}` === key,
+                      );
+                      if (!channel) {
+                        const person = byPubkey.get(key);
+                        return person ? renderOption(person, index) : <></>;
+                      }
+                      return (
+                        <NavigationItem
+                          key={key}
+                          id={highlight.rowProps(key).id}
+                          data-recipient-key={key}
+                          variant="option"
+                          role="option"
+                          tabIndex={-1}
+                          selected={highlight.active === key}
+                          aria-selected={highlight.active === key}
+                          aria-current={false}
+                          aria-label={`${channel.name}, ${channel.private ? "private channel" : "channel"}`}
+                          label={`#${channel.name}`}
+                          trailing={
+                            channel.private ? "Private channel" : "Channel"
+                          }
+                          onMouseDown={(event) => event.preventDefault()}
+                        />
+                      );
+                    }}
                   </Virtualizer>
-                  {!directory.loading &&
-                    !directory.error &&
-                    !candidates.length && (
+                  {(channelsOnly || (!directory.loading && !directory.error)) &&
+                    !candidates.length &&
+                    !matchingChannels.length && (
                       <p>
-                        {directory.tooShort
-                          ? t("mentionPicker.minCharacters", {
-                              count: SEARCH_MIN_CHARS,
-                            })
-                          : t("mentionPicker.noPeople")}
+                        {channelOptions.length &&
+                        (channelsOnly || !directory.tooShort)
+                          ? `No people or channels match "${query.trim()}".`
+                          : directory.tooShort
+                            ? `Type at least ${SEARCH_MIN_CHARS} characters to search people.`
+                            : "No matching people."}
                       </p>
                     )}
-                  {directory.loading &&
+                  {!channelsOnly &&
+                    directory.loading &&
                     (!query.trim() || !candidates.length) && (
-                      <div
-                        role="status"
-                        aria-label={t("mentionPicker.loadingPeopleLabel")}
-                      >
+                      <div role="status" aria-label="Loading people">
                         <div aria-hidden="true">
                           {Array.from(
                             {
@@ -750,18 +833,18 @@ export function RecipientPicker({
                         </div>
                       </div>
                     )}
-                  {directory.error && (
-                    <p role="alert">{t("mentionPicker.peopleFailed")}</p>
+                  {!channelsOnly && directory.error && (
+                    <p role="alert">Could not load people.</p>
                   )}
-                  {!directory.loading && directory.hasMore && (
+                  {!channelsOnly && !directory.loading && directory.hasMore && (
                     <Button
                       type="button"
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={directory.loadMore}
                     >
                       {directory.error
-                        ? t("mentionPicker.retryPeople")
-                        : t("mentionPicker.loadMorePeople")}
+                        ? "Retry loading people"
+                        : "Load more people"}
                     </Button>
                   )}
                 </div>
@@ -804,7 +887,6 @@ const RecipientOption = memo(function RecipientOption({
   position: number;
   count: number;
 }) {
-  useLanguage();
   return (
     <NavigationItem
       id={id}
@@ -813,18 +895,7 @@ const RecipientOption = memo(function RecipientOption({
       role="option"
       aria-posinset={position}
       aria-setsize={count}
-      aria-label={
-        person.isAgent
-          ? verified
-            ? t("mentionPicker.verifiedAgentOption", {
-                name: [person.name, discriminator].filter(Boolean).join(" "),
-                verified,
-              })
-            : t("mentionPicker.agentOption", {
-                name: [person.name, discriminator].filter(Boolean).join(" "),
-              })
-          : `${[person.name, discriminator].filter(Boolean).join(" ")}${verified ? `, ${verified}` : ""}`
-      }
+      aria-label={`${[person.name, discriminator].filter(Boolean).join(" ")}${verified ? `, ${verified}` : ""}${person.isAgent ? ", Agent" : ""}`}
       tabIndex={-1}
       selected={active}
       aria-selected={active}
@@ -856,13 +927,9 @@ const RecipientOption = memo(function RecipientOption({
       trailing={
         discriminator || person.isAgent ? (
           <span className={styles.agent}>
-            {person.isAgent
-              ? discriminator
-                ? t("mentionPicker.agentIdentifier", {
-                    identifier: discriminator,
-                  })
-                : t("mentionPicker.agent")
-              : discriminator}
+            {[discriminator, person.isAgent ? "Agent" : ""]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         ) : undefined
       }

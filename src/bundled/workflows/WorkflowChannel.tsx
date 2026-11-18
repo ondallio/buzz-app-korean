@@ -6,6 +6,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import type { WorkflowAgentMentions } from "./workflowAgentMentionWarning";
 import type {
   WorkflowCapability,
   WorkflowDefinition,
@@ -71,6 +72,7 @@ export function WorkflowChannel({
   onSaveReadback,
   onClose,
   onDelete,
+  agentMentions,
 }: {
   capability: WorkflowCapability;
   channelId: string;
@@ -83,6 +85,7 @@ export function WorkflowChannel({
   ) => void;
   onClose: () => void;
   onDelete: (definition: WorkflowDefinition) => void;
+  agentMentions?: WorkflowAgentMentions | undefined;
 }) {
   useLanguage();
   const { snapshot, refresh } = useWorkflowView(
@@ -384,6 +387,7 @@ export function WorkflowChannel({
             onChange={(yaml) => setDraft({ ...draft, yaml })}
             onSave={save}
             onLocalDraftRiskChange={setLocalDraftAtRisk}
+            agentMentions={agentMentions}
             readOnly={readonly}
             busy={busy}
             locked={!!draft.operationId}
