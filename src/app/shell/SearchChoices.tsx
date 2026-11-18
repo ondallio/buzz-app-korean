@@ -1,3 +1,8 @@
+import {
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
+import { t, useLanguage } from "../../shared/i18n";
 import { matchRank } from "../../features/search/match";
 import {
   useLayoutEffect,
@@ -37,6 +42,8 @@ const isNarrow = () => !!globalThis.matchMedia?.(NARROW).matches;
 export type SearchDestination = {
   content?: ReactNode;
   rank?: number;
+  /** Name-only match rank, including explicit app-owned language aliases. */
+  labelMatchRank?: number;
   key: string;
   label: string;
   detail?: string;
@@ -71,6 +78,8 @@ export type SearchDestination = {
 };
 
 export type SearchGroup = {
+  /** Stable original group identity when its visible label changes language. */
+  id?: string;
   label: string;
   /** Name the group for assistive technology only, when the view's own tab
    * already says what it holds. */
@@ -154,7 +163,7 @@ export type SearchChip = {
   /** The text Backspace restores for editing. */
   edit: string;
   /** The remove button's accessible name. */
-  label: string;
+  label: DisplayMessage;
   title?: string;
 };
 
@@ -212,7 +221,7 @@ export function SearchChoices({
   displayQuery,
   onDisplayQueryChange,
   input,
-  label = "Search Buzz",
+  label,
   scope,
   fieldAction,
   children,
@@ -246,6 +255,7 @@ export function SearchChoices({
   onRowsShown?: ((keys: readonly string[]) => void) | undefined;
   peek?: SearchPeek | undefined;
 }) {
+  useLanguage();
   const palette = useRef<HTMLDivElement>(null);
   // A hidden preview would still read; it mounts only where it shows.
   const narrow = useSyncExternalStore(watchNarrow, isNarrow);
@@ -286,7 +296,7 @@ export function SearchChoices({
   const score = (group: SearchGroup) =>
     group.rank ??
     Math.min(
-      matchRank(group.label, needle) ?? Infinity,
+      matchRank(group.id ?? group.label, needle) ?? Infinity,
       ...group.destinations.map(
         (row) =>
           row.rank ??
@@ -463,7 +473,7 @@ export function SearchChoices({
   useEffect(() => {
     input.current?.focus();
   }, [input]);
-  const resultsLabel = views?.resultsLabel ?? "Search results";
+  const resultsLabel = views?.resultsLabel ?? t("search.results");
   // A group drawn in part says where each row sits in the whole of it.
   const positions = new Map<
     string,
@@ -762,7 +772,7 @@ export function SearchChoices({
           <button
             type="button"
             className="search-palette-scope"
-            aria-label={`Remove ${scope.label} search scope`}
+            aria-label={t("search.removeScope", { scope: scope.label })}
             onClick={scope.onRemove}
           >
             {scope.label} <span aria-hidden="true">×</span>
@@ -771,6 +781,12 @@ export function SearchChoices({
       )}
       <div className="search-palette-controls">
         <SearchField
+          clearLabel={t("search.clear", {
+            label: (label === undefined
+              ? t("search.buzz")
+              : label
+            ).toLowerCase(),
+          })}
           variant="palette"
           prefix={
             chips?.length ? (
@@ -783,7 +799,7 @@ export function SearchChoices({
                     data-operator={chip.operand
                       .slice(0, chip.operand.indexOf(":"))
                       .toLowerCase()}
-                    aria-label={chip.label}
+                    aria-label={resolveMessage(chip.label)}
                     title={chip.title}
                     onClick={() => onRemoveChip?.(chip)}
                   >
@@ -801,8 +817,8 @@ export function SearchChoices({
           aria-autocomplete="list"
           aria-haspopup={hasControls ? "grid" : "listbox"}
           {...highlight.fieldProps}
-          label={label}
-          placeholder="Search"
+          label={label === undefined ? t("search.buzz") : label}
+          placeholder={t("search.search")}
           value={displayQuery ?? query}
           onValueChange={onDisplayQueryChange ?? onQueryChange}
           spellCheck={false}
@@ -877,7 +893,7 @@ export function SearchChoices({
           // as from the field, not out of search.
           <fieldset
             className="search-peek-rail"
-            aria-label="Result groups"
+            aria-label={t("v105shell.search.resultGroups")}
             onKeyDown={(event) => {
               if (event.key !== "Escape" || !scoped) return;
               event.preventDefault();
@@ -906,12 +922,16 @@ export function SearchChoices({
                   data-tone={group?.tone ?? "page"}
                   aria-hidden="true"
                 />
-                {group?.label === "Direct messages"
-                  ? "DMs"
-                  : group?.label === "Recent searches"
-                    ? "Recents"
+                {(group?.id ?? group?.label) === "Direct messages"
+                  ? t("v105shell.search.dmsShort")
+                  : (group?.id ?? group?.label) === "Recent searches"
+                    ? t("v105shell.search.recents")
                     : (group?.label ??
-                      (query.trim() ? "Top results" : "Jump back in"))}
+                      t(
+                        query.trim()
+                          ? "v105shell.search.topResults"
+                          : "v105shell.search.jumpBackIn",
+                      ))}
                 {/* A landing group has no count yet. */}
                 {(!group || group !== landing) && (
                   <span className="search-peek-count">
@@ -926,7 +946,7 @@ export function SearchChoices({
                 )}
                 {index === 1 && group !== landing && !!query.trim() && (
                   <Badge size="xs" tone="success">
-                    Best match
+                    {t("v105shell.search.bestMatch")}
                   </Badge>
                 )}
               </Button>
@@ -1052,7 +1072,10 @@ export function SearchChoices({
                                     <Button
                                       variant="plain"
                                       size="inline"
-                                      aria-label={`Show all ${label}`}
+                                      aria-label={t(
+                                        "v105shell.search.showAll",
+                                        { label },
+                                      )}
                                       tabIndex={-1}
                                       onMouseDown={(event) =>
                                         event.preventDefault()
@@ -1100,7 +1123,7 @@ export function SearchChoices({
                                     {notice}
                                     {!destinations.length && (
                                       <p className="search-palette-group-empty">
-                                        {empty ?? "No matching results."}
+                                        {empty ?? t("search.noResults")}
                                       </p>
                                     )}
                                   </div>
@@ -1120,7 +1143,10 @@ export function SearchChoices({
           </div>
         </div>
         {preview && !narrow && (
-          <aside className="search-peek-side" aria-label="Preview">
+          <aside
+            className="search-peek-side"
+            aria-label={t("v105shell.search.preview")}
+          >
             {/* Not live: the highlighted row is already announced, and the
               preview changes with every keystroke. */}
             <div className="search-peek-preview">
@@ -1152,24 +1178,29 @@ export function SearchChoices({
         >
           <span>
             <kbd>↑</kbd>
-            <kbd>↓</kbd> Move
+            <kbd>↓</kbd> {t("v105shell.search.keyMove")}
           </span>
           {ranked.length > 0 && (
             <span>
-              <kbd>Tab</kbd> Next group
+              <kbd>Tab</kbd> {t("v105shell.search.keyNextGroup")}
             </span>
           )}
           {ranked.length > 0 && (
             <span>
               <kbd>⇧</kbd>
-              <kbd>Tab</kbd> Previous
+              <kbd>Tab</kbd> {t("v105shell.search.keyPrevious")}
             </span>
           )}
           <span>
-            <kbd>↵</kbd> Open
+            <kbd>↵</kbd> {t("v105shell.search.keyOpen")}
           </span>
           <span>
-            <kbd>esc</kbd> {scoped ? "Back to top" : "Close"}
+            <kbd>esc</kbd>{" "}
+            {t(
+              scoped
+                ? "v105shell.search.keyBackToTop"
+                : "v105shell.search.keyClose",
+            )}
           </span>
         </div>
       )}

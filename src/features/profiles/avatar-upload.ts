@@ -1,3 +1,5 @@
+import { t } from "../../shared/i18n";
+import { localError } from "../../shared/i18n/deferred-message";
 import { prepareAttachment } from "../messages/prepare-attachment";
 import { mediaUrl } from "../relay/transport";
 import type { UploadProgress } from "../relay/attachments";
@@ -21,6 +23,16 @@ export function avatarPictureError(value: string): string | undefined {
  * writes and reads it. Agents save HTTPS pictures only. */
 export const profilePictureError = (value: string) =>
   legacyEmojiPicture(value.trim()) ? undefined : avatarPictureError(value);
+
+/** Localizes only the shared policy result for this input, leaving its canonical API unchanged. */
+export function avatarPictureErrorMessage(
+  value: string,
+  policy: (value: string) => string | undefined = avatarPictureError,
+): string | undefined {
+  return policy(value) === undefined
+    ? undefined
+    : t("profileEditing.pictureError");
+}
 
 export function avatarPreview(
   value: string,
@@ -50,20 +62,20 @@ export async function uploadAvatar(
   progress?: UploadProgress,
 ): Promise<string> {
   if (!/^image\/(png|jpeg|gif|webp|heic|heif)$/.test(file.type))
-    throw new Error("Choose a PNG, JPEG, GIF, WebP or HEIC image.");
+    throw localError("profileEditing.unsupportedFormat");
   if (!file.size || file.size > 50 * 1024 * 1024)
-    throw new Error("Choose an image smaller than 50 MiB.");
+    throw localError("profileEditing.imageSize");
   const transport = await connectCommunityTransport(
     communityDestination(community).id,
     signal,
   );
   if (!transport.uploadAttachment)
-    throw new Error("Image uploads are unavailable on this connection.");
+    throw localError("profileEditing.uploadUnavailable");
   const prepared = await prepareAttachment(file, signal, true);
   const result = await transport.uploadAttachment(prepared, signal, progress);
   signal.throwIfAborted();
   if (!result.type.startsWith("image/") || !avatarSource(result.url))
-    throw new Error("The server did not return an avatar image.");
+    throw localError("profileEditing.invalidImageResponse");
   return result.url;
 }
 
@@ -86,8 +98,7 @@ export function paintEmojiAvatar(
   const probe = document.createElement("canvas").getContext("2d", {
     willReadFrequently: true,
   });
-  if (!context || !probe)
-    throw new Error("Emoji images are unavailable in this browser.");
+  if (!context || !probe) throw localError("profileEditing.emojiUnavailable");
   // Measure the artwork once, then paint it at the font size that fits, so
   // even a zoomed emoji is drawn at full resolution.
   const paint = (
@@ -147,7 +158,7 @@ export async function emojiAvatar(
     emoji.length > 64 ||
     (color !== "transparent" && !/^#[0-9a-f]{6}$/i.test(color))
   )
-    throw new Error("Choose an emoji and a background color.");
+    throw localError("profileEditing.chooseEmojiColor");
   const canvas = document.createElement("canvas");
   paintEmojiAvatar(canvas, emoji, color, scale, offset, x);
   const blob = await new Promise<Blob>((resolve, reject) =>
@@ -155,7 +166,7 @@ export async function emojiAvatar(
       (value) =>
         value
           ? resolve(value)
-          : reject(new Error("Could not prepare the emoji image.")),
+          : reject(localError("profileEditing.emojiPrepareFailed")),
       "image/png",
     ),
   );
@@ -197,14 +208,15 @@ export async function croppedAvatar(
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 512;
   const context = canvas.getContext("2d");
-  if (!context)
-    throw new Error("Image cropping is unavailable in this browser.");
+  if (!context) throw localError("v105shell.avatar.cropUnavailable");
   context.imageSmoothingQuality = "high";
   context.drawImage(image, left * 512, top * 512, width * 512, height * 512);
   const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob(
       (value) =>
-        value ? resolve(value) : reject(new Error("Could not crop the image.")),
+        value
+          ? resolve(value)
+          : reject(localError("v105shell.avatar.cropFailed")),
       "image/png",
     ),
   );

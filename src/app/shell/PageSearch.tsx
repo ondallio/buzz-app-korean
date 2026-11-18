@@ -1,3 +1,5 @@
+import { t, translate, useLanguage } from "../../shared/i18n";
+import { ownedPageLabel } from "../../shared/i18n/owned-labels";
 import { useSearchSettings } from "./SearchSettings";
 import { usePagePresentation } from "./BestieNavigation";
 import { isBestiePage, useBestieConversation } from "./bestie-context";
@@ -83,6 +85,7 @@ export function PageSearch({
   onSelect: (key: string, options?: { section?: string }) => void;
   services?: SearchServices | undefined;
 }) {
+  useLanguage();
   const pagePresentation = usePagePresentation();
   const [open, setOpen] = useState(false);
   const [contentPresent, setContentPresent] = useState(false);
@@ -217,19 +220,32 @@ export function PageSearch({
   // Every search surface reads pages from here, so rank and underline them
   // here too: the disconnected and personal-space views show this list as is.
   const needle = query.trim().toLowerCase();
-  const searchPages: (Omit<SearchDestination, "run"> & { open: () => void })[] =
-    [
-      ...orderPages(pages).map((page) => ({
-        key: page.key,
-        ...pagePresentation(page),
-        open: () => onSelect(page.key),
-      })),
-      {
-        key: "settings",
-        ...shellPresentation.settings,
-        open: () => onSelect("settings"),
-      },
-    ];
+  const searchPages: (Omit<SearchDestination, "run"> & {
+    aliases: readonly string[];
+    open: () => void;
+  })[] = [
+    ...orderPages(pages).map((page) => ({
+      key: page.key,
+      ...pagePresentation(page),
+      aliases:
+        ownedPageLabel(page.key, page.title, "ko") !== page.title
+          ? [
+              ownedPageLabel(page.key, page.title, "en"),
+              ownedPageLabel(page.key, page.title, "ko"),
+            ]
+          : [],
+      open: () => onSelect(page.key),
+    })),
+    {
+      key: "settings",
+      ...shellPresentation.settings,
+      aliases: [
+        translate("en", "navigation.settings"),
+        translate("ko", "navigation.settings"),
+      ],
+      open: () => onSelect("settings"),
+    },
+  ];
   const destinations: SearchDestination[] = searchPages
     .flatMap((page) => {
       if (!needle) return [{ page, rank: 0 }];
@@ -237,15 +253,19 @@ export function PageSearch({
       const detailMatch = page.detail
         ? matchName(page.detail, needle)
         : undefined;
-      const rank = Math.min(
+      const labelMatchRank = Math.min(
         labelMatch?.rank ?? Infinity,
-        detailMatch?.rank ?? Infinity,
+        ...page.aliases.map(
+          (alias) => matchName(alias, needle)?.rank ?? Infinity,
+        ),
       );
+      const rank = Math.min(labelMatchRank, detailMatch?.rank ?? Infinity);
       return Number.isFinite(rank)
         ? [
             {
               page: {
                 ...page,
+                ...(Number.isFinite(labelMatchRank) ? { labelMatchRank } : {}),
                 ...(labelMatch ? { matches: labelMatch.positions } : {}),
               },
               rank,
@@ -269,8 +289,10 @@ export function PageSearch({
         variant="inverted"
         size="sm"
         shape="capsule"
-        aria-label="Search Buzz"
-        title={`Search Buzz (${formatBinding(binding, apple).text})`}
+        aria-label={t("search.buzz")}
+        title={t("search.buzzShortcut", {
+          shortcut: formatBinding(binding, apple).text,
+        })}
         onClick={() => {
           trigger.current?.focus();
           begin();
@@ -278,7 +300,7 @@ export function PageSearch({
       >
         <span className="shell-search-content">
           <MagnifyingGlassIcon size={16} aria-hidden="true" />
-          <span className="shell-search-label">Search</span>
+          <span className="shell-search-label">{t("search.search")}</span>
           <span className="shell-search-shortcut">
             <KeyCombo binding={binding} apple={apple} />
           </span>
@@ -291,7 +313,9 @@ export function PageSearch({
           escaped.current = true;
           return false;
         }}
-        title={scopedChannelId ? "Search this conversation" : "Search Buzz"}
+        title={
+          scopedChannelId ? t("search.conversationSearch") : t("search.buzz")
+        }
         footerGap="none"
         motion="default"
         dismissOnOutsideClick
@@ -365,7 +389,9 @@ export function PageSearch({
               query={query}
               onQueryChange={setQuery}
               input={input}
-              groups={[{ label: "Pages", destinations }]}
+              groups={[
+                { id: "Pages", label: t("navigation.pages"), destinations },
+              ]}
             />
           ))}
       </Dialog>
@@ -406,6 +432,7 @@ function CommunitySearch({
   close: (channelId?: string) => void;
   openSection: (section: string) => void;
 } & SearchInputProps) {
+  useLanguage();
   const inlineSettings = useSearchSettings({
     query: scopedChannelId ? "" : query,
     appearance: services.appearance,
@@ -432,11 +459,15 @@ function CommunitySearch({
     !enabled || !client.selected || connection.status === "ready"
       ? undefined
       : saved
-        ? `Only saved conversations are searched ${connecting ? "until this community connects" : "while this community is disconnected"}.`
+        ? t(
+            connecting
+              ? "v1shell.search.savedOnlyConnecting"
+              : "v1shell.search.savedOnlyDisconnected",
+          )
         : !connecting
-          ? "Message search is unavailable while this community is disconnected."
+          ? t("search.disconnected")
           : query.trim() && !scopedChannelId
-            ? "Connecting to this community…"
+            ? t("search.connecting")
             : undefined;
   const offline = notice && (
     <div className="px-3 text-body-sm text-subtle" aria-live="polite">
@@ -452,7 +483,7 @@ function CommunitySearch({
             services.communities.relay.tryAgain();
           }}
         >
-          Retry connection
+          {t("search.retryConnection")}
         </Button>
       )}
     </div>
@@ -469,38 +500,46 @@ function CommunitySearch({
         query={query}
         onQueryChange={onQueryChange}
         input={input}
-        label={scopedChannelId ? "Search this conversation" : "Search Buzz"}
+        label={
+          scopedChannelId ? t("search.conversationSearch") : t("search.buzz")
+        }
         scope={
           scopedChannelId
-            ? { label: "This conversation", onRemove: () => onScopeChange() }
+            ? {
+                label: t("search.thisConversation"),
+                onRemove: () => onScopeChange(),
+              }
             : undefined
         }
         groups={
           scopedChannelId
             ? [
                 {
-                  label: "Most relevant",
+                  id: "Most relevant",
+                  label: t("search.relevance"),
                   destinations: [],
-                  empty: "Connect to this community to search messages.",
+                  empty: t("search.connectSearch"),
                 },
               ]
             : query.trim()
               ? [
                   {
-                    label: "Pages",
+                    id: "Pages",
+                    label: t("navigation.pages"),
                     destinations: pages,
-                    empty: "No matching pages.",
+                    empty: t("search.noPages"),
                   },
                 ]
               : [
                   {
-                    label: "Recent activity",
+                    id: "Recent activity",
+                    label: t("search.recentActivity"),
                     destinations: [],
                     empty: !enabled
-                      ? "Enable Messages to see conversations."
+                      ? t("search.enableMessages")
                       : !client.selected
-                        ? "Choose a community to see recent conversations."
-                        : "Connecting to this community…",
+                        ? t("search.chooseCommunity")
+                        : t("search.connecting"),
                   },
                 ]
         }
@@ -540,7 +579,7 @@ function CommunitySearch({
   const views =
     !scopedChannelId && !saved && connection.session.channels.readDirectory
       ? {
-          resultsLabel: "Search results",
+          resultsLabel: t("search.results"),
           place,
         }
       : undefined;
@@ -612,8 +651,8 @@ function CommunitySearch({
           close();
           if (!kept) ask();
           else
-            notify("New chat already has an unsent draft", "info", {
-              label: "Replace it",
+            notify(t("v105shell.search.draftKept"), "info", {
+              label: t("v105shell.search.replaceDraft"),
               // The notice outlives search: after a community or session
               // switch it does nothing rather than overwrite the old draft.
               onClick: () => {

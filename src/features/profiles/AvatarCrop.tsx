@@ -5,6 +5,7 @@ import {
   type PointerEvent,
   type Ref,
 } from "react";
+import { t, useLanguage } from "../../shared/i18n";
 import { type AvatarCrop, avatarCropBox } from "./avatar-upload";
 import styles from "./AvatarCrop.module.css";
 
@@ -83,6 +84,7 @@ export function AvatarCropFrame({
   onChange?(crop: AvatarCrop): void;
   onError?(): void;
 }) {
+  useLanguage();
   const [loaded, setLoaded] = useState<{ src: string; aspect: number }>();
   // An image's shape is unknown until it loads, so it stays hidden until
   // then rather than paint squashed into the square.
@@ -98,7 +100,7 @@ export function AvatarCropFrame({
       <img
         ref={imageRef}
         src={src}
-        alt="Avatar preview"
+        alt={t("v105shell.avatar.preview")}
         draggable={false}
         onError={onError}
         onLoad={(event) => {
@@ -124,8 +126,8 @@ export function AvatarCropFrame({
       // A 2D pan has no widget role; the description gives its keys.
       role="application"
       tabIndex={disabled ? -1 : 0}
-      aria-label="Image position"
-      aria-description="Drag or use the arrow keys to move the image"
+      aria-label={t("v105shell.avatar.position")}
+      aria-description={t("v105shell.avatar.positionHelp")}
       aria-disabled={disabled || undefined}
       className={styles.frame}
       {...pan.handlers}
@@ -146,9 +148,10 @@ export function AvatarZoom({
   disabled?: boolean;
   onChange(crop: AvatarCrop): void;
 }) {
+  useLanguage();
   return (
     <label className={`${styles.zoom} ${className ?? ""}`}>
-      <span className="sr-only">Zoom</span>
+      <span className="sr-only">{t("v105shell.avatar.zoom")}</span>
       <input
         type="range"
         min={1}

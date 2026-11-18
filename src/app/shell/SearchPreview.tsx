@@ -5,6 +5,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { t, useLanguage } from "../../shared/i18n";
 import type { RelaySession } from "../../features/relay/session";
 import type { ReadFilter } from "../../features/relay/events";
 import { MatchedLabel } from "../../features/search/MatchedLabel";
@@ -86,7 +87,7 @@ function linesOf(events: readonly { [key: string]: unknown }[]): Line[] {
         channelId,
         authorId: event.pubkey,
         createdAt: event.created_at,
-        text: searchText(event) || "Attachment",
+        text: searchText(event) || t("v105shell.search.attachment"),
       },
     ];
   });
@@ -233,6 +234,7 @@ export function SearchPreview({
   whereOf: (channelId: string) => string;
   follow?: PeekFollow | undefined;
 }) {
+  useLanguage();
   // Names and pictures resolve as their profiles arrive.
   const profiles = useSyncExternalStore(
     session.profiles.subscribe,
@@ -269,7 +271,12 @@ export function SearchPreview({
     if (past > 0)
       view.scrollTop = Math.min(past, rect.top - box.top - edge - sliver);
   }, [target && keyOf(target), read.lines, failed]);
-  if (!row) return <p className="search-peek-empty">Nothing highlighted</p>;
+  if (!row)
+    return (
+      <p className="search-peek-empty">
+        {t("v105shell.search.nothingHighlighted")}
+      </p>
+    );
   const message = target?.kind === "message" ? target : undefined;
   const Icon = (message ? row.detailIcon : undefined) ?? row.icon;
   // The hit stands in while its neighbours load, below room held for the two
@@ -411,9 +418,15 @@ export function SearchPreview({
           })}
         </ol>
       )}
-      {failed && <p className="search-peek-empty">Couldn’t load a preview.</p>}
+      {failed && (
+        <p className="search-peek-empty">
+          {t("v105shell.search.previewFailed")}
+        </p>
+      )}
       {target && !message && lines?.length === 0 && (
-        <p className="search-peek-empty">No recent messages.</p>
+        <p className="search-peek-empty">
+          {t("v105shell.search.noRecentMessages")}
+        </p>
       )}
     </div>
   );

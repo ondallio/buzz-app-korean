@@ -1,4 +1,5 @@
 import { plainText } from "../../features/notifications/content";
+import { t } from "../../shared/i18n";
 import { workflowOwner } from "../../features/relay/workflow-attribution";
 import {
   useCallback,
@@ -58,7 +59,9 @@ export const SEARCH_KINDS = [9, 40002, 40008];
 export function eventText(event: { kind: number; content: string }) {
   if (event.kind !== 40002) return event.content;
   const body = objectBody(event.content);
-  return typeof body?.content === "string" ? body.content : "Agent message";
+  return typeof body?.content === "string"
+    ? body.content
+    : t("v105shell.search.agentMessage");
 }
 
 /** An indexed event's text as it reads, without Markdown syntax and with
@@ -506,7 +509,19 @@ export function useSearchMessages(
             replace({
               owner,
               messages: [],
-              error: `Message search couldn’t finish${error instanceof Error && error.message ? `: ${error.message.slice(0, 240)}` : "."}${scopedChannelId ? " Try again." : " Pages and conversations are still available."}`,
+              error:
+                error instanceof Error && error.message
+                  ? t(
+                      scopedChannelId
+                        ? "v1shell.search.messagesFailedDetailScoped"
+                        : "v1shell.search.messagesFailedDetail",
+                      { error: error.message.slice(0, 240) },
+                    )
+                  : t(
+                      scopedChannelId
+                        ? "v1shell.search.messagesFailedScoped"
+                        : "v1shell.search.messagesFailed",
+                    ),
             });
         });
     });
@@ -554,7 +569,12 @@ export function useSearchMessages(
         const { loadingMore: _, ...rest } = previous;
         replace({
           ...rest,
-          moreError: `More messages couldn’t load${error instanceof Error && error.message ? `: ${error.message.slice(0, 240)}` : "."}`,
+          moreError:
+            error instanceof Error && error.message
+              ? t("v1shell.search.moreFailedDetail", {
+                  error: error.message.slice(0, 240),
+                })
+              : t("v1shell.search.moreFailed"),
         });
       });
   }, [owner, replace, session, channelId, newestFirst]);

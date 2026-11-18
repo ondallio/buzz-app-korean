@@ -301,6 +301,10 @@ import {
   en as v105AgentsPluginsEn,
   ko as v105AgentsPluginsKo,
 } from "./catalogs/v105-agents-plugins";
+import {
+  en as v105ShellIdentityEn,
+  ko as v105ShellIdentityKo,
+} from "./catalogs/v105-shell-identity";
 
 export const english = {
   ...coreEn,
@@ -390,6 +394,7 @@ export const english = {
   ...v1FileViewerEn,
   ...v105AgentsPluginsEn,
   ...v105MessagesEn,
+  ...v105ShellIdentityEn,
 } as const;
 export const korean: Partial<Record<keyof typeof english, string>> = {
   ...coreKo,
@@ -479,6 +484,7 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...v1FileViewerKo,
   ...v105AgentsPluginsKo,
   ...v105MessagesKo,
+  ...v105ShellIdentityKo,
 };
 export type TranslationKey = keyof typeof english;
 type Variables<S extends string> =
