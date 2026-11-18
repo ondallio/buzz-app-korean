@@ -77,7 +77,7 @@ export const ko: Record<keyof typeof en, string> = {
   "statusFocus.startFocus": "집중 모드 시작",
   "statusFocus.closeFocus": "집중 모드 닫기",
   "statusFocus.focusHelp":
-    "집중 모드가 끝날 때까지 솔로 채팅만 표시하고 알림을 보냅니다.",
+    "집중 모드가 끝날 때까지 1:1 채팅만 표시하고 알림을 보냅니다.",
   "statusFocus.duration": "기간",
   "statusFocus.durationName": "기간: {duration}",
   "statusFocus.focusEnd": "집중 모드 종료",

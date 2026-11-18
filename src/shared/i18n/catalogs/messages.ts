@@ -334,7 +334,7 @@ export const ko: Record<keyof typeof en, string> = {
   "messages.composer.recipientArchived":
     "선택한 대상이 보관됐습니다. 보내기 전에 제거해 주세요.",
   "messages.composer.soloAvailableOnly":
-    "솔로 채팅에서는 사용할 수 있는 내 에이전트만 멘션할 수 있습니다. 사용할 수 없는 대상을 제거한 뒤 다시 시도해 주세요.",
+    "1:1 채팅에서는 사용할 수 있는 내 에이전트만 멘션할 수 있습니다. 사용할 수 없는 대상을 제거한 뒤 다시 시도해 주세요.",
   "messages.composer.threadIn": "{name}의 스레드",
   "messages.composer.mentionUnresolved":
     "{names} 대상을 한 명의 사람이나 에이전트로 확인하지 못했습니다.",

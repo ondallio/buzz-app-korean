@@ -591,7 +591,7 @@ export const ko: Record<keyof typeof en, string> = {
     "대기 메시지를 저장하지 못했습니다. 초안은 보존했습니다.",
   "v1msg.queue.savedUnavailable": "저장된 대기 메시지를 사용할 수 없습니다.",
   "v1msg.queue.soloUnavailable":
-    "이 솔로 채팅 또는 받는 사람을 더 이상 사용할 수 없습니다.",
+    "이 1:1 채팅 또는 받는 사람을 더 이상 사용할 수 없습니다.",
   "v1msg.queue.storageRetry":
     "대기 메시지 저장소를 사용할 수 없습니다. 다시 시도하세요.",
   "v1msg.queue.storageUnavailable": "대기 메시지 저장소를 사용할 수 없습니다.",

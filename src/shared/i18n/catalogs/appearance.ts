@@ -151,7 +151,7 @@ export const ko: Record<keyof typeof en, string> = {
     "시간을 숨겨도 스크린리더에서는 읽을 수 있습니다.",
   "appearance.timestamps": "시간 표시",
   "appearance.show": "표시",
-  "appearance.hide_in_solo_chats": "솔로 채팅에서 숨기기",
+  "appearance.hide_in_solo_chats": "1:1 채팅에서 숨기기",
   "appearance.hide": "숨기기",
   "appearance.show_people_by": "이름 표시 기준",
   "appearance.how_people_with_verified_names_appear_to_you_search_profiles_and_previews_show_both":
@@ -161,7 +161,7 @@ export const ko: Record<keyof typeof en, string> = {
   "appearance.full_name": "전체 이름",
   "appearance.follow_up_behavior": "후속 메시지 전송",
   "appearance.in_solo_send_follow_ups_immediately_or_queue_them_until_the_agent_finishes_its_previous_response":
-    "솔로에서 후속 메시지를 바로 보내거나 에이전트가 이전 응답을 마칠 때까지 대기시킬 수 있습니다.",
+    "1:1 채팅에서 후속 메시지를 바로 보내거나 에이전트가 이전 응답을 마칠 때까지 대기시킬 수 있습니다.",
   "appearance.behavior": "전송 방식",
   "appearance.send_immediately": "바로 보내기",
   "appearance.queue": "대기시키기",

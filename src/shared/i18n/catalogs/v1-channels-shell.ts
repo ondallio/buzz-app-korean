@@ -452,10 +452,10 @@ export const ko: Record<keyof typeof en, string> = {
   "v1shell.linkedChat.draftFailed":
     "새 채팅 초안을 저장하지 못했습니다. 아무것도 만들지 않았습니다.",
   "v1shell.linkedChat.openFailed":
-    "솔로 채팅을 열지 못했습니다. 다시 시도해 주세요.",
+    "1:1 채팅을 열지 못했습니다. 다시 시도해 주세요.",
   "v1shell.linkedChat.sourceUnavailable":
     "이 원본을 사용할 수 없습니다. 다시 연 뒤 시도해 주세요.",
-  "v1shell.linkedChat.start": "솔로 채팅 시작",
+  "v1shell.linkedChat.start": "1:1 채팅 시작",
   "v1shell.live.connecting": "연결 중",
   "v1shell.live.diagnostics": "실시간 업데이트: {status}",
   "v1shell.live.established": "스트림 연결됨",

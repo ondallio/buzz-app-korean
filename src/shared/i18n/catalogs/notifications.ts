@@ -108,7 +108,7 @@ export const ko: Record<keyof typeof en, string> = {
   "notifications.sound.mention": "@멘션",
   "notifications.category.direct": "다이렉트 메시지",
   "notifications.category.thread": "스레드 답글",
-  "notifications.category.agent": "솔로 채팅 완료",
+  "notifications.category.agent": "1:1 채팅 완료",
   "notifications.category.reminders": "미리 알림",
   "notifications.permission.development":
     "로컬 개발 설정에 따라 알림이 일시 중지되었습니다. .env.local에서 BUZZ_DEV_NOTIFICATIONS=0을 제거하고 개발 서버를 다시 시작하면 알림을 다시 받을 수 있습니다. 저장된 알림 설정은 유지됩니다.",
