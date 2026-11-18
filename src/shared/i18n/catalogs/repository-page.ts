@@ -35,7 +35,7 @@ export const en = {
   "repositoryPage.noRepository": "No repository linked.",
   "repositoryPage.allFiles": "All files",
   "repositoryPage.binaryFile":
-    "Binary file or text larger than 1 MiB ({bytes} bytes).",
+    "Binary file, or text too large to show ({size}).",
   "repositoryPage.bytes": "{bytes} bytes",
   "repositoryPage.noFiles": "No files.",
   "repositoryPage.commit": "Commit {hash}",
@@ -90,7 +90,7 @@ export const ko: Record<keyof typeof en, string> = {
   "repositoryPage.noRepository": "연결된 저장소가 없습니다.",
   "repositoryPage.allFiles": "모든 파일",
   "repositoryPage.binaryFile":
-    "바이너리 파일이거나 1 MiB보다 큰 텍스트 파일입니다({bytes}바이트).",
+    "바이너리 파일이거나 표시하기에 너무 큰 텍스트입니다({size}).",
   "repositoryPage.bytes": "{bytes}바이트",
   "repositoryPage.noFiles": "파일이 없습니다.",
   "repositoryPage.commit": "커밋 {hash}",
