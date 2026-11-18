@@ -1,0 +1,138 @@
+# 한글판 자동 업데이트: 원본(block/buzz-app) 정식 릴리스를 따라간다.
+# 1) 6시간마다 새 정식 릴리스(vX.Y.Z)를 확인
+# 2) 한글판 브랜치에 병합 → 충돌이면 이슈를 열고 멈춤
+# 3) 충돌이 없으면 타입·린트·번역 검사·테스트를 돌리고 PR을 연다
+#    PR 본문에 "원본 문장이 바뀐 번역 키"와 "새 영어 문구 후보"를 싣는다
+# 병합(머지)과 배포는 사람이 PR을 확인한 뒤 진행한다.
+name: Korean upstream sync
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "특정 원본 태그로 동기화 (비우면 최신 정식 릴리스)"
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: korean-upstream-sync
+  cancel-in-progress: false
+
+env:
+  KOREAN_BRANCH: korean-1.0
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.KOREAN_BRANCH }}
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Configure git
+        run: |
+          git config user.name "korean-sync[bot]"
+          git config user.email "korean-sync@users.noreply.github.com"
+
+      - name: Check for a new upstream release
+        id: check
+        run: |
+          result=$(./bin/node scripts/korean/sync.mjs --check ${{ inputs.tag && format('--tag {0}', inputs.tag) || '' }} | tail -1)
+          echo "$result"
+          echo "status=$(echo "$result" | jq -r .status)" >> "$GITHUB_OUTPUT"
+          echo "target=$(echo "$result" | jq -r '.target // empty')" >> "$GITHUB_OUTPUT"
+
+      - name: Skip when an open sync PR or issue already exists
+        id: existing
+        if: steps.check.outputs.status == 'available'
+        run: |
+          target=${{ steps.check.outputs.target }}
+          prs=$(gh pr list --state open --head "korean-sync/$target" --json number --jq length)
+          issues=$(gh issue list --state open --search "\"Korean sync conflict: $target\" in:title" --json number --jq length)
+          echo "skip=$([ "$prs$issues" != "00" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Merge upstream
+        id: merge
+        if: steps.check.outputs.status == 'available' && steps.existing.outputs.skip != 'true'
+        run: |
+          target=${{ steps.check.outputs.target }}
+          git switch -c "korean-sync/$target"
+          set +e
+          result=$(./bin/node scripts/korean/sync.mjs --tag "$target" | tail -1)
+          set -e
+          echo "$result" | tee sync-result.json
+          echo "status=$(jq -r .status sync-result.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Report conflicts as an issue
+        if: steps.merge.outputs.status == 'conflict'
+        run: |
+          target=${{ steps.check.outputs.target }}
+          {
+            echo "원본 \`$target\`을 \`${KOREAN_BRANCH}\`에 합치다가 충돌이 났습니다."
+            echo
+            echo "### 충돌 파일"
+            jq -r '.conflicts[] | "- `" + . + "`"' sync-result.json
+            echo
+            echo "### 로컬에서 해결하기"
+            echo '```sh'
+            echo "git switch ${KOREAN_BRANCH} && git pull"
+            echo "git switch -c korean-sync/$target"
+            echo "./bin/node scripts/korean/sync.mjs --tag $target"
+            echo "# 충돌 해결: 원본 로직을 유지하고 번역(t(...))만 다시 입힌다"
+            echo "git add -A && git commit --no-edit"
+            echo "./bin/node scripts/korean/finish-sync.mjs $target"
+            echo '```'
+          } > issue.md
+          git merge --abort
+          gh issue create --title "Korean sync conflict: $target" --body-file issue.md
+
+      - name: Install dependencies
+        if: steps.merge.outputs.status == 'merged'
+        run: ./bin/pnpm install --frozen-lockfile
+      - name: Lint and types
+        id: lint
+        if: steps.merge.outputs.status == 'merged'
+        continue-on-error: true
+        run: ./bin/pnpm check
+      - name: Catalog check
+        id: catalogs
+        if: steps.merge.outputs.status == 'merged'
+        continue-on-error: true
+        run: ./bin/node scripts/localization/check-catalogs.mjs > catalog-check.json
+      - name: Tests
+        id: tests
+        if: steps.merge.outputs.status == 'merged'
+        continue-on-error: true
+        run: ./bin/pnpm exec vitest run --reporter=dot
+
+      - name: Open the sync pull request
+        if: steps.merge.outputs.status == 'merged'
+        run: |
+          target=${{ steps.check.outputs.target }}
+          mark() { [ "$1" = success ] && echo "통과" || echo "**실패**"; }
+          {
+            echo "원본 \`$target\`을 자동으로 합쳤습니다. 충돌은 없었습니다."
+            echo
+            echo "| 검사 | 결과 |"
+            echo "|---|---|"
+            echo "| 린트·타입 | $(mark ${{ steps.lint.outcome }}) |"
+            echo "| 번역 짝 검사 | $(mark ${{ steps.catalogs.outcome }}) |"
+            echo "| 테스트 | $(mark ${{ steps.tests.outcome }}) |"
+            echo
+            echo "새 영어 문구나 원본 문장 변경이 있으면 이 브랜치에서 번역을 보완한 뒤 머지하세요."
+            echo
+            cat korean/sync-report.md
+          } > pr.md
+          git push origin "korean-sync/$target"
+          gh pr create --base "$KOREAN_BRANCH" --head "korean-sync/$target" \
+            --title "Sync upstream $target" --body-file pr.md --draft
