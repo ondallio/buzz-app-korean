@@ -1,6 +1,7 @@
 // A conversation's Codex thread, read back through app-server and shown in the
 // host's turn-transcript model. Codex owns the history; nothing here is saved.
 import { isMessageTool } from "../../buzz-mcp/session-tools";
+import { t } from "../../shared/i18n";
 import {
   postedAs,
   promptSections,
@@ -137,7 +138,12 @@ function item(
     case "plan":
       return { id, at, type: "status", text: str(value.text) };
     case "contextCompaction":
-      return { id, at, type: "status", text: "Context compaction" };
+      return {
+        id,
+        at,
+        type: "status",
+        text: t("fubuilderlab.tr.contextCompaction"),
+      };
     case "commandExecution":
       return tool({
         title: shellCommand(str(value.command)),
@@ -149,7 +155,7 @@ function item(
         Array.isArray(value.changes) ? value.changes : []
       ) as Json[];
       return tool({
-        title: "Edit files",
+        title: t("fubuilderlab.tr.editFiles"),
         kind: "edit",
         paths: changes.map((change) => str(change.path)),
         output: changes.map((change) => str(change.diff)).join("\n"),
@@ -190,7 +196,7 @@ function item(
     }
     case "webSearch":
       return tool({
-        title: "Web search",
+        title: t("fubuilderlab.tr.webSearch"),
         kind: "fetch",
         input: str(value.query),
       });
@@ -545,7 +551,9 @@ export async function readTranscript(
           id: `${threadId}:recorded-tools-unavailable`,
           at: latest.startedAt,
           type: "status",
-          text: `CodeMode scripts could not be loaded. Showing app-server history only. ${error instanceof Error ? error.message : String(error)}`,
+          text: t("fubuilderlab.tr.recordedToolsUnavailable", {
+            reason: error instanceof Error ? error.message : String(error),
+          }),
         });
       }
       all.push(...mapped);

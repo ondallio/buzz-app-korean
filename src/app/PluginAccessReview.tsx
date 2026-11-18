@@ -140,20 +140,12 @@ function hostDeclarations(
             key: "publicImages",
             signature:
               "Public images: any public HTTPS site · images returned only · no cookies",
-            title: "Public images:",
-            label: "Contact any public website for images",
-            hint: "The plugin picks the address, so it can send what it knows to any site in that address. Only images come back, without your cookies.",
+            title: t("fubuilderlab.access.imagesTitle"),
+            label: t("fubuilderlab.access.imagesLabel"),
+            hint: t("fubuilderlab.access.imagesHint"),
             icon: GlobeIcon,
             details: (
-              <p className="m-0">
-                Each request goes to port 443 on a public address and follows no
-                redirect: the plugin sees where a redirect points and decides
-                whether to ask again. Only PNG, JPEG, GIF, WebP and AVIF images
-                are returned. The address check can't recognize internal sites
-                that resolve to public addresses, such as those reached through
-                a company VPN, so the plugin has to refuse those itself. Sites
-                see your IP address.
-              </p>
+              <p className="m-0">{t("fubuilderlab.access.imagesDetails")}</p>
             ),
           },
         ]
@@ -164,21 +156,12 @@ function hostDeclarations(
             key: "publicPages",
             signature:
               "Public pages: any public HTTPS site · title, description and image only · no cookies",
-            title: "Public pages:",
-            label: "Contact any public website for link previews",
-            hint: "The plugin picks the address, so it can send what it knows to any site in that address. Only a page's title, description, site name, image and icon come back, without your cookies.",
+            title: t("fubuilderlab.access.pagesTitle"),
+            label: t("fubuilderlab.access.pagesLabel"),
+            hint: t("fubuilderlab.access.pagesHint"),
             icon: GlobeIcon,
             details: (
-              <p className="m-0">
-                Each request goes to port 443 on a public address and follows no
-                redirect: the plugin sees where a redirect points and decides
-                whether to ask again. Buzz reads at most the page's head and
-                returns only its preview fields, never the page itself. The
-                address check can't recognize internal sites that resolve to
-                public addresses, such as those reached through a company VPN,
-                so the plugin has to refuse those itself. Sites see your IP
-                address.
-              </p>
+              <p className="m-0">{t("fubuilderlab.access.pagesDetails")}</p>
             ),
           },
         ]

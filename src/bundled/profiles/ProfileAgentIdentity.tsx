@@ -8,6 +8,7 @@ import type { RelaySession } from "../../features/relay/session";
 import { Button } from "../../shared/design-system/ui/Button";
 import { formatPublicKey } from "../../shared/identity/public-key";
 import styles from "./Profiles.module.css";
+import { t, useLanguage } from "../../shared/i18n";
 
 export function ProfileAgentIdentity({
   session,
@@ -20,9 +21,13 @@ export function ProfileAgentIdentity({
   viewer: string | undefined;
   context: PanelProps["context"];
 }) {
+  useLanguage();
   return (
-    <section aria-label="Agent identity" className={styles.agentIdentity}>
-      <h3 className="text-body">Managed by</h3>
+    <section
+      aria-label={t("fubuilderlab.profile.agentIdentity")}
+      className={styles.agentIdentity}
+    >
+      <h3 className="text-body">{t("fubuilderlab.profile.managedBy")}</h3>
       <OwnerLink
         session={session}
         owner={owner}
@@ -63,7 +68,7 @@ function OwnerLink({
     owner,
     profiles.get(owner)?.name ?? formatPublicKey(owner) ?? owner,
   );
-  const name = self ? `${shown} (you)` : shown;
+  const name = self ? t("channelForms.members.you", { name: shown }) : shown;
   const target = profileTarget(owner);
   return (
     <div>
@@ -71,7 +76,7 @@ function OwnerLink({
         <Button
           size="compact"
           variant="ghost"
-          aria-label={`Open owner profile: ${name}`}
+          aria-label={t("fubuilderlab.profile.openOwner", { name })}
           onClick={() => (context.push ?? context.open)(target)}
         >
           {name}

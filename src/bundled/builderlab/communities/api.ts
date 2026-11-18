@@ -1,4 +1,6 @@
 // Block-hosted community accounts through a Builderlab account backend.
+import { t, type TranslationKey } from "../../../shared/i18n";
+
 export const HOST_SUFFIX = "communities.buzz.xyz";
 export const VALID_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const ACKNOWLEDGEMENT_VERSION = 1;
@@ -61,34 +63,34 @@ export type Reply = {
 };
 type Body = Record<string, string | number>;
 
-const messages: Record<string, string> = {
-  missing_mapping: "Connect your Buzz identity before creating a community.",
-  invalid_name: "Use lowercase letters, numbers, and hyphens.",
-  taken: "That Buzz address is already taken.",
-  limit_reached: "You've reached your community limit.",
-  unauthorized:
-    "This Builderlab account can't manage Buzz identities right now. Try signing in again.",
-  relay_unavailable: "Community provisioning is temporarily unavailable.",
-  identity_already_bound:
-    "This Builderlab account is connected to another Buzz identity.",
-  pubkey_already_bound:
-    "This Buzz identity is connected to another Builderlab account.",
-  not_owner: "Only the community owner can do that.",
-  transferee_not_registered:
-    "That person needs a connected Buzz identity before you can transfer ownership to them.",
-  invalid_request: "The deletion request is invalid.",
-  confirmation_mismatch: "The host confirmation does not match exactly.",
-  must_archive: "Archive the community before deleting it.",
-  protected_target: "This community cannot be deleted.",
-  deletion_conflict:
-    "This deletion conflicts with another community lifecycle change.",
+const messageKeys = {
+  missing_mapping: "fubuilderlab.api.missingMapping",
+  invalid_name: "fubuilderlab.api.invalidName",
+  taken: "fubuilderlab.api.taken",
+  limit_reached: "fubuilderlab.api.limitReached",
+  unauthorized: "fubuilderlab.api.unauthorized",
+  relay_unavailable: "fubuilderlab.api.relayUnavailable",
+  identity_already_bound: "fubuilderlab.api.identityAlreadyBound",
+  pubkey_already_bound: "fubuilderlab.api.pubkeyAlreadyBound",
+  not_owner: "fubuilderlab.api.notOwner",
+  transferee_not_registered: "fubuilderlab.api.transfereeNotRegistered",
+  invalid_request: "fubuilderlab.api.invalidRequest",
+  confirmation_mismatch: "fubuilderlab.api.confirmationMismatch",
+  must_archive: "fubuilderlab.api.mustArchive",
+  protected_target: "fubuilderlab.api.protectedTarget",
+  deletion_conflict: "fubuilderlab.api.deletionConflict",
   unsupported_acknowledgement_version:
-    "This deletion confirmation version is not supported.",
-  acceptance_unknown:
-    "Deletion status is unknown. Keep this request and check its status; do not start a new deletion.",
-  unknown:
-    "The deletion service returned an invalid response. Check deletion status before trying anything else.",
-};
+    "fubuilderlab.api.unsupportedAcknowledgementVersion",
+  acceptance_unknown: "fubuilderlab.api.acceptanceUnknown",
+  unknown: "fubuilderlab.api.unknown",
+} as const satisfies Record<string, TranslationKey>;
+
+/** The friendly message for a structured error code, in the current language. */
+function friendlyMessage(code: string) {
+  return Object.hasOwn(messageKeys, code)
+    ? t(messageKeys[code as keyof typeof messageKeys])
+    : undefined;
+}
 
 export class ApiFailure extends Error {
   constructor(
@@ -104,10 +106,10 @@ export class ApiFailure extends Error {
 }
 
 export function quotaLimitMessage(limit?: number | null) {
-  if (limit === 0) return "You can't create more communities right now.";
+  if (limit === 0) return t("fubuilderlab.api.quotaNone");
   return limit && Number.isSafeInteger(limit) && limit > 0
-    ? `You've reached your limit of ${limit} communities.`
-    : "You've reached your community limit.";
+    ? t("fubuilderlab.api.quotaLimit", { limit })
+    : t("fubuilderlab.api.limitReached");
 }
 
 /** A Builderlab account backend: the development broker or the packaged-app adapter. */
@@ -222,7 +224,7 @@ export function check(reply: Reply, fallback: string, quotaLimit?: number) {
     code,
     code === "limit_reached"
       ? quotaLimitMessage(quotaLimit)
-      : (messages[code] ?? reply.error.message ?? fallback),
+      : (friendlyMessage(code) ?? reply.error.message ?? fallback),
     reply.correlation_id,
   );
 }
@@ -445,12 +447,12 @@ function deletionResult(
   )
     throw new ApiFailure(
       "deletion_aborted",
-      `Deletion of ${request.host} stopped. This community is not being deleted.`,
+      t("fubuilderlab.hc.deletionStopped", { host: request.host }),
       value.correlation_id,
     );
   throw new ApiFailure(
     "acceptance_unknown",
-    messages.acceptance_unknown as string,
+    t("fubuilderlab.api.acceptanceUnknown"),
     value.correlation_id,
   );
 }
@@ -467,7 +469,7 @@ async function admitDeletion(
   } catch {
     throw new ApiFailure(
       "acceptance_unknown",
-      messages.acceptance_unknown as string,
+      t("fubuilderlab.api.acceptanceUnknown"),
     );
   }
   const code = response.value.error?.code ?? "";
@@ -477,9 +479,9 @@ async function admitDeletion(
   )
     throw new DefinitiveDeletionRejection(
       code,
-      messages[code] ??
+      friendlyMessage(code) ??
         response.value.error?.message ??
-        "Could not start deletion.",
+        t("fubuilderlab.api.startDeletionFailed"),
       response.value.correlation_id,
     );
   return deletionResult(response, request);

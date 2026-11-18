@@ -75,12 +75,13 @@ import {
 } from "./api";
 import { writeClipboardText } from "../../../shared/clipboard";
 import { CommunityAddressField, useCommunityAddress } from "./CommunityAddress";
+import { t, useLanguage } from "../../../shared/i18n";
 
 const card = "mt-6 rounded-xl border border-default p-5";
 const sectionClassName = "mt-section-gap";
-const refreshFailure =
-  "The change was saved, but the list could not be refreshed.";
-const npub = (hex?: string | null) => (hex ? npubEncode(hex) : "Unavailable");
+const refreshFailure = () => t("fubuilderlab.hc.refreshFailed");
+const npub = (hex?: string | null) =>
+  hex ? npubEncode(hex) : t("fubuilderlab.hc.unavailable");
 const message = (reason: unknown) =>
   reason instanceof Error ? reason.message : String(reason);
 type Confirm = {
@@ -116,6 +117,7 @@ export function HostedCommunities({
   /** Explicit dismissal or completion retires the caller's creation intent. */
   onCreateClose?: (() => void) | undefined;
 }) {
+  useLanguage();
   const activeRef = useRef(active);
   activeRef.current = active;
   const [auth, setAuth] = useState<Account | null>();
@@ -181,8 +183,9 @@ export function HostedCommunities({
         setDeletionNotice("");
       }
       if (!current.error?.setup_needed)
-        check(current, "Could not load the connected Buzz identity.");
-      if (!list.error?.setup_needed) check(list, "Could not load communities.");
+        check(current, t("fubuilderlab.hc.loadIdentityFailed"));
+      if (!list.error?.setup_needed)
+        check(list, t("fubuilderlab.hc.loadCommunitiesFailed"));
       setIdentityLoadFailed(false);
       const nextIdentity = current.identity ?? null;
       const nextOwner = boundKey(nextIdentity);
@@ -242,9 +245,11 @@ export function HostedCommunities({
                   if (acceptedDeletions.current.size === 0)
                     setDeletionNotice("");
                   setError(
-                    `Deletion of ${accepted.request.host} stopped. This community is not being deleted.`,
+                    t("fubuilderlab.hc.deletionStopped", {
+                      host: accepted.request.host,
+                    }),
                   );
-                } else setError("Couldn't check deletion status.");
+                } else setError(t("fubuilderlab.hc.deletionCheckFailed"));
               }
             }
             if (at !== generation.current || !activeRef.current()) return null;
@@ -273,7 +278,7 @@ export function HostedCommunities({
       setCommunities((list) =>
         list.filter((item) => item.id !== pending.request.community_id),
       );
-      setDeletionNotice("Deletion started");
+      setDeletionNotice(t("fubuilderlab.hc.deletionStarted"));
       setError("");
       return true;
     },
@@ -350,7 +355,7 @@ export function HostedCommunities({
       (reason) =>
         at === generation.current &&
         setError(
-          `${refreshFailure} ${message(reason)} Use Refresh to try again.`,
+          `${refreshFailure()} ${message(reason)} ${t("fubuilderlab.hc.useRefresh")}`,
         ),
     );
   };
@@ -393,12 +398,10 @@ export function HostedCommunities({
         stored.backend_origin !== api.origin() ||
         boundKey(snapshot.identity) !== pending.owner_pubkey
       )
-        throw new Error(
-          "This deletion request no longer matches the current account. Sign in with the original account to check its status.",
-        );
+        throw new Error(t("fubuilderlab.hc.deletionMismatch"));
       setAuth(currentAuth);
       if (currentAuth?.capabilities?.can_delete_buzz_communities !== true)
-        throw new Error("Community deletion is no longer available.");
+        throw new Error(t("fubuilderlab.hc.deletionUnavailableNow"));
       await settleDeletion(pending, at, () =>
         api.admitDeletion(pending.request, "recovery"),
       );
@@ -417,8 +420,8 @@ export function HostedCommunities({
     <IconButton
       variant="ghost"
       size="sm"
-      aria-label="Refresh"
-      title="Refresh"
+      aria-label={t("inbox.refresh")}
+      title={t("inbox.refresh")}
       icon={<ArrowsClockwiseIcon aria-hidden="true" />}
       loading={action === "refresh"}
       disabled={busy}
@@ -445,7 +448,7 @@ export function HostedCommunities({
         (snapshot) => {
           if (snapshot && at === generation.current)
             setError((current) =>
-              !loaded || current.startsWith(refreshFailure) ? "" : current,
+              !loaded || current.startsWith(refreshFailure()) ? "" : current,
             );
         },
         (reason) => {
@@ -484,12 +487,12 @@ export function HostedCommunities({
   const ready = bound !== null && bound === local;
   const connected = Boolean(auth) && ready && !identityLoadFailed;
   const connectedMark = connected ? (
-    <Tooltip content="This Builderlab account is connected to this device’s Buzz identity.">
+    <Tooltip content={t("fubuilderlab.hc.connectedTooltip")}>
       <span
         // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard users need the connection description too.
         tabIndex={0}
         role="img"
-        aria-label="Buzz identity connected"
+        aria-label={t("fubuilderlab.hc.identityConnected")}
         className="flex size-8 shrink-0 items-center justify-center rounded-full bg-affordance-success"
       >
         <CheckIcon size={16} aria-hidden="true" color="var(--icon-success)" />
@@ -519,7 +522,7 @@ export function HostedCommunities({
   const bind = async () => {
     const reply = check(
       await api.call("bind"),
-      "Could not connect the Buzz identity.",
+      t("fubuilderlab.hc.connectFailed"),
     );
     setIdentity(reply.identity ?? null);
     await settle();
@@ -544,7 +547,7 @@ export function HostedCommunities({
             kind: "filled",
             items: shown.map((community, index) => ({
               key: community.id ?? String(index),
-              label: community.name ?? "Untitled",
+              label: community.name ?? t("fubuilderlab.hc.untitled"),
             })),
           }
         : { kind: "empty" },
@@ -573,13 +576,15 @@ export function HostedCommunities({
 
   const identityControls = auth ? (
     <>
-      {!sharedSignIn && <InlineHeader title="Account" />}
+      {!sharedSignIn && <InlineHeader title={t("fubuilderlab.hc.account")} />}
       <SettingsGroup layout="form">
         {!sharedSignIn && (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="m-0 text-label">
-                {auth.name || auth.email || "Builderlab account"}
+                {auth.name ||
+                  auth.email ||
+                  t("fubuilderlab.hc.builderlabAccount")}
               </p>
               {auth.name && auth.email && (
                 <p className="m-0 text-body-sm text-muted">{auth.email}</p>
@@ -601,7 +606,7 @@ export function HostedCommunities({
                 })
               }
             >
-              <SignOutIcon aria-hidden="true" /> Sign out
+              <SignOutIcon aria-hidden="true" /> {t("settings.signOut")}
             </Button>
           </div>
         )}
@@ -609,8 +614,8 @@ export function HostedCommunities({
           identityLoadFailed ? null : (
             <div className="space-y-3">
               <InlineHeader
-                title="Link this account to your Buzz identity"
-                subtitle="This Builderlab account isn’t linked to a Buzz identity yet. Connect this device’s key to create and own communities under it — Buzz signs a one-time challenge locally. Connecting shares the signed proof and your public identity."
+                title={t("fubuilderlab.hc.linkTitle")}
+                subtitle={t("fubuilderlab.hc.linkSubtitle")}
               />
               <Button
                 variant="primary"
@@ -618,40 +623,41 @@ export function HostedCommunities({
                 disabled={busy}
                 onClick={() => void run("bind", bind)}
               >
-                Connect Buzz identity
+                {t("fubuilderlab.hc.connectIdentity")}
               </Button>
             </div>
           )
         ) : local === undefined && bound ? (
           <p role="status" className="space-y-3">
-            Checking this device’s Buzz identity…
+            {t("fubuilderlab.hc.checkingLocal")}
           </p>
         ) : local === null && bound ? (
           <div className="space-y-3">
             <p role="alert" className="error m-0">
-              Could not read this device’s Buzz identity, so community actions
-              are paused.
+              {t("fubuilderlab.hc.localReadFailed")}
             </p>
             <div className="mt-3">
-              <Button onClick={loadLocal}>Try again</Button>
+              <Button onClick={loadLocal}>{t("identity.failure.retry")}</Button>
             </div>
           </div>
         ) : mismatch ? (
-          <section className="space-y-3" aria-label="Identity mismatch">
+          <section
+            className="space-y-3"
+            aria-label={t("fubuilderlab.hc.identityMismatch")}
+          >
             <InlineHeader
               icon={<WarningCircleIcon size={16} aria-hidden="true" />}
-              title="This account is connected to a different Buzz identity"
+              title={t("fubuilderlab.hc.mismatchTitle")}
             />
             <p className="text-body-sm text-muted">
-              Your Builderlab account is linked to another Buzz key. Creating
-              communities and copying addresses are paused until the identities
-              match. To keep the account’s key, sign in to Buzz on this device
-              with that key instead of switching.
+              {t("fubuilderlab.hc.mismatchBody")}
             </p>
             <dl className="text-body-sm">
-              <dt className="text-muted">Account uses</dt>
+              <dt className="text-muted">{t("fubuilderlab.hc.accountUses")}</dt>
               <dd className="m-0 break-all font-mono">{npub(bound)}</dd>
-              <dt className="mt-2 text-muted">This device</dt>
+              <dt className="mt-2 text-muted">
+                {t("fubuilderlab.hc.thisDevice")}
+              </dt>
               <dd className="m-0 break-all font-mono">{npub(local)}</dd>
             </dl>
             <Button
@@ -659,17 +665,16 @@ export function HostedCommunities({
               disabled={busy || !local}
               onClick={() =>
                 setConfirm({
-                  title: "Switch to this device’s identity?",
+                  title: t("fubuilderlab.hc.switchTitle"),
                   // kgoose revokes an unlinked key: binding it again answers 409.
                   // The client can't tell whether this device's key already was.
-                  description:
-                    "The key your account uses now will be permanently unlinked. It can never be linked to a Builderlab account again. If this device’s key was unlinked before, Builderlab refuses it too, and your account is left with no key.",
-                  action: "Switch identity",
+                  description: t("fubuilderlab.hc.switchDescription"),
+                  action: t("fubuilderlab.hc.switchAction"),
                   caution: "permanent",
                   run: async () => {
                     check(
                       await api.call("unbind"),
-                      "Could not release the previously connected Buzz identity.",
+                      t("fubuilderlab.hc.releaseFailed"),
                     );
                     setPendingDeletion(null);
                     // Unbound is a valid resting state; Connect recovers it.
@@ -682,14 +687,14 @@ export function HostedCommunities({
                 })
               }
             >
-              Switch to this device’s identity
+              {t("fubuilderlab.hc.switchButton")}
             </Button>
           </section>
         ) : sharedSignIn ? null : (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="m-0 flex min-w-0 flex-wrap items-center gap-2 text-body-sm">
               <CheckCircleIcon size={16} aria-hidden="true" />
-              Buzz identity connected{" "}
+              {t("fubuilderlab.hc.identityConnected")}{" "}
               <span className="break-all font-mono text-muted">
                 {npub(bound)}
               </span>
@@ -716,13 +721,13 @@ export function HostedCommunities({
       <ManagementHeader
         navigation={navigation}
         id="hosted-communities-title"
-        title="Communities"
+        title={t("v1id.blab.communities")}
         align="end"
         actions={
           <Button
             ref={createTrigger}
             variant="prominent"
-            aria-label="Create community"
+            aria-label={t("fubuilderlab.hc.createCommunity")}
             disabled={
               !auth || !ready || busy || quotaState?.canCreate === false
             }
@@ -730,7 +735,7 @@ export function HostedCommunities({
               if (activeRef.current()) setCreateOpen(true);
             }}
           >
-            Create
+            {t("fubuilderlab.hc.create")}
           </Button>
         }
       />
@@ -741,15 +746,15 @@ export function HostedCommunities({
             ? []
             : [
                 {
-                  label: "Buzz identity",
+                  label: t("fubuilderlab.hc.buzzIdentity"),
                   value:
                     auth === undefined || (auth && local === undefined)
                       ? "…"
                       : error || mismatch || identityLoadFailed
-                        ? "Needs attention"
+                        ? t("v1id.needsAttention")
                         : ready
-                          ? "Connected"
-                          : "Not connected",
+                          ? t("v1agent.external.connected")
+                          : t("v1agent.manage.notConnected"),
                 },
               ]),
         ]}
@@ -787,7 +792,7 @@ export function HostedCommunities({
               aria-hidden="true"
               className="motion-safe:animate-spin"
             />
-            Checking sign-in…
+            {t("fubuilderlab.hc.checkingSignIn")}
           </p>
         ) : !auth ? (
           sharedSignIn ? (
@@ -797,14 +802,14 @@ export function HostedCommunities({
                 disabled={busy}
                 onClick={() => void retryAuth()}
               >
-                Try again
+                {t("identity.failure.retry")}
               </Button>
             </div>
           ) : (
             <EmptyState
               icon={<GlobeIcon />}
-              title="Sign in to manage hosted communities"
-              description="Sign in through your browser to manage Builderlab hosting. The rest of Buzz works without a Builderlab account."
+              title={t("fubuilderlab.hc.signInTitle")}
+              description={t("fubuilderlab.hc.signInDescription")}
               action={
                 <>
                   <Button
@@ -820,12 +825,12 @@ export function HostedCommunities({
                       })
                     }
                   >
-                    <ArrowSquareOutIcon size={18} aria-hidden="true" /> Sign in
-                    with Builderlab
+                    <ArrowSquareOutIcon size={18} aria-hidden="true" />{" "}
+                    {t("fubuilderlab.hc.signInWithBuilderlab")}
                   </Button>
                   {action === "login" && (
                     <Button onClick={() => loginAbort.current?.abort()}>
-                      Cancel
+                      {t("profileEditing.cancel")}
                     </Button>
                   )}
                 </>
@@ -841,19 +846,17 @@ export function HostedCommunities({
             )}
             {pendingDeletion && (
               <div className={card}>
-                <p className="m-0 text-label">Deletion status is unknown</p>
+                <p className="m-0 text-label">
+                  {t("fubuilderlab.hc.deletionUnknownTitle")}
+                </p>
                 <p className="text-body-sm text-muted">
-                  Buzz will not check automatically. Use Check deletion status
-                  when deletion is available. This resends the same request
-                  UUID, which may admit the original intent; a failed check does
-                  not prove the earlier request was never accepted.
+                  {t("fubuilderlab.hc.deletionUnknownBody")}
                 </p>
                 <p className="break-all font-mono text-body-sm">
                   {pendingDeletion.request.host}
                 </p>
                 <p className="text-body-sm text-muted">
-                  If this remains uncertain, contact support and include this
-                  Request UUID:
+                  {t("fubuilderlab.hc.contactSupport")}
                 </p>
                 <p className="select-all break-all font-mono text-body-sm">
                   {pendingDeletion.request.request_id}
@@ -865,40 +868,30 @@ export function HostedCommunities({
                     disabled={busy || !deletionEnabled || !ready}
                     onClick={() => void checkPendingDeletion(pendingDeletion)}
                   >
-                    Check deletion status
+                    {t("fubuilderlab.hc.checkDeletion")}
                   </Button>
                 </div>
                 {!deletionEnabled && (
                   <p className="text-body-sm text-muted">
-                    Community deletion is unavailable right now, so this request
-                    can't be checked. It stays saved on this device.
+                    {t("fubuilderlab.hc.deletionUnavailable")}
                   </p>
                 )}
               </div>
             )}
             {deletionEnabled && blockedOwner && (
               <p role="status" className={`${card} text-body-sm`}>
-                {blockedOwner === bound ? (
-                  <>
-                    This identity has a deletion request saved from a different
-                    app address on this device. It can't be checked here, so
-                    contact support before starting another deletion.
-                  </>
-                ) : (
-                  <>
-                    A deletion request from {npub(blockedOwner)} is still
-                    pending on this device. Switch to that Buzz identity and use
-                    Check deletion status before starting another deletion here.
-                    If you no longer have that identity, contact support.
-                  </>
-                )}
+                {blockedOwner === bound
+                  ? t("fubuilderlab.hc.blockedSameOwner")
+                  : t("fubuilderlab.hc.blockedOtherOwner", {
+                      npub: npub(blockedOwner),
+                    })}
               </p>
             )}
             {communities.length > 0 && (
               <div className="flex flex-col gap-3">
                 <Tabs<"active" | "archived">
                   variant="capsule"
-                  label="Community status"
+                  label={t("fubuilderlab.hc.communityStatus")}
                   trailingAction={
                     <div className="flex w-full min-w-0 items-center gap-2 self-end sm:w-auto">
                       {refreshAction}
@@ -906,8 +899,8 @@ export function HostedCommunities({
                       <div className="min-w-0 flex-1 sm:w-60">
                         <SearchField
                           variant="capsule"
-                          label="Search communities"
-                          placeholder="Search"
+                          label={t("fubuilderlab.hc.searchCommunities")}
+                          placeholder={t("search.search")}
                           value={listQuery}
                           onValueChange={(value) => {
                             if (active()) setListQuery(value);
@@ -917,8 +910,11 @@ export function HostedCommunities({
                     </div>
                   }
                   items={[
-                    { value: "active", label: "Active" },
-                    { value: "archived", label: "Archived" },
+                    { value: "active", label: t("fubuilderlab.hc.active") },
+                    {
+                      value: "archived",
+                      label: t("fubuilderlab.hc.archived"),
+                    },
                   ]}
                   value={listTab}
                   onValueChange={(value) => {
@@ -943,21 +939,25 @@ export function HostedCommunities({
                         {rows.length === 0 && (
                           <p className="py-12 text-center text-body-sm text-secondary">
                             {needle
-                              ? "No communities match your search."
+                              ? t("fubuilderlab.hc.noMatches")
                               : panel === "archived"
-                                ? "No archived communities."
-                                : "No active communities."}
+                                ? t("fubuilderlab.hc.noArchived")
+                                : t("fubuilderlab.hc.noActive")}
                           </p>
                         )}
                         <ul
                           className="m-0 list-none p-0"
-                          aria-label={`${panel === "active" ? "Active" : "Archived"} communities`}
+                          aria-label={
+                            panel === "active"
+                              ? t("fubuilderlab.hc.activeList")
+                              : t("fubuilderlab.hc.archivedList")
+                          }
                         >
                           {rows.map((community, index) => {
                             const name =
                               community.name ??
                               community.slug ??
-                              "Hosted community";
+                              t("fubuilderlab.hc.hostedCommunity");
                             const url = relayUrl(community);
                             const archived = Boolean(community.archived_at);
                             const deletionPending =
@@ -975,7 +975,11 @@ export function HostedCommunities({
                                   icon={<GlobeIcon size={20} />}
                                   title={name}
                                   detail={url ?? undefined}
-                                  status={archived ? "Archived" : undefined}
+                                  status={
+                                    archived
+                                      ? t("fubuilderlab.hc.archived")
+                                      : undefined
+                                  }
                                   actions={
                                     <>
                                       <MenuRoot>
@@ -997,21 +1001,31 @@ export function HostedCommunities({
                                               variant="bare"
                                               size="sm"
                                               shape="row-end"
-                                              aria-label={`More actions for ${name}`}
+                                              aria-label={t(
+                                                "fubuilderlab.moreActions",
+                                                {
+                                                  name,
+                                                },
+                                              )}
                                               icon={<DotsThreeIcon size={18} />}
                                             />
                                           }
                                         />
                                         <MenuPopup
                                           align="end"
-                                          aria-label={`More actions for ${name}`}
+                                          aria-label={t(
+                                            "fubuilderlab.moreActions",
+                                            {
+                                              name,
+                                            },
+                                          )}
                                         >
                                           {!archived && url && ready && (
                                             <MenuItem
                                               disabled={busy}
                                               onClick={() => void copy(url)}
                                             >
-                                              Copy address
+                                              {t("fubuilderlab.hc.copyAddress")}
                                             </MenuItem>
                                           )}
                                           {archived ? (
@@ -1024,15 +1038,23 @@ export function HostedCommunities({
                                                 }
                                                 onClick={() =>
                                                   setConfirm({
-                                                    title: `Unarchive ${name}?`,
-                                                    description:
-                                                      "This address will become connectable again. Connections closed during archival will not reconnect automatically.",
-                                                    action: "Unarchive",
+                                                    title: t(
+                                                      "fubuilderlab.hc.unarchiveTitle",
+                                                      { name },
+                                                    ),
+                                                    description: t(
+                                                      "fubuilderlab.hc.unarchiveDescription",
+                                                    ),
+                                                    action: t(
+                                                      "fubuilderlab.hc.unarchive",
+                                                    ),
                                                     run: () =>
                                                       mutate(
                                                         "unarchive",
                                                         community,
-                                                        "Could not unarchive the community.",
+                                                        t(
+                                                          "fubuilderlab.hc.unarchiveFailed",
+                                                        ),
                                                       ),
                                                   })
                                                 }
@@ -1043,7 +1065,7 @@ export function HostedCommunities({
                                                     aria-hidden="true"
                                                   />
                                                 </MenuIcon>{" "}
-                                                Unarchive
+                                                {t("fubuilderlab.hc.unarchive")}
                                               </MenuItem>
                                               {deletionEnabled &&
                                                 ready &&
@@ -1068,7 +1090,9 @@ export function HostedCommunities({
                                                         aria-hidden="true"
                                                       />
                                                     </MenuIcon>{" "}
-                                                    Delete
+                                                    {t(
+                                                      "fubuilderlab.hc.delete",
+                                                    )}
                                                   </MenuItem>
                                                 )}
                                             </>
@@ -1086,22 +1110,30 @@ export function HostedCommunities({
                                                     aria-hidden="true"
                                                   />
                                                 </MenuIcon>{" "}
-                                                Transfer ownership
+                                                {t("v105ch.members.transfer")}
                                               </MenuItem>
                                               <MenuItem
                                                 disabled={busy || !community.id}
                                                 onClick={() =>
                                                   setConfirm({
-                                                    title: `Archive ${name}?`,
-                                                    description:
-                                                      "New and existing connections stop and the address stays reserved. Archiving can’t be undone from here without unarchiving, and the community keeps counting toward your quota — it isn’t deleted.",
-                                                    action: "Archive",
+                                                    title: t(
+                                                      "fubuilderlab.hc.archiveTitle",
+                                                      { name },
+                                                    ),
+                                                    description: t(
+                                                      "fubuilderlab.hc.archiveDescription",
+                                                    ),
+                                                    action: t(
+                                                      "fubuilderlab.hc.archive",
+                                                    ),
                                                     caution: "guarded",
                                                     run: () =>
                                                       mutate(
                                                         "archive",
                                                         community,
-                                                        "Could not archive the community.",
+                                                        t(
+                                                          "fubuilderlab.hc.archiveFailed",
+                                                        ),
                                                       ),
                                                   })
                                                 }
@@ -1112,7 +1144,7 @@ export function HostedCommunities({
                                                     aria-hidden="true"
                                                   />
                                                 </MenuIcon>{" "}
-                                                Archive
+                                                {t("fubuilderlab.hc.archive")}
                                               </MenuItem>
                                             </>
                                           )}
@@ -1145,20 +1177,16 @@ export function HostedCommunities({
                 }
                 initialFocus={false}
                 finalFocus={false}
-                aria-label="Community address"
+                aria-label={t("v1id.blab.communityAddress")}
               >
                 {shown?.copied && (
                   <p role="status" className="m-0 text-body-sm text-muted">
-                    Address copied. To join, open the community picker and
-                    choose Join a community.
+                    {t("fubuilderlab.hc.addressCopied")}
                   </p>
                 )}
                 {shown && !shown.copied && (
                   <div role="alert" className="text-body-sm">
-                    <p className="m-0">
-                      Couldn’t copy the address. Copy it manually, then open the
-                      community picker and choose Join a community:
-                    </p>
+                    <p className="m-0">{t("fubuilderlab.hc.copyFailed")}</p>
                     <p className="m-0 select-all break-all font-mono">
                       {shown.url}
                     </p>
@@ -1167,7 +1195,7 @@ export function HostedCommunities({
                         disabled={busy || !ready}
                         onClick={() => void copy(shown.url)}
                       >
-                        Try copying again
+                        {t("fubuilderlab.hc.copyAgain")}
                       </Button>
                     </div>
                   </div>
@@ -1182,7 +1210,10 @@ export function HostedCommunities({
               }}
               quotaLabel={
                 quotaState
-                  ? `${quotaState.used} of ${quotaState.limit} communities used`
+                  ? t("fubuilderlab.hc.quotaUsed", {
+                      used: quotaState.used,
+                      limit: quotaState.limit,
+                    })
                   : null
               }
               failure={failure}
@@ -1201,7 +1232,7 @@ export function HostedCommunities({
                   const at = generation.current;
                   const reply = check(
                     await api.call("create", { name }),
-                    "Could not create the community.",
+                    t("fubuilderlab.hc.createFailed"),
                     quotaState?.limit,
                   );
                   // Join or hand off the address before refreshing, so a failed
@@ -1236,7 +1267,7 @@ export function HostedCommunities({
             const occupied = readPendingDeletion();
             if (blockedOwner && !occupied) {
               setBlockedOwner(null);
-              setError("Try again.");
+              setError(t("fubuilderlab.hc.tryAgainError"));
               return;
             }
             if (blockedOwner || occupied) {
@@ -1245,15 +1276,15 @@ export function HostedCommunities({
                 occupied.backend_origin === api.origin()
               ) {
                 setPendingDeletion(occupied);
-                setError(
-                  "Deletion was not sent. This identity already has a pending deletion request. Use Check deletion status.",
-                );
+                setError(t("fubuilderlab.hc.notSentPending"));
               } else if (occupied) {
                 setBlockedOwner(occupied.owner_pubkey);
                 setError(
                   occupied.owner_pubkey === bound
-                    ? "Deletion was not sent. This identity has a deletion request saved from a different app address on this device. Contact support before starting another deletion."
-                    : `Deletion was not sent. A deletion request from ${npub(occupied.owner_pubkey)} is already pending on this device.`,
+                    ? t("fubuilderlab.hc.notSentOtherAddress")
+                    : t("fubuilderlab.hc.notSentOtherOwner", {
+                        npub: npub(occupied.owner_pubkey),
+                      }),
                 );
               }
               return;
@@ -1269,9 +1300,7 @@ export function HostedCommunities({
                 stored.backend_origin === api.origin()
               )
                 setPendingDeletion(stored);
-              setError(
-                "Deletion was not sent because its recovery record could not be saved.",
-              );
+              setError(t("fubuilderlab.hc.notSentRecovery"));
               return;
             }
             setPendingDeletion(pending);
@@ -1300,7 +1329,7 @@ export function HostedCommunities({
                 disabled={busy}
                 onClick={() => setConfirm(null)}
               >
-                Cancel
+                {t("profileEditing.cancel")}
               </Button>
               <Button
                 ref={proceed}
@@ -1322,7 +1351,9 @@ export function HostedCommunities({
       )}
       {transfer && (
         <TransferDialog
-          name={transfer.name ?? transfer.slug ?? "this community"}
+          name={
+            transfer.name ?? transfer.slug ?? t("fubuilderlab.hc.thisCommunity")
+          }
           busy={busy}
           failure={failure}
           close={() => setTransfer(null)}
@@ -1335,10 +1366,10 @@ export function HostedCommunities({
               if (reply.error?.code === "limit_reached")
                 throw new ApiFailure(
                   "limit_reached",
-                  "The recipient has reached their community limit.",
+                  t("fubuilderlab.hc.recipientLimit"),
                   reply.correlation_id,
                 );
-              check(reply, "Could not transfer ownership.");
+              check(reply, t("fubuilderlab.hc.transferFailed"));
               // The community is no longer owned; drop it before refreshing.
               setCommunities((list) =>
                 list.filter((item) => item.id !== transfer.id),
@@ -1365,11 +1396,13 @@ function DeleteCommunityDialog({
   close(): void;
   onDelete(): void;
 }) {
+  useLanguage();
   const hostInput = useRef<HTMLInputElement>(null);
   const [host, setHost] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
   const expected = community.normalized_host ?? "";
-  const name = community.name ?? community.slug ?? "this community";
+  const name =
+    community.name ?? community.slug ?? t("fubuilderlab.hc.thisCommunity");
   const confirmed = host === expected && acknowledged;
   return (
     <Dialog
@@ -1377,13 +1410,13 @@ function DeleteCommunityDialog({
       onOpenChange={(open) => !open && close()}
       size="compact"
       initialFocus={hostInput}
-      title={`Permanently delete ${name}?`}
-      description="This starts an irreversible deletion."
+      title={t("fubuilderlab.hc.deleteTitle", { name })}
+      description={t("fubuilderlab.hc.deleteDescription")}
       preventClose={pending}
       actions={
         <>
           <Button disabled={pending} onClick={close}>
-            Cancel
+            {t("profileEditing.cancel")}
           </Button>
           <Button
             variant="prominent"
@@ -1391,18 +1424,14 @@ function DeleteCommunityDialog({
             disabled={!confirmed || pending}
             onClick={onDelete}
           >
-            Start deletion
+            {t("fubuilderlab.hc.startDeletion")}
           </Button>
         </>
       }
     >
       <div className="space-y-4 text-body-sm">
-        <p className="m-0">
-          This request cannot be canceled by an owner. All community content
-          will be deleted eventually, the host stays permanently reserved, and
-          your quota slot is released only after logical cleanup finishes.
-        </p>
-        <Field label="Type the exact host">
+        <p className="m-0">{t("fubuilderlab.hc.deleteBody")}</p>
+        <Field label={t("fubuilderlab.hc.typeHost")}>
           <Input
             ref={hostInput}
             autoComplete="off"
@@ -1415,7 +1444,7 @@ function DeleteCommunityDialog({
         <Checkbox
           checked={acknowledged}
           onCheckedChange={(checked) => setAcknowledged(checked === true)}
-          label="I understand this cannot be canceled and deletion continues after acceptance."
+          label={t("fubuilderlab.hc.deleteAcknowledge")}
         />
         {failure}
       </div>
@@ -1446,6 +1475,7 @@ function CreateCommunity({
   creating: boolean;
   onCreate(name: string): Promise<boolean>;
 }) {
+  useLanguage();
   const formId = useId();
   const addressInput = useRef<HTMLInputElement>(null);
   const deferredFocus = useRef<Element | null>(null);
@@ -1466,7 +1496,7 @@ function CreateCommunity({
       Boolean(
         check(
           await api.call("availability", { name }),
-          "Could not check that address.",
+          t("fubuilderlab.hc.checkAddressFailed"),
         ).available,
       ),
     [api],
@@ -1489,8 +1519,8 @@ function CreateCommunity({
         return input ?? false;
       }}
       preventClose={creating}
-      title="Create community"
-      description="Choose your community’s address."
+      title={t("fubuilderlab.hc.createCommunity")}
+      description={t("fubuilderlab.hc.createDescription")}
       leadingActions={
         quotaLabel && (
           <p className="m-0 text-body-sm text-muted">{quotaLabel}</p>
@@ -1506,17 +1536,17 @@ function CreateCommunity({
               close();
             }}
           >
-            Cancel
+            {t("profileEditing.cancel")}
           </Button>
           <Button
             type="submit"
             form={formId}
             variant="prominent"
-            aria-label="Create community"
+            aria-label={t("fubuilderlab.hc.createCommunity")}
             loading={creating}
             disabled={!address.ready || busy}
           >
-            Create
+            {t("fubuilderlab.hc.create")}
           </Button>
         </>
       }
@@ -1560,6 +1590,7 @@ function TransferDialog({
   close(): void;
   onTransfer(npub: string): void;
 }) {
+  useLanguage();
   const recipientInput = useRef<HTMLInputElement>(null);
   const [recipient, setRecipient] = useState("");
   const valid = /^npub1[02-9ac-hj-np-z]{58}$/.test(recipient);
@@ -1569,12 +1600,12 @@ function TransferDialog({
       onOpenChange={(open) => !open && close()}
       preventClose={busy}
       initialFocus={recipientInput}
-      title="Transfer ownership"
-      description={`Transfer ${name} to another person. You become a regular member. The recipient needs a connected Buzz identity first, and this can’t be undone.`}
+      title={t("v105ch.members.transfer")}
+      description={t("fubuilderlab.hc.transferDescription", { name })}
       actions={
         <>
           <Button disabled={busy} onClick={close}>
-            Cancel
+            {t("profileEditing.cancel")}
           </Button>
           <Button
             variant="destructive"
@@ -1582,18 +1613,16 @@ function TransferDialog({
             disabled={!valid}
             onClick={() => onTransfer(recipient)}
           >
-            Transfer ownership
+            {t("v105ch.members.transfer")}
           </Button>
         </>
       }
     >
       <Field
-        label="Recipient npub"
+        label={t("fubuilderlab.hc.recipientNpub")}
         invalid={Boolean(recipient) && !valid}
         error={
-          recipient && !valid
-            ? "Enter a valid npub that starts with npub1."
-            : undefined
+          recipient && !valid ? t("fubuilderlab.hc.invalidNpub") : undefined
         }
       >
         <Input

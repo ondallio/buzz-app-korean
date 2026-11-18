@@ -27,6 +27,7 @@ import agentsHero from "../assets/agents-hero.png";
 import type { OverviewObserver } from "../overview";
 import { sessionTarget, type BuilderlabSession } from "../session";
 import type { AgentClient, RemoteAgent } from "./client";
+import { t, useLanguage } from "../../../shared/i18n";
 
 export function RemoteAgents({
   client,
@@ -51,6 +52,7 @@ export function RemoteAgents({
   savedAgents?: readonly Pick<Agent, "pubkey" | "picture">[];
   openAgent?: ((pubkey: string) => void) | undefined;
 }) {
+  useLanguage();
   const login = useSyncExternalStore(session.subscribe, session.snapshot);
   useLayoutEffect(() => {
     if (
@@ -66,12 +68,12 @@ export function RemoteAgents({
       <AgentSection>
         {showHeading ? (
           <InlineHeader
-            title="Remote agents"
-            subtitle="Unavailable for this account"
+            title={t("v1id.blab.remoteAgents")}
+            subtitle={t("fubuilderlab.ra.unavailable")}
           />
         ) : (
           <p className="text-body-sm text-secondary">
-            Unavailable for this account
+            {t("fubuilderlab.ra.unavailable")}
           </p>
         )}
       </AgentSection>
@@ -96,8 +98,9 @@ export function RemoteAgents({
     <AgentSection>
       {login.status !== "pending" && (
         <p className="text-body-sm text-secondary">
-          Sign in{session.providerName ? ` to ${session.providerName}` : ""} to
-          view your remote agents.
+          {session.providerName
+            ? t("fubuilderlab.ra.signInTo", { provider: session.providerName })
+            : t("fubuilderlab.ra.signIn")}
         </p>
       )}
       {signIn}
@@ -122,6 +125,7 @@ function AgentList({
   savedAgents: readonly Pick<Agent, "pubkey" | "picture">[];
   openAgent?: ((pubkey: string) => void) | undefined;
 }) {
+  useLanguage();
   const [agents, setAgents] = useState<readonly RemoteAgent[]>();
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
@@ -141,8 +145,8 @@ function AgentList({
                 items: agents.map((agent) => ({
                   key: agent.id,
                   label: agent.name,
-                  ...(agentState(agent) === "Needs setup"
-                    ? { note: "Needs setup" }
+                  ...(agentState(agent) === "needs-setup"
+                    ? { note: t("fubuilderlab.ra.needsSetup") }
                     : {}),
                 })),
               }
@@ -185,7 +189,7 @@ function AgentList({
                 setError(
                   reason instanceof Error
                     ? reason.message
-                    : "Could not load agents.",
+                    : t("fubuilderlab.ra.loadFailed"),
                 );
               setLoading(false);
               setRetrying(false);
@@ -210,20 +214,20 @@ function AgentList({
     <section
       data-buzz-ui=""
       className="flex flex-col gap-3"
-      aria-label="Remote agents"
+      aria-label={t("v1id.blab.remoteAgents")}
     >
-      {showHeading && <InlineHeader title="Remote agents" />}
+      {showHeading && <InlineHeader title={t("v1id.blab.remoteAgents")} />}
       <AgentSection>
         {loading && (
           <p role="status" className="text-body-sm text-secondary">
-            Loading agents…
+            {t("mentionPicker.loadingAgents")}
           </p>
         )}
         {error && (
           <div role="alert">
             <EmptyState
               icon={<RobotIcon />}
-              title="Couldn’t load agents"
+              title={t("fubuilderlab.ra.loadFailedTitle")}
               description={error}
               action={
                 <Button
@@ -231,7 +235,7 @@ function AgentList({
                   loading={retrying}
                   onClick={() => refresh.current()}
                 >
-                  Try again
+                  {t("identity.failure.retry")}
                 </Button>
               }
             />
@@ -240,8 +244,8 @@ function AgentList({
         {agents?.length === 0 && (
           <EmptyState
             icon={<RobotIcon />}
-            title="No agents yet"
-            description="Create agents in the Agents tab. They’ll show up here."
+            title={t("fubuilderlab.ra.emptyTitle")}
+            description={t("fubuilderlab.ra.emptyDescription")}
             action={
               openAgents && (
                 <Button
@@ -250,7 +254,7 @@ function AgentList({
                     if (active()) openAgents();
                   }}
                 >
-                  Open Agents
+                  {t("fubuilderlab.ra.openAgents")}
                 </Button>
               )
             }
@@ -258,7 +262,10 @@ function AgentList({
           />
         )}
         {agents && agents.length > 0 && (
-          <ul className="m-0 list-none p-0" aria-label="Your remote agents">
+          <ul
+            className="m-0 list-none p-0"
+            aria-label={t("fubuilderlab.ra.yourAgents")}
+          >
             {agents.map((agent) => (
               <AgentRow
                 key={agent.id}
@@ -296,15 +303,16 @@ function AgentRow({
   saved?: Pick<Agent, "pubkey" | "picture"> | undefined;
   openAgent?: ((pubkey: string) => void) | undefined;
 }) {
+  useLanguage();
   const notify = useToastNotification();
-  const state = agentState(agent);
+  const state = agentStateLabel(agentState(agent));
   const copy = async () => {
     if (!active()) return;
     try {
       await writeClipboardText(agent.pubkey);
-      if (active()) notify("Key copied", "success");
+      if (active()) notify(t("fubuilderlab.ra.keyCopied"), "success");
     } catch {
-      if (active()) notify("Couldn’t copy the key", "error");
+      if (active()) notify(t("fubuilderlab.ra.copyKeyFailed"), "error");
     }
   };
   return (
@@ -330,10 +338,10 @@ function AgentRow({
         }
         detail={
           <>
-            {agent.modelId ?? "No model selected"} · {state}
+            {agent.modelId ?? t("fubuilderlab.ra.noModel")} · {state}
           </>
         }
-        status={saved ? "In Agents" : undefined}
+        status={saved ? t("fubuilderlab.ra.inAgents") : undefined}
         actions={
           <MenuRoot>
             <MenuTrigger
@@ -342,14 +350,16 @@ function AgentRow({
                   variant="bare"
                   size="sm"
                   shape="row-end"
-                  aria-label={`More actions for ${agent.name}`}
+                  aria-label={t("fubuilderlab.moreActions", {
+                    name: agent.name,
+                  })}
                   icon={<DotsThreeIcon size={18} />}
                 />
               }
             />
             <MenuPopup
               align="end"
-              aria-label={`More actions for ${agent.name}`}
+              aria-label={t("fubuilderlab.moreActions", { name: agent.name })}
             >
               {saved && openAgent && (
                 <MenuItem
@@ -357,10 +367,12 @@ function AgentRow({
                     if (active()) openAgent(agent.pubkey);
                   }}
                 >
-                  View Agent
+                  {t("fubuilderlab.ra.viewAgent")}
                 </MenuItem>
               )}
-              <MenuItem onClick={() => void copy()}>Copy key</MenuItem>
+              <MenuItem onClick={() => void copy()}>
+                {t("fubuilderlab.ra.copyKey")}
+              </MenuItem>
             </MenuPopup>
           </MenuRoot>
         }
@@ -369,12 +381,27 @@ function AgentRow({
   );
 }
 
-function agentState(agent: RemoteAgent) {
+type AgentState = "revoked" | "unknown" | "configured" | "needs-setup";
+
+function agentState(agent: RemoteAgent): AgentState {
   return agent.status === "Revoked"
-    ? "Revoked"
+    ? "revoked"
     : agent.status === "Unknown"
-      ? "Unknown"
+      ? "unknown"
       : agent.status === "Active" && agent.modelSelectionStatus === "valid"
-        ? "Configured"
-        : "Needs setup";
+        ? "configured"
+        : "needs-setup";
+}
+
+function agentStateLabel(state: AgentState) {
+  switch (state) {
+    case "revoked":
+      return t("fubuilderlab.ra.revoked");
+    case "unknown":
+      return t("fubuilderlab.ra.unknown");
+    case "configured":
+      return t("fubuilderlab.ra.configured");
+    case "needs-setup":
+      return t("fubuilderlab.ra.needsSetup");
+  }
 }
