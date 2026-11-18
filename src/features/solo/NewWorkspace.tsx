@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useId, useRef, useState, type ComponentProps } from "react";
 import type { RelaySession } from "../relay/session";
 import { emptyLineup } from "../channel-templates/model";
@@ -35,6 +36,7 @@ export function NewWorkspace({
   close(): void;
   onCreated(id: string): void | Promise<void>;
 }) {
+  useLanguage();
   const [id] = useState(() => crypto.randomUUID());
   const [name, setName] = useState("");
   const [workspace, setWorkspace] = useState<Workspace>(emptyWorkspace);
@@ -75,7 +77,9 @@ export function NewWorkspace({
         await session.channelKit.refresh();
         const state = session.channelKit.snapshot();
         if (state.status !== "ready")
-          throw new Error(state.error ?? "Workspace defaults are unavailable.");
+          throw new Error(
+            state.error ?? t("v105sweep.solo.newWorkspace.defaultsUnavailable"),
+          );
         const existing = state.entries.find(
           (entry) =>
             entry.record.value.type === "template" &&
@@ -87,9 +91,7 @@ export function NewWorkspace({
             JSON.stringify(existing.record.value) !== JSON.stringify(template))
         ) {
           setConflict(true);
-          throw new Error(
-            "Workspace defaults changed. Close this dialog and review Workspace settings.",
-          );
+          throw new Error(t("v105sweep.solo.newWorkspace.defaultsChanged"));
         }
         if (!existing)
           await session.channelKit.save(
@@ -106,7 +108,7 @@ export function NewWorkspace({
       setError(
         reason instanceof Error
           ? reason.message
-          : "Workspace could not be created. Try again.",
+          : t("v105sweep.solo.newWorkspace.failed"),
       );
     } finally {
       pending.current = false;
@@ -133,14 +135,14 @@ export function NewWorkspace({
       preventClose={busy}
       // A partly created workspace keeps its retry state; never drop it on a stray click.
       dismissOnOutsideClick={false}
-      title="New workspace"
-      description="The chats you start in this workspace begin with its folders and instructions."
+      title={t("v105sweep.solo.newWorkspace.title")}
+      description={t("v105sweep.solo.newWorkspace.description")}
       initialFocus={input}
       finalFocus={finalFocus}
       actions={
         <>
           <Button disabled={busy} onClick={close}>
-            {submitted ? "Close" : "Cancel"}
+            {submitted ? t("v105sweep.solo.close") : t("v105sweep.solo.cancel")}
           </Button>
           {!conflict && (
             <Button
@@ -150,7 +152,9 @@ export function NewWorkspace({
               loading={busy}
               disabled={!name.trim()}
             >
-              {submitted ? "Retry" : "Create"}
+              {submitted
+                ? t("v105sweep.solo.retry")
+                : t("v105sweep.solo.create")}
             </Button>
           )}
         </>
@@ -165,7 +169,7 @@ export function NewWorkspace({
           void submit();
         }}
       >
-        <Field label="Name">
+        <Field label={t("v105sweep.solo.name")}>
           <Input
             ref={input}
             required
@@ -181,15 +185,13 @@ export function NewWorkspace({
           disabled={busy || submitted}
         />
         {submitted && !busy && !conflict && (
-          <p role="status">
-            Name, folders and instructions are kept for the retry.
-          </p>
+          <p role="status">{t("v105sweep.solo.newWorkspace.kept")}</p>
         )}
         {error && <p role="alert">{error}</p>}
       </form>
       {confirmDiscard && (
         <DiscardChanges
-          description="Your new workspace has unsaved changes."
+          description={t("v105sweep.solo.newWorkspace.unsaved")}
           onKeep={() => setConfirmDiscard(false)}
           onDiscard={close}
         />

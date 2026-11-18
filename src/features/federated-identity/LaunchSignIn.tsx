@@ -367,7 +367,7 @@ function SignInScreen({
       )}
       {copied && signingIn && (
         <p role="status" className="text-body-sm">
-          Sign-in link copied. Paste it into your browser.
+          {t("v105sweep.signIn.linkCopied")}
         </p>
       )}
       {signingIn ? (
@@ -406,7 +406,7 @@ function SignInScreen({
               })
             }
           >
-            Copy sign-in link
+            {t("v105sweep.signIn.copyLink")}
           </Button>
           <Button
             size="lg"

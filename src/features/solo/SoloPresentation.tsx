@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   PanelHeader,
   PanelHeaderLabel,
@@ -14,13 +15,16 @@ export function SoloDraftView({
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  useLanguage();
   return (
     <section
       className={styles.work}
       data-attachment-drop-zone=""
-      aria-label="New chat"
+      aria-label={t("v105sweep.solo.newChat")}
     >
-      <SoloTitle channel={{ name: "New chat" }}>{actions}</SoloTitle>
+      <SoloTitle channel={{ name: t("v105sweep.solo.newChat") }}>
+        {actions}
+      </SoloTitle>
       <div className={styles.start}>
         <div className={styles.startContent}>{children}</div>
       </div>

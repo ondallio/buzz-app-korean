@@ -219,7 +219,7 @@ export function IdentityBadge({
                   <span
                     className={`${styles.keyLabel} text-caption text-subtle`}
                   >
-                    PUBLIC KEY
+                    {t("v105sweep.identity.publicKey")}
                   </span>
                   {/* Code 128-B: fixed public word BUZZBUZZ, checksum 51; no key data. */}
                   <div className={`dark ${styles.barcodeSticker}`}>

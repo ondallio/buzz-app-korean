@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import {
   sameLabels,
   type ChannelDetailsDraft,
@@ -67,9 +68,7 @@ export async function checkShareDestination(
     !destination.members?.includes(session.viewer ?? "") ||
     !chatShareDestination(destination)
   )
-    throw new Error(
-      "Destination membership could not be confirmed. Retry to share.",
-    );
+    throw new Error(t("v105sweep.solo.share.destinationUnconfirmed"));
 }
 
 /** Both share entry points confirm Private and View only chats. Public stays intact.
@@ -98,9 +97,7 @@ export async function shareSoloChatAccess(
   const pending = details.snapshot(id);
   if (pending) {
     if (pending.status !== "unconfirmed" || pending.draft !== attempts.get(id))
-      throw new Error(
-        "Finish the existing General access change before sharing.",
-      );
+      throw new Error(t("v105sweep.solo.share.finishAccess"));
     await details.check(id, signal);
     check();
     onAccessChanged?.();
@@ -108,7 +105,7 @@ export async function shareSoloChatAccess(
   const base = await details.load(id, signal);
   check();
   if (confirmed && confirmed.channelId !== id)
-    throw new Error("Chat selection changed. Try sharing again.");
+    throw new Error(t("v105sweep.solo.share.selectionChanged"));
   if (base.visibility === "public")
     return base.joinRole === "guest" && !confirmed ? base : undefined;
   const source = session.channels
@@ -119,12 +116,10 @@ export async function shareSoloChatAccess(
     !soloLabels(base.labels) ||
     !ownSolo(source, session.viewer)
   )
-    throw new Error("You can no longer change this chat’s general access.");
+    throw new Error(t("v105sweep.solo.share.noAccessChange"));
   if (!confirmed) return base;
   if (confirmed.visibility !== "private")
-    throw new Error(
-      "The chat is now Private. Close this dialog and share again to confirm the access change.",
-    );
+    throw new Error(t("v105sweep.solo.share.nowPrivate"));
   const saving = details.save(
     confirmed,
     {
@@ -165,14 +160,11 @@ export async function applySharedChannelDetails(
   const pending = details.snapshot(id);
   if (pending) {
     if (!matches(pending.draft) || pending.status !== "unconfirmed")
-      throw new Error(
-        "Finish the existing channel details change before continuing.",
-      );
+      throw new Error(t("v105sweep.solo.share.finishDetails"));
     await details.check(id, signal);
   }
   const base = await details.load(id, signal);
-  if (!base.canEdit)
-    throw new Error("You no longer have permission to edit this conversation.");
+  if (!base.canEdit) throw new Error(t("v105sweep.solo.share.noPermission"));
   if (!matches(base)) {
     if (
       base.name !== expected.name ||
@@ -183,9 +175,7 @@ export async function applySharedChannelDetails(
       (draft.labels !== undefined &&
         !sameLabels(base.labels ?? [], expected.labels ?? []))
     )
-      throw new Error(
-        "Channel settings changed. Reload details before continuing.",
-      );
+      throw new Error(t("v105sweep.solo.convert.settingsChanged"));
     await details.save(base, draft, signal);
   }
 }

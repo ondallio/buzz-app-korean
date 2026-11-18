@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useState } from "react";
 import {
   CHANNEL_DURATIONS,
@@ -10,19 +11,22 @@ import { useDefaultLifetime, writeDefaultLifetime } from "./default-lifetime";
 /** The lifetime New chat starts Solo chats with, saved as soon as it
  * changes. The same choices as a chat's own lifetime setting. */
 export function DefaultLifetimeSettings({ scope }: { scope: string }) {
+  useLanguage();
   const ttlSeconds = useDefaultLifetime(scope);
   const [error, setError] = useState("");
   return (
     <SettingsGroup>
       <Select
         variant="preference"
-        label="New Solo chats"
-        description="Chats you start with New chat in this community begin with this lifetime. You can change it in a chat’s settings."
+        label={t("v105sweep.solo.defaultLifetime.label")}
+        description={t("v105sweep.solo.defaultLifetime.description")}
         value={ttlSeconds === undefined ? "ongoing" : String(ttlSeconds)}
         valueLabel={
           ttlSeconds === undefined
-            ? "Ongoing"
-            : `Temporary, ${channelDurationLabel(ttlSeconds)}`
+            ? t("channelForms.duration.ongoing")
+            : t("v105sweep.solo.defaultLifetime.temporary", {
+                duration: channelDurationLabel(ttlSeconds),
+              })
         }
         error={error || undefined}
         groups={[
@@ -31,13 +35,17 @@ export function DefaultLifetimeSettings({ scope }: { scope: string }) {
             options: [
               {
                 value: "ongoing",
-                label: "Ongoing",
-                description: "No automatic archive.",
+                label: t("channelForms.duration.ongoing"),
+                description: t("channelForms.duration.ongoingDescription"),
               },
               ...CHANNEL_DURATIONS.map((seconds) => ({
                 value: String(seconds),
-                label: `Temporary, ${channelDurationLabel(seconds)}`,
-                description: `Archives after ${channelDurationLabel(seconds)} without activity.`,
+                label: t("v105sweep.solo.defaultLifetime.temporary", {
+                  duration: channelDurationLabel(seconds),
+                }),
+                description: t("v105sweep.solo.defaultLifetime.archivesAfter", {
+                  duration: channelDurationLabel(seconds),
+                }),
               })),
             ],
           },
@@ -49,7 +57,7 @@ export function DefaultLifetimeSettings({ scope }: { scope: string }) {
               value === "ongoing" ? undefined : Number(value),
             )
               ? ""
-              : "Couldn’t save this on this device. Try again.",
+              : t("v105sweep.solo.defaultLifetime.saveFailed"),
           );
         }}
       />

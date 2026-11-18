@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import type { AgentLibrarySnapshot } from "../agents/library";
 import type { ChannelSummary, Profile } from "../relay/contracts";
 
@@ -30,13 +31,8 @@ export function soloRecipients(
 ): readonly string[] {
   if (channel?.channelType !== "solo" || explicit.length) return explicit;
   const agents = soloAgents(channel, profiles, library, viewer);
-  if (!agents)
-    throw new Error(
-      "Chat participants are still loading. Retry or @mention an agent.",
-    );
+  if (!agents) throw new Error(t("v105sweep.solo.recipients.loading"));
   if (agents.length > 1)
-    throw new Error(
-      "There are multiple agents in this chat. @mention who should respond.",
-    );
+    throw new Error(t("v105sweep.solo.recipients.multiple"));
   return agents;
 }

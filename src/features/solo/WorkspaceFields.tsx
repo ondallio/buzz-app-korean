@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useId, useRef, useEffect, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { Button } from "../../shared/design-system/ui/Button";
@@ -36,6 +37,7 @@ export function WorkspaceFields({
   instructionRows?: number;
   onChange(value: Workspace): void;
 }) {
+  useLanguage();
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState("");
   const [typed, setTyped] = useState("");
@@ -77,7 +79,7 @@ export function WorkspaceFields({
     const next = path.trim();
     if (!next) return false;
     if (existing.includes(next)) {
-      setError("Already added.");
+      setError(t("v105sweep.solo.fields.alreadyAdded"));
       return false;
     }
     if (existing.length >= MAX_FOLDERS) return false;
@@ -90,7 +92,7 @@ export function WorkspaceFields({
     setError("");
     try {
       const path = await invoke<string | null>("workspace_pick_folder", {
-        title: "Add a folder",
+        title: t("v105sweep.solo.fields.pickFolder"),
       });
       if (alive.current && path) attach(path);
     } catch (reason) {
@@ -108,7 +110,7 @@ export function WorkspaceFields({
     setError("");
     try {
       const path = await invoke<string | null>("workspace_pick_folder", {
-        title: "Choose a worktree location",
+        title: t("v105sweep.solo.fields.pickWorktree"),
         start: current.current.value.worktree?.location,
       });
       const latest = current.current.value;
@@ -138,11 +140,11 @@ export function WorkspaceFields({
   const folderError =
     error ||
     (worktree && !folders.length
-      ? "Add at least one folder to use a new worktree."
+      ? t("v105sweep.solo.fields.worktreeNeedsFolder")
       : undefined);
   return (
     <div className={styles.sections}>
-      <Field label="Instructions" optional>
+      <Field label={t("v105sweep.solo.instructions")} optional>
         <Textarea
           disabled={disabled}
           rows={instructionRows}
@@ -150,15 +152,17 @@ export function WorkspaceFields({
           onChange={(event) =>
             onChange({ ...value, canvas: event.target.value })
           }
-          placeholder="Instructions and context for agents working in this chat."
+          placeholder={t("v105sweep.solo.fields.instructionsPlaceholder")}
         />
       </Field>
       <div className={styles.fields}>
         <Field
-          label="Folders"
+          label={t("v105sweep.solo.fields.folders")}
           optional={!worktree}
           nativeLabel={false}
-          description={full ? "Up to 20 folders." : undefined}
+          description={
+            full ? t("v105sweep.solo.fields.folderLimit") : undefined
+          }
           error={
             folderError ? (
               <span id={folderErrorId}>{folderError}</span>
@@ -182,7 +186,9 @@ export function WorkspaceFields({
                         disabled={disabled}
                         variant="ghost"
                         size="sm"
-                        aria-label={`Remove ${folderName(folder)}`}
+                        aria-label={t("v105sweep.solo.fields.removeFolder", {
+                          name: folderName(folder),
+                        })}
                         icon={<XIcon size={16} />}
                         onClick={() => remove(index)}
                       />
@@ -204,14 +210,14 @@ export function WorkspaceFields({
                 onClick={() => void browse()}
               >
                 <FolderPlusIcon size={16} aria-hidden="true" />
-                Add folder…
+                {t("v105sweep.solo.fields.addFolder")}
               </Button>
             </div>
           ) : (
             <div className={styles.repositoryInput}>
               <Input
                 ref={pathInput}
-                aria-label="Folder path"
+                aria-label={t("v105sweep.solo.fields.folderPath")}
                 value={typed}
                 disabled={disabled || full}
                 placeholder="~/Development/my-project"
@@ -230,14 +236,14 @@ export function WorkspaceFields({
                   if (attach(typed)) setTyped("");
                 }}
               >
-                Add
+                {t("v105sweep.solo.add")}
               </Button>
             </div>
           )}
         </Field>
         <Switch
           disabled={disabled}
-          label="Work in a new worktree"
+          label={t("v105sweep.solo.fields.newWorktree")}
           checked={!!worktree}
           onCheckedChange={(checked) =>
             onChange({
@@ -251,12 +257,17 @@ export function WorkspaceFields({
         {worktree && (
           <div className={styles.worktree}>
             {isTauri() ? (
-              <Field label="Worktree location" nativeLabel={false}>
+              <Field
+                label={t("v105sweep.solo.fields.worktreeLocation")}
+                nativeLabel={false}
+              >
                 <FieldButton
                   ref={location}
                   dropdown={false}
                   title={worktree.location}
-                  aria-label={`Worktree location: ${worktree.location}`}
+                  aria-label={t("v105sweep.solo.fields.worktreeLocationValue", {
+                    location: worktree.location,
+                  })}
                   disabled={disabled || picking}
                   onClick={() => void pickLocation()}
                 >
@@ -264,7 +275,7 @@ export function WorkspaceFields({
                 </FieldButton>
               </Field>
             ) : (
-              <Field label="Worktree location">
+              <Field label={t("v105sweep.solo.fields.worktreeLocation")}>
                 <Input
                   disabled={disabled}
                   value={worktree.location}
@@ -277,7 +288,7 @@ export function WorkspaceFields({
                 />
               </Field>
             )}
-            <Field label="Base branch">
+            <Field label={t("v105sweep.solo.fields.baseBranch")}>
               <Input
                 disabled={disabled}
                 value={worktree.baseBranch}

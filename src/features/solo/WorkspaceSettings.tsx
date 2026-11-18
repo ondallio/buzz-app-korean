@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import type { RelaySession } from "../relay/session";
 import { soloGroups, WorkspaceNameConflict } from "../relay/solo-preferences";
@@ -46,6 +47,7 @@ export function WorkspaceSettings({
   signal?: AbortSignal | undefined;
   finalFocus?: ComponentProps<typeof Dialog>["finalFocus"];
 }) {
+  useLanguage();
   const [workspace, setWorkspace] = useState<Workspace>(emptyWorkspace);
   const [raw, setRaw] = useState<string>();
   const [base, setBase] = useState<string>();
@@ -70,7 +72,7 @@ export function WorkspaceSettings({
     target.kind === "project" && nextName !== confirmedName.current;
   const nameError =
     target.kind === "project" && (!nextName || nextName.length > 120)
-      ? "Use a workspace name of 1–120 characters."
+      ? t("v105sweep.solo.settings.nameInvalid")
       : undefined;
   const alive = useRef(true);
   const inFlight = useRef(false);
@@ -117,7 +119,9 @@ export function WorkspaceSettings({
         if (!active()) return;
         const kit = session.channelKit.snapshot();
         if (kit.status !== "ready")
-          throw new Error(kit.error ?? "Workspace defaults are unavailable.");
+          throw new Error(
+            kit.error ?? t("v105sweep.solo.newWorkspace.defaultsUnavailable"),
+          );
         const groups = soloGroups(kit.entries);
         if (
           groups &&
@@ -194,9 +198,7 @@ export function WorkspaceSettings({
         adopted = adopt(saved.canvas);
         setBase(saved.base ?? undefined);
         if ((saved.base ?? undefined) !== revision) {
-          setError(
-            "Saved settings changed while this draft was open. Your draft is kept; copy it before reloading.",
-          );
+          setError(t("v105sweep.solo.settings.savedChanged"));
           setCanvasError(true);
         }
       } else {
@@ -208,7 +210,7 @@ export function WorkspaceSettings({
       setReloadConfirmed(false);
       if (replace && !writeView(scope, key, null))
         throw new CanvasSettingsError(
-          "Saved settings loaded, but the old draft couldn’t be cleared on this device.",
+          t("v105sweep.solo.settings.oldDraftKept"),
         );
     } catch (reason) {
       if (alive.current) {
@@ -246,18 +248,14 @@ export function WorkspaceSettings({
         await lifetime.run("check");
         if (!active()) return;
         if (canvasAvailable && !loaded) {
-          setStatus(
-            "Chat name and lifetime saved. Workspace and Canvas were not loaded; retry settings to review them.",
-          );
+          setStatus(t("v105sweep.solo.settings.savedNotLoaded"));
           return;
         }
         if (
           loaded &&
           (raw ?? workspaceCanvas(workspace)) !== confirmedCanvas.current
         ) {
-          setStatus(
-            "Chat name and lifetime saved. Workspace and Canvas still have unsaved changes.",
-          );
+          setStatus(t("v105sweep.solo.settings.savedUnsaved"));
           return;
         }
       } else {
@@ -277,8 +275,7 @@ export function WorkspaceSettings({
             : undefined;
         if (lifetime.changed && lifetime.blocked)
           throw new Error(
-            lifetime.invalid ||
-              "Reload chat details before saving name or lifetime.",
+            lifetime.invalid || t("v105sweep.solo.settings.reloadBeforeSave"),
           );
         if (
           canvas !== undefined &&
@@ -292,7 +289,7 @@ export function WorkspaceSettings({
           })
         )
           throw new CanvasSettingsError(
-            "Your draft couldn’t be saved on this device. No new changes were sent.",
+            t("v105sweep.solo.settings.draftNotSaved"),
           );
         if (canvas !== undefined) kept.current = snapshot(canvas, lineup);
         if (target.kind === "project") keptName.current = projectName;
@@ -315,7 +312,7 @@ export function WorkspaceSettings({
             })
           )
             throw new CanvasSettingsError(
-              "The confirmed workspace name couldn’t be retained on this device. Keep this dialog open to retry.",
+              t("v105sweep.solo.settings.nameNotRetained"),
             );
         }
         if (!active()) return;
@@ -350,7 +347,7 @@ export function WorkspaceSettings({
               })
             )
               throw new CanvasSettingsError(
-                "The confirmed Canvas revision couldn’t be saved on this device. Name and lifetime were not sent; keep this dialog open to retry.",
+                t("v105sweep.solo.settings.canvasNotSaved"),
               );
           }
         }
@@ -362,14 +359,14 @@ export function WorkspaceSettings({
       if (loaded && !writeView(scope, key, null))
         throw new CanvasSettingsError(
           target.kind === "project"
-            ? "Workspace defaults are confirmed, but the saved draft couldn’t be cleared on this device."
-            : "Changes are confirmed, but the saved draft couldn’t be cleared on this device. Retry to finish without resending confirmed changes.",
+            ? t("v105sweep.solo.settings.defaultsDraftKept")
+            : t("v105sweep.solo.settings.changesDraftKept"),
         );
       close();
     } catch (reason) {
       if (active()) {
         setError(
-          `${nameConfirmed ? "Workspace name saved. " : ""}${canvasConfirmed ? "Workspace and Canvas saved. " : ""}${reason instanceof Error ? reason.message : String(reason)}`,
+          `${nameConfirmed ? t("v105sweep.solo.settings.nameSaved") : ""}${canvasConfirmed ? t("v105sweep.solo.settings.canvasSaved") : ""}${reason instanceof Error ? reason.message : String(reason)}`,
         );
         const conflictedName = reason instanceof WorkspaceNameConflict;
         if (conflictedName) setNameConflict(true);
@@ -400,8 +397,16 @@ export function WorkspaceSettings({
           snapshot(instructionsCanvas(workspace, raw), lineup) !== kept.current)
       }
       busy={busy || lifetime.busy}
-      title={target.kind === "project" ? "Workspace settings" : undefined}
-      saveLabel={lifetime.checkOnly ? "Check save status" : "Save changes"}
+      title={
+        target.kind === "project"
+          ? t("v105sweep.solo.settings.title")
+          : undefined
+      }
+      saveLabel={
+        lifetime.checkOnly
+          ? t("v105sweep.solo.settings.checkStatus")
+          : t("v105sweep.solo.saveChanges")
+      }
       saveLoading={busy || lifetime.busy || loadingCanvas}
       saveDisabled={
         loadingCanvas ||
@@ -418,7 +423,10 @@ export function WorkspaceSettings({
       onSave={() => void save()}
     >
       {target.kind === "project" && (
-        <Field label="Workspace name" error={nameError}>
+        <Field
+          label={t("v105sweep.solo.settings.workspaceName")}
+          error={nameError}
+        >
           <Input
             value={projectName}
             maxLength={120}
@@ -430,7 +438,7 @@ export function WorkspaceSettings({
         </Field>
       )}
       {lifetime.available && lifetime.base && (
-        <Field label="Chat name" error={lifetime.nameError}>
+        <Field label={t("v105sweep.solo.chatName")} error={lifetime.nameError}>
           <Input
             value={lifetime.name}
             placeholder={lifetime.base.name}
@@ -443,14 +451,17 @@ export function WorkspaceSettings({
         <>
           {target.kind === "project" && templates.length > 0 && (
             <Select
-              label="Start from a template"
+              label={t("v105sweep.solo.settings.template")}
               variant="field"
               value={selectedTemplate}
               groups={[
                 {
                   label: "",
                   options: [
-                    { value: "", label: "Custom settings" },
+                    {
+                      value: "",
+                      label: t("v105sweep.solo.settings.customTemplate"),
+                    },
                     ...templates.map((template) => ({
                       value: template.id,
                       label: template.name,
@@ -480,8 +491,7 @@ export function WorkspaceSettings({
           {target.kind === "project" &&
             (lineup.agents.length > 0 || lineup.teamIds.length > 0) && (
               <p className="text-secondary">
-                The selected template’s agents and teams are also included in
-                new chats.
+                {t("v105sweep.solo.settings.templateAgents")}
               </p>
             )}
           {canvasError && (
@@ -493,23 +503,25 @@ export function WorkspaceSettings({
               }}
             >
               {reloadConfirmed
-                ? "Discard draft and reload saved settings"
-                : "Review saved settings"}
+                ? t("v105sweep.solo.settings.discardReload")
+                : t("v105sweep.solo.settings.review")}
             </Button>
           )}
         </>
       )}
       {canvasAvailable && !loaded && !loadingCanvas && (
-        <Button onClick={() => void load()}>Retry settings</Button>
+        <Button onClick={() => void load()}>
+          {t("v105sweep.solo.retrySettings")}
+        </Button>
       )}
       {!canvasAvailable && (
-        <p role="status">Workspace and Canvas are unavailable.</p>
+        <p role="status">{t("v105sweep.solo.settings.unavailable")}</p>
       )}
       {lifetime.available && (
         <>
           {lifetime.base ? (
             <ChannelDurationField
-              label="Lifetime"
+              label={t("v105sweep.solo.lifetime")}
               temporary={lifetime.ttl !== undefined}
               ttlSeconds={lifetime.temporaryTtl}
               disabled={busy || lifetime.busy || lifetime.blocked}
@@ -517,18 +529,15 @@ export function WorkspaceSettings({
               onChange={lifetime.change}
             />
           ) : (
-            !lifetime.error && <p role="status">Loading chat details…</p>
+            !lifetime.error && (
+              <p role="status">{t("v105sweep.solo.loadingChatDetails")}</p>
+            )
           )}
           {lifetime.base && !lifetime.eligible && (
-            <p role="status">
-              Only a chat you can edit can change its name or lifetime.
-            </p>
+            <p role="status">{t("v105sweep.solo.settings.onlyEditable")}</p>
           )}
           {lifetime.unrelatedAttempt && (
-            <p role="status">
-              Finish the existing channel details change before editing the chat
-              name or lifetime.
-            </p>
+            <p role="status">{t("v105sweep.solo.settings.finishExisting")}</p>
           )}
           {lifetime.error && !error.includes(lifetime.error) && (
             <p role="alert">{lifetime.error}</p>
@@ -545,7 +554,7 @@ export function WorkspaceSettings({
                   .catch(() => {})
               }
             >
-              Reload chat details
+              {t("v105sweep.solo.reloadChatDetails")}
             </Button>
           )}
         </>
@@ -553,7 +562,7 @@ export function WorkspaceSettings({
       {status && <p role="status">{status}</p>}
       {error && <p role="alert">{error}</p>}
       {canvasAvailable && loadingCanvas && !loaded && (
-        <p role="status">Loading settings…</p>
+        <p role="status">{t("v105sweep.solo.loadingSettings")}</p>
       )}
     </ChatSettingsDialog>
   );

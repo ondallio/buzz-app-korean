@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { templateAgentChoices } from "../agents/choices";
 import type { KitEntry, Lineup, Template } from "../channel-templates/model";
 import {
@@ -31,9 +32,7 @@ export function validateWorkspace(value: Workspace): Workspace {
     value.length <= 2048 &&
     [...value].every((char) => char.charCodeAt(0) >= 32 && char !== "`");
   if (folders.length > 20 || folders.some((folder) => !path(folder)))
-    throw new Error(
-      "Use up to 20 workspace folders, without control characters or backticks.",
-    );
+    throw new Error(t("v105sweep.solo.workspace.foldersInvalid"));
   const worktree = value.worktree && {
     location: value.worktree.location.trim(),
     baseBranch: value.worktree.baseBranch.trim(),
@@ -46,9 +45,7 @@ export function validateWorkspace(value: Workspace): Workspace {
       !worktree.baseBranch ||
       !path(worktree.baseBranch))
   )
-    throw new Error(
-      "Choose a workspace folder, worktree location, and base branch.",
-    );
+    throw new Error(t("v105sweep.solo.workspace.worktreeIncomplete"));
   return { folders, ...(worktree ? { worktree } : {}), canvas: value.canvas };
 }
 
@@ -56,7 +53,9 @@ export function validateWorkspace(value: Workspace): Workspace {
 export function workspaceCanvas(input: Workspace): string {
   const value = validateWorkspace(input);
   if (new TextEncoder().encode(value.canvas).length > LIVE_CANVAS_BYTES)
-    throw new Error(`Keep Canvas below ${LIVE_CANVAS_LIMIT}.`);
+    throw new Error(
+      t("v105sweep.solo.workspace.canvasLimit", { limit: LIVE_CANVAS_LIMIT }),
+    );
   if (!value.folders.length) return value.canvas;
   const metadata = JSON.stringify({
     folders: value.folders,
@@ -90,7 +89,9 @@ export function workspaceCanvas(input: Workspace): string {
   ].join("\n");
   if (new TextEncoder().encode(canvas).length > LIVE_CANVAS_BYTES)
     throw new Error(
-      `Keep Canvas and workspace instructions below ${LIVE_CANVAS_LIMIT}.`,
+      t("v105sweep.solo.workspace.instructionsLimit", {
+        limit: LIVE_CANVAS_LIMIT,
+      }),
     );
   return canvas;
 }
@@ -104,9 +105,7 @@ export function readWorkspace(content: string): Workspace {
     canvas !== content &&
     canvas.replace(worktreeRule, earlierWorktreeRule) !== content
   )
-    throw new Error(
-      "Workspace instructions were edited in Canvas. Use the raw Canvas editor to preserve those changes.",
-    );
+    throw new Error(t("v105sweep.solo.workspace.editedInCanvas"));
   return value;
 }
 
@@ -128,16 +127,12 @@ function parseWorkspace(content: string): Workspace {
   const lineEnd = content.indexOf(" -->\n");
   const blockEnd = content.indexOf(`\n${end}\n\n`, lineEnd);
   if (lineEnd < 0 || blockEnd < 0)
-    throw new Error(
-      "Workspace metadata is incomplete. Edit the raw Canvas before changing workspace settings.",
-    );
+    throw new Error(t("v105sweep.solo.workspace.metadataIncomplete"));
   let raw: unknown;
   try {
     raw = JSON.parse(content.slice(prefix.length, lineEnd));
   } catch {
-    throw new Error(
-      "Workspace metadata is invalid. Edit the raw Canvas before changing workspace settings.",
-    );
+    throw new Error(t("v105sweep.solo.workspace.metadataInvalid"));
   }
   if (
     !raw ||
@@ -146,7 +141,7 @@ function parseWorkspace(content: string): Workspace {
     !Array.isArray(raw.folders) ||
     raw.folders.some((v) => typeof v !== "string")
   )
-    throw new Error("Invalid workspace folders.");
+    throw new Error(t("v105sweep.solo.workspace.foldersMalformed"));
   const worktree = "worktree" in raw ? raw.worktree : undefined;
   if (
     worktree !== undefined &&
@@ -157,7 +152,7 @@ function parseWorkspace(content: string): Workspace {
       !("baseBranch" in worktree) ||
       typeof worktree.baseBranch !== "string")
   )
-    throw new Error("Invalid worktree settings.");
+    throw new Error(t("v105sweep.solo.workspace.worktreeMalformed"));
   return validateWorkspace({
     folders: raw.folders,
     ...(worktree
@@ -183,8 +178,7 @@ export function projectTemplate(
   lineup: Lineup,
 ): Template {
   const community = splitPartition(scope)?.communityOrigin;
-  if (!community)
-    throw new Error("Workspace defaults require a connected community.");
+  if (!community) throw new Error(t("v105sweep.solo.workspace.needsCommunity"));
   const template: Template = {
     ...lineup,
     type: "template",
@@ -231,9 +225,7 @@ export function projectDefault(
     ? templateEntry(entries, defaultId)?.record.value
     : undefined;
   if (requireDefault && defaultId && fallback?.type !== "template")
-    throw new Error(
-      "This workspace’s default template is unavailable. Choose new workspace defaults before starting a chat.",
-    );
+    throw new Error(t("v105sweep.solo.workspace.templateUnavailable"));
   return fallback?.type === "template" ? fallback : undefined;
 }
 export type ChatSetup = {
@@ -251,7 +243,7 @@ export function parseChatSetup(raw: unknown): ChatSetup {
         !raw.projectId ||
         raw.projectId.length > 256))
   )
-    throw new Error("Invalid saved chat workspace.");
+    throw new Error(t("v105sweep.solo.workspace.savedInvalid"));
   const lineup = parseLineup({ ...raw, teamIds: [] });
   return {
     ...("projectId" in raw && typeof raw.projectId === "string"
@@ -277,15 +269,12 @@ export async function loadChatSetup(
     !store.writable ||
     !preferences.data?.sections.some((project) => project.id === projectId)
   )
-    throw new Error(
-      "This workspace is unavailable. Refresh workspaces before starting a chat.",
-    );
+    throw new Error(t("v105sweep.solo.workspace.unavailable"));
   await session.channelKit.refresh();
   const kit = session.channelKit.snapshot();
   if (kit.status !== "ready")
     throw new Error(
-      kit.error ??
-        "Workspace defaults couldn’t load. Retry before starting the chat.",
+      kit.error ?? t("v105sweep.solo.workspace.defaultsUnloaded"),
     );
   const revision = defaultsRevision(kit);
   const template = projectDefault(
@@ -303,9 +292,7 @@ export async function loadChatSetup(
       !choices.templates.complete ||
       choices.archives.status !== "ready"
     )
-      throw new Error(
-        "Available agents couldn’t load. Retry before starting the chat.",
-      );
+      throw new Error(t("v105sweep.solo.workspace.agentsUnloaded"));
     const roster = session.channels.list();
     const candidates = resolveLineup(
       template,
@@ -322,9 +309,7 @@ export async function loadChatSetup(
       (roster.status !== "ready" || roster.coverage === "partial")
     ) {
       session.channels.refreshList?.();
-      throw new Error(
-        "Community membership couldn’t load completely. Refresh and retry before starting the chat.",
-      );
+      throw new Error(t("v105sweep.solo.workspace.membershipUnloaded"));
     }
     const agents = resolveLineup(
       template,

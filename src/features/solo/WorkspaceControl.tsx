@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useSoloNavigation } from "../channel-navigation/solo-navigation-react";
 import { prepareSoloMove } from "../channel-navigation/solo-navigation";
 import { useEffect, useState } from "react";
@@ -31,6 +32,7 @@ export function WorkspaceControl({
   channelId?: string | undefined;
   disabled?: boolean;
 }) {
+  useLanguage();
   const regions = useSoloNavigation(session);
   // A region's chat is filed by its region, when the region offers that.
   const filed = useRegionWorkspace(session, channelId);
@@ -76,7 +78,9 @@ export function WorkspaceControl({
       )
       .finally(() => setBusy(false));
   };
-  const name = project ? `Workspace: ${project.name}` : "Add workspace";
+  const name = project
+    ? t("v105sweep.solo.control.workspace", { name: project.name })
+    : t("v105sweep.solo.control.add");
   if (channelId && regions.managed.has(channelId) && !filed) return null;
   return (
     <span className={styles.control}>
@@ -117,10 +121,14 @@ export function WorkspaceControl({
             </Button>
           )}
         />
-        <MenuPopup side="top" align="end" aria-label="Choose workspace">
+        <MenuPopup
+          side="top"
+          align="end"
+          aria-label={t("v105sweep.solo.control.choose")}
+        >
           <MenuRadioGroup value={projectId} onValueChange={choose}>
             <MenuRadioItem value="" closeOnClick>
-              No workspace
+              {t("v105sweep.solo.control.none")}
             </MenuRadioItem>
             {(snapshot.data?.sections ?? []).map((item) => (
               <MenuRadioItem key={item.id} value={item.id} closeOnClick>
@@ -130,7 +138,7 @@ export function WorkspaceControl({
           </MenuRadioGroup>
           {snapshot.status === "error" && (
             <MenuItem onClick={() => void session.soloPreferences.refresh()}>
-              Retry workspaces
+              {t("v105sweep.solo.control.retry")}
             </MenuItem>
           )}
         </MenuPopup>

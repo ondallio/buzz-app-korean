@@ -1,3 +1,4 @@
+import { languagePreference, t, useLanguage } from "../../shared/i18n";
 import { linkedDraftKey, readLinkedChat, type LinkedChat } from "./linked-chat";
 import {
   canonicalDetailsName,
@@ -183,8 +184,14 @@ const openNewChats = new Set<{
 /** The prompt last given back to each New chat, as saved, so a later refusal
  * that finds it still there can say so. */
 const restoredPrompts = new Map<string, string>();
-const REGION_UNAVAILABLE =
-  "This chat's plugin is unavailable. Your draft is saved.";
+const regionUnavailable = () => t("v105sweep.solo.draft.regionUnavailable");
+const missingLabel = (item: string) =>
+  item === "link" ||
+  item === "settings" ||
+  item === "workspace" ||
+  item === "agents"
+    ? t(`v105sweep.solo.draft.missing.${item}`)
+    : item;
 // Allow async local preparation without leaving Send stuck on a plugin.
 const PREPARE_START_TIMEOUT_MS = 3_000;
 
@@ -226,6 +233,7 @@ export function SoloDraft({
     | undefined;
   projectId?: string | undefined;
 }) {
+  useLanguage();
   const draftKey = region
     ? regionDraftKey(region, projectId, regionDraft?.key)
     : linkedId
@@ -405,7 +413,7 @@ export function SoloDraft({
     const startingDraftPicks = draftPicks ?? {};
     try {
       if (typeof name !== "string")
-        throw new Error("The chat name could not be verified.");
+        throw new Error(t("v105sweep.solo.draft.nameUnverified"));
       const errors = detailsDraftErrors({
         name,
         description: "",
@@ -453,10 +461,11 @@ export function SoloDraft({
         if (!mounted.current) return;
         references = outside();
         if (references.length && !session.agentChoices.snapshot().complete)
-          throw new Error("Could not load your agents. Retry.");
+          throw new Error(t("v105sweep.solo.draft.agentsUnloaded"));
       }
       const recipients = tagged.filter((key) => !references.includes(key));
-      if (!recipients.length) throw new Error("Tag an agent to send.");
+      if (!recipients.length)
+        throw new Error(t("v105sweep.solo.draft.tagAgent"));
       // The workspace's agents join in the create with the tagged ones.
       const members = [...new Set([...recipients, ...(setup?.agents ?? [])])];
       // The agents already listed decide at once; only an unknown one waits
@@ -471,9 +480,7 @@ export function SoloDraft({
         await session.agentChoices.refresh();
         if (!mounted.current) return;
         if (!selectable())
-          throw new Error(
-            "Solo chats can only use your available agents. Check mentions and workspace defaults.",
-          );
+          throw new Error(t("v105sweep.solo.draft.onlyYourAgents"));
       }
       const admins = [
         ...(await ownedSoloAgents(session.profiles, session.viewer, members)),
@@ -484,7 +491,7 @@ export function SoloDraft({
         const current = region
           ? soloNavigationFor(session)?.draftRegion(region)
           : undefined;
-        if (region && !current) throw new Error(REGION_UNAVAILABLE);
+        if (region && !current) throw new Error(regionUnavailable());
         return current;
       };
       const eligible = regionOwner();
@@ -494,9 +501,7 @@ export function SoloDraft({
         accepts &&
         members.some((key) => !accepts(eligible.binding, key))
       )
-        throw new Error(
-          "This chat's plugin can't use one of these agents. Choose another agent.",
-        );
+        throw new Error(t("v105sweep.solo.draft.pluginAgent"));
       // Finish uploads before anything is created, so a failed file blocks
       // the start instead of leaving an empty chat behind.
       const uploaded = await files.prepareForSend(new AbortController().signal);
@@ -510,9 +515,7 @@ export function SoloDraft({
         ...(project ? { workspace: project } : {}),
       };
       if (startKey && !writeView(scope, startKey, startRecord))
-        throw new Error(
-          "This chat couldn't be saved on this device. Your draft is kept.",
-        );
+        throw new Error(t("v105sweep.solo.draft.chatNotSaved"));
       const attached = files.snapshot();
       // The chat lists at once, in its workspace, and its message goes out
       // behind the create, so the agents start on it without waiting for the
@@ -563,7 +566,7 @@ export function SoloDraft({
             current?.source !== owner.source ||
             current?.binding !== owner.binding
           )
-            throw new Error(REGION_UNAVAILABLE);
+            throw new Error(regionUnavailable());
         }
         starting = session.channelWrites.start(
           channelId,
@@ -676,15 +679,9 @@ export function SoloDraft({
       draftEdited(undefined);
       if (mounted.current) onStarted(channelId);
       if (clearedPicks === "failed")
-        notify(
-          "Could not clear model and effort from New chat. Reset them before starting another chat.",
-          "error",
-        );
+        notify(t("v105sweep.solo.draft.picksNotCleared"), "error");
       if (!savedChatPicks)
-        notify(
-          "Could not save model and effort for this chat. Choose them again before your next message.",
-          "error",
-        );
+        notify(t("v105sweep.solo.draft.picksNotSaved"), "error");
       // Only a start that made no chat ends here; the chat and its messages
       // are dropped (see channelWrites.start), and what was sent returns to a
       // New chat still blank. Any other miss leaves the chat listed, with its
@@ -769,7 +766,7 @@ export function SoloDraft({
               if (blank && !returned) {
                 await undoPrepared();
                 failedPromptWrite = true;
-                throw new Error("The recovered prompt could not be saved.");
+                throw new Error(t("v105sweep.solo.draft.promptNotSaved"));
               }
               writeView(scope, `draft:${channelId}`, null);
               clearAttachmentDraft(session, `${scope}:draft:${channelId}`);
@@ -810,28 +807,34 @@ export function SoloDraft({
               const earlier = restoredPrompts.get(returnedTo);
               const outcome = returned
                 ? missing.length
-                  ? `Your message is back in New chat, but its ${new Intl.ListFormat(
-                      undefined,
-                      { type: "conjunction" },
-                    ).format(missing)} could not be saved on this device.`
-                  : "Your message is back in New chat."
+                  ? t("v105sweep.solo.draft.backPartly", {
+                      items: new Intl.ListFormat(
+                        languagePreference() === "ko" ? "ko-KR" : undefined,
+                        { type: "conjunction" },
+                      ).format(missing.map(missingLabel)),
+                    })
+                  : t("v105sweep.solo.draft.back")
                 : earlier !== undefined &&
                     viewRevision(scope, `${draftKey}:new-draft`) === earlier
-                  ? "New chat holds an earlier message that couldn't be sent, so this one was not restored."
-                  : "New chat has a newer draft, so your message was not restored.";
+                  ? t("v105sweep.solo.draft.earlierHeld")
+                  : t("v105sweep.solo.draft.newerDraft");
               restored = true;
               onFailed?.(
                 channelId,
-                `Couldn't start "${name}": ${why} ${outcome}`,
+                t("v105sweep.solo.draft.startFailed", { name, why, outcome }),
               );
             });
           } catch {
             const unavailable = failedPromptWrite
-              ? "Your message could not be saved on this device."
-              : "Window ownership or saved choices are unavailable.";
+              ? t("v105sweep.solo.draft.messageNotSaved")
+              : t("v105sweep.solo.draft.windowUnavailable");
             onFailed?.(
               channelId,
-              `Couldn't start "${name}": ${reason.message}. ${unavailable} Retry to restore your message.`,
+              t("v105sweep.solo.draft.startFailedRetry", {
+                name,
+                reason: reason.message,
+                unavailable,
+              }),
               restore,
             );
           } finally {
@@ -875,8 +878,8 @@ export function SoloDraft({
         extensions={extensions}
         scope={scope}
         channelId={channelId}
-        channelName="this chat"
-        label="Message your agents"
+        channelName={t("v1msg.models.targetChat")}
+        label={t("v1msg.composer.agents")}
         inviteAgents
         agentFilter={draftAgent ? agentFilter : undefined}
         defaultMention={defaultAgent}
@@ -916,8 +919,8 @@ export function SoloDraft({
       {!available && (
         <p className={styles.availability} role="status">
           {region && !owner
-            ? REGION_UNAVAILABLE
-            : "Solo preferences or channel creation are unavailable. Your draft is saved."}
+            ? regionUnavailable()
+            : t("v105sweep.solo.draft.unavailable")}
         </p>
       )}
       {error && <p role="alert">{error}</p>}
@@ -929,8 +932,8 @@ export function SoloDraft({
         <IconButton
           ref={settingsTrigger}
           size="toolbar"
-          aria-label="Chat settings"
-          title="Chat settings"
+          aria-label={t("channelsMenus.solo.settings")}
+          title={t("channelsMenus.solo.settings")}
           icon={<GearIcon size="1rem" aria-hidden="true" />}
           disabled={busy}
           onClick={() => {
@@ -964,9 +967,7 @@ export function SoloDraft({
               name: name ?? "",
             };
             if (!writeView(scope, `${draftKey}:settings`, next))
-              throw new Error(
-                "Settings couldn’t be saved on this device. Try again.",
-              );
+              throw new Error(t("v105sweep.solo.draft.settingsNotSaved"));
             setDraftSettings(next);
           }}
         />

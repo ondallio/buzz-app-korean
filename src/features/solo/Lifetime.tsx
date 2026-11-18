@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { RelaySession } from "../relay/session";
 import type { ChannelSummary } from "../relay/contracts";
@@ -59,7 +60,7 @@ export function useLifetime({
   const nameError =
     base && normalized
       ? detailsDraftErrors({ ...base, name: normalized }).name
-        ? "Use a chat name of at most 120 characters."
+        ? t("v105sweep.solo.chatNameTooLong")
         : undefined
       : undefined;
   const invalid =
@@ -156,9 +157,7 @@ export function useLifetime({
               : base;
             active.throwIfAborted();
             if (!current.canEdit || !soloLabels(current.labels))
-              throw new Error(
-                "This conversation is no longer an editable Solo chat. Reload its details before changing its name or lifetime.",
-              );
+              throw new Error(t("v105sweep.solo.notEditableSolo"));
             await details.save(
               current,
               {

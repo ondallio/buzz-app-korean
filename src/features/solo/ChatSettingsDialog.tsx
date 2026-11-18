@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useState, type ComponentProps, type ReactNode } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Dialog } from "../../shared/design-system/ui/Dialog";
@@ -10,11 +11,11 @@ import styles from "./WorkspaceSettings.module.css";
 
 /** One settings surface for drafts, chats and projects; callers own loading and saving. */
 export function ChatSettingsDialog({
-  title = "Edit chat",
+  title,
   finalFocus,
   close,
   busy = false,
-  saveLabel = "Save changes",
+  saveLabel,
   saveDisabled = false,
   saveLoading = false,
   dismissOnOutsideClick = true,
@@ -36,6 +37,7 @@ export function ChatSettingsDialog({
   onSave(): void;
   children: ReactNode;
 }) {
+  useLanguage();
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   return (
     <Dialog
@@ -49,11 +51,11 @@ export function ChatSettingsDialog({
       preventClose={busy}
       dismissOnOutsideClick={dismissOnOutsideClick}
       size="wide"
-      title={title}
+      title={title ?? t("v105sweep.solo.editChat")}
       actions={
         <>
           <Button disabled={busy} onClick={close}>
-            Cancel
+            {t("v105sweep.solo.cancel")}
           </Button>
           <Button
             variant="prominent"
@@ -61,7 +63,7 @@ export function ChatSettingsDialog({
             disabled={saveDisabled}
             onClick={onSave}
           >
-            {saveLabel}
+            {saveLabel ?? t("v105sweep.solo.saveChanges")}
           </Button>
         </>
       }
@@ -71,7 +73,7 @@ export function ChatSettingsDialog({
       </div>
       {confirmDiscard && (
         <DiscardChanges
-          description="Your settings have unsaved changes."
+          description={t("v105sweep.solo.unsavedSettings")}
           onKeep={() => setConfirmDiscard(false)}
           onDiscard={close}
         />
@@ -112,8 +114,8 @@ export function ChatInstructions({
     />
   ) : (
     <Field
-      label="Instructions"
-      description="These instructions have custom workspace setup. Edit them directly to keep it."
+      label={t("v105sweep.solo.instructions")}
+      description={t("v105sweep.solo.customInstructions")}
     >
       <Textarea
         rows={12}

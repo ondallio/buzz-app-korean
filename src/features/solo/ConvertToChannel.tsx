@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { prepareSoloMove } from "../channel-navigation/solo-navigation";
 import {
   useCallback,
@@ -23,12 +24,7 @@ import {
   useChatConversions,
   type ChatConversion,
 } from "./conversion";
-import {
-  SOLO_ACCESS_DISCLOSURE,
-  SOLO_LABEL,
-  soloLabels,
-  soloRetainedAccessWarning,
-} from "./labels";
+import { SOLO_LABEL, soloLabels, soloRetainedAccessWarning } from "./labels";
 import { applySharedChannelDetails } from "./share";
 import {
   generalAccessOptions,
@@ -67,6 +63,28 @@ function matchesConversion(base: ChannelDetails, receipt: ChatConversion) {
   );
 }
 
+const accessLabels = {
+  private: [
+    "channelForms.general.private",
+    "channelForms.general.privateDescription",
+  ],
+  "view-only": [
+    "channelForms.general.viewOnly",
+    "channelForms.general.anyRead",
+  ],
+  public: [
+    "channelForms.general.public",
+    "channelForms.general.publicDescription",
+  ],
+} as const;
+
+const accessOptions = () =>
+  Object.values(generalAccessOptions).map((option) => ({
+    ...option,
+    label: t(accessLabels[option.value][0]),
+    description: t(accessLabels[option.value][1]),
+  }));
+
 /** Clear the Solo label, drop the chat's project filing, then hand off navigation. */
 export function ConvertToChannel({
   session,
@@ -83,6 +101,7 @@ export function ConvertToChannel({
   onConverted?: (() => void) | undefined;
   finalFocus?: ComponentProps<typeof Dialog>["finalFocus"];
 }) {
+  useLanguage();
   const details = session.channelDetails;
   const receipt = useChatConversions(session).get(id);
   const converted = !!receipt?.converted;
@@ -193,7 +212,7 @@ export function ConvertToChannel({
         if (!active.aborted) acceptDetails(next);
       } else {
         if (chatConversion(session, id)?.running)
-          throw new Error("Conversion is already in progress in another view.");
+          throw new Error(t("v105sweep.solo.convert.inProgress"));
         if (
           action !== "finish" &&
           (!base ||
@@ -223,9 +242,7 @@ export function ConvertToChannel({
               setBase(fresh);
               if (!details.snapshot(id))
                 updateChatConversion(session, id, undefined);
-              throw new Error(
-                "Channel settings changed. Reload details before continuing.",
-              );
+              throw new Error(t("v105sweep.solo.convert.settingsChanged"));
             }
           } else if (base)
             await applySharedChannelDetails(
@@ -247,7 +264,7 @@ export function ConvertToChannel({
           const filing = projects.snapshot();
           if (filing.status !== "ready")
             throw new Error(
-              filing.error ?? "Solo workspaces could not be read. Try again.",
+              filing.error ?? t("v105sweep.solo.convert.workspacesUnreadable"),
             );
           if (filing.data?.assignments[id])
             await projects.assign(id, undefined);
@@ -255,7 +272,7 @@ export function ConvertToChannel({
         }
         updateChatConversion(session, id, undefined);
         if (!active.aborted) {
-          notify("Converted to channel.", "success");
+          notify(t("v105sweep.solo.convert.done"), "success");
           completed.current = true;
           setOpen(false);
         }
@@ -290,16 +307,21 @@ export function ConvertToChannel({
         if (completed.current && !signal?.aborted) onConverted?.();
       }}
       initialFocus={cancel}
-      title="Convert to channel"
+      title={t("v105sweep.solo.convert.title")}
       size="compact"
       footerGap="compact"
       description={
         base?.visibility === "private" && selectedAccess !== "private"
-          ? SOLO_ACCESS_DISCLOSURE
+          ? t("channelForms.general.soloDisclosure")
           : (base &&
               selectedAccess === "private" &&
-              soloRetainedAccessWarning(base)) ||
-            "Move this conversation from Solo to Team. History, Canvas, members and lifetime stay the same."
+              soloRetainedAccessWarning(base) &&
+              t(
+                base.joinRole === "guest"
+                  ? "channelForms.general.retainedGuest"
+                  : "channelForms.general.retainedMember",
+              )) ||
+            t("v105sweep.solo.convert.description")
       }
       onOpenChange={(open) => {
         if (!open) setOpen(false);
@@ -309,7 +331,7 @@ export function ConvertToChannel({
       actions={
         <>
           <Button ref={cancel} onClick={() => setOpen(false)} disabled={busy}>
-            {converted ? "Close" : "Cancel"}
+            {converted ? t("v105sweep.solo.close") : t("v105sweep.solo.cancel")}
           </Button>
           {canFinish ? (
             <Button
@@ -317,14 +339,14 @@ export function ConvertToChannel({
               disabled={busy || !!receipt?.running || !!signal?.aborted}
               onClick={() => void run("finish")}
             >
-              Finish conversion
+              {t("v105sweep.solo.convert.finish")}
             </Button>
           ) : attempt?.status === "unconfirmed" && matchingAttempt ? (
             <Button
               disabled={busy || !!receipt?.running || !!signal?.aborted}
               onClick={() => void run("check")}
             >
-              Check status
+              {t("v105sweep.solo.convert.check")}
             </Button>
           ) : (
             <Button
@@ -338,17 +360,17 @@ export function ConvertToChannel({
               }
               onClick={() => void run("convert")}
             >
-              Convert to channel
+              {t("v105sweep.solo.convert.title")}
             </Button>
           )}
         </>
       }
     >
       <Select
-        label="General access"
+        label={t("channelForms.general.title")}
         variant="field"
         value={selectedAccess}
-        groups={[{ label: "", options: Object.values(generalAccessOptions) }]}
+        groups={[{ label: "", options: accessOptions() }]}
         disabled={
           busy ||
           converted ||
@@ -365,21 +387,19 @@ export function ConvertToChannel({
         }}
       />
       {converted && (
-        <p role="status">
-          Channel converted. Finish removing it from its Solo workspace.
-        </p>
+        <p role="status">{t("v105sweep.solo.convert.converted")}</p>
       )}
-      {!base && !error && <p role="status">Loading chat details…</p>}
+      {!base && !error && (
+        <p role="status">{t("v105sweep.solo.loadingChatDetails")}</p>
+      )}
       {base && !base.canEdit && !canFinish && (
-        <p role="status">You don’t have permission to convert this chat.</p>
+        <p role="status">{t("v105sweep.solo.convert.noPermission")}</p>
       )}
       {base?.canEdit && !eligible && !matchingAttempt && !canFinish && (
-        <p role="status">Only a Solo chat can be converted.</p>
+        <p role="status">{t("v105sweep.solo.convert.onlySolo")}</p>
       )}
       {attempt && !matchingAttempt && !converted && (
-        <p role="status">
-          Finish the existing channel details change before converting.
-        </p>
+        <p role="status">{t("v105sweep.solo.convert.finishExisting")}</p>
       )}
       {error && <p role="alert">{error}</p>}
       {error && !converted && (
@@ -387,7 +407,7 @@ export function ConvertToChannel({
           disabled={busy || !!signal?.aborted}
           onClick={() => void run("reload")}
         >
-          Reload chat details
+          {t("v105sweep.solo.reloadChatDetails")}
         </Button>
       )}
     </Dialog>

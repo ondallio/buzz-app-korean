@@ -266,7 +266,9 @@ export function ProfileButton({
   const renderAction = (action: RegisteredAccountAction) => (
     <MenuItem key={action.key} onClick={() => setSelectedAction(action)}>
       <MenuIcon>{action.icon ?? <PlugIcon size={17} />}</MenuIcon>
-      {action.title}
+      {action.key === "buzz.feedback/send" && action.title === "Send feedback"
+        ? t("v1wf.feedback.title")
+        : action.title}
     </MenuItem>
   );
   const accountLabel = useId();

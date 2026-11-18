@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { ChannelDurationField } from "../../bundled/channels/ChannelDurationField";
 import {
   canonicalDetailsName,
@@ -42,6 +43,7 @@ export function DraftSettings({
   save(canvas: string, ttlSeconds?: number, name?: string): void;
   close(): void;
 }) {
+  useLanguage();
   // A persisted name arrives unchecked; a malformed one opens blank.
   const openedName = typeof name === "string" ? name : "";
   const [value, setValue] = useState(openedName);
@@ -52,7 +54,7 @@ export function DraftSettings({
         description: "",
         visibility: "private",
       }).name
-      ? "Use a chat name of at most 120 characters."
+      ? t("v105sweep.solo.chatNameTooLong")
       : undefined
     : undefined;
   const [ttl, setTtl] = useState(ttlSeconds);
@@ -125,7 +127,7 @@ export function DraftSettings({
         }
       }}
     >
-      <Field label="Chat name" optional error={nameError}>
+      <Field label={t("v105sweep.solo.chatName")} optional error={nameError}>
         <Input
           value={value}
           disabled={!loaded}
@@ -140,10 +142,10 @@ export function DraftSettings({
           onRawChange={setRaw}
         />
       ) : (
-        !error && <p role="status">Loading settings…</p>
+        !error && <p role="status">{t("v105sweep.solo.loadingSettings")}</p>
       )}
       <ChannelDurationField
-        label="Lifetime"
+        label={t("v105sweep.solo.lifetime")}
         temporary={ttl !== undefined}
         ttlSeconds={temporaryTtl}
         disabled={!loaded}
@@ -156,7 +158,7 @@ export function DraftSettings({
       {error && <p role="alert">{error}</p>}
       {!loaded && error && (
         <Button onClick={() => setAttempt((value) => value + 1)}>
-          Retry settings
+          {t("v105sweep.solo.retrySettings")}
         </Button>
       )}
     </ChatSettingsDialog>

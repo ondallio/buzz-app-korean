@@ -339,7 +339,7 @@ export function SoloWorkspaces({
     })),
     {
       id: "",
-      name: "Chats",
+      name: t("v105sweep.solo.unfiled"),
       rows: chats.filter((item) => !ids.has(assignmentFor(item) ?? "")),
     },
   ];
