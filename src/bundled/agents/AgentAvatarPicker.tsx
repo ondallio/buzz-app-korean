@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useMediaCorners } from "../../features/messages/use-media-corners";
 import { animatedImage } from "../../features/messages/prepare-attachment";
 import { AgentAvatarBackdrop } from "./AgentAvatarBackdrop";
@@ -116,6 +117,7 @@ export function AgentAvatarPicker({
   onBusyChange(busy: boolean): void;
   avatarRef: Ref<{ prepare(): Promise<string> }>;
 }) {
+  useLanguage();
   const surfaceCorners = useMediaCorners();
   const filmCorners = useMediaCorners();
   const mode = selection.kind;
@@ -333,7 +335,7 @@ export function AgentAvatarPicker({
           await image?.decode().catch(() => {
             // Saving the original would silently drop the framing.
             if (crop.zoom !== 1 || crop.x || crop.y)
-              throw new Error("Couldn't frame the image. Try again.");
+              throw new Error(t("v105agent.avatar.frameFailed"));
           });
         request.signal.throwIfAborted();
         const framed =
@@ -355,7 +357,7 @@ export function AgentAvatarPicker({
               : undefined;
         if (!paint) return selection.kind === "emoji" ? "" : selection.picture;
         if (!community)
-          throw new Error("Select a community to use an emoji avatar.");
+          throw new Error(t("v1agent.avatar.selectCommunityEmoji"));
         const file = await paint();
         request.signal.throwIfAborted();
         return await uploadAvatar(file, community, request.signal);
@@ -399,7 +401,7 @@ export function AgentAvatarPicker({
       setError(
         reason instanceof Error
           ? reason.message
-          : "Image upload failed. Try again.",
+          : t("v1agent.avatar.uploadFailed"),
       );
     } finally {
       if (!request.signal.aborted) {
@@ -420,7 +422,7 @@ export function AgentAvatarPicker({
   };
   const chooseImage = () => {
     if (!community) {
-      setError("Select a community to upload an image.");
+      setError(t("v1agent.avatar.selectCommunityImage"));
       return;
     }
     input.current?.click();
@@ -456,7 +458,7 @@ export function AgentAvatarPicker({
         )}
         <div className="flex items-center justify-end">
           <Tabs<AvatarSelection["kind"]>
-            label="Avatar type"
+            label={t("v1agent.avatar.type")}
             variant="segmented-icons"
             value={mode}
             items={[
@@ -476,13 +478,13 @@ export function AgentAvatarPicker({
               },
               {
                 value: "emoji",
-                label: "Emoji",
+                label: t("v1agent.avatar.emoji"),
                 icon: <SmileyIcon />,
                 disabled: locked,
               },
               {
                 value: "image",
-                label: "Upload image",
+                label: t("v1agent.avatar.uploadImage"),
                 icon: <ImageIcon />,
                 disabled: locked,
               },
@@ -512,7 +514,7 @@ export function AgentAvatarPicker({
           ref={input}
           type="file"
           accept="image/*"
-          aria-label="Upload an image"
+          aria-label={t("v1agent.avatar.uploadAnImage")}
           hidden
           onChange={(event) => {
             const file = event.target.files?.[0];
@@ -527,7 +529,7 @@ export function AgentAvatarPicker({
                 <div className={styles.avatarUploading}>
                   <Avatar
                     src={uploading.url}
-                    alt="Uploading avatar"
+                    alt={t("v1agent.avatar.uploadingAvatar")}
                     fallback={name}
                     size="fill"
                     shape="squircle"
@@ -537,13 +539,13 @@ export function AgentAvatarPicker({
                       variant="glass"
                       shape="round"
                       size="large"
-                      aria-label="Cancel upload"
+                      aria-label={t("v1agent.avatar.cancelUpload")}
                       icon={
                         <span className={styles.uploadControl}>
                           <svg
                             viewBox="0 0 24 24"
                             role="progressbar"
-                            aria-label="Uploading image"
+                            aria-label={t("v1agent.avatar.uploadingImage")}
                             aria-valuemin={0}
                             aria-valuemax={100}
                             aria-valuenow={
@@ -598,8 +600,8 @@ export function AgentAvatarPicker({
                     render={
                       <SurfaceButton
                         className={styles.emojiAvatarButton}
-                        aria-label="Choose emoji"
-                        aria-description="Drag or use the arrow keys to move the emoji"
+                        aria-label={t("v1agent.avatar.chooseEmoji")}
+                        aria-description={t("v105agent.avatar.moveEmojiHint")}
                         disabled={locked}
                         {...emojiPan.handlers}
                       />
@@ -618,7 +620,7 @@ export function AgentAvatarPicker({
                     </span>
                   </PopoverTrigger>
                   <PopoverPopup
-                    aria-label="Choose emoji"
+                    aria-label={t("v1agent.avatar.chooseEmoji")}
                     onKeyDownCapture={(event) => {
                       // Emoji Mart consumes Escape in its shadow-root search.
                       // Close this popup before the key reaches the widget.
@@ -655,7 +657,7 @@ export function AgentAvatarPicker({
               ) : (
                 <Avatar
                   src={shown ?? preview}
-                  alt="Selected avatar"
+                  alt={t("v1agent.avatar.selected")}
                   fallback={name}
                   size="fill"
                   shape="squircle"
@@ -694,7 +696,7 @@ export function AgentAvatarPicker({
               <fieldset
                 className={styles.avatarDock}
                 {...dockEvents}
-                aria-label="Avatar background"
+                aria-label={t("v1agent.avatar.background")}
                 disabled={locked}
               >
                 {backgrounds.map((swatch) => (
@@ -714,7 +716,9 @@ export function AgentAvatarPicker({
                           }
                         />
                       }
-                      aria-label={`Use ${swatch} background`}
+                      aria-label={t("v1agent.avatar.useBackground", {
+                        color: swatch,
+                      })}
                       aria-pressed={color === swatch}
                       style={
                         swatch === "transparent"
@@ -737,7 +741,7 @@ export function AgentAvatarPicker({
               <fieldset
                 className={styles.avatarDock}
                 {...dockEvents}
-                aria-label="Agent avatars"
+                aria-label={t("v1agent.avatar.agentAvatars")}
                 disabled={locked}
               >
                 {slots.map(({ id, avatar }, index) => (
@@ -795,7 +799,7 @@ export function AgentAvatarPicker({
         </div>
         {busy && (
           <p role="status" className="sr-only">
-            Uploading image…
+            {t("v1agent.avatar.uploadingImageEllipsis")}
           </p>
         )}
         {error && (
@@ -810,7 +814,7 @@ export function AgentAvatarPicker({
           className="m-0 text-body-sm text-secondary"
           style={{ visibility: mode === "emoji" ? "visible" : "hidden" }}
         >
-          Select a community to use an emoji avatar.
+          {t("v1agent.avatar.selectCommunityEmoji")}
         </p>
       )}
     </>

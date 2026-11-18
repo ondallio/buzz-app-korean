@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { t, useLanguage } from "../../shared/i18n";
 import { interestSlug, watchSlug } from "../../features/agents/attention";
 import type {
   Agent,
@@ -190,7 +191,8 @@ function BestieTab({
   const others = bestie.choices.selectable.filter(
     (choice) => choice.pubkey !== agent.pubkey,
   );
-  const name = agent.name || "This agent";
+  useLanguage();
+  const name = agent.name || t("v105agent.bestie.thisAgent");
   const switches = (features: readonly Feature[]) =>
     features.map((feature) => (
       <FeatureSwitch
@@ -213,7 +215,7 @@ function BestieTab({
         {former ? (
           <PreferenceRow
             icon={<BestieIcon size="1rem" />}
-            title={`${name} is no longer your Bestie. These are still on.`}
+            title={t("v105agent.bestie.noLonger", { name })}
             trailing={
               <Button
                 variant="outline"
@@ -224,24 +226,30 @@ function BestieTab({
                 }
                 onClick={() => bestie.make(agent.pubkey)}
               >
-                Make my Bestie again
+                {t("v105agent.bestie.makeAgain")}
               </Button>
             }
           />
         ) : (
           <PreferenceRow
             icon={<BestieIcon size="1rem" />}
-            title="This is your Bestie"
-            subtitle="It's pinned at the top of Buzz, with your DM as its home."
+            title={t("v105agent.bestie.thisIsYours")}
+            subtitle={t("v105agent.bestie.pinned")}
             trailing={
               <MenuRoot>
                 <MenuTrigger
                   disabled={!others.length}
-                  render={<Button variant="outline">Change</Button>}
+                  render={
+                    <Button variant="outline">
+                      {t("v105agent.bestie.change")}
+                    </Button>
+                  }
                 />
                 <MenuPopup align="end">
                   <MenuGroup>
-                    <MenuGroupLabel>Make your Bestie</MenuGroupLabel>
+                    <MenuGroupLabel>
+                      {t("v105agent.bestie.makeYours")}
+                    </MenuGroupLabel>
                     {others.map((choice) => (
                       <MenuItem
                         key={choice.pubkey}
@@ -258,25 +266,25 @@ function BestieTab({
         )}
         {!former && bestie.remove && (
           <PreferenceRow
-            title="Remove as Bestie"
-            subtitle="Have no Bestie until you make one again."
+            title={t("v1agent.bestie.remove")}
+            subtitle={t("v105agent.bestie.removeHint")}
             trailing={(label) => (
               <Button
                 variant="outline"
                 aria-describedby={label["aria-labelledby"]}
                 onClick={() => bestie.remove?.(agent.pubkey, name)}
               >
-                Remove
+                {t("v105agent.bestie.remove")}
               </Button>
             )}
           />
         )}
       </SettingsGroup>
-      <InlineHeader title="Settings" />
+      <InlineHeader title={t("v105agent.bestie.settings")} />
       <SettingsGroup>
         {switches(FEATURES.filter((feature) => !feature.timer))}
       </SettingsGroup>
-      <InlineHeader title="Check-ins" />
+      <InlineHeader title={t("v105agent.bestie.checkIns")} />
       <SettingsGroup>
         {switches(FEATURES.filter((feature) => feature.timer))}
       </SettingsGroup>
@@ -314,19 +322,20 @@ function FeatureSwitch({
   saving: boolean;
   setSaving(saving: boolean): void;
 }) {
+  useLanguage();
+  const title = featureTitle(feature);
   const [error, setError] = useState<string>();
   const problem = cannotEdit(agents, agent, feature);
-  if (problem)
-    return <PreferenceRow title={feature.title} subtitle={problem} />;
+  if (problem) return <PreferenceRow title={title} subtitle={problem} />;
   if (hosted && !hosted.loaded)
     return (
       <PreferenceRow
-        title={feature.title}
-        subtitle={hosted.error ?? "Reading its instructions…"}
+        title={title}
+        subtitle={hosted.error ?? t("v105agent.bestie.readingInstructions")}
         trailing={
           hosted.error ? (
             <Button variant="outline" onClick={hosted.retry}>
-              Retry
+              {t("v105agent.bestie.retry")}
             </Button>
           ) : undefined
         }
@@ -379,11 +388,11 @@ function FeatureSwitch({
     return (
       <>
         <PreferenceRow
-          title={feature.title}
+          title={title}
           subtitle={
             restorable
-              ? "Its section in Instructions was edited where it starts or ends. Restore puts back the original section."
-              : "Its section in Instructions was edited where it starts or ends. Fix its start and end lines there."
+              ? t("v105agent.bestie.editedRestorable")
+              : t("v105agent.bestie.editedFix")
           }
           trailing={
             restorable ? (
@@ -394,7 +403,7 @@ function FeatureSwitch({
                   void run(() => restoreFeature(agents, agent, feature))
                 }
               >
-                Restore
+                {t("v105agent.bestie.restore")}
               </Button>
             ) : undefined
           }
@@ -406,21 +415,23 @@ function FeatureSwitch({
   return (
     <>
       <SwitchPreferenceRow
-        label={feature.title}
+        label={title}
         description={
           formerCheckIn
-            ? "Only your Bestie checks in."
+            ? t("v105agent.bestie.onlyBestie")
             : blocked && required && !checked
-              ? `Turn on ${required.title} first.`
+              ? t("v105agent.bestie.turnOnFirst", {
+                  feature: featureTitle(required),
+                })
               : // Paused on its own in the Attention tab, which can't resume a
                 // timer: saving it again here does.
                 checked && timer?.value.type === "timer" && !timer.value.enabled
-                ? `Paused in Attention. Turn ${feature.title} off and on again to restart it.`
+                ? t("v105agent.bestie.pausedInAttention", { feature: title })
                 : // Attention reads off while no plugin shows it, as when the
                   // Watching plugin is off.
                   checked && feature.timer && !agent.attentionEnabled
-                  ? "Paused: watches aren't running on this device. Turn on the Attention plugin."
-                  : feature.description
+                  ? t("v105agent.bestie.pausedNoWatches")
+                  : featureDescription(feature)
         }
         checked={checked}
         // One left on can still be turned off.
@@ -432,8 +443,8 @@ function FeatureSwitch({
           away. */}
       {part && !checked && (
         <PreferenceRow
-          title={`${feature.title} is partly saved`}
-          subtitle="Part of it is missing, so it reads as off. Remove clears the rest."
+          title={t("v105agent.bestie.partlySaved", { feature: title })}
+          subtitle={t("v105agent.bestie.partlySavedHint")}
           trailing={(label) => (
             <Button
               variant="outline"
@@ -441,7 +452,7 @@ function FeatureSwitch({
               disabled={saving}
               onClick={() => void save(false)}
             >
-              Remove
+              {t("v105agent.bestie.remove")}
             </Button>
           )}
         />
@@ -449,4 +460,33 @@ function FeatureSwitch({
       {alert}
     </>
   );
+}
+
+/** Feature names and descriptions, translated when shown. */
+function featureTitle(feature: Feature): string {
+  switch (feature.id) {
+    case "memory":
+      return t("v105agent.bestie.feature.memory");
+    case "notes.hourly":
+      return t("v105agent.bestie.feature.hourlyNotes");
+    case "dream.nightly":
+      return t("v105agent.bestie.feature.nightlyReview");
+    case "checkin.hourly":
+      return t("v105agent.bestie.feature.everyHour");
+    default:
+      return feature.title;
+  }
+}
+
+function featureDescription(feature: Feature): string {
+  switch (feature.id) {
+    case "memory":
+      return t("v105agent.bestie.feature.memoryDescription");
+    case "notes.hourly":
+      return t("v105agent.bestie.feature.hourlyNotesDescription");
+    case "dream.nightly":
+      return t("v105agent.bestie.feature.nightlyReviewDescription");
+    default:
+      return feature.description;
+  }
 }

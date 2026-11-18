@@ -462,7 +462,7 @@ export const en = {
   "v1agent.settings.yours": "Yours: {value}",
   "v1agent.settings.useLatest": "Use latest",
   "v1agent.settings.keepMine": "Keep mine",
-  "v1agent.settings.targetModel": "Use the model configured on the target",
+  "v1agent.settings.targetModel": "Follows the target computer's settings",
   "v1agent.settings.unavailable":
     "Your edits stay in this form. You can save them, including Workspace changes, when configuration is available again.",
   "v1agent.settings.workspace": "Workspace",
@@ -494,7 +494,7 @@ export const en = {
   "v1agent.settings.absoluteWorkspace":
     "Enter an absolute or ~/… workspace path.",
   "v1agent.codex.default": "Codex default",
-  "v1agent.codex.targetDefault": "Use the model default on the target computer",
+  "v1agent.codex.targetDefault": "Follows the target computer's settings",
   "v1agent.codex.adapterWorkspace":
     "The adapter selects a workspace for each conversation session.",
   "v1agent.codex.workspaceHint":
@@ -1060,7 +1060,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.settings.yours": "내 변경: {value}",
   "v1agent.settings.useLatest": "최신 사용",
   "v1agent.settings.keepMine": "내 변경 유지",
-  "v1agent.settings.targetModel": "대상에 구성된 모델 사용",
+  "v1agent.settings.targetModel": "대상 컴퓨터의 설정을 따릅니다",
   "v1agent.settings.unavailable":
     "편집한 내용은 이 양식에 남아 있습니다. 구성을 다시 사용할 수 있게 되면 작업 공간 변경을 포함해 저장할 수 있습니다.",
   "v1agent.settings.workspace": "작업 공간",
@@ -1092,7 +1092,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.settings.absoluteWorkspace":
     "절대 경로나 ~/…로 시작하는 작업 공간 경로를 입력하세요.",
   "v1agent.codex.default": "Codex 기본값",
-  "v1agent.codex.targetDefault": "대상 컴퓨터의 기본 모델 사용",
+  "v1agent.codex.targetDefault": "대상 컴퓨터의 설정을 따릅니다",
   "v1agent.codex.adapterWorkspace":
     "어댑터가 대화 세션마다 작업 공간을 선택합니다.",
   "v1agent.codex.workspaceHint":

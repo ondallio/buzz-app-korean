@@ -41,6 +41,8 @@ import {
   stats,
   type Total,
 } from "./stats";
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
 
 const RANGES = [7, 30];
 /** The period shown until another is chosen. */
@@ -236,6 +238,7 @@ export function UsagePage({
   /** Where the filters are kept, per viewer and community. */
   viewScope?: string | undefined;
 }) {
+  useLanguage();
   const snapshot = useSyncExternalStore(
     agents.subscribe,
     agents.snapshot,
@@ -297,7 +300,7 @@ export function UsagePage({
       ? [
           {
             key: "other",
-            label: "Other",
+            label: t("v1wf.usage.other"),
             color: `var(--chart-series-${SERIES})`,
             harnesses: rest.map((type) => type.key),
           },
@@ -371,22 +374,27 @@ export function UsagePage({
     failed.length === 1 && failed[0]
       ? load?.reasons.get(keyOf(failed[0]))
       : undefined;
+  const failedNames =
+    failed.length > 3
+      ? count(failed.length, "agent")
+      : failed.map((agent) => agent.name).join(", ");
   const failure =
     failed.length || load?.unpriced ? (
       <p className={styles.notice} role="status">
         {failed.length > 0 && (
           <>
-            Couldn’t read the sessions of{" "}
-            {failed.length > 3
-              ? `${failed.length} agents`
-              : failed.map((agent) => agent.name).join(", ")}
-            {reason ? `: ${reason.replace(/\.$/, "")}. ` : ". "}
+            {reason
+              ? t("v1wf.usage.readFailedReason", {
+                  agents: failedNames,
+                  reason: reason.replace(/\.$/, ""),
+                })
+              : t("v1wf.usage.readFailedNamed", { agents: failedNames })}{" "}
             {failed.some((agent) =>
               load?.usage.some((entry) => keyOf(entry.agent) === keyOf(agent)),
-            ) && "Showing what was read before. "}
+            ) && `${t("v1wf.usage.showingBefore")} `}
           </>
         )}
-        {load?.unpriced && "Couldn’t load prices to estimate costs. "}
+        {load?.unpriced && `${t("v1wf.usage.pricesFailed")} `}
         <Button
           size="sm"
           variant="ghost"
@@ -396,7 +404,7 @@ export function UsagePage({
             setReload((value) => value + 1);
           }}
         >
-          Try again
+          {t("v1wf.usage.tryAgain")}
         </Button>
       </p>
     ) : undefined;
@@ -407,26 +415,26 @@ export function UsagePage({
     body = (
       <EmptyState
         icon={<ChartBarIcon size="1.5rem" />}
-        title="Usage runs in the desktop app"
-        description="It reads the sessions your agents run on your computer."
+        title={t("v1wf.usage.desktopTitle")}
+        description={t("v1wf.usage.desktopDescription")}
       />
     );
   else if (snapshot.status === "error")
     body = (
       <EmptyState
         icon={<ChartBarIcon size="1.5rem" />}
-        title="Agents aren’t available"
-        description={snapshot.error || "Try again in a moment."}
+        title={t("v1wf.usage.agentsUnavailable")}
+        description={snapshot.error || t("v1wf.usage.tryInMoment")}
       />
     );
   else if (snapshot.status !== "ready" || (targets.length && !ready))
-    body = <p className={styles.status}>Reading your agents’ sessions…</p>;
+    body = <p className={styles.status}>{t("v1wf.usage.reading")}</p>;
   else if (!targets.length || !result)
     body = (
       <EmptyState
         icon={<ChartBarIcon size="1.5rem" />}
-        title="No agent usage to show"
-        description="Usage reads the sessions your Claude Code, Codex and goose agents run on this computer. Add one from Agents to see what it spends."
+        title={t("v1wf.usage.noUsage")}
+        description={t("v1wf.usage.noUsageDescription")}
         action={
           <Button
             onClick={() =>
@@ -438,7 +446,7 @@ export function UsagePage({
               })
             }
           >
-            Open Agents
+            {t("v1wf.usage.openAgents")}
           </Button>
         }
       />
@@ -460,15 +468,15 @@ export function UsagePage({
         filters={
           <div className={styles.filters}>
             <Select
-              label="Period"
+              label={t("v1wf.usage.period")}
               size="sm"
               value={String(days)}
               groups={[
                 {
-                  label: "Period",
+                  label: t("v1wf.usage.period"),
                   options: RANGES.map((range) => ({
                     value: String(range),
-                    label: `Last ${range} days`,
+                    label: t("v1wf.usage.lastDays", { days: range }),
                   })),
                 },
               ]}
@@ -476,14 +484,14 @@ export function UsagePage({
             />
             {targets.length > 1 && (
               <Select
-                label="Agent"
+                label={t("v1wf.usage.agentLabel")}
                 size="sm"
                 value={agentFilter}
                 groups={[
                   {
-                    label: "Agent",
+                    label: t("v1wf.usage.agentLabel"),
                     options: [
-                      { value: ALL, label: "All agents" },
+                      { value: ALL, label: t("v1wf.usage.allAgents") },
                       ...targets.map((agent) => ({
                         value: agent.pubkey,
                         label: agent.name,
@@ -496,14 +504,14 @@ export function UsagePage({
             )}
             {usedHarnesses.length > 1 && (
               <Select
-                label="Harness"
+                label={t("v1wf.usage.harness")}
                 size="sm"
                 value={harnessFilter}
                 groups={[
                   {
-                    label: "Harness",
+                    label: t("v1wf.usage.harness"),
                     options: [
-                      { value: ALL, label: "All harnesses" },
+                      { value: ALL, label: t("v1wf.usage.allHarnesses") },
                       ...usedHarnesses.map((type) => ({
                         value: type.key,
                         label: type.title,
@@ -523,10 +531,10 @@ export function UsagePage({
     );
 
   return (
-    <section aria-label="Usage">
+    <section aria-label={t("v1wf.usage.title")}>
       <Header
-        title="Usage"
-        subtitle="Estimated cost of your agents’ sessions on this computer."
+        title={t("v1wf.usage.title")}
+        subtitle={t("v1wf.usage.subtitle")}
         actions={
           targets.length > 0 && (
             <IconButton
@@ -535,8 +543,8 @@ export function UsagePage({
               size="sm"
               variant="ghost"
               icon={<ArrowsClockwiseIcon size="1rem" aria-hidden="true" />}
-              aria-label="Refresh usage"
-              title="Refresh usage"
+              aria-label={t("v1wf.usage.refresh")}
+              title={t("v1wf.usage.refresh")}
               loading={loading}
               onClick={() => setReload((value) => value + 1)}
             />
@@ -577,7 +585,6 @@ function Dashboard({
   /** The agents still read, with nothing to show yet. */
   waiting: readonly Agent[];
 }) {
-  const period = `last ${days} days`;
   const top = result.agents[0];
   const spent = result.cost.value ?? 0;
   const before = result.previousCost?.value ?? 0;
@@ -599,68 +606,73 @@ function Dashboard({
       {!result.sessions && !progress && unread ? (
         <EmptyState
           icon={<ChartBarIcon size="1.5rem" />}
-          title="No sessions read"
-          description="The sessions that couldn’t be read may include some from this period. Try again to read them."
+          title={t("v1wf.usage.noSessionsRead")}
+          description={t("v1wf.usage.noSessionsReadDescription")}
         />
       ) : !result.sessions && !progress ? (
         <EmptyState
           icon={<ChartBarIcon size="1.5rem" />}
-          title="No sessions in this period"
-          description="Your agents ran no sessions here in the selected period. Choose a longer period or another agent."
+          title={t("v1wf.usage.noSessions")}
+          description={t("v1wf.usage.noSessionsDescription")}
         />
       ) : (
         <>
           {progress ? (
             <p className={styles.summary} role="status">
-              Reading your agents’ sessions: {progress.done} of {progress.total}{" "}
-              done…
+              {t("v1wf.usage.progress", {
+                done: progress.done,
+                total: progress.total,
+              })}
             </p>
           ) : (
             <p className={styles.summary}>
-              {result.agents.length === 1 && top ? (
-                <>
-                  <b>{top.agent.name}</b> ran{" "}
-                  <b>{count(result.sessions, "session")}</b>
-                </>
-              ) : (
-                <>
-                  Your <b>{result.agents.length} agents</b> ran{" "}
-                  <b>{count(result.sessions, "session")}</b>
-                </>
-              )}
-              {harnessCount > 1 && (
-                <>
-                  {" "}
-                  across <b>{harnessCount} harnesses</b>
-                </>
-              )}{" "}
-              in the {period}.
+              {summary(result, top, harnessCount, days)}
               {top && result.agents.length > 1 && spent > 0 && (
                 <>
                   {" "}
-                  <b>{top.agent.name}</b> accounts for{" "}
-                  <b>{percent((top.cost.value ?? 0) / spent)}</b> of the{" "}
-                  {result.cost.partial ? "counted cost" : "cost"}
-                  {top.model && (
-                    <>
-                      , mostly on <b>{modelName(top.model)}</b>
-                    </>
-                  )}
-                  .
+                  {top.model
+                    ? rich(
+                        result.cost.partial
+                          ? "v1wf.usage.shareCountedModel"
+                          : "v1wf.usage.shareModel",
+                        {
+                          agent: <b>{top.agent.name}</b>,
+                          share: (
+                            <b>{percent((top.cost.value ?? 0) / spent)}</b>
+                          ),
+                          model: <b>{modelName(top.model)}</b>,
+                        },
+                      )
+                    : rich(
+                        result.cost.partial
+                          ? "v1wf.usage.shareCounted"
+                          : "v1wf.usage.share",
+                        {
+                          agent: <b>{top.agent.name}</b>,
+                          share: (
+                            <b>{percent((top.cost.value ?? 0) / spent)}</b>
+                          ),
+                        },
+                      )}
                 </>
               )}
             </p>
           )}
-          <section className={styles.hero} aria-label="Estimated cost">
-            <p className={styles.label}>Estimated cost · {period}</p>
+          <section
+            className={styles.hero}
+            aria-label={t("v1wf.usage.estimatedCost")}
+          >
+            <p className={styles.label}>
+              {t("v1wf.usage.estimatedCostPeriod", { days })}
+            </p>
             <p className={styles.heroValue}>
               {progress ? "—" : amount(result.cost, cost)}
             </p>
             <p className={styles.meta}>
               {progress ? (
-                <span>Waiting for every agent</span>
+                <span>{t("v1wf.usage.waitingEvery")}</span>
               ) : change === undefined ? null : Math.abs(change) < 0.005 ? (
-                <span>No change from the previous {days} days</span>
+                <span>{t("v1wf.usage.noChange", { days })}</span>
               ) : (
                 <span className={styles.delta}>
                   {change > 0 ? (
@@ -668,36 +680,48 @@ function Dashboard({
                   ) : (
                     <ArrowDownIcon size="0.875rem" aria-hidden="true" />
                   )}
-                  {percent(Math.abs(change))} {change > 0 ? "more" : "less"}{" "}
-                  than the previous {days} days
+                  {change > 0
+                    ? t("v1wf.usage.more", {
+                        percent: percent(Math.abs(change)),
+                        days,
+                      })
+                    : t("v1wf.usage.less", {
+                        percent: percent(Math.abs(change)),
+                        days,
+                      })}
                 </span>
               )}
               {!progress && result.cost.value !== undefined && (
-                <span>{cost(spent / days)} a day</span>
+                <span>
+                  {t("v1wf.usage.perDay", { cost: cost(spent / days) })}
+                </span>
               )}
-              {!progress && result.cost.partial && <span>Partial</span>}
+              {!progress && result.cost.partial && (
+                <span>{t("v1wf.usage.partial")}</span>
+              )}
             </p>
             <p className={styles.footnote} role="note">
               <InfoIcon size="0.875rem" aria-hidden="true" />
-              Best-effort estimate from local session files at published API
-              prices, not your bill.
+              {t("v1wf.usage.footnote")}
             </p>
           </section>
           <div className={styles.tiles}>
             <Tile
-              label="Tokens"
+              label={t("v1wf.usage.tokens")}
               value={progress ? "—" : amount(result.tokens, count)}
               detail={
                 progress
-                  ? "Reading…"
+                  ? t("v1wf.usage.readingShort")
                   : partly(
                       result.tokens,
-                      `${amount(result.output, count)} output`,
+                      t("v1wf.usage.output", {
+                        amount: amount(result.output, count),
+                      }),
                     )
               }
             />
             <Tile
-              label="Cache hit rate"
+              label={t("v1wf.usage.cacheHit")}
               value={
                 !progress && result.cacheHit
                   ? amount(result.cacheHit, percent)
@@ -705,34 +729,39 @@ function Dashboard({
               }
               detail={
                 progress
-                  ? "Reading…"
+                  ? t("v1wf.usage.readingShort")
                   : result.cacheHit?.partial
-                    ? "Of the prompts with cache counts"
-                    : "Prompt tokens read from cache"
+                    ? t("v1wf.usage.cachePartial")
+                    : t("v1wf.usage.cacheRead")
               }
             />
             <Tile
-              label="Sessions"
+              label={t("v1wf.usage.sessions")}
               value={progress ? "—" : String(result.sessions)}
               detail={
                 progress
-                  ? "Reading…"
-                  : `By ${count(result.agents.length, "agent")}`
+                  ? t("v1wf.usage.readingShort")
+                  : t("v1wf.usage.byAgents", {
+                      agents: count(result.agents.length, "agent"),
+                    })
               }
             />
           </div>
           <section className={styles.section}>
             <InlineHeader
-              title="Daily cost"
+              title={t("v1wf.usage.dailyCost")}
               {...(progress && {
-                subtitle: `Filling in as agents finish: ${progress.done} of ${progress.total}`,
+                subtitle: t("v1wf.usage.filling", {
+                  done: progress.done,
+                  total: progress.total,
+                }),
               })}
             />
             <DailyCostChart days={result.days} series={series} />
           </section>
           <div className={styles.columns}>
             <section className={styles.section}>
-              <InlineHeader title="By agent" />
+              <InlineHeader title={t("v1wf.usage.byAgent")} />
               <ul className={styles.list}>
                 {result.agents.map((entry) => (
                   <li key={entry.agent.pubkey}>
@@ -770,7 +799,11 @@ function Dashboard({
                         </span>
                       }
                       trailing={<Amount total={entry.cost} />}
-                      aria-label={`${entry.agent.name}, ${titleOf(entry.harness)}, ${costLabel(entry.cost)}. Open in Agents`}
+                      aria-label={t("v1wf.usage.agentRowLabel", {
+                        agent: entry.agent.name,
+                        harness: titleOf(entry.harness),
+                        cost: costLabel(entry.cost),
+                      })}
                       onClick={() =>
                         void open({
                           ...agentTarget(entry.agent.pubkey),
@@ -791,7 +824,9 @@ function Dashboard({
                     <div className={styles.agentText}>
                       <span className={styles.name}>{agent.name}</span>
                       <span className={styles.label}>
-                        {titleOf(agent.type)} · Reading…
+                        {t("v1wf.usage.readingRow", {
+                          harness: titleOf(agent.type),
+                        })}
                       </span>
                       <span className={styles.track} aria-hidden="true" />
                     </div>
@@ -801,9 +836,9 @@ function Dashboard({
               </ul>
             </section>
             <section className={styles.section}>
-              <InlineHeader title="Costliest sessions" />
+              <InlineHeader title={t("v1wf.usage.costliest")} />
               {progress ? (
-                <p className={styles.label}>Shown once every agent is read.</p>
+                <p className={styles.label}>{t("v1wf.usage.shownOnceRead")}</p>
               ) : (
                 <ul className={styles.list}>
                   {result.costliest.map(({ agent, session, cost: total }) => {
@@ -811,7 +846,9 @@ function Dashboard({
                     // A watch's or timer's turn has no conversation to open.
                     const name =
                       session.title ??
-                      (channelId ? "Untitled session" : "No conversation");
+                      (channelId
+                        ? t("v1wf.usage.untitledSession")
+                        : t("v105agent.usage.noConversation"));
                     const label = (
                       <span className={styles.sessionText}>
                         <span className={styles.name}>{name}</span>
@@ -822,7 +859,8 @@ function Dashboard({
                               undefined,
                               { month: "short", day: "numeric" },
                             ),
-                            session.gaps.length > 0 && "partly read",
+                            session.gaps.length > 0 &&
+                              t("v1wf.usage.partlyRead"),
                           ]
                             .filter(Boolean)
                             .join(" · ")}
@@ -835,7 +873,11 @@ function Dashboard({
                           <NavigationItem
                             label={label}
                             trailing={<Amount total={total} />}
-                            aria-label={`${name}, ${agent.name}, ${costLabel(total)}. Open conversation`}
+                            aria-label={t("v1wf.usage.sessionRowLabel", {
+                              title: name,
+                              agent: agent.name,
+                              cost: costLabel(total),
+                            })}
                             onClick={() =>
                               void open({
                                 version: 1,
@@ -871,11 +913,44 @@ function Dashboard({
 }
 
 const partly = (total: Total, text: string) =>
-  total.partial ? `${text} · partial` : text;
+  total.partial ? t("v1wf.usage.partialSuffix", { text }) : text;
 const costLabel = (total: Total) =>
   total.value === undefined
-    ? "cost unavailable"
+    ? t("v1wf.usage.costUnavailable")
     : partly(total, cost(total.value));
+
+/** Who ran how many sessions, on how many harnesses, in the period. */
+function summary(
+  result: ReturnType<typeof stats>,
+  top: ReturnType<typeof stats>["agents"][number] | undefined,
+  harnessCount: number,
+  days: number,
+) {
+  const sessions = <b>{count(result.sessions, "session")}</b>;
+  const harnesses = (
+    <b>{t("v1wf.usage.harnessCount", { count: harnessCount })}</b>
+  );
+  if (result.agents.length === 1 && top) {
+    const agent = <b>{top.agent.name}</b>;
+    return harnessCount > 1
+      ? rich("v1wf.usage.summarySingleHarness", {
+          agent,
+          sessions,
+          harnesses,
+          days,
+        })
+      : rich("v1wf.usage.summarySingle", { agent, sessions, days });
+  }
+  const agents = <b>{count(result.agents.length, "agent")}</b>;
+  return harnessCount > 1
+    ? rich("v1wf.usage.summaryMultiHarness", {
+        agents,
+        sessions,
+        harnesses,
+        days,
+      })
+    : rich("v1wf.usage.summaryMulti", { agents, sessions, days });
+}
 
 /** A cost in a list row: `—` when unknown, marked when partial. */
 function Amount({ total }: { total: Total }) {
