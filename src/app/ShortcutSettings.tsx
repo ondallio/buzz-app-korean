@@ -86,6 +86,8 @@ const shortcutLabels = {
   settings: "settings.shortcut.settings",
   "app-reload": "settings.shortcut.app-reload",
   "close-tab": "settings.shortcut.close-tab",
+  "next-tab": "fuwin.shortcut.next-tab",
+  "previous-tab": "fuwin.shortcut.previous-tab",
   "edit-message": "settings.shortcut.edit-message",
   "react-to-message": "settings.shortcut.react-to-message",
   "reply-to-message": "settings.shortcut.reply-to-message",
