@@ -1,4 +1,7 @@
 export const en = {
+  "v105shell.appearance.timeZoneDetails": "Show time zone details on profiles",
+  "v105shell.appearance.timeZoneDetailsHelp":
+    "With someone’s local time, shows how far ahead or behind you they are and their time zone.",
   "v105shell.avatar.cropFailed": "Could not crop the image.",
   "v105shell.avatar.cropUnavailable":
     "Image cropping is unavailable in this browser.",
@@ -73,6 +76,9 @@ export const en = {
 } as const;
 
 export const ko: Record<keyof typeof en, string> = {
+  "v105shell.appearance.timeZoneDetails": "프로필에 시간대 정보 표시",
+  "v105shell.appearance.timeZoneDetailsHelp":
+    "상대의 현지 시간과 함께 나보다 몇 시간 빠르거나 늦은지, 어느 시간대인지 보여 줍니다.",
   "v105shell.avatar.cropFailed": "이미지를 자르지 못했습니다.",
   "v105shell.avatar.cropUnavailable":
     "이 브라우저에서는 이미지 자르기를 사용할 수 없습니다.",

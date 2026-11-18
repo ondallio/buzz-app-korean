@@ -318,8 +318,8 @@ export function AppearanceSettings({
             onCheckedChange={(seconds) => setClockPreference({ seconds })}
           />
           <SwitchPreferenceRow
-            label="Show time zone details on profiles"
-            description="With someone’s local time, shows how far ahead or behind you they are and their time zone."
+            label={t("v105shell.appearance.timeZoneDetails")}
+            description={t("v105shell.appearance.timeZoneDetailsHelp")}
             checked={clock.localTimeDetails}
             onCheckedChange={(localTimeDetails) =>
               setClockPreference({ localTimeDetails })

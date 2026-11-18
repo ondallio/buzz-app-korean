@@ -360,7 +360,11 @@ function ScopedSidebar({
                 target: props.target,
                 sidebar,
                 filter,
-                soloTitle,
+                // Compared as "Solo" above; only the shown heading is translated.
+                soloTitle:
+                  soloTitle === "Solo"
+                    ? t("v105ch.sidebar.soloSection")
+                    : soloTitle,
                 active: () => true,
                 chatIcons: props.chatIcons,
                 chatMenus: props.chatMenus,
