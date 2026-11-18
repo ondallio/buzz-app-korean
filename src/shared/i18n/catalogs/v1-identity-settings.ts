@@ -355,7 +355,7 @@ export const ko: Record<keyof typeof en, string> = {
     "{agents}, {plugins}, {attention} 같은 기능은 이 API로 감시 중인 이벤트가 에이전트를 깨워야 하는지처럼 빠르고 비용이 적게 드는 판단을 할 수 있습니다. 선택한 제공자가 이 질문을 처리하며, 함께 전송되는 메시지 텍스트(비공개 채널의 내용일 수 있음)를 받습니다.",
   "v1id.decisionsAgents": "에이전트",
   "v1id.decisionsPlugins": "플러그인",
-  "v1id.decisionsAttention": "관심",
+  "v1id.decisionsAttention": "지켜보기",
   "v1id.openPlugin": "플러그인 열기",
   "v1id.requestedByRefusal": "{requester}의 요청입니다. {conflict}",
   "v1id.revokeToolTitle": "{client}의 연결을 해제할까요?",

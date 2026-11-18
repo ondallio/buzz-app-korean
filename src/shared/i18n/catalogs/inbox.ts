@@ -165,7 +165,7 @@ export const ko: Record<keyof typeof en, string> = {
   "inbox.workflowCaption": "워크플로 · 소유자 {name}",
   "inbox.dmContext": "DM · {name}",
   "inbox.directMessage": "다이렉트 메시지",
-  "inbox.notesSelf": "나에게 보낸 메시지",
+  "inbox.notesSelf": "나에게 보내는 메모",
   "inbox.conversation": "대화",
   "inbox.openRow": "{context}에서 {sender} 열기",
   "inbox.someone": "누군가",

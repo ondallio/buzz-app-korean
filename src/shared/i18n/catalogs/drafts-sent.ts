@@ -149,7 +149,7 @@ export const ko: Record<keyof typeof en, string> = {
   "draftsSent.places.you": "나",
   "draftsSent.places.unknownPerson": "알 수 없는 사람",
   "draftsSent.places.unavailable": "사용할 수 없는 대화",
-  "draftsSent.places.self": "나에게 쓰는 메모",
+  "draftsSent.places.self": "나에게 보내는 메모",
   "draftsSent.places.emptyDraft": "빈 초안",
   "draftsSent.places.attachment": "첨부 파일",
   "draftsSent.places.fileOne": "첨부 파일 {count}개",

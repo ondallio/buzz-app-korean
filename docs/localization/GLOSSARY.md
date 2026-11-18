@@ -9,6 +9,7 @@
 | Message / thread / reply | 메시지 / 스레드 / 답글 | 버튼은 짧게 |
 | Direct message | 다이렉트 메시지 | 좁은 UI에서는 DM |
 | Activity | 활동 | 현재 Inbox plugin의 실제 표시 이름 |
+| Attention (기능·플러그인 이름) | 지켜보기 | 사용자 지정(2026-11-18). "Watching plugin"도 "지켜보기 플러그인". 상태 문구 "needs attention"은 "확인 필요", Interest는 "관심사" |
 | Agent / workflow | 에이전트 / 워크플로 | 사용자 이름·ID 보존 |
 | Project / repository | 프로젝트 / 저장소 | git 명령과 경로 보존 |
 | Issue / pull request | 이슈 / PR | git ref와 API 필드 보존 |
