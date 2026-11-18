@@ -1,3 +1,11 @@
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  errorMessage,
+  localError,
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { isPrivateForwardSource } from "./is-private-forward-source";
 import { snapshotAttachments } from "../relay/forwarded-message";
 import { copyAsForward } from "./forward-clipboard";
@@ -153,6 +161,7 @@ export function ForwardMessageProvider({
   renderDialog?: boolean;
   children: ReactNode;
 }) {
+  useLanguage();
   const active = useConversationPresentation();
   // Hosted conversations nest beneath the dialog's owner. Delegate to it so
   // one provider holds the source, the pending guard and the retry notice.
@@ -278,7 +287,7 @@ export function ForwardMessageProvider({
         )}
         {blocked && !delegate && (
           <ToastNotice
-            title="Retry the pending forward before forwarding another message."
+            title={t("messageActions.forward.blocked")}
             tone="info"
             timeout={pending ? 0 : 4000}
             onDismiss={() => setBlocked(false)}
@@ -290,7 +299,7 @@ export function ForwardMessageProvider({
                   open(pending.source.channelId, pending.source.forward);
                 }}
               >
-                Review pending forward
+                {t("messageActions.forward.review")}
               </Button>
             )}
           </ToastNotice>
@@ -321,6 +330,7 @@ function ForwardMessageDialog({
   finalFocus: React.RefObject<HTMLElement | null>;
   lock(value: boolean): void;
 }) {
+  useLanguage();
   const [people, setPeople] = useState<Recipient[]>(
     () => recovered?.people ?? [],
   );
@@ -338,11 +348,11 @@ function ForwardMessageDialog({
   }
   const [typed, setTyped] = useState(false);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const [notice, setNotice] = useState<{
-    text: string;
+    text: DisplayMessage;
     error: boolean;
-    navigation?: { label: string; open(): void };
+    navigation?: { label: DisplayMessage; open(): void };
   }>();
   const fields = useRef<HTMLDivElement>(null);
   const noteField = useRef<HTMLTextAreaElement>(null);
@@ -397,8 +407,13 @@ function ForwardMessageDialog({
   const destinationName = channel
     ? `#${channel.name}`
     : named.length > 2
-      ? `${named.length} people`
-      : named.map((person) => person.name).join(" and ");
+      ? t("v105msg.forward.peopleCount", { count: named.length })
+      : named.length === 2
+        ? t("v105msg.forward.twoPeople", {
+            first: named[0]?.name ?? "",
+            second: named[1]?.name ?? "",
+          })
+        : (named[0]?.name ?? "");
   const privateSource = isPrivateForwardSource(sourceRead.reference);
   const privacy = privateSource && channel?.id !== source.channelId;
 
@@ -419,9 +434,12 @@ function ForwardMessageDialog({
       await writeClipboardText(
         `buzz://message?${new URLSearchParams({ channel: source.channelId, id: source.forward })}`,
       );
-      setNotice({ text: "Message link copied", error: false });
+      setNotice({
+        text: localMessage("v105msg.forward.linkCopied"),
+        error: false,
+      });
     } catch {
-      setError("Couldn’t copy the link. Try again.");
+      setError(localMessage("v105msg.forward.linkCopyFailed"));
     }
   };
 
@@ -458,9 +476,7 @@ function ForwardMessageDialog({
                 (item) => item.id === channel.id && writableDestination(item),
               )
           )
-            throw new Error(
-              "You can no longer post in this channel. Choose another destination.",
-            );
+            throw localError("v105msg.forward.channelUnavailable");
           for (const person of people)
             if (
               agentUnavailable(session, person.pubkey) ||
@@ -474,9 +490,7 @@ function ForwardMessageDialog({
                       canMessageAgent(choice),
                   ))
             )
-              throw new Error(
-                "This agent is no longer available for direct messages. Choose another person.",
-              );
+              throw localError("messageActions.forward.personUnavailable");
         };
         validateRecipient();
         const channelId =
@@ -493,12 +507,9 @@ function ForwardMessageDialog({
           session.viewer,
         );
         if (saved && !isPendingSource(saved, source))
-          throw new Error(
-            "Retry the pending forward before forwarding another message.",
-          );
+          throw localError("messageActions.forward.blocked");
         validateRecipient();
-        if (!forwardRow)
-          throw new Error("Couldn’t load this message. Try again.");
+        if (!forwardRow) throw localError("v105msg.forward.loadFailed");
         sent = saved ?? {
           id: session.messages.forward(
             channelId,
@@ -543,10 +554,12 @@ function ForwardMessageDialog({
         : sent.people.map((person) => person.name).join(", ");
       // You stay where you forwarded from; the notice opens what you sent.
       setNotice({
-        text: `Message forwarded to ${to}`,
+        text: localMessage("messageActions.forward.success", { name: to }),
         error: false,
         navigation: {
-          label: `Open ${to}`,
+          label: localMessage("v105msg.forward.openDestination", {
+            name: to,
+          }),
           open: () => {
             setNotice(undefined);
             void navigation.open({
@@ -565,8 +578,8 @@ function ForwardMessageDialog({
         lock(false);
         const text =
           reason instanceof Error
-            ? reason.message
-            : "Couldn’t forward the message. Try again.";
+            ? errorMessage(reason)
+            : localMessage("messageActions.forward.failed");
         setError(text);
         setNotice({ text, error: true });
       }
@@ -581,8 +594,8 @@ function ForwardMessageDialog({
     <>
       <Dialog
         open={open}
-        title="Forward message"
-        description="Send a copy to people or a channel, with an optional note."
+        title={t("messageActions.forward.title")}
+        description={t("messageActions.forward.description")}
         footerGap="compact"
         preventClose={pending}
         dismissOnOutsideClick={false}
@@ -606,24 +619,26 @@ function ForwardMessageDialog({
                 void copyAsForward(session, forwardRow, authorName, note).then(
                   () =>
                     setNotice({
-                      text: "Copied. Paste it in any message box to forward it.",
+                      text: localMessage("v105msg.forward.copied"),
                       error: false,
                     }),
                   () =>
                     setNotice({
-                      text: "Couldn't copy. Try again, or use Forward.",
+                      text: localMessage("v105msg.forward.copyFailed"),
                       error: true,
                     }),
                 );
               }}
             >
-              Copy as forward
+              {t("v105msg.forward.copyAsForward")}
             </Button>
             {forwardProblem && (
-              <Button onClick={() => void copyLink()}>Copy link</Button>
+              <Button onClick={() => void copyLink()}>
+                {t("v105msg.forward.copyLink")}
+              </Button>
             )}
             <Button disabled={pending} onClick={close}>
-              Cancel
+              {t("messageActions.cancel")}
             </Button>
             <Button
               variant="prominent"
@@ -639,10 +654,10 @@ function ForwardMessageDialog({
               onClick={() => void submit()}
             >
               {recovered
-                ? "Retry forward"
+                ? t("messageActions.forward.retry")
                 : destinationName
-                  ? `Forward to ${destinationName}`
-                  : "Forward"}
+                  ? t("v105msg.forward.forwardTo", { name: destinationName })
+                  : t("messageActions.forward.confirm")}
             </Button>
           </>
         }
@@ -665,7 +680,7 @@ function ForwardMessageDialog({
             onTyped={setTyped}
             onComplete={() => noteField.current?.focus()}
           />
-          <Field label="Note (optional)">
+          <Field label={t("messageActions.forward.note")}>
             <Textarea
               ref={noteField}
               rows={2}
@@ -710,19 +725,20 @@ function ForwardMessageDialog({
                 />
                 {!forwardProblem && snapshotAttachments(row).length > 0 && (
                   <span className="text-body-sm">
-                    {snapshotAttachments(row).length}{" "}
-                    {snapshotAttachments(row).length === 1
-                      ? "attachment"
-                      : "attachments"}{" "}
-                    included
+                    {t(
+                      snapshotAttachments(row).length === 1
+                        ? "v105msg.forward.attachmentIncluded"
+                        : "v105msg.forward.attachmentsIncluded",
+                      { count: snapshotAttachments(row).length },
+                    )}
                   </span>
                 )}
               </ForwardedMessage>
             ) : (
               <p role="status" className="text-body-sm">
                 {sourceRead.unavailable
-                  ? "Couldn’t load this message. It may have been deleted, or you no longer have access."
-                  : "Loading message…"}
+                  ? t("v105msg.forward.sourceUnavailable")
+                  : t("v105msg.forward.loadingSource")}
               </p>
             ))}
           {forwardProblem && (
@@ -735,25 +751,32 @@ function ForwardMessageDialog({
               id={privacyId}
               audience={
                 channel
-                  ? `Everyone in #${channel.name}`
-                  : destinationName || "The recipients"
+                  ? t("v105msg.forward.audienceChannel", {
+                      channel: channel.name,
+                    })
+                  : destinationName || t("v105msg.forward.audienceRecipients")
               }
             />
           )}
           {error && (
             <p role="alert" className="text-body-sm text-subtle">
-              {error}
+              {resolveMessage(error)}
             </p>
           )}
         </div>
       </Dialog>
       {notice && (
         <ToastNotice
-          title={notice.text}
+          title={resolveMessage(notice.text)}
           tone={notice.error ? "error" : "success"}
           timeout={notice.error ? 0 : 4000}
           onDismiss={() => setNotice(undefined)}
-          navigation={notice.navigation}
+          navigation={
+            notice.navigation && {
+              ...notice.navigation,
+              label: resolveMessage(notice.navigation.label),
+            }
+          }
         />
       )}
     </>

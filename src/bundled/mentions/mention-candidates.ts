@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import type { ChannelSummary } from "../../features/relay/contracts";
 import type { ComposerSession } from "../../features/messages/composer-session";
 import type { MentionRecipient } from "../../features/messages/mention-draft";
@@ -42,12 +43,14 @@ export function outsideMentionDetail(
   channel: Pick<ChannelSummary, "channelType"> | undefined,
   elsewhere?: string,
 ) {
-  if (elsewhere) return `In ${elsewhere}`;
-  return channel?.channelType === "dm"
-    ? "Not in DM · Will not be notified"
-    : channel?.channelType === "solo"
-      ? "Not in chat · Will not be notified"
-      : "Not in channel";
+  if (elsewhere) return t("mentionPicker.inHost", { host: elsewhere });
+  return t(
+    channel?.channelType === "dm"
+      ? "mentionPicker.outsideDm"
+      : channel?.channelType === "solo"
+        ? "v105msg.mention.outsideChat"
+        : "mentionPicker.outsideChannel",
+  );
 }
 
 /**

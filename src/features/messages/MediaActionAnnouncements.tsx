@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   createContext,
   useCallback,
@@ -14,6 +15,7 @@ export function MediaActionAnnouncements({
 }: {
   children: ReactNode;
 }) {
+  useLanguage();
   const [notice, setNotice] = useState({ text: "", sequence: 0 });
   const announce = useCallback((text: string) => {
     setNotice((previous) => ({ text, sequence: previous.sequence + 1 }));
@@ -26,7 +28,7 @@ export function MediaActionAnnouncements({
       <span
         className="sr-only"
         role="status"
-        aria-label="Media actions"
+        aria-label={t("v105msg.media.actions")}
         aria-live="polite"
       >
         {notice.text && <span key={notice.sequence}>{notice.text}</span>}

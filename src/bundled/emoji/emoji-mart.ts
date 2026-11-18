@@ -1,10 +1,10 @@
+import { t, languagePreference } from "../../shared/i18n";
 import { forwardTerminalKey as forwardHostKey } from "../../features/shortcuts/terminal-key-event";
 import scrollbarStyles from "../../shared/design-system/styles/scrollbars.css?raw";
 import searchFieldStyles from "../../shared/design-system/styles/search-field.css?raw";
 import { pickerIcons } from "../../shared/design-system/icons/svg";
 // Emoji Mart config adapted from block/buzz's shared picker; see NOTICE.md.
 import data from "@emoji-mart/data";
-import english from "@emoji-mart/data/i18n/en.json";
 import { Data, Picker, SearchIndex } from "emoji-mart";
 import type { CustomEmoji } from "../../features/relay/emoji";
 import { rankShortcodes } from "./emoji-search";
@@ -18,6 +18,84 @@ import {
 } from "./skin-tone";
 import { rootFontSize, spaciousGrid } from "./picker-layout";
 
+// Mart reads this documented i18n object during render. Getters project labels
+// without resetting its module-global dictionary, query, selection or grid.
+const martLabels = {
+  get search() {
+    return t("emojiPicker.mart.search");
+  },
+  get search_no_results_1() {
+    return t("emojiPicker.mart.search_no_results_1");
+  },
+  get search_no_results_2() {
+    return t("emojiPicker.mart.search_no_results_2");
+  },
+  get pick() {
+    return t("emojiPicker.mart.pick");
+  },
+  get add_custom() {
+    return t("emojiPicker.mart.add_custom");
+  },
+  categories: {
+    get activity() {
+      return t("emojiPicker.mart.categories.activity");
+    },
+    get custom() {
+      return t("emojiPicker.mart.categories.custom");
+    },
+    get flags() {
+      return t("emojiPicker.mart.categories.flags");
+    },
+    get foods() {
+      return t("emojiPicker.mart.categories.foods");
+    },
+    get frequent() {
+      return t("emojiPicker.mart.categories.frequent");
+    },
+    get nature() {
+      return t("emojiPicker.mart.categories.nature");
+    },
+    get objects() {
+      return t("emojiPicker.mart.categories.objects");
+    },
+    get people() {
+      return t("emojiPicker.mart.categories.people");
+    },
+    get places() {
+      return t("emojiPicker.mart.categories.places");
+    },
+    get search() {
+      return t("emojiPicker.mart.categories.search");
+    },
+    get symbols() {
+      return t("emojiPicker.mart.categories.symbols");
+    },
+  },
+  skins: {
+    get choose() {
+      return t("emojiPicker.mart.skins.choose");
+    },
+    get "1"() {
+      return t("emojiPicker.mart.skins.1");
+    },
+    get "2"() {
+      return t("emojiPicker.mart.skins.2");
+    },
+    get "3"() {
+      return t("emojiPicker.mart.skins.3");
+    },
+    get "4"() {
+      return t("emojiPicker.mart.skins.4");
+    },
+    get "5"() {
+      return t("emojiPicker.mart.skins.5");
+    },
+    get "6"() {
+      return t("emojiPicker.mart.skins.6");
+    },
+  },
+};
+
 const martSearch = SearchIndex.search;
 const resolvedTheme = (value: unknown): "light" | "dark" =>
   value === "dark" ? "dark" : "light";
@@ -25,11 +103,18 @@ const resolvedTheme = (value: unknown): "light" | "dark" =>
 const prefix = "buzz-custom/";
 // Idle and with no matches, the footer shows only its actions; the empty grid
 // under the query already says nothing matched.
-const previewStrings = {
-  ...english,
+const previewLabels = {
+  get search() {
+    return martLabels.search;
+  },
+  get add_custom() {
+    return martLabels.add_custom;
+  },
   pick: "",
   search_no_results_1: "",
   search_no_results_2: "",
+  categories: martLabels.categories,
+  skins: martLabels.skins,
 };
 // Unknown IDs render nothing in place of Mart's pointing and crying emoji.
 const NO_PREVIEW_EMOJI = "buzz-none";
@@ -138,8 +223,17 @@ export function mountEmojiMart({
   }
   const picker = new Picker({
     data,
+    i18n: martLabels,
     custom: emojis.length
-      ? [{ id: "buzz-custom", name: "Custom", emojis }]
+      ? [
+          {
+            id: "buzz-custom",
+            get name() {
+              return t("emojiPicker.mart.categories.custom");
+            },
+            emojis,
+          },
+        ]
       : [],
     autoFocus: false,
     categoryIcons,
@@ -160,7 +254,7 @@ export function mountEmojiMart({
           previewPosition: "bottom",
           previewEmoji: NO_PREVIEW_EMOJI,
           noResultsEmoji: NO_PREVIEW_EMOJI,
-          i18n: previewStrings,
+          i18n: previewLabels,
         }
       : { previewPosition: "none" }),
     set: "native",
@@ -184,7 +278,45 @@ export function mountEmojiMart({
   // The documented web-component attribute updates in place: do not recreate the
   // picker/dictionary (or lose search, focus and scroll) just to change appearance.
   const documentRoot = host.ownerDocument.documentElement;
+  const syncLabels = () => {
+    const root = picker.shadowRoot;
+    // Mart's PureComponent navigation skips locale-only redraws. Its pinned
+    // constructor orders buttons by non-target Data.categories; project only the
+    // built-in IDs and our own custom group, without touching handlers or state.
+    const categories: readonly { id: string; target?: unknown }[] =
+      Data?.categories ?? [];
+    const visibleCategories = categories.filter((category) => !category.target);
+    const buttons = root?.querySelectorAll<HTMLButtonElement>(
+      "#nav > .flex.relative > button:not(.buzz-skin-tone-nav-button)",
+    );
+    const labels: Readonly<Record<string, string>> = martLabels.categories;
+    if (buttons?.length === visibleCategories.length) {
+      visibleCategories.forEach((category, index) => {
+        const label =
+          labels[category.id === "buzz-custom" ? "custom" : category.id];
+        const button = buttons[index];
+        if (label && button) {
+          button.setAttribute("aria-label", label);
+          button.title = label;
+        }
+      });
+    }
+    const input = root?.querySelector<HTMLInputElement>('input[type="search"]');
+    if (input) {
+      input.placeholder = t("emojiPicker.mart.search");
+      input.setAttribute("aria-label", t("emojiPicker.mart.search"));
+    }
+    const clear = root?.querySelector<HTMLButtonElement>(".search .delete");
+    if (clear) {
+      clear.setAttribute("aria-label", t("emojiPicker.mart.clear"));
+      clear.title = t("emojiPicker.mart.clear");
+    }
+  };
   const syncAppearance = () => {
+    const language = languagePreference();
+    if (picker.getAttribute("locale") !== language)
+      picker.setAttribute("locale", language);
+    syncLabels();
     picker.setAttribute(
       "theme",
       resolvedTheme(colorMode ?? documentRoot.dataset.colorMode),
@@ -198,7 +330,7 @@ export function mountEmojiMart({
   const themeObserver = new MutationObserver(syncAppearance);
   themeObserver.observe(documentRoot, {
     attributes: true,
-    attributeFilter: ["data-color-mode", "data-keyboard-navigation"],
+    attributeFilter: ["data-color-mode", "data-keyboard-navigation", "lang"],
   });
   // Like the legacy picker, own search focus/corrections after async shadow render.
   const root = picker.shadowRoot;
@@ -540,7 +672,7 @@ ${[1, 2, 3, 4, 5, 6].map((tone) => `    .menu .skin-tone-${tone}::before { conte
     button.className = "buzz-skin-tone-nav-button flex flex-center flex-middle";
     button.setAttribute(
       "aria-label",
-      source.getAttribute("aria-label") ?? "Choose skin tone",
+      source.getAttribute("aria-label") ?? t("emojiPicker.mart.skins.choose"),
     );
     button.title = source.title;
     const tone = host.ownerDocument.createElement("span");
@@ -551,6 +683,12 @@ ${[1, 2, 3, 4, 5, 6].map((tone) => `    .menu .skin-tone-${tone}::before { conte
       source,
       button,
       (selected, open) => {
+        button.setAttribute(
+          "aria-label",
+          source.getAttribute("aria-label") ??
+            t("emojiPicker.mart.skins.choose"),
+        );
+        button.title = source.title;
         button.toggleAttribute("aria-selected", open);
         tone.className = `skin-tone skin-tone-${selected}`;
       },
@@ -775,6 +913,7 @@ ${[1, 2, 3, 4, 5, 6].map((tone) => `    .menu .skin-tone-${tone}::before { conte
   const focusSearch = () => {
     const input = root?.querySelector<HTMLInputElement>('input[type="search"]');
     if (!root || !input || disposed) return;
+    syncLabels();
     placeSkinTone();
     root.querySelector(".scroll")?.classList.add("buzz-thin-scrollbar");
     input.parentElement?.classList.add("search-field");
@@ -821,8 +960,6 @@ ${[1, 2, 3, 4, 5, 6].map((tone) => `    .menu .skin-tone-${tone}::before { conte
       true,
     );
     input.spellcheck = false;
-    input.placeholder = "Search emoji";
-    input.setAttribute("aria-label", "Search emoji");
     input.setAttribute("autocorrect", "off");
     input.setAttribute("autocapitalize", "off");
     if (search) {

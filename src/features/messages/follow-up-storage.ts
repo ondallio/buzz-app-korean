@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { forwardReference, type ForwardReference } from "./forward-clipboard";
 import {
   clearView,
@@ -90,9 +91,7 @@ export function followUpStorage(scope: string) {
           continue;
         const value = readView<unknown>(scope, pair[1], null);
         if (!valid(value) || pair[1] !== key(value.id))
-          throw new Error(
-            "A saved queued message could not be read. Its saved copy has been kept.",
-          );
+          throw new Error(t("v1msg.queue.unreadable"));
         records.push(value);
       }
       return records.sort(
@@ -102,17 +101,16 @@ export function followUpStorage(scope: string) {
     has(id: string) {
       const revision = viewRevision(scope, key(id));
       if (revision === undefined)
-        throw new Error("Queued message storage is unavailable. Try again.");
+        throw new Error(t("v1msg.queue.storageRetry"));
       return revision !== null;
     },
     sending(id: string, sending: boolean) {
       const saved = readView<unknown>(scope, key(id), null);
-      if (!valid(saved))
-        throw new Error("The saved queued message is unavailable.");
+      if (!valid(saved)) throw new Error(t("v1msg.queue.savedUnavailable"));
       if (
         !writeView(scope, key(id), { ...saved, sending: sending || undefined })
       )
-        throw new Error("Could not save queued message delivery. Try again.");
+        throw new Error(t("v1msg.queue.saveDeliveryFailed"));
     },
     isSending(id: string) {
       return (
@@ -121,9 +119,7 @@ export function followUpStorage(scope: string) {
     },
     save(value: SavedFollowUp) {
       if (!writeView(scope, key(value.id), value))
-        throw new Error(
-          "Could not save the queued message. Your draft has been kept.",
-        );
+        throw new Error(t("v1msg.queue.saveFailed"));
     },
     remove(id: string) {
       clearView(scope, key(id));
@@ -146,18 +142,15 @@ export function followUpStorage(scope: string) {
         ((value as FollowUpHandoff).complete !== undefined &&
           (value as FollowUpHandoff).complete !== true)
       )
-        throw new Error("Queued message ordering is unavailable. Try again.");
+        throw new Error(t("v1msg.queue.orderUnavailable"));
       return value as FollowUpHandoff;
     },
     claim(channelId: string, handoff: FollowUpHandoff) {
       if (!writeView(scope, `follow-up-handoff:${channelId}`, handoff))
-        throw new Error("Could not save queued message ordering. Try again.");
+        throw new Error(t("v1msg.queue.orderSaveFailed"));
     },
     async lockChat<T>(channelId: string, run: () => Promise<T>) {
-      if (!navigator.locks)
-        throw new Error(
-          "This browser cannot safely send saved queued messages.",
-        );
+      if (!navigator.locks) throw new Error(t("v1msg.queue.browserUnsafe"));
       return navigator.locks.request(
         `buzz-follow-up-chat:${scope}:${channelId}`,
         run,
@@ -174,10 +167,7 @@ export function followUpStorage(scope: string) {
       );
     },
     async lock<T>(id: string, run: () => Promise<T>) {
-      if (!navigator.locks)
-        throw new Error(
-          "This browser cannot safely send saved queued messages. Use a current browser.",
-        );
+      if (!navigator.locks) throw new Error(t("v1msg.queue.browserOutdated"));
       return navigator.locks.request(`buzz-follow-up:${scope}:${id}`, run);
     },
   };

@@ -1,3 +1,4 @@
+import { formattingLocale, t, useLanguage } from "../../shared/i18n";
 import referenceStyles from "../../shared/InlineReference.module.css";
 import { workflowLabel } from "../relay/workflow-attribution";
 import {
@@ -36,6 +37,7 @@ export function ForwardedMessage({
   compact?: boolean;
   fill?: boolean;
 }) {
+  const language = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const contentId = useId();
   const source = useForwardSource(session, snapshot.channelId, snapshot.id);
@@ -55,7 +57,7 @@ export function ForwardedMessage({
     ? workflowLabel(snapshot.authorName)
     : snapshot.authorName;
   const date = new Date(snapshot.createdAt * 1000);
-  const time = date.toLocaleString(undefined, {
+  const time = date.toLocaleString(formattingLocale(language), {
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -63,11 +65,11 @@ export function ForwardedMessage({
   const known = reference.state === "found" && reference.readable !== false;
   const sourceName = known
     ? reference.channelType === "dm"
-      ? "Direct message"
+      ? t("v105msg.forwarded.directMessage")
       : reference.channelType === "solo"
-        ? "Solo chat"
+        ? t("v105msg.forwarded.soloChat")
         : `#${reference.name}`
-    : "Private conversation";
+    : t("v105msg.forwarded.privateConversation");
   // Collapse by rendered height so wrapped prose and code follow the same limit.
   const [overflows, setOverflows] = useState(false);
   const measureBody = useCallback((node: HTMLDivElement | null) => {
@@ -85,10 +87,11 @@ export function ForwardedMessage({
       role="group"
       className={styles.card}
       data-fill={fill || undefined}
-      aria-label={`Forwarded message from ${authorLabel}, ${time}`}
+      aria-label={t("v105msg.forwarded.label", { name: authorLabel, time })}
     >
       <span className="text-label-sm">
-        <span aria-hidden="true">↪ </span>Forwarded
+        <span aria-hidden="true">↪ </span>
+        {t("v105msg.forwarded.badge")}
       </span>
       <div className={styles.byline}>
         <Avatar
@@ -103,7 +106,9 @@ export function ForwardedMessage({
           shape={profile?.isAgent ? "squircle" : "circle"}
         />
         <span className={`${styles.byline} text-label-sm`}>
-          {profile?.isAgent && <RobotIcon size={14} aria-label="Agent" />}{" "}
+          {profile?.isAgent && (
+            <RobotIcon size={14} aria-label={t("v1msg.row.agentFallback")} />
+          )}{" "}
           {authorLabel}
         </span>
         <time
@@ -135,7 +140,9 @@ export function ForwardedMessage({
           aria-controls={contentId}
           onClick={() => setExpanded(!expanded)}
         >
-          {expanded ? "Show less" : "Show full message"}
+          {expanded
+            ? t("v105msg.forwarded.showLess")
+            : t("v105msg.forwarded.showFull")}
         </Button>
       )}
       {attachments}
@@ -150,12 +157,14 @@ export function ForwardedMessage({
               )
             }
           >
-            View original
+            {t("v105msg.forwarded.viewOriginal")}
           </button>
         </span>
       )}
       {reference.state === "found" && source.unavailable && (
-        <span className="text-body-sm text-subtle">Original unavailable</span>
+        <span className="text-body-sm text-subtle">
+          {t("v105msg.forwarded.originalUnavailable")}
+        </span>
       )}
     </section>
   );

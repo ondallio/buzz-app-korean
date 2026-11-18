@@ -1868,9 +1868,12 @@ function ThreadMessages({
         >
           {!parent && row.id === unreadBoundary && (
             <div className={styles.newMessages} data-new-messages-boundary>
-              <hr className="sr-only select-none" aria-label="New messages" />
+              <hr
+                className="sr-only select-none"
+                aria-label={t("v1msg.timeline.newMessages")}
+              />
               <span className="select-none" aria-hidden="true">
-                New messages
+                {t("v1msg.timeline.newMessages")}
               </span>
             </div>
           )}

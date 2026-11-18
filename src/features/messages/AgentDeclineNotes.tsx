@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useSyncExternalStore } from "react";
 import { useWorkflowAgentMentions } from "../../bundled/workflows/useWorkflowAgentMentions";
 import type { MentionRefusal } from "../agents/owner-attestation";
@@ -7,9 +8,10 @@ import styles from "./Messages.module.css";
 const noSubscribe = () => () => {};
 
 export function agentDeclineText(name: string, ownerOnly: boolean) {
-  if (!ownerOnly)
-    return `${name} didn't respond because this workflow message wasn't set up to direct agents.`;
-  return `${name} didn't respond to this workflow message. This community limits which workflows can use agents, so other people can't use yours. If the workflow's Runs tab gives a reason, it's there.`;
+  return t(
+    ownerOnly ? "v105msg.decline.ownerOnly" : "v105msg.decline.notDirected",
+    { name },
+  );
 }
 
 /** Why this device's agents didn't act on this message. Local and owner-only:
@@ -55,6 +57,7 @@ function Notes({
   scope: string;
   agents: string[];
 }) {
+  useLanguage();
   const ownerOnly = useWorkflowAgentMentions(scope) === "owner";
   // Test and preview sessions may have no choices store.
   const readChoices = () => session.agentChoices?.snapshot();
@@ -66,7 +69,7 @@ function Notes({
   return agents.map((agent) => {
     const name =
       choices?.identities.find((choice) => choice.pubkey === agent)?.name ??
-      "Your agent";
+      t("v105msg.decline.yourAgent");
     return (
       <p key={agent} role="status" className={styles.agentNote}>
         {agentDeclineText(name, ownerOnly)}
