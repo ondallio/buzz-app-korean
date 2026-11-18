@@ -12,6 +12,7 @@ import { EmojiPicker } from "../emoji/EmojiPicker";
 import { SmileyIcon } from "../../shared/design-system/icons";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
 import { InputGroup } from "../../shared/design-system/ui/InputGroup";
+import { t, useLanguage } from "../../shared/i18n";
 import { SidebarGroupIcon } from "./SidebarGroupIcon";
 import styles from "./SidebarSectionEmojiInput.module.css";
 
@@ -33,6 +34,7 @@ export function SidebarSectionEmojiInput({
   onIconChange: (icon: string) => void;
   disabled?: boolean;
 }) {
+  useLanguage();
   const [pickerOpen, setPickerOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const field = useRef<HTMLDivElement>(null);
@@ -43,8 +45,8 @@ export function SidebarSectionEmojiInput({
   }, [disabled, close]);
   const selection = CUSTOM_REACTION.exec(icon)?.[1] ?? icon;
   const label = icon
-    ? `Change section emoji, currently ${selection}`
-    : "Choose section emoji";
+    ? t("v105ch.section.changeEmoji", { emoji: selection })
+    : t("v105ch.section.chooseEmoji");
   return (
     <>
       <InputGroup

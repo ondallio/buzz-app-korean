@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { teamSidebarSlotsReady } from "./TeamSidebarSource";
 import { SidebarSectionSlotView } from "../../features/channel-navigation/SidebarSectionSources";
 import {
@@ -133,6 +134,7 @@ function ScopedSidebar({
   scope: string;
   connection: ReturnType<typeof useRelayConnection>;
 }) {
+  useLanguage();
   const attemptView = useMemo(
     () => destinationAttempt(props.navigator),
     [props.navigator],
@@ -285,16 +287,20 @@ function ScopedSidebar({
             />
           ) : (
             <Tabs
-              label="Navigation scope"
+              label={t("shell.sidebar.scope")}
               variant="segmented"
               size="sm"
               value={filter}
               items={
                 soloTitle === "Solo"
-                  ? filters
+                  ? [
+                      { ...filters[0], label: t("shell.sidebar.all") },
+                      { ...filters[1], label: t("v105ch.sidebar.soloTab") },
+                      { ...filters[2], label: t("shell.sidebar.team") },
+                    ]
                   : [
-                      filters[0],
-                      filters[2],
+                      { ...filters[0], label: t("shell.sidebar.all") },
+                      { ...filters[2], label: t("shell.sidebar.team") },
                       { ...filters[1], label: soloTitle },
                     ]
               }
@@ -382,7 +388,7 @@ function ScopedSidebar({
                       <props.Frame
                         scope={scope}
                         resizable
-                        label="Sidebar"
+                        label={t("shell.sidebar.label")}
                         header={header}
                         panelId={panelId}
                         {...frame}
@@ -415,7 +421,11 @@ function ScopedSidebar({
                           dmPreviews={dmPreviews}
                         >
                           <section
-                            aria-label={soloTitle}
+                            aria-label={
+                              soloTitle === "Solo"
+                                ? t("v105ch.sidebar.soloSection")
+                                : soloTitle
+                            }
                             className={styles.sidebarGroup}
                             hidden={filter === "team"}
                           >
@@ -436,7 +446,7 @@ function ScopedSidebar({
                               <InventoryGroup
                                 sidebar={sidebar}
                                 sectionKey="scope:team"
-                                title="Team"
+                                title={t("shell.sidebar.team")}
                                 ownsCurrent={
                                   destination === "team" && !preserveSidebar
                                 }
@@ -461,7 +471,7 @@ function ScopedSidebar({
         />
       ) : (
         <props.Frame
-          label="Sidebar"
+          label={t("shell.sidebar.label")}
           header={header}
           panelId={panelId}
           launchPending={
@@ -487,10 +497,10 @@ function ScopedSidebar({
               <div className={styles.connectionStatus}>
                 <p>
                   {connection.status === "connecting" || connection.retrying
-                    ? "Connecting…"
+                    ? t("shell.sidebar.connecting")
                     : connection.status === "error"
-                      ? "Couldn’t load channels."
-                      : "Choose a community to see channels."}
+                      ? t("shell.sidebar.loadFailed")
+                      : t("shell.sidebar.chooseCommunity")}
                 </p>
                 {connection.status === "error" && !connection.retrying && (
                   <>
@@ -505,7 +515,9 @@ function ScopedSidebar({
                       memberships={props.memberships}
                       asksAgain
                     />
-                    <Button onClick={props.relay.tryAgain}>Try again</Button>
+                    <Button onClick={props.relay.tryAgain}>
+                      {t("shell.sidebar.retry")}
+                    </Button>
                   </>
                 )}
               </div>
@@ -605,7 +617,9 @@ function LiveSignIn({
         memberships={memberships}
         asksAgain={asksAgain}
       />
-      {asksAgain && <Button onClick={tryAgain}>Try again</Button>}
+      {asksAgain && (
+        <Button onClick={tryAgain}>{t("shell.sidebar.retry")}</Button>
+      )}
     </>
   );
 }

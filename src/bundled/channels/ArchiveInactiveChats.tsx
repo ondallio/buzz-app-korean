@@ -20,6 +20,7 @@ import {
   ToastNotice,
   useToastNotification,
 } from "../../shared/design-system/ui/Toast";
+import { t, useLanguage } from "../../shared/i18n";
 import { workingAgents } from "./working-agents";
 
 /** A chat with no message for this long counts as inactive. */
@@ -82,7 +83,10 @@ const workspaceHeading = (id: string) =>
     `[data-solo-menu-id="project-${CSS.escape(id)}"]:not([inert] *) button`,
   );
 
-const chats = (count: number) => (count === 1 ? "1 chat" : `${count} chats`);
+const chats = (count: number) =>
+  count === 1
+    ? t("v105ch.archiveInactive.oneChat")
+    : t("v105ch.archiveInactive.chatCount", { count });
 
 /** Archives or restores a workspace's chats one at a time: the relay runs one
  * lifecycle action per session and confirms each. */
@@ -103,6 +107,7 @@ export function ArchiveInactiveChats({
   close(): void;
 }) {
   // A run outlives renders: read the caller's current callbacks when used.
+  useLanguage();
   const callbacks = useRef({ eligible, undo, close });
   useLayoutEffect(() => {
     callbacks.current = { eligible, undo, close };
@@ -186,23 +191,37 @@ export function ArchiveInactiveChats({
       }
     }
     if (controller.signal.aborted) return;
-    const verb = archive ? "archive" : "restore";
     if (!restorable.length)
       notify(
         failed
-          ? `Couldn’t ${verb} ${chats(failed)}. ${failure}`
-          : "No inactive chats left to archive",
+          ? t(
+              archive
+                ? "v105ch.archiveInactive.archiveFailed"
+                : "v105ch.archiveInactive.restoreFailed",
+              { chats: chats(failed), error: failure },
+            )
+          : t("v105ch.archiveInactive.noneLeft"),
         failed ? "error" : "info",
       );
     else
       notify(
-        `${archive ? "Archived" : "Restored"} ${chats(done.length)}${
-          failed ? `. Couldn’t ${verb} ${failed}. ${failure}` : ""
-        }`,
+        failed
+          ? t(
+              archive
+                ? "v105ch.archiveInactive.archivedPartial"
+                : "v105ch.archiveInactive.restoredPartial",
+              { chats: chats(done.length), failed, error: failure },
+            )
+          : t(
+              archive
+                ? "v105ch.archiveInactive.archived"
+                : "v105ch.archiveInactive.restored",
+              { chats: chats(done.length) },
+            ),
         failed ? "info" : "success",
         archive
           ? {
-              label: "Undo",
+              label: t("channelsMenus.undo"),
               onClick: () =>
                 callbacks.current.undo({
                   action: "unarchive",
@@ -231,23 +250,35 @@ export function ArchiveInactiveChats({
   if (progress !== undefined)
     return (
       <ToastNotice
-        title={archive ? "Archiving inactive chats…" : "Restoring chats…"}
-        description={`${progress + 1} of ${total}`}
+        title={t(
+          archive
+            ? "v105ch.archiveInactive.archiving"
+            : "v105ch.archiveInactive.restoring",
+        )}
+        description={t("v105ch.archiveInactive.progress", {
+          current: progress + 1,
+          total,
+        })}
         tone="info"
       />
     );
   if (!archive) return null;
   return (
     <AlertDialog
-      title="Archive inactive chats"
+      title={t("v105ch.archiveInactive.title")}
       description={
         !ids
           ? unchecked
-            ? "Couldn’t check which chats are inactive."
-            : "Checking which chats are inactive…"
+            ? t("v105ch.archiveInactive.checkFailed")
+            : t("v105ch.archiveInactive.checking")
           : total
-            ? `${total === 1 ? "1 chat has" : `${total} chats have`} been inactive for the last ${INACTIVE_DAYS} days.`
-            : `No chats have been inactive for the last ${INACTIVE_DAYS} days.`
+            ? total === 1
+              ? t("v105ch.archiveInactive.foundOne", { days: INACTIVE_DAYS })
+              : t("v105ch.archiveInactive.foundMany", {
+                  count: total,
+                  days: INACTIVE_DAYS,
+                })
+            : t("v105ch.archiveInactive.foundNone", { days: INACTIVE_DAYS })
       }
       initialFocus={cancel}
       finalFocus={() => workspaceHeading(run.workspaceId) ?? true}
@@ -255,7 +286,9 @@ export function ArchiveInactiveChats({
       actions={
         <>
           <Button ref={cancel} type="button" onClick={close}>
-            {(ids && !total) || unchecked ? "Close" : "Cancel"}
+            {(ids && !total) || unchecked
+              ? t("dialog.close")
+              : t("channelForms.cancel")}
           </Button>
           {/* Shown from the start so the actions don't move when the count
               arrives. */}
@@ -265,7 +298,7 @@ export function ArchiveInactiveChats({
               variant="prominent"
               onClick={() => setAttempt((value) => value + 1)}
             >
-              Try again
+              {t("channelPages.retry")}
             </Button>
           ) : (
             (!ids || total > 0) && (
@@ -275,7 +308,11 @@ export function ArchiveInactiveChats({
                 disabled={!ids}
                 onClick={() => ids && void start(ids)}
               >
-                {ids ? `Archive ${chats(total)}` : "Archive chats"}
+                {ids
+                  ? t("v105ch.archiveInactive.archiveCount", {
+                      chats: chats(total),
+                    })
+                  : t("v105ch.archiveInactive.archiveChats")}
               </Button>
             )
           )}

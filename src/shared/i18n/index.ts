@@ -283,6 +283,10 @@ import {
   en as v105MessagesEn,
   ko as v105MessagesKo,
 } from "./catalogs/v105-messages";
+import {
+  en as v105ChannelsEn,
+  ko as v105ChannelsKo,
+} from "./catalogs/v105-channels";
 import { languagePreference, type Language } from "./language";
 import { formatMessage } from "./messages";
 
@@ -395,6 +399,7 @@ export const english = {
   ...v105AgentsPluginsEn,
   ...v105MessagesEn,
   ...v105ShellIdentityEn,
+  ...v105ChannelsEn,
 } as const;
 export const korean: Partial<Record<keyof typeof english, string>> = {
   ...coreKo,
@@ -485,6 +490,7 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...v105AgentsPluginsKo,
   ...v105MessagesKo,
   ...v105ShellIdentityKo,
+  ...v105ChannelsKo,
 };
 export type TranslationKey = keyof typeof english;
 type Variables<S extends string> =

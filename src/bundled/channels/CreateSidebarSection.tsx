@@ -8,6 +8,12 @@ import {
 import { Button } from "../../shared/design-system/ui/Button";
 import { Dialog } from "../../shared/design-system/ui/Dialog";
 import { Input } from "../../shared/design-system/ui/Input";
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import type { RelaySession } from "../../features/relay/session";
 import type { SidebarSectionDraft } from "../../features/relay/sidebar-preferences";
 import { SidebarSectionEmojiInput } from "./SidebarSectionEmojiInput";
@@ -48,6 +54,7 @@ export function CreateSidebarSection({
   retry: () => Promise<void>;
   finalFocus?: ComponentProps<typeof Dialog>["finalFocus"];
 }) {
+  useLanguage();
   const formId = useId();
   const input = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
@@ -55,7 +62,7 @@ export function CreateSidebarSection({
   const submitted = useRef(false);
   const section = useRef<SidebarSectionDraft | undefined>(undefined);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<DisplayMessage>("");
   const [focusRequest, setFocusRequest] = useState(0);
   useLayoutEffect(() => {
     // The preference update may remove the focused Retry button. Hand focus
@@ -90,7 +97,7 @@ export function CreateSidebarSection({
     } catch {
       section.current = attempt;
       submitted.current = false;
-      setError("Couldn't confirm the section was saved. Try again.");
+      setError(localMessage("sidebarSectionDialogs.confirmation"));
     } finally {
       setPending(false);
     }
@@ -105,13 +112,17 @@ export function CreateSidebarSection({
       onOpenChange={(open) => {
         if (!open) close();
       }}
-      title={channelName ? "Move to new section" : "Create new section"}
+      title={t(
+        channelName
+          ? "sidebarSectionDialogs.moveTitle"
+          : "sidebarSectionDialogs.createTitle",
+      )}
       initialFocus={input}
       finalFocus={finalFocus}
       actions={
         <>
           <Button disabled={pending} onClick={close}>
-            Cancel
+            {t("channelForms.cancel")}
           </Button>
           <Button
             form={formId}
@@ -120,7 +131,11 @@ export function CreateSidebarSection({
             disabled={!writable || !name.trim()}
             loading={pending}
           >
-            {channelName ? "Create and move" : "Create"}
+            {t(
+              channelName
+                ? "sidebarSectionDialogs.createAndMove"
+                : "sidebarSectionDialogs.create",
+            )}
           </Button>
         </>
       }
@@ -141,9 +156,9 @@ export function CreateSidebarSection({
         >
           <Input
             ref={input}
-            aria-label="Section name"
+            aria-label={t("sidebarSectionDialogs.name")}
             aria-describedby={error || needsRecovery ? errorId : undefined}
-            placeholder="Section name"
+            placeholder={t("sidebarSectionDialogs.name")}
             required
             readOnly={pending || !!section.current}
             maxLength={256}
@@ -154,13 +169,10 @@ export function CreateSidebarSection({
       </form>
       {(error || needsRecovery) && (
         <div id={errorId} role="alert">
-          {error && <p>{error}</p>}
+          {error && <p>{resolveMessage(error)}</p>}
           {needsRecovery && (
             <>
-              <p>
-                Saved preferences are unavailable. Retry preferences before
-                trying again.
-              </p>
+              <p>{t("sidebarSectionDialogs.preferencesUnavailable")}</p>
               <Button
                 disabled={refreshing}
                 onClick={async () => {
@@ -168,7 +180,7 @@ export function CreateSidebarSection({
                   setFocusRequest((request) => request + 1);
                 }}
               >
-                Retry preferences
+                {t("sidebarSectionDialogs.retryPreferences")}
               </Button>
             </>
           )}

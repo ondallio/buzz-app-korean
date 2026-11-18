@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { Button } from "../../shared/design-system/ui/Button";
 import { AlertDialog } from "../../shared/design-system/ui/AlertDialog";
 import { isWorkflowOperation } from "../../features/workflows/protocol";
@@ -18,8 +19,8 @@ import { soloAdminSetup } from "../../features/relay/solo-admins";
 function additionLabel(tags: readonly (readonly string[])[]) {
   const people = tags.filter(([tag]) => tag === "p");
   return people.length > 1
-    ? `Add ${people.length} people`
-    : `Add agent ${people[0]?.[1]?.slice(0, 12) ?? ""}`;
+    ? t("v1shell.outbox.addPeople", { count: people.length })
+    : t("v1shell.outbox.addAgent", { id: people[0]?.[1]?.slice(0, 12) ?? "" });
 }
 
 /** Delivery belongs to the session, including messages from other pages or a previous launch. */
@@ -32,6 +33,7 @@ export function OutboxStatus({
   profiling: RelayProfiler;
   memberAdditions: Pick<RelaySession["memberAdditions"], "add">;
 }) {
+  useLanguage();
   const operations = useSyncExternalStore(
     outbox.subscribe,
     outbox.snapshot,
@@ -62,8 +64,10 @@ export function OutboxStatus({
 
   return (
     <details>
-      <summary ref={summary}>Outbox · {operations.length} items</summary>
-      <p>Removing an item from the outbox does not delete a sent message.</p>
+      <summary ref={summary}>
+        {t("v1shell.outbox.summary", { count: operations.length })}
+      </summary>
+      <p>{t("v1shell.outbox.removeNote")}</p>
       <ul
         style={{
           maxHeight: "10rem",
@@ -75,20 +79,22 @@ export function OutboxStatus({
           <li key={item.event.id}>
             <span>
               {item.setup
-                ? "Opening agent admin setup"
+                ? t("v105ch.outbox.openingAdminSetup")
                 : item.event.kind === 9000
                   ? additionLabel(item.event.tags)
                   : item.event.content.slice(0, 100)}{" "}
               ·{" "}
-              {
-                {
-                  sending: "Sending",
-                  accepted: "Sent",
-                  unknown: "Unconfirmed",
-                  failed: "Not sent",
-                  seen: "Sent",
-                }[item.delivery]
-              }
+              {t(
+                (
+                  {
+                    sending: "v1shell.outbox.sending",
+                    accepted: "v1shell.outbox.sent",
+                    unknown: "v1shell.outbox.unconfirmed",
+                    failed: "v1shell.outbox.notSent",
+                    seen: "v1shell.outbox.sent",
+                  } as const
+                )[item.delivery],
+              )}
             </span>{" "}
             {!isWorkflowOperation(item.event) &&
               !item.guarded &&
@@ -114,9 +120,7 @@ export function OutboxStatus({
                             tag === "p" && value ? [value] : [],
                         );
                         if (!channelId || !pubkeys.length)
-                          throw new Error(
-                            "Reopen Members to check this addition.",
-                          );
+                          throw new Error(t("v1shell.outbox.reopenMembers"));
                         // A stale explicit role must never overwrite a newer
                         // admission, so each person is checked again. A guest
                         // addition is retried as one, so it never sends a
@@ -146,15 +150,12 @@ export function OutboxStatus({
                     }
                   }}
                 >
-                  Retry
+                  {t("channelForms.retry")}
                 </Button>
               )}{" "}
             {item.guarded &&
               (item.delivery === "failed" || item.delivery === "unknown") && (
-                <span>
-                  Retry from the channel or agent profile after checking
-                  membership.
-                </span>
+                <span>{t("v1shell.outbox.guarded")}</span>
               )}{" "}
             {item.held &&
               (item.delivery === "failed" || item.delivery === "unknown") && (
@@ -192,8 +193,8 @@ export function OutboxStatus({
                   }}
                 >
                   {item.abandonSetup
-                    ? "Abandon admin setup"
-                    : "Remove from outbox"}
+                    ? t("v105ch.outbox.abandonAdminSetup")
+                    : t("v1shell.outbox.remove")}
                 </Button>
               )}
           </li>
@@ -201,8 +202,8 @@ export function OutboxStatus({
       </ul>
       {abandon && (
         <AlertDialog
-          title="Abandon admin setup?"
-          description="The chat keeps its current roles. Retry your opening message to continue, or send a new message if it expired."
+          title={t("v105ch.outbox.abandonTitle")}
+          description={t("v105ch.outbox.abandonDescription")}
           initialFocus={cancel}
           finalFocus={() =>
             abandonButton.current?.isConnected
@@ -214,7 +215,7 @@ export function OutboxStatus({
           actions={
             <>
               <Button ref={cancel} disabled={abandoning} onClick={closeAbandon}>
-                Cancel
+                {t("channelForms.cancel")}
               </Button>
               <Button
                 variant="prominent"
@@ -232,7 +233,7 @@ export function OutboxStatus({
                   }
                 }}
               >
-                Abandon admin setup
+                {t("v105ch.outbox.abandonAdminSetup")}
               </Button>
             </>
           }

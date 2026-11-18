@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { SoloDisclosure } from "../../features/channel-navigation/SoloDisclosure";
 import {
   RegionChannelGroup,
@@ -250,6 +251,7 @@ function RegionFrame({
   groupSectionKey?: string | undefined;
   hideHeading?: boolean;
 }) {
+  useLanguage();
   const binding = service.snapshot().binding;
   const source = region.source;
   const [actionError, setActionError] = useState(false);
@@ -370,12 +372,12 @@ function RegionFrame({
     <>
       <p role={region.reason === "failed" ? "alert" : "status"}>
         {region.reason === "not-installed"
-          ? "The plugin for these chats is not installed."
+          ? t("v1shell.nav.pluginMissing")
           : region.reason === "off"
-            ? "The plugin for these chats is off."
+            ? t("v1shell.nav.pluginOff")
             : region.reason === "loading"
-              ? `Loading ${region.title}…`
-              : `${region.title} could not load`}
+              ? t("v1shell.nav.regionLoading", { name: region.title })
+              : t("v1shell.nav.regionFailed", { name: region.title })}
       </p>
       {source ? (
         <Button
@@ -384,7 +386,7 @@ function RegionFrame({
             service.retry(region.key);
           }}
         >
-          Retry
+          {t("channelForms.retry")}
         </Button>
       ) : (
         <Button
@@ -397,7 +399,7 @@ function RegionFrame({
             })
           }
         >
-          Open plugin settings
+          {t("v1shell.nav.pluginSettings")}
         </Button>
       )}
       {region.channels.map((channel) => (
@@ -437,7 +439,7 @@ function RegionFrame({
   );
   const headerNotice = actionError && (
     <p className={styles.contributionFeedback} role="alert">
-      The action could not run.
+      {t("v1shell.nav.actionFailed")}
     </p>
   );
   const unavailable = (
