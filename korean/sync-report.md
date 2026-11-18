@@ -1,0 +1,82 @@
+## 원본 텍스트 영향 보고 (v1.0.4 → v1.0.5)
+
+### 원본 영어 문장이 바뀌었거나 사라진 번역 키: 50개
+- `channelForms.general.newParticipateExisting`: New people can participate. People already in the channel keep their access.
+- `channelForms.general.publicExisting`: Public (existing)
+- `channelForms.general.retainedMember`: People who already joined remain members and keep their access until you remove them in People.
+- `channelForms.general.retainedGuest`: People who joined while it was View only are members and keep reading until you remove them in People.
+- `channelForms.members.dmFixed`: DM membership cannot be changed here.
+- `claudeCreate.followDefault`: Following the provider's model default
+- `codexCreate.followDefault`: Following the provider's model default
+- `messageActions.forward.preview`: Message to forward
+- `messageActions.forward.access`: The recipient can open the original only if they have access to its conversation.
+- `messageActions.typing.scopeUnknown`: Work with unconfirmed thread
+- `search.channelMatches`: {count} channel matches
+- `search.joinableChannels`: Channels you can join
+- `search.allChannelsFailed`: Couldn’t load all channels.
+- `search.onlyRecentChannels`: Only the newest open channels are shown.
+- `search.loadingMoreChannels`: Loading more channels…
+- `search.privateChannels`: Private channels show up once someone invites you.
+- `search.joinedRecent`: You’ve joined all of the newest open channels.
+- `search.joinedAll`: You’ve joined every open channel.
+- `settingsHost.clickUpdate`: Click to update
+- `settingsHost.readyToUpdate`: Ready to update!
+- `v1wf.todo.conflict`: Canvas changed elsewhere. Refresh to load the latest todos. Your changes are kept until then.
+- `v1wf.todo.saveFailed`: Couldn’t save. Your changes are still here. {reason}
+- `v1wf.todo.recovered`: Recovered unsaved changes. Retry to save them to Canvas.
+- `v1wf.todo.saved`: Saved in Canvas
+- `v1wf.todo.changeStatus`: Change status
+- `v1wf.todo.assigneeFor`: Assignee for {task}
+- `v1wf.todo.assigneeForNamed`: Assignee for {task}: {name}
+- `v1wf.todo.fromCanvasChoose`: {name} (from Canvas; choose a member to link)
+- `v1wf.todo.fromCanvasNotLinked`: {name} (from Canvas; not linked to a member)
+- `v1wf.todo.refreshTodos`: Refresh todos
+- `v1wf.todo.localDraft`: Showing your unsaved local draft. Refresh to see the saved list.
+- `v1wf.todo.membersUnavailable`: Channel members unavailable or out of date.
+- `v1wf.todo.namesUnavailable`: Names unavailable; public keys still identify users.
+- `v1wf.todo.noCanvas`: This connection doesn’t support saving Canvas.
+- `v1wf.todo.readOnly`: Todos are read-only.
+- `v1wf.todo.loading`: Loading todos…
+- `v1wf.todo.loadFailed`: Couldn’t load todos. Try Refresh.
+- `v1wf.todo.none`: No todos yet
+- `v1wf.todo.emptyDescription`: Add a todo above to track work with this channel. Changes save automatically.
+- `v1wf.todo.discardTitle`: Discard unsaved changes?
+- `v1wf.todo.discardDescription`: Refreshing replaces your local changes and new todo text with the saved channel Canvas.
+- `v1wf.todo.discardRefresh`: Discard and refresh
+- `v1wf.todo.toggle`: Toggle channel todos
+- `v1wf.todo.connect`: Connect to this channel to view todos.
+- `v1wf.todo.err.multipleSections`: Canvas has more than one Todos section. Keep one ## Todos heading in Canvas before editing here.
+- `v1wf.todo.err.changed`: This todo changed. Reload the Canvas before editing it.
+- `v1wf.todo.err.singleLine`: Use a single line for your todo.
+- `v1wf.todo.err.addUnsafe`: Could not add a todo safely. Check Canvas for unfinished Markdown blocks.
+- `v1wf.todo.err.invalidUser`: Choose a valid Buzz user.
+- `v1wf.todo.err.assignUnsafe`: Could not assign safely. Check this todo’s Markdown in Canvas.
+
+### 새로 추가됐고 아직 번역되지 않은 영어 문구 후보: 27개
+- `src/app/shell/SearchResults.tsx`: Agents
+- `src/app/shell/SearchResults.tsx`: Chats
+- `src/app/shell/SearchResults.tsx`: Channels
+- `src/app/shell/SearchResults.tsx`: People
+- `src/app/shell/SearchResults.tsx`: Direct messages
+- `src/app/shell/SearchResults.tsx`: Pages
+- `src/app/shell/SearchResults.tsx`: Messages
+- `src/app/shell/SearchResults.tsx`: Messages
+- `src/app/shell/SearchResults.tsx`: Unread
+- `src/app/shell/SearchResults.tsx`: This conversation
+- `src/app/shell/SearchResults.tsx`: Recent activity
+- `src/app/shell/SearchResults.tsx`: Recent searches
+- `src/app/shell/SearchResults.tsx`: This conversation
+- `src/bundled/bestie/BestieTab.tsx`: On failed too, or one was deleted in Attention: Remove takes it
+- `src/bundled/bestie/features.ts`: Remembers you
+- `src/bundled/bestie/features.ts`: Your memory has these slugs. Keep each within its size, so you can read it in one call.
+- `src/bundled/bestie/features.ts`: Hourly notes
+- `src/bundled/bestie/features.ts`: Nightly review
+- `src/bundled/bestie/features.ts`: Every hour
+- `src/bundled/channels/ArchiveInactiveChats.tsx`: Try again
+- `src/bundled/channels/MessagesSidebar.tsx`: All
+- `src/bundled/channels/MessagesSidebar.tsx`: Solo
+- `src/bundled/channels/MessagesSidebar.tsx`: Team
+- `src/buzz-mcp/tools.ts`: Default 30, max 100.
+- `src/buzz-mcp/tools.ts`: From a continue line.
+- `src/features/messages/forward-clipboard.ts`: Forwarded message
+- `src/features/solo/WorkspaceSettings.tsx`: Workspace name
