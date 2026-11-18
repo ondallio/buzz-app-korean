@@ -275,6 +275,10 @@ import {
   ko as v1IdentitySettingsKo,
 } from "./catalogs/v1-identity-settings";
 import { en as v1ShellEn, ko as v1ShellKo } from "./catalogs/v1-channels-shell";
+import {
+  en as v1FileViewerEn,
+  ko as v1FileViewerKo,
+} from "./catalogs/v1-file-viewer";
 import { languagePreference, type Language } from "./language";
 import { formatMessage } from "./messages";
 
@@ -375,6 +379,7 @@ export const english = {
   ...v1WorkflowsIntegrationsEn,
   ...v1IdentitySettingsEn,
   ...v1ShellEn,
+  ...v1FileViewerEn,
 } as const;
 export const korean: Partial<Record<keyof typeof english, string>> = {
   ...coreKo,
@@ -461,6 +466,7 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...v1WorkflowsIntegrationsKo,
   ...v1IdentitySettingsKo,
   ...v1ShellKo,
+  ...v1FileViewerKo,
 };
 export type TranslationKey = keyof typeof english;
 type Variables<S extends string> =

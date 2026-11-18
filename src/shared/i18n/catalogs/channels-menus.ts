@@ -57,7 +57,7 @@ export const en = {
   "channelsMenus.lifecycle.channel.archive.namedTitle":
     "Archive channel: {name}",
   "channelsMenus.lifecycle.channel.archive.detail":
-    "Archive this channel for everyone and remove it from the sidebar. Messages are kept. Find it in search and open Settings to unarchive it later.",
+    "Archive this channel for everyone and remove it from the sidebar. Messages are kept. Find it in search to unarchive it later.",
   "channelsMenus.lifecycle.channel.unarchive.title": "Unarchive channel",
   "channelsMenus.lifecycle.channel.unarchive.pending": "Unarchiving channel…",
   "channelsMenus.lifecycle.channel.unarchive.success":
@@ -83,7 +83,7 @@ export const en = {
   "channelsMenus.lifecycle.channel.leave.detail":
     "Leave this channel and remove it from your sidebar. You may need an invitation to rejoin a private channel.",
   "channelsMenus.lifecycle.channel.archive.starterDetail":
-    "Archive this channel for everyone and remove it from the sidebar. Messages are kept. Find it in search and open Settings to unarchive it later. It’s a starter channel, so new members will be added to it again once it’s unarchived. To stop that, turn off Starter channel for new members in Settings first.",
+    "Archive this channel for everyone and remove it from the sidebar. Messages are kept. Find it in search to unarchive it later. It’s a starter channel, so new members will be added to it again once it’s unarchived. To stop that, turn off Starter channel for new members in Settings first.",
   "channelsMenus.lifecycle.chat.archive.title": "Archive chat",
   "channelsMenus.lifecycle.chat.archive.pending": "Archiving chat…",
   "channelsMenus.lifecycle.chat.archive.success": "Chat archived: {name}",
@@ -182,7 +182,7 @@ export const ko: Record<keyof typeof en, string> = {
   "channelsMenus.lifecycle.channel.archive.failure": "채널 보관 실패",
   "channelsMenus.lifecycle.channel.archive.namedTitle": "채널 보관: {name}",
   "channelsMenus.lifecycle.channel.archive.detail":
-    "모든 사용자에 대해 이 채널을 보관하고 사이드바에서 제거합니다. 메시지는 유지됩니다. 나중에 검색에서 채널을 찾아 설정을 열면 보관을 해제할 수 있습니다.",
+    "모든 사용자에 대해 이 채널을 보관하고 사이드바에서 제거합니다. 메시지는 유지됩니다. 나중에 검색에서 채널을 찾으면 보관을 해제할 수 있습니다.",
   "channelsMenus.lifecycle.channel.unarchive.title": "채널 보관 해제",
   "channelsMenus.lifecycle.channel.unarchive.pending": "채널 보관 해제 중…",
   "channelsMenus.lifecycle.channel.unarchive.success":
@@ -207,7 +207,7 @@ export const ko: Record<keyof typeof en, string> = {
   "channelsMenus.lifecycle.channel.leave.detail":
     "이 채널에서 나가고 내 사이드바에서 제거합니다. 비공개 채널에 다시 참여하려면 초대가 필요할 수 있습니다.",
   "channelsMenus.lifecycle.channel.archive.starterDetail":
-    "모든 사용자에 대해 이 채널을 보관하고 사이드바에서 제거합니다. 메시지는 유지됩니다. 나중에 검색에서 채널을 찾아 설정을 열면 보관을 해제할 수 있습니다. 시작 채널이므로 보관을 해제하면 새 멤버가 다시 추가됩니다. 이를 중지하려면 먼저 설정에서 새 멤버용 시작 채널을 끄세요.",
+    "모든 사용자에 대해 이 채널을 보관하고 사이드바에서 제거합니다. 메시지는 유지됩니다. 나중에 검색에서 채널을 찾으면 보관을 해제할 수 있습니다. 시작 채널이므로 보관을 해제하면 새 멤버가 다시 추가됩니다. 이를 중지하려면 먼저 설정에서 새 멤버용 시작 채널을 끄세요.",
   "channelsMenus.lifecycle.chat.archive.title": "채팅 보관",
   "channelsMenus.lifecycle.chat.archive.pending": "채팅 보관 중…",
   "channelsMenus.lifecycle.chat.archive.success": "채팅 보관됨: {name}",

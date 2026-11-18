@@ -530,7 +530,6 @@ export function AgentShareDialog({
   return (
     <Dialog
       open
-      headerGap="compact"
       footerGap="compact"
       title={t(
         previewing ? "v1agent.share.exportTitle" : "v1agent.share.title",

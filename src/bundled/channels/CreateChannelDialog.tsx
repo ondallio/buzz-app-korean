@@ -318,7 +318,6 @@ function OpenCreateChannelDialog({
             ? { key: "privacy", scale: 0.95 }
             : { key: "details", scale: 1.05 }
       }
-      headerGap="compact"
       footerGap={privacyChoice ? "compact" : "default"}
       preventClose={busy}
       title={

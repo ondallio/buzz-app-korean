@@ -234,7 +234,6 @@ function ClaudeSignIn({
             ? t("v1agent.claudeTabs.integration")
             : t("v1agent.claudeTabs.setUp")
         }
-        headerGap={missing || outdated ? "default" : "compact"}
         onOpenChange={(next) => {
           setOpen(next);
           if (!next) void setup.cancel();
@@ -720,7 +719,6 @@ export function createTabs({
         <Dialog
           open={open && signedOut}
           title={t("v1agent.claudeTabs.setUp")}
-          headerGap="compact"
           actions={
             signingIn && (
               <Button variant="ghost" onClick={() => void setup.cancel()}>
@@ -924,6 +922,19 @@ export function createTabs({
           : status?.state === "signed-out" && setup.auth.signIn
             ? ({ step: "sign-in", label: t("accessDialogs.signIn") } as const)
             : undefined;
+    // Looks again for a setup made with the Claude CLI meanwhile.
+    const refreshing =
+      keyEntry && status?.state === "signed-out" && !state.running;
+    const done = useRef<HTMLButtonElement>(null);
+    const refreshFocused = useRef(false);
+    // Finding a setup removes Refresh, which WebKit leaves focus outside the
+    // dialog for: hand it to Done, unless the person has moved it themselves.
+    useEffect(() => {
+      if (refreshing || !refreshFocused.current) return;
+      refreshFocused.current = false;
+      const active = document.activeElement;
+      if (!active || active === document.body) done.current?.focus();
+    }, [refreshing]);
     const latestOutputLine = state.output
       .replaceAll("\r", "\n")
       .split("\n")
@@ -990,7 +1001,25 @@ export function createTabs({
           <SignedIn setup={setup} onSaved={onClose} />
         )}
         <ProviderDialogActions>
+          {refreshing && (
+            <Button
+              disabled={state.checking}
+              // Natively disabled, it would blur out of the open dialog.
+              focusableWhenDisabled
+              onFocus={() => {
+                refreshFocused.current = true;
+              }}
+              onBlur={(event) => {
+                // Removal blurs with nowhere to go; moving on has somewhere.
+                if (event.relatedTarget) refreshFocused.current = false;
+              }}
+              onClick={() => void setup.check()}
+            >
+              Refresh
+            </Button>
+          )}
           <Button
+            ref={done}
             onClick={() =>
               state.running && !ready ? void setup.cancel() : onClose()
             }

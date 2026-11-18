@@ -359,7 +359,6 @@ export function DecisionsSettings({
         <Dialog
           open
           visit
-          headerGap="compact"
           title={
             selected.key === ownKey.key
               ? t("v1id.connectTypesafe")

@@ -51,7 +51,6 @@ export function SidebarActiveDialog({
       size="compact"
       open
       title={t("sidebarSectionDialogs.activeTitle")}
-      headerGap="compact"
       footerGap="compact"
       onOpenChange={(open) => !open && close()}
       preventClose={pending}

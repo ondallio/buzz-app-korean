@@ -595,7 +595,6 @@ export function SharedImportDialog({
             ? t("agentsBrowse.editedCopy")
             : t("agentsBrowse.editBeforeImport")
       }
-      headerGap="compact"
       footerGap="compact"
       finalFocus={finalFocus}
       preventClose={pending}

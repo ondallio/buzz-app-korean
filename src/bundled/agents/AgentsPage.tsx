@@ -2439,7 +2439,6 @@ function CommunityImportDialog({
     <Dialog
       open
       size="compact"
-      headerGap="compact"
       footerGap="compact"
       title={t("agentsBrowse.importName", { name })}
       artwork={

@@ -348,7 +348,6 @@ function TypeField({
               })
             : t("agentsDetails.move")
         }
-        headerGap="compact"
         actions={
           <>
             <Button

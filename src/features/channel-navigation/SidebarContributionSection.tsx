@@ -18,6 +18,7 @@ import type {
   SidebarSections,
 } from "./sidebar-sections-service";
 import { DroppableSidebarSection } from "./ChannelSidebarDnd";
+import { sidebarTarget } from "./routes";
 
 function isSelectedDestination(destination: OpenTarget, target: OpenTarget) {
   const selectedKey = targetKey(target);
@@ -167,6 +168,13 @@ function SectionContents({
   );
   const snapshot = useCallback(() => entry.rows.snapshot(), [entry.rows]);
   const rows = useSyncExternalStore(subscribe, snapshot, snapshot);
+  // The sidebar's target names only the open conversation; a row may name a
+  // message or thread in it. Elsewhere, as under Settings, keep the target:
+  // there a conversation's rows stay current, but a message's do not.
+  const current = useSyncExternalStore(navigator.subscribe, () => {
+    const open = navigator.snapshot().entry.target;
+    return targetKey(sidebarTarget(open)) === targetKey(target) ? open : target;
+  });
   // The external-store update rerenders this child, not the reveal owner.
   useLayoutEffect(() => {
     onRowsCommitted?.();
@@ -260,7 +268,7 @@ function SectionContents({
                   </span>
                 ) : undefined
               }
-              selected={isSelectedDestination(destination, target)}
+              selected={isSelectedDestination(destination, current)}
               onClick={() => select(destination)}
             />
           </div>

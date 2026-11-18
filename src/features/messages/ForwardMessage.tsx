@@ -466,7 +466,6 @@ function ForwardMessageDialog({
         open={open}
         title={t("messageActions.forward.title")}
         description={t("messageActions.forward.description")}
-        headerGap="compact"
         footerGap="compact"
         preventClose={pending}
         dismissOnOutsideClick={false}

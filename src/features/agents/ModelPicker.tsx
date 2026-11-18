@@ -104,7 +104,6 @@ export function CustomModelDialog({
         if (!open) onClose();
       }}
       title={t("agentModel.custom")}
-      headerGap="compact"
       initialFocus={input}
       finalFocus={finalFocus}
       actions={

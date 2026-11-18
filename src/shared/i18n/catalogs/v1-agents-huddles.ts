@@ -1,4 +1,5 @@
 export const en = {
+  "v1agent.codex.appsAndPlugins": "Codex apps and plugins",
   "v1agent.card.add": "Add agent",
   "v1agent.card.addNamed": "Add agent: {name}",
   "v1agent.card.retryNamed": "Try again: {name}",
@@ -399,6 +400,11 @@ export const en = {
   "v1agent.claudeSettings.removeTitle": "Remove Claude API key?",
   "v1agent.claudeSettings.removeDescription":
     "This removes the key from {storage}. New local Claude sessions will need a key. A turn already running can finish.",
+  "v1agent.claudeSettings.refresh": "Refresh",
+  "v1agent.claudeSettings.removeDescriptionOwn":
+    "This removes the key from {storage}. Security reviews will need a key. A turn already running can finish.",
+  "v1agent.claudeSettings.connectHelp":
+    "Buzz can help you configure your Claude setup with an API key, or use the Claude CLI to configure your own connection and refresh Buzz.",
   "v1agent.claudeSettings.removeKey": "Remove key",
   "v1agent.claude.addKey": "Add Claude API key",
   "v1agent.claude.needsKey": "needs an Anthropic API key",
@@ -492,7 +498,7 @@ export const en = {
   "v1agent.codex.adapterWorkspace":
     "The adapter selects a workspace for each conversation session.",
   "v1agent.codex.workspaceHint":
-    "Codex starts here with full access to your files and network. Buzz tools run inside the app. Inherited MCP/Apps/plugin tools are disabled.",
+    "Codex starts here with full access to your files and network. Buzz tools run inside the app. Inherited MCP tools are disabled.",
   "v1agent.codex.selectedAtStart": "Selected when the session starts",
   "v1agent.goose.defaultModel": "Goose default model",
   "v1agent.goose.providerDefault": "Provider default",
@@ -580,6 +586,7 @@ export const en = {
 } as const;
 
 export const ko: Record<keyof typeof en, string> = {
+  "v1agent.codex.appsAndPlugins": "Codex 앱과 플러그인",
   "v1agent.card.add": "에이전트 추가",
   "v1agent.card.addNamed": "에이전트 추가: {name}",
   "v1agent.card.retryNamed": "다시 시도: {name}",
@@ -990,6 +997,11 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.claudeSettings.removeTitle": "Claude API 키를 제거할까요?",
   "v1agent.claudeSettings.removeDescription":
     "{storage}에서 키를 제거합니다. 새 로컬 Claude 세션에는 키가 필요합니다. 이미 실행 중인 턴은 마칠 수 있습니다.",
+  "v1agent.claudeSettings.refresh": "새로고침",
+  "v1agent.claudeSettings.removeDescriptionOwn":
+    "{storage}에서 키를 제거합니다. 보안 검토에는 키가 필요합니다. 이미 실행 중인 턴은 마칠 수 있습니다.",
+  "v1agent.claudeSettings.connectHelp":
+    "Buzz가 API 키로 Claude 설정을 도와드릴 수 있습니다. 또는 Claude CLI로 직접 연결을 설정한 뒤 Buzz를 새로고침하세요.",
   "v1agent.claudeSettings.removeKey": "키 제거",
   "v1agent.claude.addKey": "Claude API 키 추가",
   "v1agent.claude.needsKey": "Anthropic API 키가 필요합니다",
@@ -1084,7 +1096,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.codex.adapterWorkspace":
     "어댑터가 대화 세션마다 작업 공간을 선택합니다.",
   "v1agent.codex.workspaceHint":
-    "Codex는 파일과 네트워크에 대한 전체 접근 권한으로 여기서 시작합니다. Buzz 도구는 앱 안에서 실행됩니다. 상속된 MCP/앱/플러그인 도구는 비활성화됩니다.",
+    "Codex는 파일과 네트워크에 대한 전체 접근 권한으로 여기서 시작합니다. Buzz 도구는 앱 안에서 실행됩니다. 상속된 MCP 도구는 비활성화됩니다.",
   "v1agent.codex.selectedAtStart": "세션이 시작될 때 선택됨",
   "v1agent.goose.defaultModel": "Goose 기본 모델",
   "v1agent.goose.providerDefault": "제공자 기본값",

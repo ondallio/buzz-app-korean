@@ -5,7 +5,7 @@ import { useState, useSyncExternalStore } from "react";
 import type { RelayProfiler } from "../../features/relay/profiling";
 import { RelayTimings } from "./RelayTimings";
 import { PRODUCT_FEEDBACK_KIND } from "../../features/relay/product-feedback";
-import type { Outbox } from "../../features/relay/outbox";
+import { HELD_RETRY_REFUSED, type Outbox } from "../../features/relay/outbox";
 import type { RelaySession } from "../../features/relay/session";
 import { isBatchAddition } from "../../features/channel-members/members";
 
@@ -69,6 +69,7 @@ export function OutboxStatus({
             </span>{" "}
             {!isWorkflowOperation(item.event) &&
               !item.guarded &&
+              !item.held &&
               (item.delivery === "failed" ||
                 item.delivery === "unknown" ||
                 // A kept batch still names someone unsettled.
@@ -126,6 +127,10 @@ export function OutboxStatus({
             {item.guarded &&
               (item.delivery === "failed" || item.delivery === "unknown") && (
                 <span>{t("v1shell.outbox.guarded")}</span>
+              )}{" "}
+            {item.held &&
+              (item.delivery === "failed" || item.delivery === "unknown") && (
+                <span>{HELD_RETRY_REFUSED}</span>
               )}{" "}
             {item.delivery !== "sending" && (
               <Button

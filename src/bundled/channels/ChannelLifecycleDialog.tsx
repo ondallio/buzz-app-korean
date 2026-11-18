@@ -3,7 +3,10 @@ import { localMessage } from "../../shared/i18n/deferred-message";
 import { TranslatedMessage } from "../../shared/i18n/Message";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
-import type { ChannelLifecycleCapability } from "../../features/relay/channel-lifecycle";
+import {
+  ChannelLifecycleUnconfirmed,
+  type ChannelLifecycleCapability,
+} from "../../features/relay/channel-lifecycle";
 import type { ChannelLifecycleAction } from "../../features/relay/channel-lifecycle-protocol";
 import { ApiPaused } from "../../features/relay/http-admission";
 import { Dialog, type DialogProps } from "../../shared/design-system/ui/Dialog";
@@ -78,7 +81,9 @@ export function ChannelLifecycleDialog({
   completed(): void;
   onSubmit?(): void;
   finalFocus?: DialogProps["finalFocus"];
-  failed?(title: string, message: string): void;
+  /** `unconfirmed`: the relay may have applied it anyway
+   * (`ChannelLifecycleUnconfirmed`). */
+  failed?(title: string, message: string, unconfirmed: boolean): void;
   /** Already chosen without a dialog, as Undo is: run it on mount. */
   confirmed?: boolean;
   /** Offered from an immediate archive's result toast. */
@@ -190,7 +195,11 @@ export function ChannelLifecycleDialog({
       } else if (!controller.signal.aborted) {
         const message = error instanceof Error ? error.message : String(error);
         if (callbacks.current.failed)
-          callbacks.current.failed(t(copy.failure), message);
+          callbacks.current.failed(
+            t(copy.failure),
+            message,
+            error instanceof ChannelLifecycleUnconfirmed,
+          );
         else setError(message);
       }
     } finally {

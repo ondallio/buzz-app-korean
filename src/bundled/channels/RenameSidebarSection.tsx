@@ -44,7 +44,6 @@ export function RenameSidebarSection({
       onOpenChange={(open) => !open && close()}
       preventClose={pending}
       title={t("sidebarSectionDialogs.renameTitle")}
-      headerGap="compact"
       finalFocus={finalFocus}
       actions={
         <>

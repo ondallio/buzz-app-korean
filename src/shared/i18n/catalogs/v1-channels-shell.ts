@@ -1,4 +1,8 @@
 export const en = {
+  "v1shell.channel.archivedViewOnly": "Archived · view only",
+  "v1shell.channel.backToChannels": "Back to channels",
+  "v1shell.app.pluginHelpSection":
+    "Turn it on in Manage plugins to open this section.",
   "v1shell.activity.inChannel": "Activity in {name}",
   "v1shell.activity.markMention": "Mark mention from {name} as read",
   "v1shell.activity.markMentionFailed":
@@ -300,6 +304,10 @@ export const en = {
 } as const;
 
 export const ko: Record<keyof typeof en, string> = {
+  "v1shell.channel.archivedViewOnly": "보관됨 · 보기 전용",
+  "v1shell.channel.backToChannels": "채널로 돌아가기",
+  "v1shell.app.pluginHelpSection":
+    "이 섹션을 열려면 플러그인 관리에서 플러그인을 켜세요.",
   "v1shell.activity.inChannel": "{name}의 활동",
   "v1shell.activity.markMention": "{name}의 멘션을 읽음으로 표시",
   "v1shell.activity.markMentionFailed":

@@ -1251,7 +1251,6 @@ export function PluginImport({
                 : t("pluginManagement.import.builtHelp")
         }
         size={error || (reviewing && updating) ? "compact" : "wide"}
-        headerGap={reviewing && updating ? "compact" : "default"}
         footerGap={reviewing && updating ? "compact" : "default"}
         leadingActions={
           !error &&

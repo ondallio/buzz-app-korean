@@ -50,6 +50,7 @@ import type {
   ChannelWindow,
 } from "../relay/contracts";
 import { useRowProfiles } from "../relay/react";
+import { useHeaderChannel } from "../relay/listed-channel";
 import { useHeadReadPending, useRecovery } from "../relay/RecoveryNotice";
 import { geometryFor, geometrySignature } from "./geometry";
 import { readView, writeView } from "../../shared/view-state";
@@ -314,6 +315,12 @@ function Timeline({
   // rows. The reader follows the bottom meanwhile; their input retires it.
   const pendingRestore = useRef<number | undefined>(undefined);
   const profiles = useRowProfiles(queries.profiles, window.rows);
+  // Archived and read-only conversations have no composer to start one in.
+  const composerless = useHeaderChannel(
+    queries.channels,
+    channelId,
+    (channel) => !!channel?.readOnly || !!channel?.archived,
+  );
   const agentPubkeys = useKnownAgentPubkeys(queries, profiles);
   const visibleRows = useMemo(
     () =>
@@ -1530,7 +1537,7 @@ function Timeline({
     const measured = edge.current?.clientWidth ?? 0;
     initialCache.current = geometry.get(
       channelId,
-      latest.current.signature(),
+      latest.current.signature,
       measured,
     );
     let measuredSize = { width: 0, height: 0, edgeHeight: 0 };
@@ -2324,7 +2331,7 @@ function Timeline({
               icon={<ChatCircleIcon />}
               title={t("v1msg.timeline.empty")}
               description={
-                queries.channels.get?.(channelId)?.readOnly
+                composerless
                   ? undefined
                   : t("draftsSent.preview.startConversation")
               }

@@ -1,4 +1,6 @@
 export const en = {
+  "v1msg.row.viewAgentActivity": "View {name}’s activity",
+  "v1msg.row.agentFallback": "Agent",
   "v1msg.annotation.label": "{label}: “{text}”",
   "v1msg.attachment.unavailable": "Attachment unavailable",
   "v1msg.bring.cannotAddMany":
@@ -340,6 +342,8 @@ export const en = {
 } as const;
 
 export const ko: Record<keyof typeof en, string> = {
+  "v1msg.row.viewAgentActivity": "{name}의 활동 보기",
+  "v1msg.row.agentFallback": "에이전트",
   "v1msg.annotation.label": "{label}: “{text}”",
   "v1msg.attachment.unavailable": "첨부 파일을 사용할 수 없습니다",
   "v1msg.bring.cannotAddMany":
