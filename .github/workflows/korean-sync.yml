@@ -25,7 +25,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  KOREAN_BRANCH: korean-1.0
+  KOREAN_BRANCH: main
 
 jobs:
   sync:
@@ -130,6 +130,7 @@ jobs:
             echo "| 테스트 | $(mark ${{ steps.tests.outcome }}) |"
             echo
             echo "새 영어 문구나 원본 문장 변경이 있으면 이 브랜치에서 번역을 보완한 뒤 머지하세요."
+            echo "머지하면 \`korean-$target\` 태그가 자동으로 붙습니다."
             echo
             cat korean/sync-report.md
           } > pr.md

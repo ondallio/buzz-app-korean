@@ -1,0 +1,30 @@
+# 한글판 버전 태그: main에서 korean/upstream.json의 원본 버전이 바뀌면
+# korean-v<원본버전> 태그를 붙인다 (예: 원본 v1.0.5 → korean-v1.0.5).
+# 원본 배포 워크플로가 반응하는 v* 태그와 겹치지 않도록 korean- 접두사를 쓴다.
+name: Korean version tag
+
+on:
+  push:
+    branches: [main]
+    paths: [korean/upstream.json]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Tag the Korean build of this upstream version
+        run: |
+          upstream=$(jq -r .tag korean/upstream.json)
+          tag="korean-$upstream"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "$tag already exists"
+            exit 0
+          fi
+          git tag "$tag" "$GITHUB_SHA"
+          git push origin "refs/tags/$tag"
+          echo "created $tag"
