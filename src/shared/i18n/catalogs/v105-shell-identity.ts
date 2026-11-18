@@ -85,14 +85,14 @@ export const ko: Record<keyof typeof en, string> = {
   "v105shell.picker.itemsNeedYou": "확인이 필요한 항목 {count}개",
   "v105shell.picker.switcherUnreadElsewhere":
     "커뮤니티 전환: {name}, 다른 커뮤니티에 읽지 않은 항목 있음",
-  "v105shell.picker.switchToWithUnread": "{name}(으)로 전환, {unread}",
+  "v105shell.picker.switchToWithUnread": "{name} 커뮤니티로 전환, {unread}",
   "v105shell.picker.unread": "읽지 않음",
   "v105shell.profile.unknownUpdating":
     "접속 상태 알 수 없음, {target} 상태로 변경 중",
   "v105shell.search.agentMessage": "에이전트 메시지",
   "v105shell.search.agentSearches":
-    "{name}이(가) 새 채팅에서 대신 Buzz를 검색합니다",
-  "v105shell.search.ask": "{name}에게 묻기",
+    "{name} 님이 새 채팅에서 대신 Buzz를 검색합니다",
+  "v105shell.search.ask": "{name} 님에게 묻기",
   "v105shell.search.attachment": "첨부 파일",
   "v105shell.search.bestMatch": "가장 잘 맞음",
   "v105shell.search.dmsShort": "DM",
@@ -109,7 +109,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v105shell.search.mentionIt": "{count}개에서 언급",
   "v105shell.search.messages": "메시지",
   "v105shell.search.nameStarts": "이름이 검색어로 시작",
-  "v105shell.search.newChatWith": "{name}와(과) 새 채팅",
+  "v105shell.search.newChatWith": "{name} 님과 새 채팅",
   "v105shell.search.noAgentToAsk":
     "아직 질문할 에이전트가 없습니다. 에이전트에서 추가하세요.",
   "v105shell.search.noRecentMessages": "최근 메시지가 없습니다.",
@@ -126,9 +126,9 @@ export const ko: Record<keyof typeof en, string> = {
   "v105shell.search.readsLikeTopic": "주제를 찾는 검색어",
   "v105shell.search.recents": "최근",
   "v105shell.search.recentSearches": "최근 검색",
-  "v105shell.search.removeAsk": "{name}에게 묻기 제거",
+  "v105shell.search.removeAsk": "{name} 님에게 묻기 제거",
   "v105shell.search.removeAskHint":
-    "직접 메시지를 검색하려면 {ask}를 지우세요.",
+    "직접 메시지를 검색하려면 {ask} 항목을 지우세요.",
   "v105shell.search.replaceDraft": "바꾸기",
   "v105shell.search.resultGroups": "결과 그룹",
   "v105shell.search.searchAgain": "다시 검색",
@@ -138,7 +138,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v105shell.search.startChat": "채팅 시작",
   "v105shell.search.stillSearching": "아직 메시지를 검색하는 중…",
   "v105shell.search.topResults": "주요 결과",
-  "v105shell.search.typeQuestion": "{name}에게 할 질문을 입력하세요.",
+  "v105shell.search.typeQuestion": "{name} 님에게 할 질문을 입력하세요.",
   "v105shell.search.wordsInName": "이름의 단어와 일치",
   "v105shell.search.yourAgent": "내 에이전트",
   "v105shell.search.yourAgentTitle": "내 에이전트",

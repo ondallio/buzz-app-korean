@@ -144,7 +144,7 @@ export const ko: Record<keyof typeof en, string> = {
   "identityMore.readFileFailed": "파일을 읽지 못했습니다.",
   "identityMore.importFailed": "이 키를 가져오지 못했습니다.",
   "identityMore.keyMismatch":
-    "이 계정에 연결된 키가 아닙니다. 다른 기기에 있는 키인 {key}를 입력해 주세요.",
+    "이 계정에 연결된 키가 아닙니다. 다른 기기에 있는 다음 키를 입력해 주세요: {key}",
   "identityMore.encryptedKey":
     "여기서는 아직 비밀번호로 보호된 백업을 지원하지 않습니다. nsec1 키 자체를 붙여넣어 주세요.",
   "identityMore.invalidKey":

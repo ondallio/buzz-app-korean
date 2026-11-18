@@ -595,7 +595,7 @@ export const ko: Record<keyof typeof en, string> = {
     "에이전트는 데스크톱 앱에서 실행됩니다. 가져오려면 데스크톱 앱에서 Buzz를 여세요.",
   "v1agent.import.loadFailed": "에이전트를 불러오지 못했습니다. {reason}",
   "v1agent.import.noHarness":
-    "이 컴퓨터에서 에이전트를 실행할 수 있는 하네스가 없습니다. {link}을 확인하세요.",
+    "이 컴퓨터에서 에이전트를 실행할 수 있는 하네스가 없습니다. {link}에서 확인하세요.",
   "v1agent.create.setUpFirst": "Goose, Codex 또는 Claude를 먼저 설정하세요.",
   "v1agent.claude.keyOnce":
     "Buzz가 API 키로 Claude 설정을 도와드릴 수 있습니다. 또는 Claude CLI로 직접 연결을 설정한 뒤 Buzz를 새로고침하세요. console.anthropic.com에서 키를 만들어 아래에 붙여 넣으세요.",
@@ -634,40 +634,40 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.identity.changeAvatar": "아바타 변경",
   "v1agent.identity.removeAvatar": "아바타 제거",
   "v1agent.drag.start":
-    "{name}을(를) 집었습니다. Esc 키를 누르면 이동이 취소됩니다.",
+    "{name} 항목을 집었습니다. Esc 키를 누르면 이동이 취소됩니다.",
   "v1agent.drag.agent": "에이전트",
   "v1agent.drag.end": "에이전트 이동을 마쳤습니다.",
   "v1agent.drag.cancel": "에이전트 이동을 취소했습니다.",
   "v1agent.share.namesJoin": "{list}, {last}",
-  "v1agent.share.published": "{name}을(를) 마켓플레이스에 게시했습니다.",
-  "v1agent.share.unpublished": "{name}을(를) 마켓플레이스에서 제거했습니다.",
+  "v1agent.share.published": "{name} 님을 마켓플레이스에 게시했습니다.",
+  "v1agent.share.unpublished": "{name} 님을 마켓플레이스에서 제거했습니다.",
   "v1agent.common.view": "보기",
   "v1agent.common.send": "보내기",
   "v1agent.common.done": "완료",
-  "v1agent.share.publishFailed": "{name}을(를) 게시하지 못했습니다. {reason}",
-  "v1agent.share.removeFailed": "{name}을(를) 제거하지 못했습니다. {reason}",
+  "v1agent.share.publishFailed": "{name} 님을 게시하지 못했습니다. {reason}",
+  "v1agent.share.removeFailed": "{name} 님을 제거하지 못했습니다. {reason}",
   "v1agent.share.savedCardTo":
     "{name}의 에이전트 카드를 {path}에 저장했습니다.",
-  "v1agent.share.savedTo": "{name}을(를) {path}에 저장했습니다.",
+  "v1agent.share.savedTo": "{name} 님을 {path}에 저장했습니다.",
   "v1agent.share.savedCard": "{name}의 에이전트 카드를 저장했습니다.",
-  "v1agent.share.saved": "{name}을(를) 저장했습니다.",
-  "v1agent.share.exportFailed": "{name}을(를) 내보내지 못했습니다. {reason}",
+  "v1agent.share.saved": "{name} 님을 저장했습니다.",
+  "v1agent.share.exportFailed": "{name} 님을 내보내지 못했습니다. {reason}",
   "v1agent.share.cantSend":
     "이 커뮤니티에서는 메시지로 에이전트를 보낼 수 없습니다.",
   "v1agent.share.noDirectMessages":
     "여기서는 다이렉트 메시지를 사용할 수 없습니다.",
   "v1agent.share.message":
     "제 에이전트 {name}의 사본입니다. 카드를 선택해 내 에이전트에 추가하세요.",
-  "v1agent.share.sent": "{name}을(를) {targets}에게 보냈습니다.",
-  "v1agent.share.sendFailed": "{targets}에게 보내지 못했습니다. {reason}",
+  "v1agent.share.sent": "{name} 님을 {targets} 님에게 보냈습니다.",
+  "v1agent.share.sendFailed": "{targets} 님에게 보내지 못했습니다. {reason}",
   "v1agent.share.exportTitle": "{name} 내보내기",
   "v1agent.share.title": "{name} 공유",
   "v1agent.share.exportDescription":
-    "이 카드가 있는 사람은 누구나 지침과 설정을 포함해 {name}을(를) 추가할 수 있습니다. 메모리와 대화는 공유되지 않습니다.",
+    "이 카드가 있는 사람은 누구나 지침과 설정을 포함해 {name} 님을 추가할 수 있습니다. 메모리와 대화는 공유되지 않습니다.",
   "v1agent.share.description":
     "각자 자신의 사본을 받습니다. 이후 변경 사항은 동기화되지 않습니다.",
-  "v1agent.share.exportAsCard": "{name}을(를) 에이전트 카드로 내보내기",
-  "v1agent.share.exportAsJson": "{name}을(를) JSON 파일로 내보내기",
+  "v1agent.share.exportAsCard": "{name} 님을 에이전트 카드로 내보내기",
+  "v1agent.share.exportAsJson": "{name} 님을 JSON 파일로 내보내기",
   "v1agent.share.chooseFormat": "내보내기 형식 선택",
   "v1agent.share.cardNote":
     "에이전트 카드는 에이전트 설정이 담긴 이미지라서 누구나 Buzz에 추가할 수 있습니다.",
@@ -676,7 +676,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.share.exportJson": "JSON 내보내기",
   "v1agent.share.saveCard": "카드 저장",
   "v1agent.share.drawing": "카드를 그리는 중…",
-  "v1agent.share.refused": "{name}은(는) 공유할 수 없습니다. {reason}",
+  "v1agent.share.refused": "{name} 님은 공유할 수 없습니다. {reason}",
   "v1agent.share.drawFailed":
     "카드를 그리지 못했습니다. 저장해도 에이전트 설정은 그대로 보존됩니다.",
   "v1agent.share.cardAlt": "{name}의 에이전트 카드",
@@ -695,20 +695,20 @@ export const ko: Record<keyof typeof en, string> = {
     "에이전트가 아직 베스티를 변경하는 중입니다. 다시 시도해 주세요.",
   "v1agent.bestie.remoteWarning":
     "원격 에이전트에서는 일부 베스티 기능을 사용할 수 없습니다.",
-  "v1agent.bestie.replaceTitle": "{name}을(를) 베스티로 지정할까요?",
+  "v1agent.bestie.replaceTitle": "{name} 님을 베스티로 지정할까요?",
   "v1agent.bestie.replaceDescription":
-    "{name}과(와) 나눈 기존 대화는 DM에서 계속 볼 수 있습니다.",
+    "{name} 님과 나눈 기존 대화는 DM에서 계속 볼 수 있습니다.",
   "v1agent.bestie.replaceDescriptionRemote":
-    "{name}과(와) 나눈 기존 대화는 DM에서 계속 볼 수 있습니다. 원격 에이전트에서는 일부 베스티 기능을 사용할 수 없습니다.",
+    "{name} 님과 나눈 기존 대화는 DM에서 계속 볼 수 있습니다. 원격 에이전트에서는 일부 베스티 기능을 사용할 수 없습니다.",
   "v1agent.bestie.keep": "{name} 유지",
-  "v1agent.bestie.switch": "{name}(으)로 변경",
-  "v1agent.bestie.useTitle": "{name}을(를) 베스티로 사용할까요?",
+  "v1agent.bestie.switch": "{name} 님으로 변경",
+  "v1agent.bestie.useTitle": "{name} 님을 베스티로 사용할까요?",
   "v1agent.bestie.use": "베스티로 사용",
   "v1agent.bestie.removeTitle": "{name}의 베스티 지정을 해제할까요?",
   "v1agent.bestie.removeDescription":
-    "{name}은(는) 에이전트 목록에 남고 대화는 DM에 남습니다. 체크인은 중단됩니다. 메모리 규칙과 비공개 채널은 유지되며, 이전 베스티 탭에서 끌 수 있습니다.",
+    "{name} 님은 에이전트 목록에 남고 대화는 DM에 남습니다. 체크인은 중단됩니다. 메모리 규칙과 비공개 채널은 유지되며, 이전 베스티 탭에서 끌 수 있습니다.",
   "v1agent.bestie.removeDescriptionRemote":
-    "{name}은(는) 에이전트 목록에 남고 대화는 DM에 남습니다. 체크인은 중단됩니다. 메모리 규칙과 비공개 채널은 유지되며, 에이전트가 실행되는 기기의 이전 베스티 탭에서 끌 수 있습니다.",
+    "{name} 님은 에이전트 목록에 남고 대화는 DM에 남습니다. 체크인은 중단됩니다. 메모리 규칙과 비공개 채널은 유지되며, 에이전트가 실행되는 기기의 이전 베스티 탭에서 끌 수 있습니다.",
   "v1agent.bestie.remove": "베스티 지정 해제",
   "v1agent.team.proposed":
     "{requester}님이 이 변경 사항을 제안했습니다. 저장하기 전까지는 아무것도 바뀌지 않습니다.",
@@ -747,7 +747,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.remoteIntro.ending9":
     "어서 말씀하세요. 귀 기울이고 있어요. 비유적으로요.",
   "v1agent.remoteIntro.ending10": "좋아요. 줄거리가 뭔가요?",
-  "v1agent.remoteIntro.hello": "안녕하세요, 저는 {name}이에요.",
+  "v1agent.remoteIntro.hello": "안녕하세요, 저는 {name}입니다.",
   "v1agent.remoteIntro.hostedBefore": "저는 ",
   "v1agent.remoteIntro.hostedAfter":
     "에서 호스팅하는 원격 에이전트라서 언제든 함께할 준비가 되어 있어요.",
@@ -760,14 +760,14 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.remoteIntro.files": "다만 이 컴퓨터의 파일은 열 수 없어요.",
   "v1agent.remoteIntro.avatar": "{name}의 아바타",
   "v1agent.ai.skipped":
-    "Buzz가 평소 고르는 {skipped}이(가) 이 컴퓨터에 설정되어 있지 않아 이 에이전트는 {model}을(를) 사용합니다.",
+    "Buzz가 평소 고르는 {skipped} 모델이 이 컴퓨터에 설정되어 있지 않아 이 에이전트는 {model} 모델을 사용합니다.",
   "v1agent.ai.checking": "이 컴퓨터를 확인하는 중…",
   "v1agent.ai.noRecommended":
     "사용할 수 있는 추천 모델이 없어 {harness}의 기본값을 사용합니다.",
   "v1agent.ai.recommendedBy": "{name}의 추천입니다.",
   "v1agent.ai.useRecommended": "추천 설정을 사용합니다.",
   "v1agent.ai.title": "AI 설정",
-  "v1agent.ai.setToTitle": "{model}(으)로 설정됨 (추천)",
+  "v1agent.ai.setToTitle": "설정된 모델: {model} (추천)",
   "v1agent.ai.setTo": "설정:",
   "v1agent.ai.recommended": " (추천)",
   "v1agent.ai.custom": "사용자 지정",
@@ -875,7 +875,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.connect.title": "{name} 연결",
   "v1agent.connect.previewHint": "이 에이전트를 가져올 하네스를 선택하세요.",
   "v1agent.connect.sendAgainHint":
-    "원래 메시지의 스레드에서 {name}에게 “Please respond to my message above.”를 보내세요.",
+    "원래 메시지의 스레드에서 {name} 님에게 “Please respond to my message above.”를 보내세요.",
   "v1agent.connect.sendHint": "메시지를 보내 대화를 이어 가세요.",
   "v1agent.connect.reviewHint":
     "설정을 검토해 이 에이전트를 가져오고 대화를 이어 가세요.",
@@ -887,12 +887,12 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.connect.connect": "연결",
   "v1agent.connect.queued": "후속 메시지 대기 중",
   "v1agent.connect.sending": "보내는 중…",
-  "v1agent.connect.ask": "{name}에게 응답 요청",
+  "v1agent.connect.ask": "{name} 님에게 응답 요청",
   "v1agent.manage.sameAgents":
     "이름, 유형, 설정(지침, 모델, 작업 공간 포함)은 모든 커뮤니티에서 공유됩니다. 변경 사항은 모든 커뮤니티에 적용됩니다. 사진과 주의를 기울이는 대상은 커뮤니티마다 따로 유지됩니다. 메모리는 커뮤니티별로 보관되므로 이전에 여기서 저장한 내용과 여기서 나눈 대화가 다시 돌아옵니다.",
   "v1agent.manage.sameAgent":
     "이름, 유형, 설정(지침, 모델, 작업 공간 포함)은 모든 커뮤니티에서 공유됩니다. 변경 사항은 모든 커뮤니티에 적용됩니다. 사진과 주의를 기울이는 대상은 커뮤니티마다 따로 유지됩니다. 메모리는 커뮤니티별로 보관되므로 이전에 여기서 저장한 내용과 여기서 나눈 대화가 다시 돌아옵니다.",
-  "v1agent.manage.deleteTitle": "{name}을(를) 삭제할까요?",
+  "v1agent.manage.deleteTitle": "{name} 님을 삭제할까요?",
   "v1agent.manage.deleteHosted":
     "제공자가 에이전트와 키를 삭제한 뒤, 에이전트는 모든 채널에서 나가고 보관 처리되어 멤버 목록이나 멘션 추천에 더 이상 나타나지 않습니다. 되돌릴 수 없습니다.",
   "v1agent.manage.deleteSeveral":
@@ -908,7 +908,7 @@ export const ko: Record<keyof typeof en, string> = {
     "잊기는 해당 커뮤니티에 연결하지 않고 이 기기에서만 삭제하므로, 그곳 채널에는 남아 있을 수 있습니다.",
   "v1agent.manage.deleteAgain": "여기서 마치려면 다시 삭제하세요.",
   "v1agent.manage.forgetIt": "잊기",
-  "v1agent.manage.removeTitle": "{place}에서 {name}을(를) 제거할까요?",
+  "v1agent.manage.removeTitle": "{place}에서 {name} 님을 제거할까요?",
   "v1agent.manage.removeDescription":
     "이 커뮤니티에서 중지되고 채널에서 나가며 보관 처리됩니다. 다른 커뮤니티에서는 같은 이름, 유형, 설정으로 유지됩니다. 여기에 다시 추가하면 메모리와 대화는 돌아오지만, 여기서 주의를 기울이던 대상은 돌아오지 않습니다.",
   "v1agent.manage.remove": "제거",
@@ -926,7 +926,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.authorize.failed": "외부 앱 승인 실패",
   "v1agent.authorize.deny": "거부",
   "v1agent.authorize.title": "앱 승인",
-  "v1agent.authorize.requests": "{client}이(가) 접근 권한을 요청합니다.",
+  "v1agent.authorize.requests": "{client}에서 접근 권한을 요청합니다.",
   "v1agent.authorize.nameNote":
     "요청한 앱의 이름은 앱이 직접 제공한 것입니다. 그 앱에서 직접 설정을 시작한 경우에만 승인하세요.",
   "v1agent.authorize.replaces":
@@ -953,9 +953,9 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.interrupted.titleOne": "중단된 에이전트를 재개할까요?",
   "v1agent.interrupted.titleMany": "중단된 에이전트들을 재개할까요?",
   "v1agent.interrupted.descriptionOne":
-    "Buzz가 닫히거나 다시 로드될 때 {names}이(가) 작업 중이었습니다.",
+    "Buzz가 닫히거나 다시 로드될 때 {names} 님이 작업 중이었습니다.",
   "v1agent.interrupted.descriptionMany":
-    "Buzz가 닫히거나 다시 로드될 때 {names}이(가) 작업 중이었습니다.",
+    "Buzz가 닫히거나 다시 로드될 때 {names} 님이 작업 중이었습니다.",
   "v1agent.interrupted.resume": "재개",
   "v1agent.interrupted.dontResume": "재개 안 함",
   "v1agent.interrupted.mention": "멘션 {count}개",
@@ -1020,11 +1020,11 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.claudeTabs.checking": "Claude 확인 중…",
   "v1agent.claudeTabs.notInstalled": "Claude 통합이 아직 설치되지 않았습니다.",
   "v1agent.claudeTabs.outdated":
-    "Claude {version}은(는) Buzz에 필요한 버전보다 오래되었습니다.",
+    "Claude {version} 버전은 Buzz에 필요한 버전보다 오래되었습니다.",
   "v1agent.claudeTabs.needs": "Claude {version}: {needs}.",
-  "v1agent.claudeTabs.ready": "Claude {version}이(가) 준비되었습니다.",
+  "v1agent.claudeTabs.ready": "Claude {version} 버전이 준비되었습니다.",
   "v1agent.claudeTabs.readyAccount":
-    "Claude {version}이(가) 준비되었습니다({account}).",
+    "Claude {version} 버전이 준비되었습니다({account}).",
   "v1agent.claudeTabs.download":
     "Buzz 전용 Claude 사본(약 250MB)을 내려받아 최신 릴리스로 유지합니다. 직접 설치한 Claude에는 영향을 주지 않으며, 같은 설정을 사용합니다.",
   "v1agent.claudeTabs.isSetUp": "Claude 설정이 완료되었습니다",
@@ -1053,7 +1053,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.settings.modelThinking": "{model} · 사고 {effort}",
   "v1agent.settings.conflict": "{setting} 충돌",
   "v1agent.settings.changedElsewhere":
-    "다른 곳에서 {setting}이(가) 변경되었습니다. 유지할 변경 사항을 선택하세요.",
+    "다른 곳에서 {setting} 설정이 변경되었습니다. 유지할 변경 사항을 선택하세요.",
   "v1agent.settings.viewLatest": "최신 지침 보기",
   "v1agent.settings.noInstructions": "지침 없음",
   "v1agent.settings.latest": "최신: {value}",
@@ -1067,7 +1067,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.settings.remoteWorkspace":
     "원격 작업 공간은 실행 제공자가 설정합니다.",
   "v1agent.settings.workspaceHint":
-    "{harness}이(가) 작업하는 폴더입니다. 홈 폴더는 ~/로 지정하세요.",
+    "{harness} 하네스가 작업하는 폴더입니다. 홈 폴더는 ~/로 지정하세요.",
   "v1agent.settings.sessions": "세션",
   "v1agent.settings.modelAndThinking": "모델 및 사고",
   "v1agent.codex.notInstalled": "Codex 통합이 아직 설치되지 않았습니다.",
@@ -1100,23 +1100,25 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.codex.selectedAtStart": "세션이 시작될 때 선택됨",
   "v1agent.goose.defaultModel": "Goose 기본 모델",
   "v1agent.goose.providerDefault": "제공자 기본값",
-  "v1agent.goose.runConfigure": "Goose를 설정하려면 {command}를 실행하세요.",
+  "v1agent.goose.runConfigure":
+    "Goose를 설정하려면 {command} 명령을 실행하세요.",
   "v1agent.goose.loadingDefaults": "Goose 기본값을 불러오는 중…",
   "v1agent.goose.fromConfigNamed": "goose 구성에서 가져오기({provider})",
   "v1agent.goose.fromConfig": "goose 구성에서 가져오기",
   "v1agent.goose.provider": "제공자",
   "v1agent.goose.loadingProviders": "goose 제공자를 불러오는 중…",
-  "v1agent.goose.setUpOnSettings": "설정 탭에서 {provider}을(를) 설정하세요.",
+  "v1agent.goose.setUpOnSettings":
+    "설정 탭에서 {provider} 제공자를 설정하세요.",
   "v1agent.goose.chooseProvider": "제공자 선택",
   "v1agent.goose.noProviders": "일치하는 제공자가 없습니다.",
   "v1agent.goose.providerModel": "제공자 모델",
   "v1agent.goose.availableOnce":
-    "{provider}을(를) 설정하면 사용할 수 있습니다.",
+    "{provider} 제공자를 설정하면 사용할 수 있습니다.",
   "v1agent.goose.listFailed": "모델 목록을 가져오지 못했습니다: {error}",
   "v1agent.goose.testConnection": "연결 테스트",
   "v1agent.goose.levelsFailed": "goose의 사고 수준을 읽지 못했습니다: {error}",
   "v1agent.goose.signsIn":
-    "{provider}은(는) goose를 통해 로그인합니다. 로그인하려면 {command}를 실행하세요.",
+    "{provider} 제공자는 goose를 통해 로그인합니다. 로그인하려면 {command} 명령을 실행하세요.",
   "v1agent.goose.optional": "{name}(선택 사항)",
   "v1agent.goose.defaultValue": "기본값: {value}",
   "v1agent.goose.savedPlaceholder":
@@ -1138,18 +1140,18 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.goose.chooseDefault":
     "goose configure로 기본 모델을 선택한 뒤 다시 시도하세요.",
   "v1agent.goose.addFields":
-    "구성 편집에서 {fields}을(를) 추가하거나 goose configure를 실행하세요.",
+    "구성 편집에서 {fields} 항목을 추가하거나 goose configure를 실행하세요.",
   "v1agent.goose.runToSignIn": "로그인하려면 goose configure를 실행하세요.",
   "v1agent.goose.notSetUp":
-    "goose에 {provider}이(가) 설정되어 있지 않습니다. {step}",
+    "goose에 {provider} 제공자가 설정되어 있지 않습니다. {step}",
   "v1agent.pi.perThread": "스레드마다 대화 하나",
   "v1agent.pi.perChannel": "채널마다 대화 하나",
   "v1agent.pi.unknownProvider":
-    "{provider}은(는) Pi의 기본 제공자가 아니며, Buzz가 불러온 Pi 패키지 중 이를 추가하는 것도 없습니다. 다른 제공자를 선택하세요.",
+    "{provider} 제공자는 Pi의 기본 제공자가 아니며, Buzz가 불러온 Pi 패키지 중 이를 추가하는 것도 없습니다. 다른 제공자를 선택하세요.",
   "v1agent.pi.loadingProviders": "Pi 제공자를 불러오는 중…",
   "v1agent.pi.noProvider":
     "Pi 설정에 지정된 제공자가 없습니다. 하나를 선택하세요.",
-  "v1agent.pi.setUpInSettings": "설정에서 {provider}을(를) 설정하세요.",
+  "v1agent.pi.setUpInSettings": "설정에서 {provider} 제공자를 설정하세요.",
   "v1agent.pi.fromSettingsNamed": "Pi 설정에서 가져오기({provider})",
   "v1agent.pi.fromSettings": "Pi 설정에서 가져오기",
   "v1agent.pi.isSetUp": "설정됨",
@@ -1157,10 +1159,10 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.pi.default": "Pi 기본값",
   "v1agent.pi.noModel":
     "Pi 설정에 {provider}용 모델이 지정되어 있지 않습니다. 하나를 선택하세요.",
-  "v1agent.pi.providerSetUp": "Pi에 {provider}이(가) 설정되어 있습니다.",
+  "v1agent.pi.providerSetUp": "Pi에 {provider} 제공자가 설정되어 있습니다.",
   "v1agent.pi.change": "변경",
   "v1agent.pi.signsIn":
-    "{provider}은(는) Pi를 통해 로그인합니다. {command}를 실행한 뒤 {login}으로 설정하고 여기서 선택하세요.",
+    "{provider} 제공자는 Pi를 통해 로그인합니다. {command} 명령을 실행한 뒤 {login} 명령으로 설정하고 여기서 선택하세요.",
   "v1agent.pi.apiKey": "API 키",
   "v1agent.pi.keySaved":
     "~/.pi/agent/auth.json에 저장되며 모든 Pi 에이전트와 pi 명령에서 사용됩니다.",

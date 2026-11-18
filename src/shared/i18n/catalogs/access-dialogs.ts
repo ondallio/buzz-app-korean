@@ -133,7 +133,8 @@ export const ko: Record<keyof typeof en, string> = {
     "이 기기에 Buzz가 저장한 나머지 데이터도 모두 삭제",
   "accessDialogs.removeAgents": "내 에이전트도 제거",
   "accessDialogs.wipeCheckFailed": "삭제 가능 여부를 확인하지 못했습니다.",
-  "accessDialogs.confirmPhrase": "확인하려면 “{phrase}”을 입력하세요",
+  "accessDialogs.confirmPhrase":
+    "확인하려면 다음 문구를 입력하세요: “{phrase}”",
   "accessDialogs.eraseDescription":
     "삭제하면 이 기기의 앱 데이터, 로컬 저장소, 캐시와 플러그인 저장소만 지웁니다. 클립보드, 내보낸 키, 릴레이 데이터는 지울 수 없으며 npub와 기록은 릴레이에 남습니다.",
   "accessDialogs.eraseKeepAgentsDescription":
@@ -158,13 +159,13 @@ export const ko: Record<keyof typeof en, string> = {
   "accessDialogs.requiresSignIn":
     "이 커뮤니티에는 {server} 로그인이 필요합니다.",
   "accessDialogs.cancelSignIn": "로그인 취소",
-  "accessDialogs.signInWith": "{server}(으)로 로그인",
+  "accessDialogs.signInWith": "{server} 계정으로 로그인",
   "accessDialogs.mismatchAccount":
-    "{account}(으)로 로그인한 {server} 계정은 다른 Buzz 신원에 연결되어 있습니다. {host}에서 연결을 확인할 때까지 이 키를 보관하거나 다른 {server} 계정으로 전환해 주세요.",
+    "{server} 계정(로그인: {account})은 다른 Buzz 신원에 연결되어 있습니다. {host}에서 연결을 확인할 때까지 이 키를 보관하거나 다른 {server} 계정으로 전환해 주세요.",
   "accessDialogs.mismatchOrganization":
     "조직 계정으로 로그인한 {server} 계정은 다른 Buzz 신원에 연결되어 있습니다. {host}에서 연결을 확인할 때까지 이 키를 보관하거나 다른 {server} 계정으로 전환해 주세요.",
   "accessDialogs.rejectedAccount":
-    "이 커뮤니티에서 {account}(으)로 로그인한 {server} 계정을 허용하지 않았습니다.",
+    "이 커뮤니티에서 {server} 계정(로그인: {account})을 허용하지 않았습니다.",
   "accessDialogs.rejectedOrganization":
     "이 커뮤니티에서 조직 계정으로 로그인한 {server} 계정을 허용하지 않았습니다.",
   "accessDialogs.switchAffects":
@@ -189,7 +190,7 @@ export const ko: Record<keyof typeof en, string> = {
   "accessDialogs.signInAgain": "다시 로그인",
   "accessDialogs.needsServer": "이 커뮤니티에는 {server} 로그인이 필요합니다.",
   "accessDialogs.refusedEmail":
-    "이 커뮤니티에서 {email}을(를) 허용하지 않았습니다.",
+    "이 커뮤니티에서 {email} 주소를 허용하지 않았습니다.",
   "accessDialogs.refusedServer":
     "이 커뮤니티에서 내 {server} 계정을 허용하지 않았습니다.",
   "accessDialogs.endingNamed": "{organization} 로그인이 {time}에 종료됩니다",

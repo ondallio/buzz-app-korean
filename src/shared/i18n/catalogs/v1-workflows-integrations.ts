@@ -709,7 +709,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1wf.gh.blockedByRules": "{base}의 규칙으로 차단됨",
   "v1wf.gh.canBypass": "우회할 수 있음",
   "v1wf.gh.behind": "{base}보다 뒤처짐",
-  "v1wf.gh.conflicts": "{base}와(과) 충돌함",
+  "v1wf.gh.conflicts": "{base} 브랜치와 충돌함",
   "v1wf.gh.draftCantMerge": "초안이라 아직 병합할 수 없음",
   "v1wf.gh.stillChecking": "GitHub에서 아직 확인 중",
   "v1wf.gh.mergeLabel": "병합",
@@ -879,11 +879,11 @@ export const ko: Record<keyof typeof en, string> = {
   "v1wf.pair.getOnPhone": "휴대폰에서 Buzz 사용하기",
   "v1wf.pair.install": "휴대폰에 Buzz를 설치한 뒤 Builderlab으로 로그인하세요.",
   "v1wf.pair.installAs":
-    "휴대폰에 Buzz를 설치한 뒤 Builderlab에 {email}(으)로 로그인하세요.",
+    "휴대폰에 Buzz를 설치한 뒤 Builderlab에 {email} 계정으로 로그인하세요.",
   "v1wf.pair.installStore":
     "앱 스토어에서 휴대폰에 Buzz를 설치한 뒤 Builderlab으로 로그인하세요.",
   "v1wf.pair.installStoreAs":
-    "앱 스토어에서 휴대폰에 Buzz를 설치한 뒤 Builderlab에 {email}(으)로 로그인하세요.",
+    "앱 스토어에서 휴대폰에 Buzz를 설치한 뒤 Builderlab에 {email} 계정으로 로그인하세요.",
   "v1wf.pair.storeQrAlt": "휴대폰으로 스캔해 {store}에서 Buzz 받기",
   "v1wf.pair.getItOn": "{store}에서 받기",
   "v1wf.rem.group.Overdue": "기한 지남",
@@ -915,7 +915,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1wf.rem.time": "알림 시간",
   "v1wf.rem.chooseFuture": "미래의 날짜와 시간을 선택해 주세요.",
   "v1wf.rem.dstShift":
-    "그 시간은 일광 절약 시간제로 건너뜁니다. 알림은 {due}(으)로 설정됩니다.",
+    "그 시간은 일광 절약 시간제로 건너뜁니다. 알림은 {due}에 설정됩니다.",
   "v1wf.rem.note": "메모(선택)",
   "v1wf.rem.notePlaceholder": "무엇을 다시 확인하고 싶으신가요?",
   "v1wf.rem.updateFailed":
@@ -1067,21 +1067,22 @@ export const ko: Record<keyof typeof en, string> = {
     "선택한 기간에 에이전트가 이곳에서 실행한 세션이 없습니다. 더 긴 기간이나 다른 에이전트를 선택해 보세요.",
   "v1wf.usage.progress": "에이전트 세션을 읽는 중: {total}개 중 {done}개 완료…",
   "v1wf.usage.summarySingle":
-    "{agent}이(가) 최근 {days}일 동안 {sessions}를 실행했습니다.",
+    "{agent} 님이 최근 {days}일 동안 {sessions}를 실행했습니다.",
   "v1wf.usage.summarySingleHarness":
-    "{agent}이(가) 최근 {days}일 동안 {harnesses}에서 {sessions}를 실행했습니다.",
+    "{agent} 님이 최근 {days}일 동안 {harnesses}에서 {sessions}를 실행했습니다.",
   "v1wf.usage.summaryMulti":
     "{agents}가 최근 {days}일 동안 {sessions}를 실행했습니다.",
   "v1wf.usage.summaryMultiHarness":
     "{agents}가 최근 {days}일 동안 {harnesses}에서 {sessions}를 실행했습니다.",
   "v1wf.usage.harnessCount": "하네스 {count}개",
-  "v1wf.usage.share": "비용의 {share}는 {agent}에서 발생했습니다.",
+  "v1wf.usage.share":
+    "비용의 {share}에 해당하는 금액이 {agent}에서 발생했습니다.",
   "v1wf.usage.shareCounted":
-    "집계된 비용의 {share}는 {agent}에서 발생했습니다.",
+    "집계된 비용의 {share}에 해당하는 금액이 {agent}에서 발생했습니다.",
   "v1wf.usage.shareModel":
-    "비용의 {share}는 {agent}에서 발생했으며, 대부분 {model} 사용분입니다.",
+    "비용의 {share}에 해당하는 금액이 {agent}에서 발생했으며, 대부분 {model} 사용분입니다.",
   "v1wf.usage.shareCountedModel":
-    "집계된 비용의 {share}는 {agent}에서 발생했으며, 대부분 {model} 사용분입니다.",
+    "집계된 비용의 {share}에 해당하는 금액이 {agent}에서 발생했으며, 대부분 {model} 사용분입니다.",
   "v1wf.usage.estimatedCost": "예상 비용",
   "v1wf.usage.estimatedCostPeriod": "예상 비용 · 최근 {days}일",
   "v1wf.usage.waitingEvery": "모든 에이전트를 기다리는 중",
@@ -1172,7 +1173,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1wf.watch.sonar.9": "이 PR이 승인되면 알려 주기",
   "v1wf.watch.runsIn": "실행 위치",
   "v1wf.watch.thread": "{name} 스레드",
-  "v1wf.watch.deliversTo": "{name}(으)로 전달",
+  "v1wf.watch.deliversTo": "전달 대상: {name}",
   "v1wf.watch.recordedEvent": "기록된 이벤트",
   "v1wf.watch.openActivity": "활동 열기: {summary}",
   "v1wf.watch.showActivityFor": "{label} 활동 보기",
@@ -1184,7 +1185,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1wf.watch.startWatching": "지켜보기 시작",
   "v1wf.watch.attention": "주의",
   "v1wf.watch.emptyDescription":
-    "주의 기능을 켜면 {name}이(가) Buzz 전반의 메시지와 업데이트를 지켜보다가 지시에 따라 행동하거나 알려 줍니다. 시작하려면 {name}에게 메시지를 보내세요.",
+    "주의 기능을 켜면 {name} 님이 Buzz 전반의 메시지와 업데이트를 지켜보다가 지시에 따라 행동하거나 알려 줍니다. 시작하려면 {name} 님에게 메시지를 보내세요.",
   "v1wf.watch.statusFor": "{name}의 주의 상태",
   "v1wf.watch.active": "활성",
   "v1wf.watch.paused": "일시 중지됨",
@@ -1195,7 +1196,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1wf.watch.interest": "관심사",
   "v1wf.watch.interestStatusFor": "{label} 관심사 상태",
   "v1wf.watch.interestGone": "이 관심사는 더 이상 없습니다.",
-  "v1wf.watch.deleteNamed": "{label}을(를) 삭제할까요?",
+  "v1wf.watch.deleteNamed": "{label} 항목을 삭제할까요?",
   "v1wf.watch.deleteInterestDescription":
     "관심사와 그에 속한 모든 지켜보기를 삭제합니다. 에이전트가 이 트리거를 더 이상 지켜보지 않습니다. 되돌릴 수 없습니다.",
   "v1wf.watch.noInstructions": "저장된 지침이 없습니다.",
@@ -1211,7 +1212,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1wf.watch.channelFallback": "채널 {id}",
   "v1wf.watch.settings": "주의 설정",
   "v1wf.watch.settingsSubtitle":
-    "{name}이(가) 업데이트를 지켜보고 일정에 따라 확인하게 합니다. 이 기기에서 Buzz가 열려 있는 동안 실행됩니다.",
+    "{name} 님이 업데이트를 지켜보고 일정에 따라 확인하게 합니다. 이 기기에서 Buzz가 열려 있는 동안 실행됩니다.",
   "v1wf.watch.removeUnreadable": "읽을 수 없는 {slug} 제거",
   "v1wf.watch.stray": "연결되지 않은 지켜보기",
   "v1wf.watch.strayDescription":
@@ -1245,7 +1246,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1wf.watch.interestPaused":
     "이 관심사는 일시 중지되었습니다. 활성화된 지켜보기를 실행하려면 다시 시작하세요.",
   "v1wf.watch.askTimer":
-    "{name}에게 이 타이머의 다음 실행을 설정해 달라고 요청하세요.",
+    "{name} 님에게 이 타이머의 다음 실행을 설정해 달라고 요청하세요.",
   "v1wf.watch.deleteTimer": "이 타이머를 삭제할까요?",
   "v1wf.watch.deleteWatch": "이 지켜보기를 삭제할까요?",
   "v1wf.watch.deleteTimerDescription":

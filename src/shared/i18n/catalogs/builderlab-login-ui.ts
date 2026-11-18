@@ -38,6 +38,6 @@ export const ko: Record<keyof typeof en, string> = {
   "builderlabLogin.secureBrowser": "브라우저에서 안전하게 로그인하세요.",
   "builderlabLogin.checkingAction": "로그인 확인 중",
   "builderlabLogin.organization":
-    "Builderlab은 조직 로그인을 사용합니다. 로그아웃하려면 {link}으로 이동하세요.",
+    "Builderlab은 조직 로그인을 사용합니다. 로그아웃하려면 {link} 화면으로 이동하세요.",
   "builderlabLogin.organizationLink": "신원 → 조직 로그인",
 };

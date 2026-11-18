@@ -23,7 +23,7 @@ export const en = {
 export const ko: Record<keyof typeof en, string> = {
   "directMessage.new": "새 메시지",
   "directMessage.channelName": "새 메시지",
-  "directMessage.messageTo": "{names}에게 메시지",
+  "directMessage.messageTo": "{names} 님에게 메시지",
   "directMessage.savedInvalid": "저장된 새 메시지를 복원하지 못했습니다.",
   "directMessage.restoreFailed": "메시지를 복원하지 못했습니다.",
   "directMessage.agentUnavailable":

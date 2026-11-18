@@ -349,7 +349,7 @@ export const ko: Record<keyof typeof en, string> = {
   "settings.organizationSignIn": "조직 로그인",
   "settings.signOutServerFailed":
     "{server}에서 로그아웃하지 못했습니다. {error}",
-  "settings.signedInAs": "{account}(으)로 로그인됨",
+  "settings.signedInAs": "{account} 계정으로 로그인됨",
   "settings.signedInOrganization": "조직 계정으로 로그인됨",
   "settings.expiresAt": "만료 시각 {time}",
   "settings.expiresSuffix": " · 만료 시각 {time}",
@@ -424,12 +424,12 @@ export const ko: Record<keyof typeof en, string> = {
   "settings.leaveDescription":
     "멤버십을 종료하고 이 기기에서 커뮤니티를 제거합니다. 다시 참여하려면 새 초대가 필요할 수 있습니다.",
   "settings.leaveConfirm": "{community}에서 탈퇴할까요?",
-  "settings.removeConfirm": "이 기기에서 {community}을(를) 제거할까요?",
+  "settings.removeConfirm": "이 기기에서 {community} 커뮤니티를 제거할까요?",
   "settings.leaveConfirmDescription":
     "커뮤니티 릴레이에 탈퇴 요청을 보내고 이 기기에서 커뮤니티를 제거합니다. 다시 참여하려면 새 초대가 필요할 수 있습니다.",
   "settings.removeConfirmDescription":
     "이 기기의 Buzz에서 커뮤니티 연결과 저장된 초안 및 데이터를 제거합니다.",
-  "settings.shownAs": "이 기기에서는 {name}(으)로 표시됨",
+  "settings.shownAs": "이 기기에서의 표시 이름: {name}",
   "settings.shortcuts": "단축키",
   "settings.messageFormatting": "메시지 서식",
   "settings.editorKeysDescription":
@@ -444,17 +444,17 @@ export const ko: Record<keyof typeof en, string> = {
   "settings.includeOtherModifier":
     "일반 입력을 방해하지 않도록 Control 또는 Alt를 포함해 주세요.",
   "settings.clipboardReserved":
-    "{chord}은(는) 복사, 잘라내기, 붙여넣기 및 전체 선택에 사용됩니다. 다른 단축키를 사용해 주세요.",
+    "{chord} 단축키는 복사, 잘라내기, 붙여넣기 및 전체 선택에 사용됩니다. 다른 단축키를 사용해 주세요.",
   "settings.desktopReserved":
-    "{chord}은(는) 탭 전환, 탭 닫기 및 Buzz 종료에 사용됩니다. 다른 단축키를 사용해 주세요.",
+    "{chord} 단축키는 탭 전환, 탭 닫기 및 Buzz 종료에 사용됩니다. 다른 단축키를 사용해 주세요.",
   "settings.shortcutConflict":
-    "{chord}은(는) 이미 {title} ({owner})에서 사용합니다.",
+    "{chord} 단축키는 이미 {title} ({owner})에서 사용합니다.",
   "settings.editorWins":
-    "저장했습니다. 입력 중에는 메시지 편집기가 {chord}을(를) 직접 처리하므로 편집기 동작이 우선합니다.",
+    "저장했습니다. 입력 중에는 메시지 편집기가 {chord} 단축키를 직접 처리하므로 편집기 동작이 우선합니다.",
   "settings.sendingMessages": "메시지 보내기",
-  "settings.sendWith": "{chord}(으)로 보내기",
+  "settings.sendWith": "{chord} 키로 보내기",
   "settings.sendDescription":
-    "Enter로 줄을 바꿉니다. {chord}(으)로 메시지를 보냅니다.",
+    "Enter로 줄을 바꿉니다. {chord} 키로 메시지를 보냅니다.",
   "settings.editingMessages": "메시지 편집",
   "settings.editUpArrow": "위쪽 화살표로 마지막 메시지 편집",
   "settings.editUpArrowDescription":
@@ -539,9 +539,9 @@ export const ko: Record<keyof typeof en, string> = {
   "settings.shortcut.newline": "줄바꿈",
   "settings.shortcut.focus-side-pane": "보조 창으로 이동",
   "settings.removed":
-    "이 기기에서 {name}을(를) 제거했습니다. 멤버십은 바뀌지 않았으며 나중에 다시 추가할 수 있습니다.",
+    "이 기기에서 {name} 커뮤니티를 제거했습니다. 멤버십은 바뀌지 않았으며 나중에 다시 추가할 수 있습니다.",
   "settings.removedResidue":
-    "이 기기에서 {name}을(를) 제거했습니다. 멤버십은 바뀌지 않았으며 나중에 다시 추가할 수 있습니다. 일부 저장 데이터는 삭제하지 못했습니다.",
+    "이 기기에서 {name} 커뮤니티를 제거했습니다. 멤버십은 바뀌지 않았으며 나중에 다시 추가할 수 있습니다. 일부 저장 데이터는 삭제하지 못했습니다.",
   "settings.left": "{name}에서 탈퇴했습니다.",
   "settings.leftResidue":
     "{name}에서 탈퇴했습니다. 일부 저장 데이터는 삭제하지 못했습니다.",
@@ -553,9 +553,9 @@ export const ko: Record<keyof typeof en, string> = {
   "settings.bannedResidue":
     "현재 {name}에서 차단되어 탈퇴 요청이 거부되었습니다. 이 기기에서는 제거했으며 접근 권한이 복구되면 URL로 다시 추가할 수 있습니다. 일부 저장 데이터는 삭제하지 못했습니다.",
   "settings.removeFailed":
-    "이 기기에서 {name}을(를) 제거하지 못했습니다. 다시 시도해 주세요.",
+    "이 기기에서 {name} 커뮤니티를 제거하지 못했습니다. 다시 시도해 주세요.",
   "settings.removeFailedDetails":
-    "이 기기에서 {name}을(를) 제거하지 못했습니다 ({reason}). 다시 시도해 주세요.",
+    "이 기기에서 {name} 커뮤니티를 제거하지 못했습니다 ({reason}). 다시 시도해 주세요.",
   "settings.leftCleanupFailed":
     "{name}에서 탈퇴했지만 이 기기의 정리를 완료하지 못했습니다. 마치려면 다시 탈퇴해 주세요.",
   "settings.leftCleanupFailedDetails":

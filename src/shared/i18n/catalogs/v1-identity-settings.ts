@@ -418,9 +418,9 @@ export const ko: Record<keyof typeof en, string> = {
   "v1id.maxUses": "최대 사용 횟수",
   "v1id.yourServerAccount": "내 {server} 계정",
   "v1id.aServerAccount": "{server} 계정",
-  "v1id.labelCopied": "{label}을(를) 복사했습니다.",
+  "v1id.labelCopied": "{label} 항목을 복사했습니다.",
   "v1id.labelCopyFailed":
-    "{label}을(를) 복사하지 못했습니다. 선택해서 직접 복사해 주세요.",
+    "{label} 항목을 복사하지 못했습니다. 선택해서 직접 복사해 주세요.",
   "v1id.identitySubtitle": "신원은 여러 커뮤니티에서 함께 사용합니다.",
   "v1id.yourBuzzId": "내 Buzz ID",
   "v1id.yourPrivateKey": "내 비밀 키",
@@ -446,7 +446,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1id.signedIn": "로그인됨",
   "v1id.checkingSignIn": "로그인 확인 중…",
   "v1id.signingIn": "로그인 중…",
-  "v1id.signedInAs": "{account}(으)로 로그인됨",
+  "v1id.signedInAs": "{account} 계정으로 로그인됨",
   "v1id.yourOrganizationAccount": "조직 계정",
   "v1id.expiresAt": "{time}에 만료",
   "v1id.savedCommunitiesForHost": "이 호스트에 저장된 커뮤니티",
@@ -527,11 +527,11 @@ export const ko: Record<keyof typeof en, string> = {
   "v1id.yourBuilderlabAccount": "Builderlab 계정",
   "v1id.differentKeyTitle": "계정이 다른 키를 사용하고 있습니다",
   "v1id.differentKeyRestorableBackedUp":
-    "{account}은(는) 이 컴퓨터의 키와 다른 키에 연결되어 있으며, Builderlab에 그 키의 백업이 있습니다. 교체하면 이 컴퓨터의 키를 제거하고 Buzz를 다시 시작해 계정의 키를 복원합니다. 이 컴퓨터의 키는 Builderlab에 백업되어 있으니 복원하려면 해당 계정으로 로그인하세요.",
+    "{account} 계정은 이 컴퓨터의 키와 다른 키에 연결되어 있으며, Builderlab에 그 키의 백업이 있습니다. 교체하면 이 컴퓨터의 키를 제거하고 Buzz를 다시 시작해 계정의 키를 복원합니다. 이 컴퓨터의 키는 Builderlab에 백업되어 있으니 복원하려면 해당 계정으로 로그인하세요.",
   "v1id.differentKeyRestorableNotBackedUp":
-    "{account}은(는) 이 컴퓨터의 키와 다른 키에 연결되어 있으며, Builderlab에 그 키의 백업이 있습니다. 교체하면 이 컴퓨터의 키를 제거하고 Buzz를 다시 시작해 계정의 키를 복원합니다. 이 컴퓨터의 키는 백업되어 있지 않을 수 있습니다. 먼저 설정 → 신원에서 비밀 키를 복사해 두지 않으면 잃어버릴 수 있습니다.",
+    "{account} 계정은 이 컴퓨터의 키와 다른 키에 연결되어 있으며, Builderlab에 그 키의 백업이 있습니다. 교체하면 이 컴퓨터의 키를 제거하고 Buzz를 다시 시작해 계정의 키를 복원합니다. 이 컴퓨터의 키는 백업되어 있지 않을 수 있습니다. 먼저 설정 → 신원에서 비밀 키를 복사해 두지 않으면 잃어버릴 수 있습니다.",
   "v1id.differentKeyElsewhere":
-    "{account}은(는) 다른 기기에 있는 키에 연결되어 있으며, Builderlab에는 그 키의 백업이 없습니다. Buzz는 이 컴퓨터의 키를 계속 사용합니다. 여기서 계정의 키를 사용하려면 그 기기의 설정 → 신원에서 신원 동기화를 켜거나, 그 비밀 키를 이 기기로 가져오세요.",
+    "{account} 계정은 다른 기기에 있는 키에 연결되어 있으며, Builderlab에는 그 키의 백업이 없습니다. Buzz는 이 컴퓨터의 키를 계속 사용합니다. 여기서 계정의 키를 사용하려면 그 기기의 설정 → 신원에서 신원 동기화를 켜거나, 그 비밀 키를 이 기기로 가져오세요.",
   "v1id.ok": "확인",
   "v1id.setup.wrongAccount":
     "Buzz가 키를 복원하려고 다시 시작한 계정과 다른 Builderlab 계정으로 로그인했습니다. 다른 계정 사용을 눌러 원래 계정으로 로그인하세요.",
@@ -545,20 +545,20 @@ export const ko: Record<keyof typeof en, string> = {
   "v1id.setup.differentKeyHere":
     "이 컴퓨터에는 이미 다른 Buzz 키가 있습니다. 먼저 이 컴퓨터에서 Buzz 로그아웃을 하거나 다른 계정을 사용하세요.",
   "v1id.setup.signInAsToBackUp":
-    "이 키를 백업하려면 {account}(으)로 로그인하세요.",
+    "이 키를 백업하려면 {account} 계정으로 로그인하세요.",
   "v1id.departure.removedUnconfirmed":
-    "이 기기에서 {name}을(를) 제거했습니다. 릴레이가 나가기를 확인하지 않아 아직 멤버일 수 있습니다.",
+    "이 기기에서 {name} 커뮤니티를 제거했습니다. 릴레이가 나가기를 확인하지 않아 아직 멤버일 수 있습니다.",
   "v1id.departure.removed":
-    "이 기기에서 {name}을(를) 제거했습니다. 멤버십은 바뀌지 않았으며 나중에 다시 추가할 수 있습니다.",
+    "이 기기에서 {name} 커뮤니티를 제거했습니다. 멤버십은 바뀌지 않았으며 나중에 다시 추가할 수 있습니다.",
   "v1id.departure.absent":
     "더 이상 {name}의 멤버가 아니어서 이 기기에서 제거했습니다.",
   "v1id.departure.banned":
     "현재 {name}에서 차단되어 나가기가 거부되었습니다. 이 기기에서는 제거했으며, 접근 권한이 복구되면 URL로 다시 추가할 수 있습니다.",
   "v1id.departure.left": "{name}에서 나갔습니다.",
   "v1id.departure.removedUnconfirmedResidue":
-    "이 기기에서 {name}을(를) 제거했습니다. 릴레이가 나가기를 확인하지 않아 아직 멤버일 수 있습니다. 일부 저장된 데이터는 지우지 못했습니다.",
+    "이 기기에서 {name} 커뮤니티를 제거했습니다. 릴레이가 나가기를 확인하지 않아 아직 멤버일 수 있습니다. 일부 저장된 데이터는 지우지 못했습니다.",
   "v1id.departure.removedResidue":
-    "이 기기에서 {name}을(를) 제거했습니다. 멤버십은 바뀌지 않았으며 나중에 다시 추가할 수 있습니다. 일부 저장된 데이터는 지우지 못했습니다.",
+    "이 기기에서 {name} 커뮤니티를 제거했습니다. 멤버십은 바뀌지 않았으며 나중에 다시 추가할 수 있습니다. 일부 저장된 데이터는 지우지 못했습니다.",
   "v1id.departure.absentResidue":
     "더 이상 {name}의 멤버가 아니어서 이 기기에서 제거했습니다. 일부 저장된 데이터는 지우지 못했습니다.",
   "v1id.departure.bannedResidue":
@@ -566,9 +566,9 @@ export const ko: Record<keyof typeof en, string> = {
   "v1id.departure.leftResidue":
     "{name}에서 나갔습니다. 일부 저장된 데이터는 지우지 못했습니다.",
   "v1id.departure.removeFailed":
-    "이 기기에서 {name}을(를) 제거하지 못했습니다. 다시 시도해 주세요.",
+    "이 기기에서 {name} 커뮤니티를 제거하지 못했습니다. 다시 시도해 주세요.",
   "v1id.departure.removeFailedReason":
-    "이 기기에서 {name}을(를) 제거하지 못했습니다({reason}). 다시 시도해 주세요.",
+    "이 기기에서 {name} 커뮤니티를 제거하지 못했습니다({reason}). 다시 시도해 주세요.",
   "v1id.departure.absentCleanupFailed":
     "릴레이에 더 이상 {name} 멤버십이 없지만 이 기기에서 제거를 마치지 못했습니다. 다시 시도해 주세요.",
   "v1id.departure.absentCleanupFailedReason":
@@ -594,17 +594,17 @@ export const ko: Record<keyof typeof en, string> = {
   "v1id.picker.leaveTitle": "{name}에서 나갈까요?",
   "v1id.picker.leaveFailedTitle": "{name}에서 나가지 못했습니다",
   "v1id.picker.leaveDescription":
-    "커뮤니티 릴레이에 나가기 요청을 보낸 뒤, 저장된 초안과 읽은 위치와 함께 이 기기에서 {name}을(를) 제거합니다. 다시 참여하려면 새 초대가 필요할 수 있습니다.",
+    "커뮤니티 릴레이에 나가기 요청을 보낸 뒤, 저장된 초안과 읽은 위치와 함께 이 기기에서 {name} 커뮤니티를 제거합니다. 다시 참여하려면 새 초대가 필요할 수 있습니다.",
   "v1id.picker.removeDescription":
-    "릴레이가 나가기를 확인하지 않아 아직 멤버일 수 있습니다. 대신 저장된 초안과 읽은 위치와 함께 이 기기에서 {name}을(를) 제거할 수 있습니다. 멤버십은 바뀌지 않습니다.",
+    "릴레이가 나가기를 확인하지 않아 아직 멤버일 수 있습니다. 대신 저장된 초안과 읽은 위치와 함께 이 기기에서 {name} 커뮤니티를 제거할 수 있습니다. 멤버십은 바뀌지 않습니다.",
   "v1id.picker.leaveCommunity": "커뮤니티 나가기",
   "v1id.picker.removeFromThisDevice": "이 기기에서 제거",
-  "v1id.picker.shownAs": "이 기기에서는 {name}(으)로 표시됨",
+  "v1id.picker.shownAs": "이 기기에서의 표시 이름: {name}",
   "v1id.picker.markedAllRead": "모두 읽음으로 표시했습니다.",
   "v1id.picker.markAllReadFailed": "모두 읽음으로 표시하지 못했습니다.",
   "v1id.picker.urlCopied": "커뮤니티 URL을 복사했습니다.",
   "v1id.picker.urlCopyFailed": "커뮤니티 URL을 복사하지 못했습니다.",
-  "v1id.picker.switchTo": "{name}(으)로 전환",
+  "v1id.picker.switchTo": "{name} 커뮤니티로 전환",
   "v1id.picker.copyUrl": "커뮤니티 URL 복사",
   "v1id.picker.invite": "커뮤니티에 초대",
   "v1id.picker.leaving": "나가는 중…",
@@ -619,7 +619,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1id.find.joiningTitle": "커뮤니티에 참여하는 중",
   "v1id.find.findingTitle": "커뮤니티를 찾는 중",
   "v1id.find.joiningHost": "{host}에 참여하는 중…",
-  "v1id.find.lookingUp": "{host}을(를) 찾는 중…",
+  "v1id.find.lookingUp": "{host} 찾는 중…",
   "v1id.find.failedTitle": "커뮤니티를 찾지 못했습니다",
   "v1id.find.joinTitle": "커뮤니티 참여",
   "v1id.pasteWholeInvite": "코드만이 아니라 초대 링크 전체를 붙여 넣으세요.",

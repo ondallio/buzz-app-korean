@@ -355,21 +355,21 @@ export const ko: Record<keyof typeof en, string> = {
   "v1msg.bring.describeMany":
     "{place}에 있습니다. 여기로 데려오면 같은 에이전트가 추가됩니다. {details}",
   "v1msg.bring.describeOne":
-    "{name}은(는) {place}에 있습니다. 여기로 데려오면 같은 에이전트가 추가됩니다. {details}",
+    "{name} 님은 {place}에 있습니다. 여기로 데려오면 같은 에이전트가 추가됩니다. {details}",
   "v1msg.bring.dontBring": "데려오지 않기",
   "v1msg.bring.dontSend": "보내지 않기",
   "v1msg.bring.errorKept": "{error} 초안은 보존했습니다.",
-  "v1msg.bring.inPlaceMany": "{names}이(가) {place}에 있습니다",
-  "v1msg.bring.inPlaceOne": "{name}이(가) {place}에 있습니다",
-  "v1msg.bring.nowInMany": "{names}이(가) 이제 {place}에 있습니다.",
-  "v1msg.bring.nowInOne": "{name}이(가) 이제 {place}에 있습니다.",
+  "v1msg.bring.inPlaceMany": "{names} 님이 {place}에 있습니다",
+  "v1msg.bring.inPlaceOne": "{name} 님이 {place}에 있습니다",
+  "v1msg.bring.nowInMany": "{names} 님이 이제 {place}에 있습니다.",
+  "v1msg.bring.nowInOne": "{name} 님이 이제 {place}에 있습니다.",
   "v1msg.bring.otherCommunity": "다른 커뮤니티",
   "v1msg.bring.reviewedMany":
     "이제 이 커뮤니티에 있습니다. 메시지를 보내거나 초안을 보존하세요.",
   "v1msg.bring.reviewedOne":
     "이제 이 커뮤니티에 있습니다. 메시지를 보내거나 초안을 보존하세요.",
   "v1msg.bring.thisCommunity": "이 커뮤니티",
-  "v1msg.bring.title": "{names}을(를) {place}(으)로 데려올까요?",
+  "v1msg.bring.title": "{names} 님을 {place}에 데려올까요?",
   "v1msg.chatCards.label": "채팅 첨부",
   "v1msg.chatCards.remove": "채팅 첨부 {index} 제거",
   "v1msg.chips.count": "칩은 1개에서 32개 사이로 선택하세요.",
@@ -455,35 +455,39 @@ export const ko: Record<keyof typeof en, string> = {
   "v1msg.linkPreviews.fewer": "미리보기 줄이기",
   "v1msg.linkPreviews.more": "미리보기 {count}개 더 보기",
   "v1msg.linkPreviews.moreOne": "미리보기 1개 더 보기",
-  "v1msg.membership.manyAdded": "{person} {others}이(가) 추가되었습니다",
-  "v1msg.membership.manyRemoved": "{person} {others}이(가) 제거되었습니다",
-  "v1msg.membership.oneAdded": "{person}이(가) 추가되었습니다",
-  "v1msg.membership.oneAddedAlong": "{person}, {rest}이(가) 추가되었습니다",
-  "v1msg.membership.oneAddedBy": "{actor}이(가) {person}을(를) 추가했습니다",
+  "v1msg.membership.manyAdded": "{person} {others}이 추가되었습니다",
+  "v1msg.membership.manyRemoved": "{person} {others}이 제거되었습니다",
+  "v1msg.membership.oneAdded": "{person} 님이 추가되었습니다",
+  "v1msg.membership.oneAddedAlong": "{person} 님, {rest} 님이 추가되었습니다",
+  "v1msg.membership.oneAddedBy":
+    "{person} 님이 추가되었습니다(추가한 사람: {actor})",
   "v1msg.membership.oneAddedByAlong":
-    "{actor}이(가) {person}, {rest}을(를) 추가했습니다",
+    "{person} 님, {rest} 님이 추가되었습니다(추가한 사람: {actor})",
   "v1msg.membership.oneAddedByDetail":
-    "{actor}이(가) {person}을(를) 추가했습니다",
+    "{person} 님이 추가되었습니다(추가한 사람: {actor})",
   "v1msg.membership.oneOther": "외 1명",
-  "v1msg.membership.oneRemoved": "{person}이(가) 제거되었습니다",
-  "v1msg.membership.oneRemovedBy": "{actor}이(가) {person}을(를) 제거했습니다",
+  "v1msg.membership.oneRemoved": "{person} 님이 제거되었습니다",
+  "v1msg.membership.oneRemovedBy":
+    "{person} 님이 제거되었습니다(제거한 사람: {actor})",
   "v1msg.membership.oneRemovedByAlong":
-    "{actor}이(가) {person}, {rest}을(를) 제거했습니다",
+    "{person} 님, {rest} 님이 제거되었습니다(제거한 사람: {actor})",
   "v1msg.membership.others": "외 {count}명",
   "v1msg.membership.previewAdded": "추가된 사람",
   "v1msg.membership.previewRemoved": "제거된 사람",
   "v1msg.membership.you": "나",
-  "v1msg.membership.youAdded": "{person}이(가) 추가되었습니다",
-  "v1msg.membership.youAddedAlong": "{person}, {rest}이(가) 추가되었습니다",
-  "v1msg.membership.youAddedBy": "{actor}이(가) {person}을(를) 추가했습니다",
+  "v1msg.membership.youAdded": "{person}를 추가했습니다",
+  "v1msg.membership.youAddedAlong": "{rest} 님과 함께 {person}를 추가했습니다",
+  "v1msg.membership.youAddedBy":
+    "{person}를 추가했습니다(추가한 사람: {actor})",
   "v1msg.membership.youAddedByAlong":
-    "{actor}이(가) {person}, {rest}을(를) 추가했습니다",
+    "{rest} 님과 함께 {person}를 추가했습니다(추가한 사람: {actor})",
   "v1msg.membership.youAddedByDetail":
-    "{actor}이(가) {person}을(를) 추가했습니다",
-  "v1msg.membership.youRemoved": "{person}이(가) 제거되었습니다",
-  "v1msg.membership.youRemovedBy": "{actor}이(가) {person}을(를) 제거했습니다",
+    "{person}를 추가했습니다(추가한 사람: {actor})",
+  "v1msg.membership.youRemoved": "{person}를 제거했습니다",
+  "v1msg.membership.youRemovedBy":
+    "{person}를 제거했습니다(제거한 사람: {actor})",
   "v1msg.membership.youRemovedByAlong":
-    "{actor}이(가) {person}, {rest}을(를) 제거했습니다",
+    "{rest} 님과 함께 {person}를 제거했습니다(제거한 사람: {actor})",
   "v1msg.membership.youSubject": "나",
   "v1msg.models.agentsFailed": "에이전트를 불러오지 못했습니다.",
   "v1msg.models.all": "모델, 사고 수준, 세션 컨트롤",
@@ -494,12 +498,12 @@ export const ko: Record<keyof typeof en, string> = {
   "v1msg.models.effortForNextRun": "{name}의 다음 실행 사고 수준",
   "v1msg.models.failed": "모델 및 사고 수준을 불러오지 못했습니다.",
   "v1msg.models.fallbackDefaultEffort":
-    "{model}을(를) 기본 사고 수준({effort})으로 사용합니다",
-  "v1msg.models.fallbackModel": "{model}을(를) 사용합니다",
+    "{model} 모델을 기본 사고 수준({effort})으로 사용합니다",
+  "v1msg.models.fallbackModel": "{model} 모델을 사용합니다",
   "v1msg.models.fallbackNone":
     "불러온 목록에 지원되는 모델이 없습니다. 보내기 시 모델 및 사고 수준 지정을 생략하고 에이전트의 기본값을 사용합니다",
   "v1msg.models.fallbackProviderEffort":
-    "{model}을(를) 제공자의 기본 사고 수준으로 사용합니다",
+    "{model} 모델을 제공자의 기본 사고 수준으로 사용합니다",
   "v1msg.models.fallbackUnknown":
     "보내기 시 모델 및 사고 수준 지정을 생략하며, 어떤 모델로 실행할지는 에이전트나 제공자가 결정합니다",
   "v1msg.models.heading": "모델 및 사고 수준",
@@ -534,27 +538,27 @@ export const ko: Record<keyof typeof en, string> = {
     "{error} 초안은 보존했습니다. 일부 사람은 이미 추가되었을 수 있습니다.",
   "v1msg.nonmember.invite": "초대",
   "v1msg.nonmember.inviting": "초대하는 중…",
-  "v1msg.nonmember.notInMany": "{names}은(는) 이 채널에 없습니다.",
-  "v1msg.nonmember.notInOne": "{names}은(는) 이 채널에 없습니다.",
+  "v1msg.nonmember.notInMany": "{names} 님은 이 채널에 없습니다.",
+  "v1msg.nonmember.notInOne": "{names} 님은 이 채널에 없습니다.",
   "v1msg.nonmember.sendAnyway": "그래도 보내기",
   "v1msg.nonmember.title": "이 채널 밖의 사람을 멘션할까요?",
   "v1msg.oldAgents.agentTypes": "에이전트 유형",
   "v1msg.oldAgents.describeMany":
-    "{names}은(는) Buzz 미리보기 버전에 설정되어 있습니다. Buzz 1.0으로 가져올까요? 이름과 아바타를 유지하고 이 앱에서 실행을 시작합니다.",
+    "{names} 님은 Buzz 미리보기 버전에 설정되어 있습니다. Buzz 1.0으로 가져올까요? 이름과 아바타를 유지하고 이 앱에서 실행을 시작합니다.",
   "v1msg.oldAgents.describeManyAdopt":
-    "{names}은(는) Buzz 미리보기 버전에 설정되어 있습니다. Buzz 1.0으로 가져올까요? 이름, 아바타, 지침을 유지하고 이 앱에서 실행을 시작합니다.",
+    "{names} 님은 Buzz 미리보기 버전에 설정되어 있습니다. Buzz 1.0으로 가져올까요? 이름, 아바타, 지침을 유지하고 이 앱에서 실행을 시작합니다.",
   "v1msg.oldAgents.describeOne":
-    "{names}은(는) Buzz 미리보기 버전에 설정되어 있습니다. Buzz 1.0으로 가져올까요? 이름과 아바타를 유지하고 이 앱에서 실행을 시작합니다.",
+    "{names} 님은 Buzz 미리보기 버전에 설정되어 있습니다. Buzz 1.0으로 가져올까요? 이름과 아바타를 유지하고 이 앱에서 실행을 시작합니다.",
   "v1msg.oldAgents.describeOneAdopt":
-    "{names}은(는) Buzz 미리보기 버전에 설정되어 있습니다. Buzz 1.0으로 가져올까요? 이름, 아바타, 지침을 유지하고 이 앱에서 실행을 시작합니다.",
+    "{names} 님은 Buzz 미리보기 버전에 설정되어 있습니다. Buzz 1.0으로 가져올까요? 이름, 아바타, 지침을 유지하고 이 앱에서 실행을 시작합니다.",
   "v1msg.oldAgents.error":
     "{error} 초안은 보존했습니다. 이미 가져온 에이전트는 그대로 유지됩니다.",
   "v1msg.oldAgents.importAndSend": "가져오고 보내기",
   "v1msg.oldAgents.importAs": "가져올 유형",
   "v1msg.oldAgents.importMany": "이 에이전트들을 가져올까요?",
-  "v1msg.oldAgents.importOne": "{name}을(를) 가져올까요?",
+  "v1msg.oldAgents.importOne": "{name} 님을 가져올까요?",
   "v1msg.oldAgents.importedMany": "에이전트를 가져왔습니다",
-  "v1msg.oldAgents.importedOne": "{name}을(를) 가져왔습니다",
+  "v1msg.oldAgents.importedOne": "{name} 님을 가져왔습니다",
   "v1msg.oldAgents.justSend": "그냥 보내기",
   "v1msg.oldAgents.sendReady": "준비되면 보내세요. 닫아도 초안은 보존됩니다.",
   "v1msg.profile.viewOwn": "내 프로필 보기",
@@ -602,7 +606,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1msg.reactions.deliveryFailed": "반응을 업데이트하지 못했습니다.",
   "v1msg.reactions.deliveryUnconfirmed": "반응 전송이 확인되지 않았습니다.",
   "v1msg.reactions.everyone": "반응한 모든 사람",
-  "v1msg.reactions.peopleWith": "{name}(으)로 반응한 사람",
+  "v1msg.reactions.peopleWith": "{name} 이모지로 반응한 사람",
   "v1msg.reactions.retry": "반응 다시 시도",
   "v1msg.reactions.unavailable": "반응을 사용할 수 없음",
   "v1msg.reactions.updateFailed":
@@ -632,9 +636,9 @@ export const ko: Record<keyof typeof en, string> = {
   "v1msg.share.alreadyOne": "이 채팅은 이미 열람 전용입니다.",
   "v1msg.share.appliesTo": "적용 대상: {names}.",
   "v1msg.share.changeMany":
-    "이 채팅들을 비공개에서 열람 전용으로 바꾸고, 메시지와 채팅 링크를 {destination}(으)로 보냅니다.",
+    "이 채팅들을 비공개에서 열람 전용으로 바꾸고, 메시지와 채팅 링크를 {destination}에 보냅니다.",
   "v1msg.share.changeOne":
-    "이 채팅을 비공개에서 열람 전용으로 바꾸고, 메시지와 채팅 링크를 {destination}(으)로 보냅니다.",
+    "이 채팅을 비공개에서 열람 전용으로 바꾸고, 메시지와 채팅 링크를 {destination}에 보냅니다.",
   "v1msg.share.channel": "채널",
   "v1msg.share.checkAndSend": "권한 확인 후 보내기",
   "v1msg.share.error":
@@ -642,10 +646,8 @@ export const ko: Record<keyof typeof en, string> = {
   "v1msg.share.mixed":
     "비공개 채팅은 열람 전용으로 바뀌고, 나머지 채팅은 열람 전용으로 유지됩니다.",
   "v1msg.share.retryAndSend": "다시 공유하고 보내기",
-  "v1msg.share.sendLinksMany":
-    "메시지와 채팅 링크를 {destination}(으)로 보냅니다.",
-  "v1msg.share.sendLinksOne":
-    "메시지와 채팅 링크를 {destination}(으)로 보냅니다.",
+  "v1msg.share.sendLinksMany": "메시지와 채팅 링크를 {destination}에 보냅니다.",
+  "v1msg.share.sendLinksOne": "메시지와 채팅 링크를 {destination}에 보냅니다.",
   "v1msg.share.share": "공유",
   "v1msg.share.thisDm": "이 DM",
   "v1msg.share.titleMany": "이 채팅들을 공유할까요?",

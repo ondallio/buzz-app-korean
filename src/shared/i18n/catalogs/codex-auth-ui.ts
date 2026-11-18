@@ -19,7 +19,7 @@ export const ko: Record<keyof typeof en, string> = {
   "codexAuthUi.checking": "Codex 확인 중…",
   "codexAuthUi.missing": "Codex가 설치되어 있지 않습니다.",
   "codexAuthUi.download":
-    "Buzz 전용 Codex(약 130 MB)를 releases.openai.com에서 다운로드하여 최신 릴리스로 유지합니다. 터미널에서 사용하는 {command}는 변경하지 않으며, 같은 로그인 정보와 설정을 사용합니다.",
+    "Buzz 전용 Codex(약 130 MB)를 releases.openai.com에서 다운로드하여 최신 릴리스로 유지합니다. 터미널에서 사용하는 {command} 명령은 변경하지 않으며, 같은 로그인 정보와 설정을 사용합니다.",
   "codexAuthUi.details": "설정 세부 정보",
   "codexAuthUi.output": "설정 출력",
 };

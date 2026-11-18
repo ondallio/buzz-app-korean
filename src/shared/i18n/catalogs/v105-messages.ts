@@ -93,14 +93,14 @@ export const ko: Record<keyof typeof en, string> = {
   "v105msg.composer.oneForward":
     "전달된 메시지는 하나만 첨부할 수 있습니다. 다른 메시지를 붙여 넣으려면 먼저 제거하세요.",
   "v105msg.decline.notDirected":
-    "이 워크플로 메시지가 에이전트에게 지시하도록 설정되지 않아 {name}이(가) 응답하지 않았습니다.",
+    "이 워크플로 메시지가 에이전트에게 지시하도록 설정되지 않아 {name} 님이 응답하지 않았습니다.",
   "v105msg.decline.ownerOnly":
-    "{name}이(가) 이 워크플로 메시지에 응답하지 않았습니다. 이 커뮤니티는 에이전트를 사용할 수 있는 워크플로를 제한하므로 다른 사람은 내 에이전트를 사용할 수 없습니다. 워크플로의 실행 탭에 이유가 있다면 거기에서 확인할 수 있습니다.",
+    "{name} 님이 이 워크플로 메시지에 응답하지 않았습니다. 이 커뮤니티는 에이전트를 사용할 수 있는 워크플로를 제한하므로 다른 사람은 내 에이전트를 사용할 수 없습니다. 워크플로의 실행 탭에 이유가 있다면 거기에서 확인할 수 있습니다.",
   "v105msg.decline.yourAgent": "내 에이전트",
   "v105msg.dm.joiningOne":
-    "보내면 {names}이(가) 이 DM에 추가됩니다. 이전 메시지를 읽을 수 있습니다.",
+    "보내면 {names} 님이 이 DM에 추가됩니다. 이전 메시지를 읽을 수 있습니다.",
   "v105msg.dm.joiningMany":
-    "보내면 {names}이(가) 이 DM에 추가됩니다. 모두 이전 메시지를 읽을 수 있습니다.",
+    "보내면 {names} 님이 이 DM에 추가됩니다. 모두 이전 메시지를 읽을 수 있습니다.",
   "v105msg.emoji.remove": "이모지 제거",
   "v105msg.forward.attachmentIncluded": "첨부 파일 {count}개 포함",
   "v105msg.forward.attachmentsIncluded": "첨부 파일 {count}개 포함",
@@ -116,8 +116,8 @@ export const ko: Record<keyof typeof en, string> = {
     "복사하지 못했습니다. 다시 시도하거나 전달을 사용하세요.",
   "v105msg.forward.copyLink": "링크 복사",
   "v105msg.forward.disclosure":
-    "{audience}은(는) 출처를 볼 수 없더라도 이 메시지를 읽을 수 있습니다.",
-  "v105msg.forward.forwardTo": "{name}에게 전달",
+    "출처를 볼 수 없더라도 {audience}에게 이 메시지가 공개됩니다.",
+  "v105msg.forward.forwardTo": "{name}에 전달",
   "v105msg.forward.linkCopied": "메시지 링크를 복사했습니다",
   "v105msg.forward.linkCopyFailed":
     "링크를 복사하지 못했습니다. 다시 시도하세요.",
@@ -165,7 +165,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v105msg.recipient.channelOption": "{name}, 채널",
   "v105msg.recipient.findPersonOrChannel": "사람 또는 채널 찾기…",
   "v105msg.recipient.noPeopleOrChannels":
-    '"{query}"와(과) 일치하는 사람이나 채널이 없습니다.',
+    '"{query}"에 해당하는 사람이나 채널이 없습니다.',
   "v105msg.recipient.peopleAndChannels": "사람 및 채널",
   "v105msg.recipient.privateChannel": "비공개 채널",
   "v105msg.recipient.privateChannelOption": "{name}, 비공개 채널",

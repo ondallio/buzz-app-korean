@@ -44,7 +44,7 @@ export const ko: Record<keyof typeof en, string> = {
   "huddleMain.joinHuddle": "허들 참여",
   "huddleMain.joinActiveOne": "진행 중인 허들 참여 (참여자 {count}명)",
   "huddleMain.joinActiveMany": "진행 중인 허들 참여 (참여자 {count}명)",
-  "huddleMain.talkWith": "{name}에게 말하기",
+  "huddleMain.talkWith": "{name} 님에게 말하기",
   "huddleMain.startSolo": "허들 시작",
   "huddleMain.startOrJoin": "허들 시작 또는 참여",
   "huddleMain.confirmTitle": "허들을 시작할까요?",

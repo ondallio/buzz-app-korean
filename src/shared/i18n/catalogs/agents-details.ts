@@ -149,7 +149,7 @@ export const ko: Record<keyof typeof en, string> = {
   "agentsDetails.unavailableHarness": "사용할 수 없는 하네스",
   "agentsDetails.remote": "원격",
   "agentsDetails.localHarness": "로컬",
-  "agentsDetails.moveTo": "{name}을(를) {type}(으)로 이동할까요?",
+  "agentsDetails.moveTo": "{name} 님을 {type} 유형으로 이동할까요?",
   "agentsDetails.move": "에이전트를 이동할까요?",
   "agentsDetails.continue": "계속",
   "agentsDetails.unavailableHarnesses": "사용할 수 없는 하네스",
@@ -157,7 +157,7 @@ export const ko: Record<keyof typeof en, string> = {
   "agentsDetails.remoteNotice":
     "이 에이전트는 {type}에서 실행됩니다. 아직 로컬 하네스로 전환할 수 없습니다. 로컬에서 실행하려면 새 에이전트를 만들어 주세요.",
   "agentsDetails.localNotice":
-    "이 에이전트는 내 기기에서 실행됩니다. 아직 {type}(으)로 전환할 수 없습니다. 호스팅 환경에서 실행하려면 새 {type} 에이전트를 만들어 주세요.",
+    "이 에이전트는 내 기기에서 실행됩니다. 아직 {type} 유형으로 전환할 수 없습니다. 호스팅 환경에서 실행하려면 새 {type} 에이전트를 만들어 주세요.",
   "agentsDetails.migrationNotice":
     "설정을 저장하면 제공자가 변경됩니다. 에이전트는 Buzz에서 대화를 이어갑니다.",
   "agentsDetails.discardNotice":

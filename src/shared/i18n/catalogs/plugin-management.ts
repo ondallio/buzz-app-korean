@@ -368,9 +368,9 @@ export const ko: Record<keyof typeof en, string> = {
   "pluginManagement.rollbackWarning":
     "이 업데이트 이후에는 서명되지 않은 리비전으로 되돌릴 수 없습니다.",
   "pluginManagement.conflictKnown":
-    "{name}은(는) 이미 {source}에서 설치되어 있습니다. {destination}에서 설치하려면 먼저 제거하세요.",
+    "{name} 플러그인은 이미 {source}에서 설치되어 있습니다. {destination}에서 설치하려면 먼저 제거하세요.",
   "pluginManagement.conflictUnknown":
-    "{name}은(는) 이미 알 수 없는 출처에서 설치되어 있습니다. {destination}에서 설치하려면 먼저 제거하세요.",
+    "{name} 플러그인은 이미 알 수 없는 출처에서 설치되어 있습니다. {destination}에서 설치하려면 먼저 제거하세요.",
   "pluginManagement.import.pinMismatch":
     "이 저장소가 요청된 커밋과 일치하지 않습니다. 설치된 항목은 없습니다.",
   "pluginManagement.import.noUpdateSourceTry":
@@ -463,7 +463,7 @@ export const ko: Record<keyof typeof en, string> = {
     "이 플러그인은 Buzz에 포함되어 있습니다. 최신 버전을 사용하려면 Buzz를 업데이트하세요.",
   "pluginManagement.managed.unavailable": "추천 플러그인을 사용할 수 없음",
   "pluginManagement.managed.invalidFile":
-    "Buzz가 관리 플러그인 파일 {path}을(를) 사용할 수 없습니다. {reason}",
+    "Buzz가 다음 관리 플러그인 파일을 사용할 수 없습니다: {path}. {reason}",
   "pluginManagement.managed.recommendedBy": "{source}의 추천",
   "pluginManagement.managed.recommended": "추천 플러그인",
   "pluginManagement.managed.otherSource":
@@ -484,14 +484,14 @@ export const ko: Record<keyof typeof en, string> = {
   "pluginManagement.managed.noUrlPlugin":
     "이 URL에서 플러그인을 찾지 못했습니다.",
   "pluginManagement.managed.wrongUrl":
-    "이 URL의 플러그인은 {wanted}이(가) 아닌 {found}입니다.",
+    "이 URL의 플러그인은 {wanted} 플러그인이 아닌 {found} 플러그인입니다.",
   "pluginManagement.managed.noSource": "플러그인 출처를 찾지 못했습니다.",
   "pluginManagement.managed.wrongCommit":
-    "저장소에서 권장 커밋 {wanted}이(가) 아닌 커밋 {actual}을(를) 반환했습니다.",
+    "저장소에서 권장 커밋과 다른 커밋을 반환했습니다(반환: {actual}, 권장: {wanted}).",
   "pluginManagement.managed.wrongUnknownCommit":
-    "저장소에서 권장 커밋 {wanted}이(가) 아닌 알 수 없는 커밋을 반환했습니다.",
+    "저장소에서 권장 커밋 {wanted} 대신 알 수 없는 커밋을 반환했습니다.",
   "pluginManagement.managed.wrongPath":
-    "{path} 경로의 플러그인은 {wanted}이(가) 아닌 {found}입니다.",
+    "{path} 경로의 플러그인은 {wanted} 플러그인이 아닌 {found} 플러그인입니다.",
   "pluginManagement.managed.missingPath":
     "이 커밋의 {path} 경로에는 플러그인이 없습니다.",
   "pluginManagement.managed.requestTrust":
@@ -515,7 +515,7 @@ export const ko: Record<keyof typeof en, string> = {
   "pluginManagement.updates.reviewPermissions": "권한 검토",
   "pluginManagement.updates.reload": "업데이트 및 다시 로드",
   "pluginManagement.updates.later": "나중에",
-  "pluginManagement.updates.cannotStart": "{name}을(를) 시작할 수 없음",
+  "pluginManagement.updates.cannotStart": "{name} 플러그인을 시작할 수 없음",
   "pluginManagement.updates.retryActivation": "활성화 다시 시도",
   "pluginManagement.updates.recovery": "플러그인 복구 작업",
   "pluginManagement.updates.plugins": "플러그인",

@@ -82,7 +82,7 @@ export const ko: Record<keyof typeof en, string> = {
     "이 워크플로에는 메시지 보내기와 지연 외의 단계가 있어 에이전트가 응답하지 않습니다. 이 커뮤니티는 에이전트를 사용할 수 있는 워크플로를 제한하므로 다른 사람은 내 에이전트를 사용할 수 없습니다.",
   "v105agent.bestie.thisAgent": "이 에이전트",
   "v105agent.bestie.noLonger":
-    "{name}은(는) 더 이상 내 베스티가 아닙니다. 아래 항목은 아직 켜져 있습니다.",
+    "{name} 님은 더 이상 내 베스티가 아닙니다. 아래 항목은 아직 켜져 있습니다.",
   "v105agent.bestie.makeAgain": "다시 내 베스티로 지정",
   "v105agent.bestie.thisIsYours": "내 베스티입니다",
   "v105agent.bestie.pinned":
@@ -101,12 +101,12 @@ export const ko: Record<keyof typeof en, string> = {
     "지침에서 이 항목의 시작이나 끝 부분이 수정되었습니다. 지침에서 시작 줄과 끝 줄을 고쳐 주세요.",
   "v105agent.bestie.restore": "복원",
   "v105agent.bestie.onlyBestie": "정기 확인은 내 베스티만 합니다.",
-  "v105agent.bestie.turnOnFirst": "먼저 {feature}을(를) 켜세요.",
+  "v105agent.bestie.turnOnFirst": "먼저 {feature} 기능을 켜세요.",
   "v105agent.bestie.pausedInAttention":
-    "관심 탭에서 일시 중지되었습니다. 다시 시작하려면 {feature}을(를) 껐다가 다시 켜세요.",
+    "관심 탭에서 일시 중지되었습니다. 다시 시작하려면 {feature} 기능을 껐다가 다시 켜세요.",
   "v105agent.bestie.pausedNoWatches":
     "일시 중지됨: 이 기기에서 지켜보기가 실행되지 않고 있습니다. Attention 플러그인을 켜세요.",
-  "v105agent.bestie.partlySaved": "{feature}이(가) 일부만 저장되었습니다",
+  "v105agent.bestie.partlySaved": "{feature} 기능이 일부만 저장되었습니다",
   "v105agent.bestie.partlySavedHint":
     "일부가 빠져 있어 꺼진 것으로 표시됩니다. 제거하면 나머지를 정리합니다.",
   "v105agent.bestie.feature.memory": "나를 기억하기",

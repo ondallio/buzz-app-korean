@@ -299,7 +299,7 @@ export const ko: Record<keyof typeof en, string> = {
   "agentsBrowse.actionsFor": "{name} 작업",
   "agentsBrowse.unsavedName": "{name}의 저장하지 않은 변경 사항이 사라집니다.",
   "agentsBrowse.editName": "{name} 수정",
-  "agentsBrowse.deleteName": "{name}을(를) 삭제할까요?",
+  "agentsBrowse.deleteName": "{name} 팀을 삭제할까요?",
   "agentsBrowse.deleteTeamSynced":
     "모든 기기에서 이 팀이 삭제됩니다. 에이전트는 삭제되지 않지만 팀의 지침을 더 이상 받지 않습니다. 되돌릴 수 없습니다.",
   "agentsBrowse.deleteTeamLocal":
@@ -315,38 +315,37 @@ export const ko: Record<keyof typeof en, string> = {
   "agentsBrowse.noReadableAgents":
     "읽을 수 있는 원본에서 에이전트를 찾지 못했습니다.",
   "agentsBrowse.importTeamName": "{name} 팀 가져오기",
-  "agentsBrowse.importAsTeam": "{type}(으)로 {name} 팀 가져오기",
+  "agentsBrowse.importAsTeam": "{type} 유형으로 {name} 팀 가져오기",
   "agentsBrowse.chooseTeamType": "{name} 팀의 유형 선택",
   "agentsBrowse.importFrom": "{host}의 {name} 가져오기",
-  "agentsBrowse.importAsName": "{type}(으)로 {name} 가져오기",
+  "agentsBrowse.importAsName": "{type} 유형으로 {name} 가져오기",
   "agentsBrowse.chooseType": "{name}의 유형 선택",
-  "agentsBrowse.importAs": "{type}(으)로 가져오기",
+  "agentsBrowse.importAs": "{type} 유형으로 가져오기",
   "agentsBrowse.importName": "{name} 가져오기",
   "agentsBrowse.importedName": "{name} 가져옴",
   "agentsBrowse.fromName": "{name}에서",
-  "agentsBrowse.toName": "{name}(으)로",
+  "agentsBrowse.toName": "대상: {name}",
   "agentsBrowse.fromTooltip": "출발: {name}",
   "agentsBrowse.toTooltip": "도착: {name}",
   "agentsBrowse.fromQualified": "출발: {name} · {host}",
   "agentsBrowse.toQualified": "도착: {name} · {host}",
   "agentsBrowse.harnessHelp":
-    "이 클라이언트에서는 이 에이전트의 하네스를 사용할 수 없습니다. {plugins}를 확인하거나 이 하네스가 설정된 빌드를 사용하세요.",
+    "이 클라이언트에서는 이 에이전트의 하네스를 사용할 수 없습니다. {plugins}에서 확인하거나 이 하네스가 설정된 빌드를 사용하세요.",
   "agentsBrowse.legacyWarning":
     "{legacy}: 가져오기 전에 이전 런타임을 중지하세요. 그렇지 않으면 양쪽에서 응답할 수 있습니다. 각 에이전트의 키, 이름과 사진은 유지됩니다. 지침과 작업 공간은 선택한 유형이 지원할 때만 가져옵니다. 제공자, 모델과 나머지 설정은 나중에 선택하세요. 보관된 에이전트는 가능한 경우 여기에서 보관 해제됩니다.",
   "agentsBrowse.importedTeamMembers":
     "{team} 팀을 가져왔으며 {names}도 함께 가져왔습니다.",
   "agentsBrowse.importedTeamOnly": "{team} 팀을 가져왔습니다.",
   "agentsBrowse.teamSaveWithMembers":
-    "{team} 팀을 저장하지 못했습니다. {names}을(를) 가져왔습니다. 팀 화면에서 추가하세요.",
+    "{team} 팀을 저장하지 못했습니다. {names} 님을 가져왔습니다. 팀 화면에서 추가하세요.",
   "agentsBrowse.teamSaveNoMembers":
     "{team} 팀을 저장하지 못했습니다. 팀 화면에서 멤버를 추가하세요.",
-  "agentsBrowse.memberImportFailed":
-    "{name}을(를) 가져오지 못했습니다: {error}",
+  "agentsBrowse.memberImportFailed": "{name} 님을 가져오지 못했습니다: {error}",
   "agentsBrowse.otherCommunities":
-    "다른 커뮤니티에 있는 {names}은(는) 추가되지 않았습니다. 에이전트 가져오기로 여기에 추가한 다음 팀을 다시 가져오세요.",
+    "다른 커뮤니티에 있는 {names} 님은 추가되지 않았습니다. 에이전트 가져오기로 여기에 추가한 다음 팀을 다시 가져오세요.",
   "agentsBrowse.otherAccount":
-    "이 기기의 다른 계정에 있는 {names}은(는) 제외되었습니다.",
-  "agentsBrowse.wasntImported": "{name}을(를) 가져오지 못했습니다. {error}",
+    "이 기기의 다른 계정에 있는 {names} 님은 제외되었습니다.",
+  "agentsBrowse.wasntImported": "{name} 님을 가져오지 못했습니다. {error}",
   "agentsBrowse.readSnapshotFailed":
     "에이전트 스냅샷 파일을 읽지 못했습니다. {error}",
   "agentsBrowse.onlyMac": "이 Mac에만 있음",

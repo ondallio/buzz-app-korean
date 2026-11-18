@@ -172,7 +172,7 @@ export const ko: Record<keyof typeof en, string> = {
   "inbox.senderTwo": "{first}, {second}",
   "inbox.senderThree": "{first}, {second}, {third}",
   "inbox.senderMore": "{names} 외 {count}명",
-  "inbox.dmWith": "{name}와의 DM",
+  "inbox.dmWith": "{name} 님과의 DM",
   "inbox.reactedAria":
     "{sender}님이 내 메시지에 {reactions} 반응을 남겼습니다: {preview}",
   "inbox.reactionCaption": "{sender}님의 반응 {reactions}",

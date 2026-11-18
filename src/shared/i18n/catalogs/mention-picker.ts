@@ -135,8 +135,7 @@ export const ko: Record<keyof typeof en, string> = {
   "mentionPicker.manySelected": "{count}명 선택됨",
   "mentionPicker.addPerson": "다른 사람 추가…",
   "mentionPicker.findPerson": "사람 찾기…",
-  "mentionPicker.invalidRecipient":
-    "“{query}”은(는) 올바른 받는 사람이 아닙니다",
+  "mentionPicker.invalidRecipient": "올바른 받는 사람이 아닙니다: “{query}”",
   "mentionPicker.oneAtATime":
     "한 번에 한 사람만 선택할 수 있습니다. 다른 사람을 선택하려면 현재 선택을 제거하세요.",
   "mentionPicker.maxPeople":
@@ -152,7 +151,7 @@ export const ko: Record<keyof typeof en, string> = {
   "mentionPicker.chooseAgent": "에이전트 선택",
   "mentionPicker.changeAgents": "에이전트 변경",
   "mentionPicker.sendingAgents":
-    "{names}에게 보내는 중입니다. 에이전트를 변경합니다.",
+    "{names} 님에게 보내는 중입니다. 에이전트를 변경합니다.",
   "mentionPicker.inviteChannel":
     "멘션한 에이전트는 전송할 때 이 채널에 참여하며 이전 대화에 접근할 수 있습니다.",
   "mentionPicker.inviteChat":

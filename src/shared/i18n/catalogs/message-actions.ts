@@ -193,8 +193,8 @@ export const ko: Record<keyof typeof en, string> = {
     "이 에이전트에게 더 이상 다이렉트 메시지를 보낼 수 없습니다. 다른 사람을 선택하세요.",
   "messageActions.forward.failed":
     "메시지를 전달하지 못했습니다. 다시 시도하세요.",
-  "messageActions.forward.success": "{name}(으)로 메시지를 전달했습니다",
-  "messageActions.forward.open": "{name}과의 DM 열기",
+  "messageActions.forward.success": "{name}에 메시지를 전달했습니다",
+  "messageActions.forward.open": "{name} 님과의 DM 열기",
   "messageActions.forward.title": "메시지 전달",
   "messageActions.forward.description":
     "사람이나 채널에 사본을 보냅니다. 메모를 추가할 수 있습니다.",
