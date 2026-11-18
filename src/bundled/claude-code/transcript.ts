@@ -3,6 +3,7 @@
 // Code owns the file; nothing here writes or keeps it.
 import { isMessageTool } from "../../buzz-mcp/session-tools";
 import { readEventBody } from "../../features/agent-harness/turn-records";
+import { t } from "../../shared/i18n";
 import { readFile } from "../../buzz-mcp/app-client";
 import {
   postedAs,
@@ -176,7 +177,9 @@ export function claudeTurns(
           id: `${id}:${str(result.tool_use_id)}`,
           at,
           type: "status",
-          text: `The message above was not posted: ${text(result.content)}`,
+          text: t("fubuilderlab.tr.notPosted", {
+            reason: text(result.content),
+          }),
         });
       }
       const tool = tools.get(str(result.tool_use_id));

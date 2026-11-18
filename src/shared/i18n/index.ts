@@ -310,6 +310,10 @@ import {
   ko as v105ShellIdentityKo,
 } from "./catalogs/v105-shell-identity";
 import { en as v105SweepEn, ko as v105SweepKo } from "./catalogs/v105-sweep";
+import {
+  en as fuBuilderlabEn,
+  ko as fuBuilderlabKo,
+} from "./catalogs/fu-builderlab";
 
 export const english = {
   ...coreEn,
@@ -402,6 +406,7 @@ export const english = {
   ...v105ShellIdentityEn,
   ...v105ChannelsEn,
   ...v105SweepEn,
+  ...fuBuilderlabEn,
 } as const;
 export const korean: Partial<Record<keyof typeof english, string>> = {
   ...coreKo,
@@ -494,6 +499,7 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...v105ShellIdentityKo,
   ...v105ChannelsKo,
   ...v105SweepKo,
+  ...fuBuilderlabKo,
 };
 export type TranslationKey = keyof typeof english;
 type Variables<S extends string> =

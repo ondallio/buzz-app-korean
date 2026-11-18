@@ -1,4 +1,4 @@
-import { useLanguage } from "../../shared/i18n";
+import { t, useLanguage } from "../../shared/i18n";
 import { historyPresentation } from "../../features/agents/history-presentation";
 import {
   profileHistoryActive,
@@ -151,6 +151,7 @@ export function ProfilePanel({
     communities?: CommunityReader | undefined;
     linkRenderers?: ConversationExtensions["links"] | undefined;
   }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const activityKey = profileActivityViewKey(target);
   const opening = activityKey ? "activity" : "info";
@@ -205,9 +206,9 @@ export function ProfilePanel({
   );
   const pubkey = profilePanelKey(target) ?? activityKey;
   const owned = useAgent(agents, pubkey ?? "");
-  if (!pubkey) return <p>Unsupported profile.</p>;
+  if (!pubkey) return <p>{t("fubuilderlab.profile.unsupported")}</p>;
   if (connection.status !== "ready")
-    return <p>Connect to a community to view this profile.</p>;
+    return <p>{t("fubuilderlab.profile.connectFirst")}</p>;
   // An agent's activity opens a turn's conversation in this community.
   const openConversation = conversationOpener(
     navigation,
@@ -293,6 +294,7 @@ function OwnedAgentProfile({
   openConversation: AgentViewProps["openConversation"];
   close(): void;
 }) {
+  useLanguage();
   const { types } = useAgents(agents);
   const owned = useAgent(agents, pubkey);
   const channels = useChannelChoices(session.channels);
@@ -375,7 +377,9 @@ function OwnedAgentProfile({
       />
       {leaving && (
         <DiscardChanges
-          description={`Your unsaved changes to ${owned.agent.name} will be lost.`}
+          description={t("agentsBrowse.unsavedName", {
+            name: owned.agent.name,
+          })}
           onKeep={() => setLeaving(undefined)}
           onDiscard={() => {
             setLeaving(undefined);
@@ -550,7 +554,9 @@ function ProfileDetails({
   const name = identityName(
     pubkey,
     profile?.name ??
-      (displayAgent ? "Unknown agent" : (formatPublicKey(pubkey) ?? pubkey)),
+      (displayAgent
+        ? t("fubuilderlab.profile.unknownAgent")
+        : (formatPublicKey(pubkey) ?? pubkey)),
   );
   // The verification line carries the check, so it keeps the handle when the
   // name already is it.
@@ -613,7 +619,7 @@ function ProfileDetails({
     <section
       ref={region}
       data-buzz-ui=""
-      aria-label="Profile details"
+      aria-label={t("fubuilderlab.profile.details")}
       tabIndex={-1}
       className={styles.root}
     >
@@ -626,7 +632,7 @@ function ProfileDetails({
               agentPubkey={pubkey}
               channelId={context?.channelId}
               src={picture}
-              alt={`${name} avatar`}
+              alt={t("fubuilderlab.profile.avatar", { name })}
               fallback={name}
               size="fill"
               shape={displayAgent ? "squircle" : "circle"}
@@ -654,8 +660,12 @@ function ProfileDetails({
             {profile?.verified && (
               <p className="text-body-sm text-secondary">
                 {profile.verified.status === "checked"
-                  ? `Name verified by ${profile.verified.issuerLabel}`
-                  : `Cached verification from ${profile.verified.issuerLabel}`}{" "}
+                  ? t("fubuilderlab.profile.verifiedBy", {
+                      issuer: profile.verified.issuerLabel,
+                    })
+                  : t("fubuilderlab.profile.cachedVerification", {
+                      issuer: profile.verified.issuerLabel,
+                    })}{" "}
                 {otherName !== `@${profile.verified.username}` &&
                   `· @${profile.verified.username}`}
               </p>
@@ -663,9 +673,11 @@ function ProfileDetails({
             {presence !== "unknown" && (
               <p className="text-body-sm text-primary">
                 {
-                  { online: "Online", away: "Away", offline: "Offline" }[
-                    presence
-                  ]
+                  {
+                    online: t("shell.profile.online"),
+                    away: t("shell.profile.away"),
+                    offline: t("shell.profile.offline"),
+                  }[presence]
                 }
               </p>
             )}
@@ -685,7 +697,9 @@ function ProfileDetails({
                   aria-haspopup="dialog"
                   onClick={() => statusEditor.open()}
                 >
-                  {userStatus ? "Update status" : "Set a status"}
+                  {userStatus
+                    ? t("fubuilderlab.profile.updateStatus")
+                    : t("shell.profile.setStatus")}
                 </Button>
               )}
               {canMessage && (
@@ -695,7 +709,7 @@ function ProfileDetails({
                   loading={openingMessage}
                   onClick={() => void openMessage()}
                 >
-                  Message
+                  {t("fubuilderlab.profile.message")}
                 </Button>
               )}
               {canEdit && (
@@ -704,7 +718,7 @@ function ProfileDetails({
                   variant={picture ? "glass" : "subtle"}
                   onClick={editProfile}
                 >
-                  Edit profile
+                  {t("fubuilderlab.profile.editProfile")}
                 </Button>
               )}
             </div>
@@ -719,11 +733,11 @@ function ProfileDetails({
           value={selectedTab}
           onValueChange={setTab}
           items={[
-            { value: "info", label: "Info" },
+            { value: "info", label: t("fubuilderlab.profile.info") },
             ...sections.map(({ value, label }) => ({ value, label })),
-            { value: "channels", label: "Channels" },
+            { value: "channels", label: t("fubuilderlab.profile.channels") },
           ]}
-          label="Profile sections"
+          label={t("fubuilderlab.profile.sections")}
           variant="panel"
           renderPanel={(selected) => (
             <div className={styles.tabContent}>
@@ -735,22 +749,24 @@ function ProfileDetails({
                     {profile?.verified && (
                       <SettingsGroup>
                         <PreferenceRow
-                          title={`Name verified by ${profile.verified.issuerLabel}`}
+                          title={t("fubuilderlab.profile.verifiedBy", {
+                            issuer: profile.verified.issuerLabel,
+                          })}
                           subtitle={
                             <>
-                              Last verified{" "}
+                              {t("fubuilderlab.profile.lastVerified")}{" "}
                               <time dateTime={verificationIso}>
                                 {verificationIso
                                   ? verificationDate?.toLocaleString()
-                                  : `Unix time ${profile.verified.verifiedAt}`}
+                                  : t("fubuilderlab.profile.unixTime", {
+                                      time: profile.verified.verifiedAt,
+                                    })}
                               </time>
                               .{" "}
                               {profile.verified.status === "cached"
-                                ? "Cached evidence; reconnect to check for updates. "
+                                ? `${t("fubuilderlab.profile.cachedEvidence")} `
                                 : ""}
-                              This verifies the name and public key at that
-                              time, and does not confirm current account access
-                              or current issuer endorsement.
+                              {t("fubuilderlab.profile.verifiesNote")}
                             </>
                           }
                         />
@@ -773,7 +789,7 @@ function ProfileDetails({
                     <div className={styles.publicKey}>
                       <SettingsGroup>
                         <PreferenceRow
-                          title="Public key"
+                          title={t("agentsDetails.publicKey")}
                           subtitle={
                             <code className={styles.keyValue}>{npub}</code>
                           }
@@ -781,22 +797,25 @@ function ProfileDetails({
                             <Button
                               size="compact"
                               variant="ghost"
-                              aria-label="Copy npub"
+                              aria-label={t("identity.publicKey.copyLabel")}
                               onClick={() => {
                                 setCopyStatus("");
                                 void Promise.resolve()
                                   .then(() => writeClipboardText(npub))
                                   .then(
-                                    () => setCopyStatus("Public key copied."),
                                     () =>
                                       setCopyStatus(
-                                        "Could not copy. Select the public key above to copy it.",
+                                        t("identity.publicKey.copied"),
+                                      ),
+                                    () =>
+                                      setCopyStatus(
+                                        t("fubuilderlab.profile.copyFailed"),
                                       ),
                                   );
                               }}
                             >
                               <CopyIcon size={16} aria-hidden="true" />
-                              Copy
+                              {t("identity.publicKey.copy")}
                             </Button>
                           }
                         />
@@ -818,12 +837,12 @@ function ProfileDetails({
                     {(!profile ||
                       (profile.verified && (status === "error" || retrying))) &&
                       (status === "loading" ? (
-                        <p role="status">Loading profile…</p>
+                        <p role="status">{t("fubuilderlab.profile.loading")}</p>
                       ) : (
                         <p role={status === "error" ? "alert" : undefined}>
                           {status === "error"
-                            ? "Could not load this profile."
-                            : "No profile metadata is available in this community."}
+                            ? t("fubuilderlab.profile.loadFailed")
+                            : t("fubuilderlab.profile.noMetadata")}
                         </p>
                       ))}
                     {((!profile && status !== "loading") ||
@@ -839,7 +858,7 @@ function ProfileDetails({
                           retry((value) => value + 1);
                         }}
                       >
-                        Retry profile
+                        {t("fubuilderlab.profile.retry")}
                       </Button>
                     )}
                   </>,

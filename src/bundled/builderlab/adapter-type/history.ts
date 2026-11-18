@@ -1,6 +1,7 @@
 // A remote agent's stored sessions as the host's turn-transcript model.
 // Builderlab keeps the messages; nothing here writes or keeps them.
 import { isMessageTool } from "../../../buzz-mcp/message-tools";
+import { t } from "../../../shared/i18n";
 import {
   promptMessage,
   promptSections,
@@ -236,7 +237,7 @@ export function sessionTurns(
           id: key,
           at,
           type: "status",
-          text: "Earlier messages were summarized.",
+          text: t("fubuilderlab.tr.summarized"),
         });
       } else if (object(content.thinking)) {
         const thought = str(object(content.thinking)?.thinking);

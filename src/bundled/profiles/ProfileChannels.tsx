@@ -5,6 +5,7 @@ import { Button } from "../../shared/design-system/ui/Button";
 import { NavigationItem } from "../../shared/design-system/ui/NavigationItem";
 import { channelIcon } from "../../features/channels/channel-icon";
 import styles from "./Profiles.module.css";
+import { t, useLanguage } from "../../shared/i18n";
 
 /** Only the viewer's listed channels with an exact roster match are evidence. */
 export function ProfileChannels({
@@ -20,6 +21,7 @@ export function ProfileChannels({
   viewer: string | undefined;
   navigation: Navigation | undefined;
 }) {
+  useLanguage();
   const list = useChannelList(session.channels);
   const channels = (
     list.status === "ready" || list.status === "error" ? list.channels : []
@@ -43,26 +45,29 @@ export function ProfileChannels({
         channel.members?.includes(pubkey),
     );
   return (
-    <section aria-label="Channels" className="flex flex-col gap-2">
+    <section
+      aria-label={t("fubuilderlab.profile.channels")}
+      className="flex flex-col gap-2"
+    >
       <div className={styles.channelList}>
         {(list.status === "idle" || list.status === "loading") && (
           <p className={styles.channelNote} role="status">
-            Loading channels…
+            {t("search.loadingChannels")}
           </p>
         )}
         {list.status === "unavailable" && (
           <p className={styles.channelNote}>
-            Channel membership is unavailable.
+            {t("fubuilderlab.pc.unavailable")}
           </p>
         )}
         {list.status === "error" && (
           <div className={styles.channelNote}>
-            <p role="alert">Could not finish loading channels.</p>
+            <p role="alert">{t("fubuilderlab.pc.loadFailed")}</p>
             <Button
               size="compact"
               onClick={() => session.channels.refreshList?.()}
             >
-              Retry channels
+              {t("fubuilderlab.pc.retry")}
             </Button>
           </div>
         )}
@@ -70,16 +75,16 @@ export function ProfileChannels({
           <p
             className={`${styles.channelNote} m-0 text-body-sm text-secondary`}
           >
-            Some memberships for this identity are unclassified and omitted.
+            {t("fubuilderlab.pc.unclassified")}
           </p>
         )}
         {list.status === "ready" && !channels.length && (
           <p className={styles.channelNote}>
             {unclassifiedMembership
-              ? `No matching channels with a known visible type; other memberships could not be classified.${list.coverage === "partial" ? " More channels may exist outside the loaded list." : ""}`
+              ? `${t("fubuilderlab.pc.noMatchingClassified")}${list.coverage === "partial" ? ` ${t("fubuilderlab.pc.moreMayExist")}` : ""}`
               : list.coverage === "partial"
-                ? "No matching channels in the loaded list; more channels may exist."
-                : "No visible channels with verified membership for this identity."}
+                ? t("fubuilderlab.pc.noMatchingPartial")
+                : t("fubuilderlab.pc.noVisible")}
           </p>
         )}
         {!!channels.length && (
@@ -112,12 +117,12 @@ export function ProfileChannels({
       </div>
       {list.coverage === "partial" && !!channels.length && (
         <p className="text-body-sm text-secondary">
-          More channels may exist outside the loaded list.
+          {t("fubuilderlab.pc.moreMayExist")}
         </p>
       )}
       {channels.length > 0 && (!communityOrigin || !navigation) && (
         <p className="text-body-sm text-secondary">
-          Channel navigation is unavailable here.
+          {t("fubuilderlab.pc.navigationUnavailable")}
         </p>
       )}
     </section>
