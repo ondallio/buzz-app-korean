@@ -4,6 +4,7 @@ import {
   type DisplayMessage,
 } from "../shared/i18n/deferred-message";
 import { t, useLanguage, english, type TranslationKey } from "../shared/i18n";
+import { pluginName as pluginDisplayName } from "../shared/i18n/plugin-labels";
 import { SettingsGroup } from "../shared/design-system/ui/SettingsGroup";
 import { IconButton } from "../shared/design-system/ui/IconButton";
 import { PencilSimpleIcon, XIcon } from "../shared/design-system/icons";
@@ -271,12 +272,15 @@ function useShortcutGroups({
   );
   const sendWithModEnter = useSendWithModEnterPreference();
 
-  const pluginName = (id: string) =>
-    (configuration.status === "ready"
-      ? configuration.catalog.plugins.find(
-          (plugin) => plugin.manifest.id === id,
-        )?.manifest.name
-      : undefined) ?? id;
+  const pluginName = (id: string) => {
+    const plugin =
+      configuration.status === "ready"
+        ? configuration.catalog.plugins.find(
+            (plugin) => plugin.manifest.id === id,
+          )
+        : undefined;
+    return plugin ? pluginDisplayName(plugin) : id;
+  };
   const row = (
     key: string,
     shortcut: NormalizedShortcut,

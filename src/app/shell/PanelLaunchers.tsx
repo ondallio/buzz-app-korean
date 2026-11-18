@@ -1,3 +1,5 @@
+import { useLanguage } from "../../shared/i18n";
+import { ownedPanelLabel } from "../../shared/i18n/owned-labels";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
 import { Component, useState, type ReactNode } from "react";
 import { SidebarIcon } from "../../shared/design-system/icons/index";
@@ -12,13 +14,14 @@ export function PanelLaunchers({
   selected: RegisteredPanel | undefined;
   launch(panel: RegisteredPanel, trigger: HTMLButtonElement): void;
 }) {
+  useLanguage();
   return panels
     .filter((panel) => panel.launcher || panel.toolbar)
     .map((panel) =>
       panel.toolbar ? (
         <ToolbarBoundary
           key={`${panel.key}:${panel.revision}`}
-          title={panel.title}
+          title={ownedPanelLabel(panel)}
         >
           <panel.toolbar />
         </ToolbarBoundary>
@@ -27,8 +30,8 @@ export function PanelLaunchers({
           type="button"
           key={`${panel.key}:${panel.revision}`}
           variant="chrome"
-          aria-label={panel.title}
-          title={panel.title}
+          aria-label={ownedPanelLabel(panel)}
+          title={ownedPanelLabel(panel)}
           aria-expanded={panel === selected}
           onClick={(event) => launch(panel, event.currentTarget)}
           icon={

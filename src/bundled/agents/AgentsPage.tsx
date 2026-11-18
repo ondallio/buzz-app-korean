@@ -1,3 +1,4 @@
+import { ownedAgentTypeLabel } from "../../shared/i18n/owned-labels";
 import { t, useLanguage } from "../../shared/i18n";
 import { rich } from "../../shared/i18n/rich";
 import { formattingLocale } from "../../shared/i18n/language";
@@ -180,10 +181,14 @@ function summaryOf(agent: Agent, type: RegisteredAgentType | undefined) {
       : t("agentsBrowse.harnessUnavailable");
   if (agent.unfinished) return t("agentsBrowse.setupUnfinished");
   if (!type) return t("agentsBrowse.typeUnavailable");
+  const title = ownedAgentTypeLabel(type.key, type.title);
   try {
-    return type.summary?.(agent).trim() || type.title;
+    const summary = type.summary?.(agent).trim();
+    return summary
+      ? ownedAgentTypeLabel(`${type.key}#summary`, summary)
+      : title;
   } catch {
-    return type.title;
+    return title;
   }
 }
 
@@ -2160,7 +2165,10 @@ function ImportAgents({
     >
       {types.map((item) => (
         <MenuRadioItem key={item.key} value={item.key} closeOnClick>
-          <ChoiceRow label={item.title} leading={<TypeIcon type={item} />} />
+          <ChoiceRow
+            label={ownedAgentTypeLabel(item.key, item.title)}
+            leading={<TypeIcon type={item} />}
+          />
         </MenuRadioItem>
       ))}
     </MenuRadioGroup>
@@ -2386,9 +2394,9 @@ function ImportType({ type }: { type: RegisteredAgentType | undefined }) {
         type:
           type?.icon && type.icon !== RobotIcon ? (
             <TypeIcon type={type} />
-          ) : (
-            (type?.title ?? null)
-          ),
+          ) : type ? (
+            ownedAgentTypeLabel(type.key, type.title)
+          ) : null,
       })}
     </>
   );

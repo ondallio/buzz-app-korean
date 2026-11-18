@@ -1,3 +1,5 @@
+import { useLanguage } from "../../shared/i18n";
+import { ownedPanelLabel } from "../../shared/i18n/owned-labels";
 import type { Context } from "@deepseek-ai/cordis";
 import {
   useEffect,
@@ -59,6 +61,7 @@ export function ConversationHost({
   threadId,
   children,
 }: ConversationHostProps) {
+  useLanguage();
   const presented = useConversationPresentation();
   const presentation = useRef(presented);
   const trigger = useRef<HTMLElement | null>(null);
@@ -162,7 +165,7 @@ export function ConversationHost({
       {presented && overlay?.panel && (
         <Dialog
           open
-          title={overlay.panel.title}
+          title={ownedPanelLabel(overlay.panel)}
           placement="right"
           height="stable"
           finalFocus={() =>

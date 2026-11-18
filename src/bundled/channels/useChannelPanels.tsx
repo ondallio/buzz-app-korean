@@ -1,3 +1,4 @@
+import { ownedPanelLabel } from "../../shared/i18n/owned-labels";
 import { t, useLanguage } from "../../shared/i18n";
 import {
   type RefObject,
@@ -213,7 +214,9 @@ export function useChannelPanels(
       // Its own landing, like PanelCard's, for focus handed to a floating dock.
       <Panel
         tabIndex={-1}
-        aria-label={t("v1shell.panels.panel", { name: selected.panel.title })}
+        aria-label={t("v1shell.panels.panel", {
+          name: ownedPanelLabel(selected.panel),
+        })}
         onKeyDown={(event) => {
           // Shift+Escape is Mark all as read, not a dismissal.
           if (event.key === "Escape" && !event.shiftKey) {
@@ -239,7 +242,7 @@ export function useChannelPanels(
         {selected && selected.panel.channelPlacement !== "side" && (
           <section
             aria-label={t("v1shell.panels.drawer", {
-              name: selected.panel.title,
+              name: ownedPanelLabel(selected.panel),
             })}
           >
             <PanelView

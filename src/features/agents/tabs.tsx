@@ -1,3 +1,4 @@
+import { ownedAgentTabLabel } from "../../shared/i18n/owned-labels";
 import { t, useLanguage } from "../../shared/i18n";
 import {
   errorMessage,
@@ -111,7 +112,7 @@ export function agentSections({
         role === "activity" &&
         title === "Activity"
           ? t("agentMemory.activity")
-          : title,
+          : ownedAgentTabLabel(`${type?.key}#${id}`, title),
       render: () => (
         <EditorBase
           key={
@@ -191,7 +192,7 @@ export function agentSections({
         label:
           key === "buzz.watching/watching" && title === "Attention"
             ? t("agentMemory.attention")
-            : title,
+            : ownedAgentTabLabel(key, title),
         render: () => (
           <Component agent={agent} open={openLink} canOpen={canOpenLink} />
         ),

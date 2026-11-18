@@ -1,3 +1,4 @@
+import { pluginDescription, pluginName } from "../../shared/i18n/plugin-labels";
 import {
   t,
   translate,
@@ -263,11 +264,16 @@ export function useSearchSettings({
               )?.label ?? "Other";
             const rank = Math.min(
               matchRank(plugin.manifest.name, needle) ?? Infinity,
+              matchRank(pluginName(plugin, "ko"), needle) ?? Infinity,
               (matchRank(category, needle) ?? Infinity) + 1,
               (matchRank(categoryLabel(category, "ko"), needle) ?? Infinity) +
                 1,
               (matchRank("plugins " + plugin.manifest.description, needle) ??
                 Infinity) + 2,
+              (matchRank(
+                `플러그인 ${pluginDescription(plugin, "ko") ?? ""}`,
+                needle,
+              ) ?? Infinity) + 2,
             );
             if (!Number.isFinite(rank)) return [];
             const restricted =
@@ -292,14 +298,14 @@ export function useSearchSettings({
               controlDestination(
                 key,
                 categoryLabel(category, language),
-                plugin.manifest.name,
+                pluginName(plugin),
                 <>
                   {plugin.manifest.id === "buzz.channels" ? (
                     <PreferenceRow
                       variant="search"
                       icon={<SquaresFourIcon size={21} />}
                       title={categoryLabel(category, language)}
-                      subtitle={plugin.manifest.name}
+                      subtitle={pluginName(plugin)}
                       trailing={
                         <span className="text-body-sm text-subtle">
                           {t("search.required")}
@@ -311,9 +317,9 @@ export function useSearchSettings({
                       variant="search"
                       icon={<SquaresFourIcon size={21} />}
                       label={categoryLabel(category, language)}
-                      description={plugin.manifest.name}
+                      description={pluginName(plugin)}
                       aria-label={t("search.enablePlugin", {
-                        name: plugin.manifest.name,
+                        name: pluginName(plugin),
                       })}
                       checked={plugin.enabled}
                       readOnly={blocked}

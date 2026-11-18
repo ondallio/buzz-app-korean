@@ -32,6 +32,7 @@ import {
 } from "../../shared/design-system/icons";
 import styles from "./ChannelMembersDialog.module.css";
 import { privacyConsequence } from "./ChannelPrivacyConfirmation";
+import { pluginSubjectLabel } from "../../shared/i18n/plugin-labels";
 import {
   soloLabels,
   soloRetainedAccessWarning,
@@ -105,7 +106,9 @@ export function ChannelGeneralAccess({
                 ? t("channelForms.general.anyRead")
                 : channel.visibility === "private"
                   ? policy
-                    ? t("v105ch.general.subjectRead", { subject: place })
+                    ? t("v105ch.general.subjectRead", {
+                        subject: pluginSubjectLabel(place),
+                      })
                     : t(
                         place === "chat"
                           ? "channelForms.general.chatRead"
@@ -119,7 +122,7 @@ export function ChannelGeneralAccess({
                 : channel.joinRole === "member"
                   ? policy
                     ? t("v105ch.general.newParticipateExisting", {
-                        subject: policy.subject,
+                        subject: pluginSubjectLabel(policy.subject),
                       })
                     : t("channelForms.general.newParticipateExisting")
                   : t("channelForms.general.newUnknown")}
@@ -452,7 +455,7 @@ function ChannelGeneralAccessEditor({
                       choice.joinRole === "guest"
                         ? "v105ch.general.subjectNewView"
                         : "v105ch.general.subjectNewParticipate",
-                      { subject: place },
+                      { subject: pluginSubjectLabel(place) },
                     )
                   : t(
                       choice.joinRole === "guest"

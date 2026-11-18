@@ -1,8 +1,12 @@
 import { languagePreference, translate } from "./index";
 import type { en } from "./catalogs/navigation";
+import type { en as pluginsEn } from "./catalogs/fu-plugins";
 import type { Language } from "./language";
 
-type OwnedLabel = readonly [source: string, key: keyof typeof en];
+type OwnedLabel = readonly [
+  source: string,
+  key: keyof typeof en | keyof typeof pluginsEn,
+];
 const pages: Readonly<Record<string, OwnedLabel>> = {
   "buzz.channels/channels": ["Channels", "navigation.messages"],
   "buzz.inbox/inbox": ["Activity", "navigation.activity"],
@@ -15,6 +19,42 @@ const pages: Readonly<Record<string, OwnedLabel>> = {
   "buzz.workflows/workflows": ["Workflows", "navigation.workflows"],
   "buzz.relay-notes/notes": ["Shared notes", "navigation.sharedNotes"],
   "buzz.repos/repos": ["Repository", "navigation.repository"],
+  "buzz.bestie/bestie": ["Bestie", "fuplugins.page.bestie"],
+};
+const panels: Readonly<Record<string, OwnedLabel>> = {
+  "buzz.channels/canvas": ["Canvas", "fuplugins.panel.canvas"],
+  "buzz.terminal/terminal": ["Terminal", "fuplugins.panel.terminal"],
+  "buzz.changesets/changes": ["Changes", "fuplugins.panel.changes"],
+  "block.builderlab/app": ["App", "fuplugins.panel.app"],
+  "buzz.file-viewer/file-viewer": ["File viewer", "fuplugins.panel.fileViewer"],
+  "buzz.huddles/huddles": ["Huddles", "fuplugins.panel.huddles"],
+  "buzz.profiles/profile": ["Profile", "fuplugins.panel.profile"],
+};
+const agentSettingsTab = ["Settings", "fuplugins.agentTab.settings"] as const;
+/** Agent type tabs by `typeKey#tabId`, and added tabs by contribution key. */
+const agentTabs: Readonly<Record<string, OwnedLabel>> = {
+  "buzz.claude-code/claude-code#settings": agentSettingsTab,
+  "buzz.codex/codex#settings": agentSettingsTab,
+  "buzz.goose/goose#settings": agentSettingsTab,
+  "buzz.pi/pi#settings": agentSettingsTab,
+  "block.builderlab/builderlab#settings": agentSettingsTab,
+  "buzz.mesh-compute/mesh#prompt": agentSettingsTab,
+  "buzz.mesh-compute/mesh#transcript": [
+    "Transcripts",
+    "fuplugins.agentTab.transcripts",
+  ],
+  "buzz.bestie/bestie": ["Bestie", "fuplugins.page.bestie"],
+  "buzz.bestie/former-bestie": [
+    "Former Bestie",
+    "fuplugins.agentTab.formerBestie",
+  ],
+};
+const agentTypes: Readonly<Record<string, OwnedLabel>> = {
+  "buzz.mesh-compute/mesh": ["Shared Compute", "fuplugins.agentType.mesh"],
+  "buzz.mesh-compute/mesh#summary": [
+    "Shared compute",
+    "fuplugins.agentType.meshSummary",
+  ],
 };
 const settings: Readonly<Record<string, OwnedLabel>> = {
   profile: ["Profile", "navigation.profile"],
@@ -68,6 +108,32 @@ export function ownedPageLabel(
   language = languagePreference(),
 ): string {
   return label(pages, key, title, language);
+}
+
+/** Panel tab and header titles, matched like {@link ownedPageLabel}. */
+export function ownedPanelLabel(
+  panel: { readonly key: string; readonly title: string },
+  language = languagePreference(),
+): string {
+  return label(panels, panel.key, panel.title, language);
+}
+
+/** Agent tab titles: `key` is `typeKey#tabId` for a type's tab, or an added tab's contribution key. */
+export function ownedAgentTabLabel(
+  key: string,
+  title: string,
+  language = languagePreference(),
+): string {
+  return label(agentTabs, key, title, language);
+}
+
+/** Bundled agent type title, or with `#summary` its one-line summary. */
+export function ownedAgentTypeLabel(
+  key: string,
+  title: string,
+  language = languagePreference(),
+): string {
+  return label(agentTypes, key, title, language);
 }
 
 /** Projects navigation labels without mutating cards or their registration data. */

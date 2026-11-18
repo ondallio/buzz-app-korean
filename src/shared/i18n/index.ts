@@ -316,6 +316,7 @@ import {
   ko as fuBuilderlabKo,
 } from "./catalogs/fu-builderlab";
 import { en as fuTermsEn, ko as fuTermsKo } from "./catalogs/fu-terms";
+import { en as fuPluginsEn, ko as fuPluginsKo } from "./catalogs/fu-plugins";
 
 export const english = {
   ...coreEn,
@@ -411,6 +412,7 @@ export const english = {
   ...fuBestieEn,
   ...fuBuilderlabEn,
   ...fuTermsEn,
+  ...fuPluginsEn,
 } as const;
 export const korean: Partial<Record<keyof typeof english, string>> = {
   ...coreKo,
@@ -506,6 +508,7 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...fuBestieKo,
   ...fuBuilderlabKo,
   ...fuTermsKo,
+  ...fuPluginsKo,
 };
 export type TranslationKey = keyof typeof english;
 type Variables<S extends string> =

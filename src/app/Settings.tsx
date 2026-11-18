@@ -106,6 +106,7 @@ import { SettingsSectionLink } from "../features/navigation/SettingsSectionLink"
 
 import { pluginCategoryDefinitions } from "./plugin-categories";
 import { scrollport } from "./scrollport";
+import { pluginDescription, pluginName } from "../shared/i18n/plugin-labels";
 
 // Exit animations retain DOM briefly; retired results must stop accepting focus.
 const PluginListEntry = forwardRef<HTMLDivElement, HTMLMotionProps<"div">>(
@@ -426,7 +427,7 @@ function PluginDetails({
       id="plugin-details"
       className={styles.pluginAside}
       aria-label={t("settingsHost.detailsNamed", {
-        name: plugin.manifest.name,
+        name: pluginName(plugin),
       })}
       onKeyDown={(event) => {
         if (event.defaultPrevented || event.key !== "Escape" || event.shiftKey)
@@ -438,7 +439,7 @@ function PluginDetails({
       <div className={styles.pluginAsideHeader}>
         <div className={styles.pluginAsideIdentity}>
           <PluginIcon key={plugin.manifest.id} plugin={plugin} size={48} />
-          <h2>{plugin.manifest.name}</h2>
+          <h2>{pluginName(plugin)}</h2>
           <div className={styles.pluginBadges}>
             {plugin.source === "bundled" ? (
               <span className={styles.pluginInstallBadge}>
@@ -458,9 +459,9 @@ function PluginDetails({
               </span>
             )}
           </div>
-          {plugin.manifest.description && (
+          {pluginDescription(plugin) && (
             <p className={styles.pluginAsideDescription}>
-              {plugin.manifest.description}
+              {pluginDescription(plugin)}
             </p>
           )}
         </div>
@@ -612,7 +613,7 @@ function PluginDetails({
         <p
           role="group"
           aria-label={t("settingsHost.settingsNamed", {
-            name: plugin.manifest.name,
+            name: pluginName(plugin),
           })}
           className="m-0 text-body-sm text-secondary"
         >
@@ -644,7 +645,7 @@ function PluginDetails({
         <section
           className={styles.pluginAsideSection}
           aria-label={t("settingsHost.readmeNamed", {
-            name: plugin.manifest.name,
+            name: pluginName(plugin),
           })}
         >
           <PluginReadme key={plugin.manifest.id} text={readme} />
@@ -1039,8 +1040,10 @@ export function Settings({
           (pluginFilter === "all" || isEssentialPlugin(plugin)) &&
           [
             plugin.manifest.name,
+            pluginName(plugin),
             plugin.manifest.id,
             plugin.manifest.description,
+            pluginDescription(plugin),
             ...(plugin.manifest.discovery?.tags ?? []),
           ].some((value) => value?.toLowerCase().includes(query)),
       ),
@@ -1282,7 +1285,7 @@ export function Settings({
                 !!updateChecks[id]?.available;
               const name = (
                 <span className={styles.pluginName}>
-                  <span>{plugin.manifest.name}</span>
+                  <span>{pluginName(plugin)}</span>
                   {plugin.source === "bundled" && (
                     <CheckCircleIcon
                       size={14}
@@ -1323,11 +1326,11 @@ export function Settings({
                       className={styles.pluginRow}
                       data-enabled={plugin.enabled}
                       aria-label={t("settingsHost.viewDetails", {
-                        name: plugin.manifest.name,
+                        name: pluginName(plugin),
                       })}
                       aria-describedby={
                         [
-                          plugin.manifest.description
+                          pluginDescription(plugin)
                             ? `plugin-description-${id}`
                             : null,
                           plugin.source === "external" &&
@@ -1363,7 +1366,7 @@ export function Settings({
                             id={`plugin-description-${id}`}
                             className={styles.pluginCoreDescription}
                           >
-                            {plugin.manifest.description}
+                            {pluginDescription(plugin)}
                           </span>
                         </>
                       ) : (
@@ -1371,12 +1374,12 @@ export function Settings({
                           leading={<PluginIcon plugin={plugin} />}
                           label={name}
                           description={
-                            plugin.manifest.description ? (
+                            pluginDescription(plugin) ? (
                               <span
                                 id={`plugin-description-${id}`}
                                 className={styles.pluginRowDescription}
                               >
-                                {plugin.manifest.description}
+                                {pluginDescription(plugin)}
                               </span>
                             ) : undefined
                           }
@@ -1407,7 +1410,7 @@ export function Settings({
                           variant="prominent"
                           disabled={busy}
                           aria-label={t("settingsHost.updateNamed", {
-                            name: plugin.manifest.name,
+                            name: pluginName(plugin),
                           })}
                           onClick={(event) => {
                             holdPluginRow(event.currentTarget);
@@ -1440,7 +1443,7 @@ export function Settings({
                             aria-label={pluginActionLabel(
                               plugin,
                               access,
-                              plugin.manifest.name,
+                              pluginName(plugin),
                             )}
                             disabled={pluginToggleDisabled(
                               plugin,
@@ -1467,7 +1470,7 @@ export function Settings({
                         plugins={plugins}
                         busy={busy}
                         label={t("settingsHost.moreActions", {
-                          name: plugin.manifest.name,
+                          name: pluginName(plugin),
                         })}
                         onRemoved={() => pluginSection.current?.focus()}
                         {...(updateAvailable
@@ -1535,9 +1538,9 @@ export function Settings({
       className="sr-only"
     >
       {selected === "plugins" && activationFailure && attemptedPlugin
-        ? `${attemptedPlugin.manifest.name}: ${activationFailure}`
+        ? `${pluginName(attemptedPlugin)}: ${activationFailure}`
         : selected === "plugins" && selectedFailure && selectedPlugin
-          ? `${selectedPlugin.manifest.name}: ${selectedFailure}`
+          ? `${pluginName(selectedPlugin)}: ${selectedFailure}`
           : null}
     </div>
   );
@@ -2069,7 +2072,7 @@ function UrlInstallRequestReview({
     <UrlPluginInstallReview
       {...props}
       source={request.source}
-      requester={request.origin.name}
+      requester={pluginName({ manifest: request.origin })}
       holdReview={requests.holdReview}
       request={{ ...requests, id: request.id }}
     />
