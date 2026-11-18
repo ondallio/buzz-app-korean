@@ -1,4 +1,4 @@
-import { t, useLanguage } from "../../../shared/i18n";
+import { formattingLocale, t, useLanguage } from "../../../shared/i18n";
 import {
   localMessage,
   resolveMessage,
@@ -269,7 +269,7 @@ export function createCreationFields(
       <AgentInstructions
         creation
         description={t("v1id.upToCharacters", {
-          limit: MAX_INSTRUCTIONS_LENGTH,
+          limit: MAX_INSTRUCTIONS_LENGTH.toLocaleString(formattingLocale()),
         })}
         value={draft.instructions}
         disabled={disabled}

@@ -1,4 +1,4 @@
-import { t, useLanguage } from "../../shared/i18n";
+import { formattingLocale, t, useLanguage } from "../../shared/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   formatFullTimestamp,
@@ -36,7 +36,9 @@ const gapText = (gap: Gap) =>
   gap === "unloaded"
     ? t("v1agent.history.unloaded")
     : gap === "capped"
-      ? t("v1agent.history.capped", { limit: HISTORY_LIMIT })
+      ? t("v1agent.history.capped", {
+          limit: HISTORY_LIMIT.toLocaleString(formattingLocale()),
+        })
       : gap === "failed"
         ? t("v1agent.history.failed")
         : t("v1agent.history.unavailable");

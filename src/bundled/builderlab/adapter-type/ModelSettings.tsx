@@ -1,4 +1,4 @@
-import { t, useLanguage } from "../../../shared/i18n";
+import { formattingLocale, t, useLanguage } from "../../../shared/i18n";
 import {
   errorMessage,
   localError,
@@ -447,7 +447,9 @@ export function ModelSettings({
               <Field
                 label={t("agentCreate.instructions")}
                 description={t("v1id.upToCharacters", {
-                  limit: MAX_INSTRUCTIONS_LENGTH,
+                  limit: MAX_INSTRUCTIONS_LENGTH.toLocaleString(
+                    formattingLocale(),
+                  ),
                 })}
                 error={
                   hasAccess && !validInstructions(instructions)

@@ -154,7 +154,7 @@ export const en = {
   "settingsHost.allPlugins": "All plugins",
   "settingsHost.searchPlugins": "Search plugins",
   "settingsHost.searchPluginsPlaceholder": "Search plugins…",
-  "settingsHost.clearPluginSearch": "Clear Search plugins",
+  "settingsHost.clearPluginSearch": "Clear search plugins",
   "settingsHost.linkRequester": "A link",
   "settingsHost.pluginSettingsUnavailable":
     "Plugin settings are unavailable. Profile and Appearance still work.",

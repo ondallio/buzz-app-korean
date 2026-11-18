@@ -77,7 +77,10 @@ export function ChannelTextField(props: Props) {
       )}
       {showCount && (
         <span id={countId} className="sr-only">
-          {t("channelForms.field.characters", { count, limit })}
+          {t("channelForms.field.characters", {
+            count: countLabel,
+            limit: limitLabel,
+          })}
         </span>
       )}
     </Field>

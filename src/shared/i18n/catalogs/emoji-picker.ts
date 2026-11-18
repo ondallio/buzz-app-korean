@@ -11,7 +11,7 @@ export const en = {
   "emojiPicker.retryPicker": "Retry picker",
   "emojiPicker.retryEmoji": "Retry emoji",
   "emojiPicker.searchGifs": "Search GIFs",
-  "emojiPicker.clearGifs": "Clear GIF search",
+  "emojiPicker.clearGifs": "Clear search gifs",
   "emojiPicker.retryDiscovery": "Retry GIF availability",
   "emojiPicker.loadingGifs": "Loading GIFs",
   "emojiPicker.tryAgain": "Try again",

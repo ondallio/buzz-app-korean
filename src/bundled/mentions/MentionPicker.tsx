@@ -376,11 +376,12 @@ export function MentionPicker({
               }
               placeholder={t("mentionPicker.searchPlaceholder")}
               clearLabel={t(
-                draftRoster
-                  ? "mentionPicker.clearRecipients"
-                  : inviteAgents
-                    ? "mentionPicker.clearMembers"
-                    : "mentionPicker.clearCommunity",
+                !audience &&
+                  allowsOutsideMentions(channel, draftRoster, inviteAgents)
+                  ? "mentionPicker.clearCommunity"
+                  : draftRoster
+                    ? "mentionPicker.clearRecipients"
+                    : "mentionPicker.clearMembers",
               )}
               value={search}
               onValueChange={setSearch}

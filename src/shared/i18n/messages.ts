@@ -46,10 +46,10 @@ export function formatMessage(
     const value = values[name];
     if (value === undefined)
       throw new Error(`Missing translation parameter: ${name}`);
-    return typeof value === "number"
-      ? new Intl.NumberFormat(language === "ko" ? "ko-KR" : "en-US").format(
-          value,
-        )
-      : value;
+    // English keeps the original template-literal output; callers format explicitly.
+    if (typeof value !== "number") return value;
+    return language === "ko"
+      ? new Intl.NumberFormat("ko-KR").format(value)
+      : String(value);
   });
 }

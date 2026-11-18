@@ -250,7 +250,7 @@ function MessageActivity(
   const section = useRef<HTMLElement>(null);
   const focusAfterRetry = () =>
     section.current
-      ?.querySelector<HTMLButtonElement>("button[data-agent-activity-trigger]")
+      ?.querySelector<HTMLButtonElement>("button[data-agent-activity-view]")
       ?.focus();
   const retained = useRef<Entry[]>([]);
   const [leaving, setLeaving] = useState<Entry[] | null>(null);
@@ -860,6 +860,7 @@ function ActivityBubble({
               type="button"
               className={messageStyles.activityBubbleTrigger}
               data-activity-summary=""
+              data-agent-activity-view=""
               aria-label={activityLabel}
             >
               {singleControl ? (

@@ -80,7 +80,7 @@ it("keeps thrown diagnostics in English and only retranslates errors created by 
   const display = errorMessage(failure);
   expect(resolveMessage(display)).toBe("{time} 1,234");
   setLanguage("en");
-  expect(resolveMessage(display)).toBe("{time} at 1,234");
+  expect(resolveMessage(display)).toBe("{time} at 1234");
   expect(errorMessage(new Error(failure.message))).toBe(failure.message);
   expect(errorMessage("원문 진단")).toBe("원문 진단");
   expect(errorMessage({ message: "date.withTime" })).toBe("[object Object]");

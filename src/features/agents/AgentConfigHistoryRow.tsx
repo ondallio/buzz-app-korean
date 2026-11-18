@@ -1,4 +1,4 @@
-import { t, useLanguage } from "../../shared/i18n";
+import { formattingLocale, t, useLanguage } from "../../shared/i18n";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Accordion } from "../../shared/design-system/ui/Accordion";
 import styles from "./AgentConfigHistory.module.css";
@@ -92,7 +92,7 @@ export function ConfigHistoryRow({
             : count === 1
               ? "v1agent.history.versionOne"
               : "v1agent.history.versions",
-          { count },
+          { count: count.toLocaleString(formattingLocale()) },
         );
   const revisions = history.sides
     .flatMap((track) => {
