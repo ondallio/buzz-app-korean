@@ -16,8 +16,14 @@ const git = (...args) =>
   execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 if (git("diff", "--name-only", "--diff-filter=U"))
   throw new Error("Resolve and commit every conflict first.");
-if (git("grep", "-l", "-E", "^(<<<<<<<|>>>>>>>) ", "--", "src").length)
-  throw new Error("Conflict markers remain under src/.");
+// git grep exits 1 when nothing matches, which is the expected case here.
+const markers = spawnSync(
+  "git",
+  ["grep", "-l", "-E", "^(<<<<<<<|>>>>>>>) ", "--", "src"],
+  { cwd: root, encoding: "utf8" },
+);
+if (markers.stdout.trim())
+  throw new Error(`Conflict markers remain:\n${markers.stdout}`);
 const commit = git("rev-parse", `${target}^{commit}`);
 if (
   spawnSync("git", ["merge-base", "--is-ancestor", commit, "HEAD"], {
