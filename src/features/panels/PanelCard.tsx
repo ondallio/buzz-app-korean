@@ -1,3 +1,4 @@
+import { ownedPanelLabel } from "../../shared/i18n/owned-labels";
 import { usePanelTabHost } from "./PanelWorkspace";
 import type { Ref } from "react";
 import { Panel } from "../../shared/design-system/ui/Panel";
@@ -31,7 +32,7 @@ export function PanelCard({
       ref={ref}
       tabIndex={-1}
       className={styles.cardLayout}
-      aria-label={panel.title}
+      aria-label={ownedPanelLabel(panel)}
       onKeyDown={(event) => {
         if (event.key === "Escape" && !event.shiftKey && !tabbed) {
           event.stopPropagation();
@@ -47,17 +48,19 @@ export function PanelCard({
                 title={
                   panel.launcher ? (
                     <PanelHeaderLabel
-                      title={panel.title}
+                      title={ownedPanelLabel(panel)}
                       icon={<img src={panel.launcher.icon} alt="" />}
                     />
                   ) : (
-                    panel.title
+                    ownedPanelLabel(panel)
                   )
                 }
                 actions={
                   <IconButton
                     size="toolbar"
-                    aria-label={t("panels.close", { label: panel.title })}
+                    aria-label={t("panels.close", {
+                      label: ownedPanelLabel(panel),
+                    })}
                     onClick={props.close}
                     icon={<XIcon size={18} aria-hidden="true" />}
                   />

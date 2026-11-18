@@ -1,4 +1,5 @@
 import { t, useLanguage } from "../shared/i18n";
+import { pluginName } from "../shared/i18n/plugin-labels";
 import {
   localMessage,
   resolveMessage,
@@ -231,7 +232,7 @@ function ChangeReview({
   const plugin = catalog.plugins.find(
     (item) => item.manifest.id === request.pluginId,
   );
-  const name = plugin?.manifest.name ?? request.pluginName;
+  const name = plugin ? pluginName(plugin) : request.pluginName;
   const { action } = request;
   async function confirm() {
     if (working || (action !== "enable" && action !== "remove")) return;

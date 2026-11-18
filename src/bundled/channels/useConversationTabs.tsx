@@ -1,3 +1,4 @@
+import { ownedPanelLabel } from "../../shared/i18n/owned-labels";
 import { t, useLanguage } from "../../shared/i18n";
 import {
   useCallback,
@@ -928,7 +929,7 @@ export function useConversationTabs({
     return {
       id,
       instance: entry,
-      label: entry.panel.title,
+      label: ownedPanelLabel(entry.panel),
       ...(entry.channelContext && {
         icon: entry.panel.tabIcon ? (
           <entry.panel.tabIcon />
