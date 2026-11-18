@@ -5,6 +5,11 @@ use std::{fs, process::Command};
 
 #[test]
 fn reads_a_reply_after_the_helper_closes_its_socket() {
+    // A distribution build never uses the development helper, so these calls
+    // would reach the real Keychain; skip rather than touch it.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let directory = tempfile::tempdir().unwrap();
     let closing_helper = directory.path().join("closing-helper");
     let source = directory.path().join("closing-helper.c");

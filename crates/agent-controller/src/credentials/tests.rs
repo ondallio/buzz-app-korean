@@ -2,6 +2,8 @@ use super::*;
 use crate::{config::agent_id, AppAgents, OldStores, PortSource};
 use serde_json::json;
 use std::sync::Mutex;
+// The legacy fixture stays official even when production PREVIOUS_SERVICE is isolated.
+const PREVIOUS_SERVICE: &str = "dev.local.buzz.foundation.agents";
 const KEY: &str = "0000000000000000000000000000000000000000000000000000000000000001";
 const PUB: &str = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
 
@@ -172,6 +174,10 @@ fn blob() -> Vec<u8> {
 
 #[test]
 fn production_credential_adapter_selects_exact_legacy_service_and_account() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     for (source, service, other) in [
         (LegacySource::Installed, "buzz-desktop", "buzz-desktop-dev"),
         (
@@ -193,6 +199,10 @@ fn production_credential_adapter_selects_exact_legacy_service_and_account() {
 
 #[test]
 fn missing_denied_and_malformed_legacy_never_fall_back_or_write() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     for selected in [LegacySource::Installed, LegacySource::Development] {
         for failure in [
             Some(Failure::Absent),
@@ -228,6 +238,10 @@ fn missing_denied_and_malformed_legacy_never_fall_back_or_write() {
 
 #[test]
 fn legacy_blob_rejects_wrong_keys_duplicates_and_unbounded_data() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     for bytes in [
         b"{}".to_vec(),
         serde_json::to_vec(&json!({"identity":KEY})).unwrap(),
@@ -245,6 +259,10 @@ fn legacy_blob_rejects_wrong_keys_duplicates_and_unbounded_data() {
 
 #[test]
 fn a_busy_or_unavailable_store_is_a_transient_legacy_human_failure() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     for failure in [Failure::Busy, Failure::Unavailable] {
         let (credentials, fake) = fixture();
         *fake.failure.lock().unwrap() = Some(failure);
@@ -259,6 +277,10 @@ fn a_busy_or_unavailable_store_is_a_transient_legacy_human_failure() {
 
 #[test]
 fn legacy_human_reads_only_the_installed_identity_entry() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let human = serde_json::to_vec(&json!({"identity":"nsec-text", format!("agent:{PUB}"):KEY}));
     let human = human.unwrap();
     let agents_only = serde_json::to_vec(&json!({format!("agent:{PUB}"):KEY})).unwrap();
@@ -311,26 +333,37 @@ fn destination_is_separate_exact_bound_create_only_and_verified() {
         .add(&id, &Secret::parse(KEY, PUB).unwrap())
         .unwrap_err()
         .contains("already exists"));
-    // An absent key is looked for under the service before 1.0 too, then
-    // read again.
-    assert_eq!(
-        *fake.calls.lock().unwrap(),
-        [
+    // Only official builds probe the old service and retry the current read.
+    let expected = if buzz_credential_store::distribution::ISOLATED {
+        vec![
+            ("saved", SERVICE),
+            ("add", SERVICE),
+            ("saved", SERVICE),
+            ("add", SERVICE),
+        ]
+    } else {
+        vec![
             ("saved", SERVICE),
             ("saved", PREVIOUS_SERVICE),
             ("saved", SERVICE),
             ("add", SERVICE),
             ("saved", SERVICE),
-            ("add", SERVICE)
+            ("add", SERVICE),
         ]
-        .map(|(op, service)| (op.into(), service.into(), account.clone()))
+    };
+    assert_eq!(
+        *fake.calls.lock().unwrap(),
+        expected
+            .into_iter()
+            .map(|(op, service)| (op.into(), service.into(), account.clone()))
+            .collect::<Vec<_>>()
     );
     assert_eq!(fake.entries.lock().unwrap().len(), 1);
     *fake.failure.lock().unwrap() = Some(Failure::Denied);
     assert!(credentials.read(&id, PUB).is_err()); // denied != absent
     *fake.failure.lock().unwrap() = None;
     fake.put(
-        "xyz.block.buzz.desktop.agents",
+        SERVICE,
         &account,
         b"0000000000000000000000000000000000000000000000000000000000000002".to_vec(),
     );
@@ -349,6 +382,10 @@ fn destination_is_separate_exact_bound_create_only_and_verified() {
 
 #[test]
 fn adoption_uses_production_adapter_and_reads_back_create_only_destination() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let legacy = tempfile::tempdir().unwrap();
     let dest = tempfile::tempdir().unwrap();
     let root = legacy
@@ -376,33 +413,21 @@ fn adoption_uses_production_adapter_and_reads_back_create_only_destination() {
     adopt(&old, &store, &credentials);
     let id = agent_id(PUB, "wss://relay.example");
     let account = format!("agent:{id}");
-    assert_eq!(
-        *fake.calls.lock().unwrap(),
-        vec![
-            ("legacy".into(), "buzz-desktop-dev".into(), "secrets".into()),
-            (
-                "saved".into(),
-                "xyz.block.buzz.desktop.agents".into(),
-                account.clone()
-            ),
+    let mut expected = vec![
+        ("legacy".into(), "buzz-desktop-dev".into(), "secrets".into()),
+        ("saved".into(), SERVICE.into(), account.clone()),
+    ];
+    if !buzz_credential_store::distribution::ISOLATED {
+        expected.extend([
             ("saved".into(), PREVIOUS_SERVICE.into(), account.clone()),
-            (
-                "saved".into(),
-                "xyz.block.buzz.desktop.agents".into(),
-                account.clone()
-            ),
-            (
-                "add".into(),
-                "xyz.block.buzz.desktop.agents".into(),
-                account.clone()
-            ),
-            (
-                "saved".into(),
-                "xyz.block.buzz.desktop.agents".into(),
-                account
-            ),
-        ]
-    );
+            ("saved".into(), SERVICE.into(), account.clone()),
+        ]);
+    }
+    expected.extend([
+        ("add".into(), SERVICE.into(), account.clone()),
+        ("saved".into(), SERVICE.into(), account),
+    ]);
+    assert_eq!(*fake.calls.lock().unwrap(), expected);
     let snapshot = store.list().unwrap();
     assert_eq!(snapshot[0].pubkey, PUB);
     assert!(!serde_json::to_string(&snapshot).unwrap().contains(KEY));
@@ -556,6 +581,10 @@ fn busy_and_corrupt_individual_migration_do_not_poison_other_agents() {
 
 #[test]
 fn rollback_delete_then_reimport_reuses_retained_bundle_without_writing() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let legacy = tempfile::tempdir().unwrap();
     let dest = tempfile::tempdir().unwrap();
     let root = legacy
@@ -637,6 +666,12 @@ fn reads_copy_a_key_saved_before_one_point_oh_and_deletes_remove_both_names() {
     let id = agent_id(PUB, "wss://relay.example");
     let account = account(&id).unwrap();
     fake.put(PREVIOUS_SERVICE, &account, KEY.as_bytes().to_vec());
+    if buzz_credential_store::distribution::ISOLATED {
+        assert!(credentials.read(&id, PUB).unwrap().is_none());
+        credentials
+            .add(&id, &Secret::parse(KEY, PUB).unwrap())
+            .unwrap();
+    }
     assert_eq!(*credentials.read(&id, PUB).unwrap().unwrap().hex(), KEY);
     let saved = |service: &str| {
         fake.entries
@@ -648,18 +683,27 @@ fn reads_copy_a_key_saved_before_one_point_oh_and_deletes_remove_both_names() {
     assert!(saved(SERVICE) && saved(PREVIOUS_SERVICE));
     fake.calls.lock().unwrap().clear();
     credentials.delete(&id, PUB).unwrap();
+    let expected = if buzz_credential_store::distribution::ISOLATED {
+        vec![("delete", SERVICE)]
+    } else {
+        vec![("delete", PREVIOUS_SERVICE), ("delete", SERVICE)]
+    };
     assert_eq!(
         *fake.calls.lock().unwrap(),
-        [("delete", PREVIOUS_SERVICE), ("delete", SERVICE)].map(|(op, service)| (
-            op.into(),
-            service.into(),
-            account.clone()
-        ))
+        expected
+            .into_iter()
+            .map(|(op, service)| (op.into(), service.into(), account.clone()))
+            .collect::<Vec<_>>()
     );
     assert!(credentials.read(&id, PUB).unwrap().is_none());
     // A failed read under the previous service is never absence.
     fake.put(PREVIOUS_SERVICE, &account, b"malformed".to_vec());
-    assert!(credentials.read(&id, PUB).is_err());
+    if buzz_credential_store::distribution::ISOLATED {
+        assert!(credentials.read(&id, PUB).unwrap().is_none());
+        assert!(saved(PREVIOUS_SERVICE));
+    } else {
+        assert!(credentials.read(&id, PUB).is_err());
+    }
 }
 
 #[test]
@@ -685,6 +729,12 @@ fn bundle_reads_copy_previous_entries_and_deletes_remove_every_copy() {
         KEY.as_bytes().to_vec(),
     );
     for id in [&bundled_id, &individual_id] {
+        if buzz_credential_store::distribution::ISOLATED {
+            assert!(credentials.read(id, PUB).unwrap().is_none());
+            credentials
+                .add(id, &Secret::parse(KEY, PUB).unwrap())
+                .unwrap();
+        }
         assert_eq!(*credentials.read(id, PUB).unwrap().unwrap().hex(), KEY);
     }
     let current = fake.entries.lock().unwrap()[&(SERVICE.into(), bundle::ACCOUNT.into())].clone();
@@ -716,14 +766,26 @@ fn bundle_reads_copy_previous_entries_and_deletes_remove_every_copy() {
     // Only what was deleted is gone; another agent's entry stays.
     assert_eq!(
         previous.keys().collect::<Vec<_>>(),
-        [&account(&other_id).unwrap()]
+        if buzz_credential_store::distribution::ISOLATED {
+            let mut keys = vec![account(&bundled_id).unwrap(), account(&other_id).unwrap()];
+            keys.sort();
+            keys
+        } else {
+            vec![account(&other_id).unwrap()]
+        }
+        .iter()
+        .collect::<Vec<_>>()
     );
     assert_eq!(
         entries
             .keys()
             .filter(|(_, account)| account != bundle::ACCOUNT)
             .count(),
-        0
+        if buzz_credential_store::distribution::ISOLATED {
+            2
+        } else {
+            0
+        }
     );
 }
 
@@ -736,22 +798,109 @@ fn a_malformed_previous_bundle_fails_only_agents_it_could_hold() {
     fake.put(SERVICE, &account(&saved).unwrap(), KEY.as_bytes().to_vec());
     assert!(credentials.read(&saved, PUB).unwrap().is_some());
     fake.put(PREVIOUS_SERVICE, bundle::ACCOUNT, b"malformed".to_vec());
-    assert!(credentials
-        .read(&missing, PUB)
-        .err()
-        .unwrap()
-        .contains("malformed"));
+    if buzz_credential_store::distribution::ISOLATED {
+        assert!(credentials.read(&missing, PUB).unwrap().is_none());
+    } else {
+        assert!(credentials
+            .read(&missing, PUB)
+            .err()
+            .unwrap()
+            .contains("malformed"));
+    }
     assert!(bundled(fake.clone()).read(&saved, PUB).unwrap().is_some());
     assert!(credentials.read(&saved, PUB).unwrap().is_some());
     // Deleting one fails closed and keeps every copy, rather than leaving the
     // key in a bundle that can't be rewritten.
-    assert!(credentials
-        .delete(&saved, PUB)
-        .unwrap_err()
-        .contains("malformed"));
-    assert!(credentials.read(&saved, PUB).unwrap().is_some());
+    if buzz_credential_store::distribution::ISOLATED {
+        credentials.delete(&saved, PUB).unwrap();
+        assert!(credentials.read(&saved, PUB).unwrap().is_none());
+    } else {
+        assert!(credentials
+            .delete(&saved, PUB)
+            .unwrap_err()
+            .contains("malformed"));
+        assert!(credentials.read(&saved, PUB).unwrap().is_some());
+    }
     assert_eq!(
         fake.entries.lock().unwrap()[&(PREVIOUS_SERVICE.into(), bundle::ACCOUNT.into())],
         b"malformed"
     );
+}
+
+#[test]
+fn distribution_credentials_never_read_copy_or_delete_official_items() {
+    let Some(id) = option_env!("BUZZ_DISTRIBUTION_ID") else {
+        return;
+    };
+    let credential_id = agent_id(PUB, "wss://relay.example");
+    let account = format!("agent:{credential_id}");
+    for use_bundle in [false, true] {
+        let (mut credentials, fake) = fixture();
+        if use_bundle {
+            credentials.bundle = Some(bundle::Bundle::default());
+        }
+        fake.put(
+            "xyz.block.buzz.desktop.agents",
+            &account,
+            KEY.as_bytes().to_vec(),
+        );
+        fake.put(
+            "dev.local.buzz.foundation.agents",
+            &account,
+            KEY.as_bytes().to_vec(),
+        );
+        fake.put(
+            "xyz.block.buzz.desktop.agents",
+            bundle::ACCOUNT,
+            serde_json::to_vec(&json!({account.clone(): KEY})).unwrap(),
+        );
+        fake.put(
+            "dev.local.buzz.foundation.agents",
+            bundle::ACCOUNT,
+            serde_json::to_vec(&json!({account.clone(): KEY})).unwrap(),
+        );
+        assert!(credentials.read(&credential_id, PUB).unwrap().is_none());
+        credentials
+            .add(&credential_id, &Secret::parse(KEY, PUB).unwrap())
+            .unwrap();
+        assert_eq!(
+            credentials
+                .read(&credential_id, PUB)
+                .unwrap()
+                .unwrap()
+                .pubkey(),
+            PUB
+        );
+        credentials.delete(&credential_id, PUB).unwrap();
+        assert!(credentials.read(&credential_id, PUB).unwrap().is_none());
+        for (_, service, _) in fake.calls.lock().unwrap().iter() {
+            assert!(
+                service.starts_with(&format!("{id}.")),
+                "unexpected automatic service: {service}"
+            );
+        }
+        for service in [
+            "xyz.block.buzz.desktop.agents",
+            "dev.local.buzz.foundation.agents",
+        ] {
+            assert!(fake
+                .entries
+                .lock()
+                .unwrap()
+                .contains_key(&(service.into(), account.clone())));
+            assert!(fake
+                .entries
+                .lock()
+                .unwrap()
+                .contains_key(&(service.into(), bundle::ACCOUNT.into())));
+        }
+        // Not even a person's explicit import reads old Buzz's (0.X) item.
+        let before = fake.calls.lock().unwrap().len();
+        for source in [LegacySource::Installed, LegacySource::Development] {
+            fake.put(source.keyring_service(), "secrets", blob());
+            assert!(credentials.read_legacy(source, PUB).is_err());
+            assert!(credentials.read_legacy_human(source).is_err());
+        }
+        assert_eq!(fake.calls.lock().unwrap().len(), before);
+    }
 }

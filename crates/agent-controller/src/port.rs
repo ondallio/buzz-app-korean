@@ -186,6 +186,10 @@ impl OldStores {
     fn read(&self, source: PortSource) -> Result<Read> {
         let (path, records) = match source.legacy() {
             None => (self.harness.clone(), "agents"),
+            // Old Buzz's folders belong to official Buzz; distributors see none.
+            Some(_) if buzz_credential_store::distribution::ISOLATED => {
+                return Ok((vec![], Ok(vec![])))
+            }
             Some(legacy) => (
                 self.data_dir
                     .join(legacy.app_directory())

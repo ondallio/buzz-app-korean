@@ -13,7 +13,7 @@ pub(super) fn acquire() -> Result<Lock, Failure> {
     acquire_at_home(&home)
 }
 fn acquire_at_home(home: &Path) -> Result<Lock, Failure> {
-    acquire_at(&home.join(".buzz-foundation-credential-locks"))
+    acquire_at(&home.join(buzz_credential_store::distribution::AGENT_LOCKS))
 }
 pub(super) fn acquire_at(root: &Path) -> Result<Lock, Failure> {
     if !root.is_absolute() {
@@ -72,7 +72,9 @@ impl Drop for Lock {
 #[test]
 fn first_run_creates_private_lock_directory_below_home() {
     let home = tempfile::tempdir().unwrap();
-    let root = home.path().join(".buzz-foundation-credential-locks");
+    let root = home
+        .path()
+        .join(buzz_credential_store::distribution::AGENT_LOCKS);
     assert!(!root.exists());
     let mut lock = acquire_at_home(home.path()).unwrap();
     assert_eq!(lock.epoch().unwrap(), [0; 16]);
@@ -98,4 +100,22 @@ fn shared_epoch_and_nonblocking_lock_survive_reopen() {
     let epoch = first.invalidate().unwrap();
     drop(first);
     assert_eq!(acquire_at(root.path()).unwrap().epoch().unwrap(), epoch);
+}
+
+#[test]
+fn distribution_bundle_lock_never_creates_the_official_directory() {
+    let Some(id) = option_env!("BUZZ_DISTRIBUTION_ID") else {
+        return;
+    };
+    let home = tempfile::tempdir().unwrap();
+    let _lock = acquire_at_home(home.path()).unwrap();
+    let expected = home.path().join(format!(
+        ".{id}.agent-credential-locks{}",
+        if cfg!(debug_assertions) { ".debug" } else { "" }
+    ));
+    assert!(expected.join("agent-bundle-v1.lock").is_file());
+    assert!(!home
+        .path()
+        .join(".buzz-foundation-credential-locks")
+        .exists());
 }

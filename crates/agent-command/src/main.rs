@@ -237,9 +237,16 @@ fn offers(tools: &Value, name: &str) -> bool {
 fn advertisements() -> Result<PathBuf> {
     private_directory("agent-connections")
 }
+/// The home folder an independent distribution (`BUZZ_DISTRIBUTION_ID` at build
+/// time) keeps apart from official Buzz; unset keeps the shared folder.
+fn state_folder(distribution: Option<&str>) -> String {
+    distribution.map_or_else(|| ".buzz-foundation".into(), |id| format!(".{id}"))
+}
 fn private_directory(name: &str) -> Result<PathBuf> {
     let home = std::env::home_dir().ok_or("No home directory")?;
-    let directory = home.join(".buzz-foundation").join(name);
+    let directory = home
+        .join(state_folder(option_env!("BUZZ_DISTRIBUTION_ID")))
+        .join(name);
     let mut builder = std::fs::DirBuilder::new();
     builder.recursive(true);
     #[cfg(unix)]
@@ -572,6 +579,14 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn distribution_builds_keep_agent_connections_apart() {
+        assert_eq!(state_folder(None), ".buzz-foundation");
+        assert_eq!(
+            state_folder(Some("io.github.ondallio.buzz-korean")),
+            ".io.github.ondallio.buzz-korean"
+        );
+    }
     #[test]
     fn refuses_non_app_endpoints() {
         for url in [

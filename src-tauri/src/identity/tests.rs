@@ -387,13 +387,18 @@ fn uppercase_import_keeps_the_exact_key_and_mixed_case_is_rejected() {
 
 #[test]
 fn development_and_release_items_are_separate() {
+    let prefix = option_env!("BUZZ_DISTRIBUTION_ID").unwrap_or("xyz.block.buzz.desktop");
     assert_eq!(
         credentials::HUMAN_SERVICE,
         if cfg!(debug_assertions) {
-            "xyz.block.buzz.desktop.identity.debug"
+            format!("{prefix}.identity.debug")
         } else {
-            "xyz.block.buzz.desktop.identity"
+            format!("{prefix}.identity")
         }
+    );
+    assert_ne!(
+        credentials::human_service(true),
+        credentials::human_service(false)
     );
     assert_eq!(credentials::HUMAN_ACCOUNT, "human");
     assert!(!credentials::HUMAN_SERVICE.starts_with("buzz-desktop"));

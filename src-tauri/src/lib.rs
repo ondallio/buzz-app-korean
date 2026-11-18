@@ -24,6 +24,7 @@ mod agent_state;
 mod app_agents;
 mod decisions;
 mod deep_links;
+mod distribution_profile;
 mod dock;
 mod draft_diagnostics;
 mod huddle_window;
@@ -946,6 +947,10 @@ pub fn run() {
         eprintln!("Cannot enable native MCP: {message}");
         std::process::exit(1);
     });
+    // A distribution build opens only storage named by its own identifier.
+    if !buzz_credential_store::distribution::owns_identifier(&context.config().identifier) {
+        sign_out::exit_with("Distribution build and application identifier do not match");
+    }
     // A pending Sign out finishes before any window, webview storage, service or
     // identity read; if it can't, Buzz explains and exits without opening.
     let instance = sign_out::Paths::resolve(&context.config().identifier).map(|paths| {
@@ -1057,14 +1062,20 @@ pub fn run() {
             reshow::install(app.handle());
             #[cfg(target_os = "macos")]
             gpu_reaper::install(app.handle());
+            // `~/.local/bin/buzz` belongs to official Buzz; an independent
+            // distribution neither removes nor relinks it.
             #[cfg(target_os = "macos")]
-            if let Some(home) = dirs::home_dir() {
-                if let Err(error) = legacy_cli_shortcut::remove_stale(&home.join(".local/bin")) {
-                    eprintln!("Could not remove old Buzz's CLI shortcut: {error}");
+            if !buzz_credential_store::distribution::ISOLATED {
+                if let Some(home) = dirs::home_dir() {
+                    if let Err(error) = legacy_cli_shortcut::remove_stale(&home.join(".local/bin"))
+                    {
+                        eprintln!("Could not remove old Buzz's CLI shortcut: {error}");
+                    }
                 }
             }
             #[cfg(unix)]
-            if let (Some(home), Ok(cli)) = (
+            if let (false, Some(home), Ok(cli)) = (
+                buzz_credential_store::distribution::ISOLATED,
                 dirs::home_dir(),
                 app.path()
                     .resource_dir()
@@ -1268,8 +1279,10 @@ pub fn run() {
         .manage(DeepLinks::default())
         // Plugin storage lives in this identifier's app data, so development
         // builds keep theirs apart from the installed app.
-        .manage(PluginManager(Manager::from_env(
+        .manage(PluginManager(distribution_profile::plugin_manager(
             dirs::data_dir().map(|dir| dir.join(&identifier)),
+            buzz_credential_store::distribution::ISOLATED,
+            |name| std::env::var_os(name),
         )))
         .invoke_handler({
             let application_commands = commands::<tauri::Wry>();

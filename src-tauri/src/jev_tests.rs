@@ -78,7 +78,14 @@ fn clearing_deletes_the_previous_item_first_and_stops_at_a_failure() {
         Ok::<_, ()>(())
     })
     .unwrap();
-    assert_eq!(deleted, [PREVIOUS_KEY_SERVICE, KEY_SERVICE]);
+    assert_eq!(
+        deleted,
+        if buzz_credential_store::distribution::ISOLATED {
+            vec![KEY_SERVICE]
+        } else {
+            vec![PREVIOUS_KEY_SERVICE, KEY_SERVICE]
+        }
+    );
     deleted.clear();
     assert!(clear_with(|service| {
         deleted.push(service.to_owned());
@@ -86,4 +93,25 @@ fn clearing_deletes_the_previous_item_first_and_stops_at_a_failure() {
     })
     .is_err());
     assert_eq!(deleted, [PREVIOUS_KEY_SERVICE]);
+}
+
+#[test]
+fn distribution_typesafe_service_and_clear_never_select_official_items() {
+    let Some(id) = option_env!("BUZZ_DISTRIBUTION_ID") else {
+        return;
+    };
+    assert_eq!(
+        KEY_SERVICE,
+        format!(
+            "{id}.jev-key{}",
+            if cfg!(debug_assertions) { ".debug" } else { "" }
+        )
+    );
+    let mut deleted = Vec::new();
+    clear_with(|service| {
+        deleted.push(service.to_owned());
+        Ok::<_, ()>(())
+    })
+    .unwrap();
+    assert_eq!(deleted, [KEY_SERVICE]);
 }

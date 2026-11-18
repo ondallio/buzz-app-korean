@@ -9,14 +9,13 @@ use tokio::sync::Mutex;
 use zeroize::Zeroizing;
 
 #[cfg_attr(test, allow(dead_code))]
-pub(crate) const KEY_SERVICE: &str = if cfg!(debug_assertions) {
-    "xyz.block.buzz.desktop.jev-key.debug"
-} else {
-    "xyz.block.buzz.desktop.jev-key"
-};
+pub(crate) const KEY_SERVICE: &str =
+    buzz_credential_store::distribution::jev_service(cfg!(debug_assertions));
 /// The service before 1.0. Reads copy a key found only there; clearing removes it too.
 #[cfg_attr(test, allow(dead_code))]
-const PREVIOUS_KEY_SERVICE: &str = if cfg!(debug_assertions) {
+const PREVIOUS_KEY_SERVICE: &str = if buzz_credential_store::distribution::ISOLATED {
+    KEY_SERVICE
+} else if cfg!(debug_assertions) {
     "dev.local.buzz.foundation.jev-key.debug"
 } else {
     "dev.local.buzz.foundation.jev-key"
@@ -120,9 +119,12 @@ fn decode(bytes: Zeroizing<Vec<u8>>) -> Result<Option<Zeroizing<String>>, String
 /// current one first could let a read bring the key back.
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux", test))]
 fn clear_with<E>(delete: impl FnMut(&str) -> Result<(), E>) -> Result<(), E> {
-    [PREVIOUS_KEY_SERVICE, KEY_SERVICE]
-        .into_iter()
-        .try_for_each(delete)
+    let services = if buzz_credential_store::distribution::ISOLATED {
+        &[KEY_SERVICE][..]
+    } else {
+        &[PREVIOUS_KEY_SERVICE, KEY_SERVICE][..]
+    };
+    services.iter().copied().try_for_each(delete)
 }
 
 #[cfg(all(

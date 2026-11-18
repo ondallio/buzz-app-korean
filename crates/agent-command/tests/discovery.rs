@@ -113,7 +113,13 @@ fn plant(path: &Path, connection: String, mode: u32) {
 }
 
 fn advertised(home: &Path) -> Vec<std::path::PathBuf> {
-    let directory = home.join(".buzz-foundation/agent-connections");
+    // An independent distribution keeps its own folder; official Buzz's stays unused.
+    let folder = option_env!("BUZZ_DISTRIBUTION_ID")
+        .map_or_else(|| ".buzz-foundation".into(), |id| format!(".{id}"));
+    if folder != ".buzz-foundation" {
+        assert!(!home.join(".buzz-foundation").exists());
+    }
+    let directory = home.join(folder).join("agent-connections");
     let mut files: Vec<_> = std::fs::read_dir(directory)
         .unwrap()
         .map(|entry| entry.unwrap().path())

@@ -10,6 +10,11 @@ use std::process::Command;
 
 #[test]
 fn human_restore_uses_the_selected_helper_and_fails_closed() {
+    // A distribution build never uses the development helper, so these calls
+    // would reach the real Keychain; skip rather than touch it.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let directory = tempfile::tempdir().unwrap();
     let helper = directory.path().join("helper");
     std::env::set_var("BUZZ_DEV_CREDENTIAL_HELPER", &helper);

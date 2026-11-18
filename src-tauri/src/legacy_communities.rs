@@ -19,6 +19,10 @@ pub(crate) struct Saved {
 
 #[cfg(target_os = "macos")]
 fn root() -> Option<PathBuf> {
+    // Old Buzz's WebKit storage belongs to official Buzz; distributors never read it.
+    if buzz_credential_store::distribution::ISOLATED {
+        return None;
+    }
     let identifier = buzz_agent_controller::LegacySource::Installed.app_directory();
     Some(
         dirs::home_dir()?

@@ -1,10 +1,12 @@
 //! The advertisement a command-line tool discovers this app by:
-//! `~/.buzz-foundation/credential-providers/<instance>.json`, `{instance,url}`.
+//! `~/.buzz-foundation/credential-providers/<instance>.json` (a distributor's
+//! own home folder instead), `{instance,url}`.
 //! It holds no secret; written atomically, removed on quit.
 use std::path::{Path, PathBuf};
 
 pub(crate) fn path(home: &Path, instance: &str) -> PathBuf {
-    home.join(".buzz-foundation/credential-providers")
+    home.join(buzz_credential_store::distribution::HOME_STATE)
+        .join("credential-providers")
         .join(format!("{instance}.json"))
 }
 

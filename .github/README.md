@@ -33,19 +33,30 @@ Claude·Codex·Goose·Pi 같은 에이전트를 내 컴퓨터에서 실행해 �
 
 ## 설치
 
-> **설치 파일은 준비 중입니다.** 지금은 소스에서 직접 빌드할 수 있습니다.
+1. [Releases](https://github.com/ondallio/buzz-app-korean/releases)에서 `Buzz Korean_<버전>_aarch64.dmg`를 내려받습니다. (Apple Silicon Mac 전용)
+2. DMG를 열고 `Buzz Korean.app`을 응용 프로그램 폴더로 끌어다 놓습니다.
+3. 처음 열 때 "확인되지 않은 개발자" 경고가 나오면 앱을 **우클릭 → 열기**를 누릅니다.
+   (또는 시스템 설정 → 개인정보 보호 및 보안 → **그래도 열기**)
+4. 첫 화면에서 새 계정을 만들거나, 기존 비밀 키(`nsec1…`)를 붙여넣어 시작합니다.
+
+**공식 Buzz와 따로 동작합니다.** 한글판은 별도 식별자(`ai.codepair.buzz-korean`)를 쓰므로
+공식 Buzz와 나란히 설치할 수 있고, 공식 Buzz의 키체인·데이터·`buzz://` 링크를 읽거나 바꾸지 않습니다.
+그래서 공식 Buzz의 계정이 자동으로 넘어오지 않습니다. 같은 계정을 쓰려면 공식 Buzz의
+설정 → 신원에서 비밀 키를 복사해 한글판 첫 화면에 붙여넣으세요.
+
+- 앱에는 Apple 개발자 서명·공증이 없습니다. 내려받은 파일의 SHA-256 값은 릴리스 설명에 있습니다.
+- 앱 안의 자동 업데이트는 꺼져 있습니다. 새 버전은 Releases에서 내려받아 덮어 설치합니다.
+
+### 소스에서 빌드
 
 ```sh
 git clone https://github.com/ondallio/buzz-app-korean.git
 cd buzz-app-korean
-bin/just desktop
+bin/node scripts/korean/build-dmg.mjs   # 서명 없는 한글판 DMG
 ```
 
 `bin/` 폴더의 [Hermit](https://cashapp.github.io/hermit/)이 Node, pnpm, Rust 등 필요한 도구 버전을 자동으로 맞춥니다.
 데스크톱 빌드에는 [Tauri 준비 사항](https://v2.tauri.app/start/prerequisites/)이 필요합니다.
-
-**주의**: 소스에서 실행하는 개발용 앱은 이미 설치된 공식 Buzz와 저장 공간을 함께 쓸 수 있습니다.
-실행 전에 공식 Buzz를 종료하고, 비밀 키는 설정 → 신원에서 미리 백업해 두세요.
 
 ## 업데이트 방식
 

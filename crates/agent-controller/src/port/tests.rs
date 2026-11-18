@@ -55,6 +55,10 @@ fn key() -> Secret {
 
 #[test]
 fn lists_each_identity_once_preferring_the_harness_copy() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     let (shared, old, dev) = (key(), key(), key());
     write(
@@ -133,6 +137,10 @@ fn lists_each_identity_once_preferring_the_harness_copy() {
 
 #[test]
 fn carries_each_stores_own_instructions_and_the_harness_workspace() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     let (harness, old, linked, blank) = (key(), key(), key(), key());
     write(
@@ -190,6 +198,10 @@ fn carries_each_stores_own_instructions_and_the_harness_workspace() {
 
 #[test]
 fn missing_stores_list_nothing_and_a_broken_one_hides_only_itself() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     assert!(stores(dir.path()).list().agents.is_empty());
     assert!(stores(dir.path()).list().warnings.is_empty());
@@ -208,6 +220,10 @@ fn missing_stores_list_nothing_and_a_broken_one_hides_only_itself() {
 
 #[test]
 fn takes_the_key_from_the_store_it_was_listed_in() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     let credentials = Memory::default();
     let (harness, old, inline) = (key(), key(), key());
@@ -288,6 +304,10 @@ fn takes_the_key_from_the_store_it_was_listed_in() {
 
 #[test]
 fn a_harness_copy_whose_key_is_gone_falls_back_to_old_buzzs_copy() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     let credentials = Memory::default();
     let (stale, absent) = (key(), key());
@@ -342,6 +362,10 @@ fn reads_only_known_inline_images() {
 
 #[test]
 fn imports_authored_descriptions_from_the_saved_profile_or_exact_definition() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     let keys: Vec<_> = (0..7).map(|_| key()).collect();
     write(
@@ -514,6 +538,10 @@ const NIGHT_SHIFT: &str = "6f9c2d1e-4b7a-4e8f-9a3c-2d5e8f1b7c40";
 
 #[test]
 fn lists_old_buzz_teams_with_their_members_apart_from_agents() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     old_buzz(dir.path(), LegacySource::Installed);
     let found = stores(dir.path()).list();
@@ -573,6 +601,10 @@ fn lists_old_buzz_teams_with_their_members_apart_from_agents() {
 
 #[test]
 fn a_member_listed_by_its_harness_copy_stays_on_its_team() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     old_buzz(dir.path(), LegacySource::Installed);
     // The harness took Birch over, without old Buzz's team link.
@@ -590,6 +622,10 @@ fn a_member_listed_by_its_harness_copy_stays_on_its_team() {
 
 #[test]
 fn installed_and_development_copies_of_a_team_merge() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     let teams = |name: &str| json!([{"id": "t", "name": name, "instructions": name}]);
     let path = |source: LegacySource| {
@@ -619,6 +655,10 @@ fn installed_and_development_copies_of_a_team_merge() {
 
 #[test]
 fn members_linked_only_by_team_folder_stay_on_their_team() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let agent = |n: &str, name: &str, link: Value| {
         let mut record = json!({"pubkey": n.repeat(64), "name": name});
         record
@@ -665,6 +705,10 @@ fn members_linked_only_by_team_folder_stay_on_their_team() {
 
 #[test]
 fn unreadable_teams_warn_and_leave_every_agent_importable() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let teams_path = |dir: &std::path::Path| {
         dir.join("data")
             .join(LegacySource::Installed.app_directory())
@@ -716,6 +760,10 @@ fn team_names_are_trimmed_bounded_and_never_blank() {
 /// then, not as they were previewed.
 #[test]
 fn each_listing_rereads_both_stores_teams() {
+    // Old Buzz (0.X) stores belong to official Buzz; distributors never read them.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     old_buzz(dir.path(), LegacySource::Installed);
     let stores = stores(dir.path());
@@ -760,4 +808,52 @@ fn each_listing_rereads_both_stores_teams() {
         .map(|m| &m["name"])
         .collect();
     assert_eq!(members, ["Alder", "Birch", "Carrow"]);
+}
+
+/// A distribution build lists and takes only its own harness agents: old Buzz's
+/// files and its Keychain item stay unread even when both are present.
+#[test]
+fn distribution_never_lists_or_takes_old_buzzs_agents() {
+    if !buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let (own, old) = (key(), key());
+    write(
+        stores(dir.path()).harness,
+        json!({"version": 1, "agents": [{
+            "pubkey": own.pubkey(), "relayUrl": "wss://relay.example",
+            "name": "Ada", "credentialId": "own",
+        }]}),
+    );
+    for source in [LegacySource::Installed, LegacySource::Development] {
+        legacy(
+            dir.path(),
+            source,
+            json!([{"pubkey": old.pubkey(), "name": "Bea", "relay_url": "wss://old.example"}]),
+        );
+    }
+    let credentials = Memory::default();
+    for source in [LegacySource::Installed, LegacySource::Development] {
+        credentials.0.lock().unwrap().insert(
+            format!("{}:{}", source.keyring_service(), old.pubkey()),
+            old.hex().to_string(),
+        );
+    }
+    let found = stores(dir.path()).list();
+    assert!(found.warnings.is_empty());
+    assert!(found.teams.is_empty());
+    assert_eq!(
+        found
+            .agents
+            .iter()
+            .map(|agent| (agent.source, agent.pubkey.as_str()))
+            .collect::<Vec<_>>(),
+        [(PortSource::Harness, own.pubkey())]
+    );
+    for source in [PortSource::Installed, PortSource::Development] {
+        assert!(stores(dir.path())
+            .take(source, old.pubkey(), &credentials)
+            .is_err());
+    }
 }

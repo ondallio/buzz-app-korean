@@ -6,6 +6,11 @@ use std::os::unix::fs::PermissionsExt;
 
 #[test]
 fn debug_agents_use_the_helper_for_create_restore_and_delete() {
+    // A distribution build never uses the development helper, so these calls
+    // would reach the real Keychain; skip rather than touch it.
+    if buzz_credential_store::distribution::ISOLATED {
+        return;
+    }
     const KEY: &str = "0000000000000000000000000000000000000000000000000000000000000001";
     const PUB: &str = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
     let directory = tempfile::tempdir().unwrap();

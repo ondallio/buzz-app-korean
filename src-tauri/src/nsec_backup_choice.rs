@@ -71,7 +71,8 @@ pub(crate) fn root() -> Option<PathBuf> {
     #[cfg(not(any(unix, windows)))]
     let home: Option<PathBuf> = None;
     home.filter(|path| path.is_absolute()).map(|path| {
-        path.join(".buzz-foundation/nsec-backups")
+        path.join(buzz_credential_store::distribution::HOME_STATE)
+            .join("nsec-backups")
             .join(buzz_credential_store::HUMAN_STORE)
     })
 }

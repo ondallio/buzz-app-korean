@@ -876,6 +876,14 @@ pub enum InstallationResult {
 fn default_home() -> Result<PathBuf> {
     let data =
         dirs::data_dir().ok_or("Cannot determine application data directory; set BUZZODZ_HOME")?;
+    // A distribution build owns only its own folder and never waits on official Buzz's.
+    if buzz_credential_store::distribution::ISOLATED {
+        return Ok(
+            data.join(buzz_credential_store::distribution::application_identifier(
+                cfg!(debug_assertions),
+            )),
+        );
+    }
     let (home, older, open): (_, &[_], _) = if cfg!(debug_assertions) {
         (
             "xyz.block.buzz.desktop.dev",

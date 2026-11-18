@@ -1337,10 +1337,11 @@ pub async fn identity_import(
 #[tauri::command]
 pub fn identity_legacy_available<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> bool {
     use tauri::Manager;
-    app.path().data_dir().is_ok_and(|dir| {
-        dir.join(buzz_agent_controller::LegacySource::Installed.app_directory())
-            .is_dir()
-    })
+    !buzz_credential_store::distribution::ISOLATED
+        && app.path().data_dir().is_ok_and(|dir| {
+            dir.join(buzz_agent_controller::LegacySource::Installed.app_directory())
+                .is_dir()
+        })
 }
 /// `expected` saves old Buzz's key only when it is that key, as setup does for
 /// the key an account already holds; otherwise nothing is saved or returned.

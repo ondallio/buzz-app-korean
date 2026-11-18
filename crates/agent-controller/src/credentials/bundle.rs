@@ -70,6 +70,7 @@ impl Bundle {
             // Never consult old Buzz or substitute another identity/community.
             let key = match individual(keychain, SERVICE, account, pubkey)? {
                 Some(key) => key,
+                None if buzz_credential_store::distribution::ISOLATED => return Ok(None),
                 None => match load(keychain, PREVIOUS_SERVICE)?.0.get(account) {
                     Some(value) => parse(value, pubkey)?,
                     None => match individual(keychain, PREVIOUS_SERVICE, account, pubkey)? {
@@ -108,7 +109,11 @@ impl Bundle {
             let mut map = load(keychain, SERVICE)?;
             // A malformed old bundle may still hold this key: fail rather
             // than report a deletion that left it there.
-            let mut previous = load(keychain, PREVIOUS_SERVICE)?;
+            let mut previous = if buzz_credential_store::distribution::ISOLATED {
+                None
+            } else {
+                Some(load(keychain, PREVIOUS_SERVICE)?)
+            };
             state.cached = None;
             lock.invalidate()?;
             let delete = |service| match keychain.delete(service, account) {
@@ -119,10 +124,12 @@ impl Bundle {
             // the current ones are absent, then the rollback copy. A failure
             // leaves the bundle intact; a later bundle-write failure leaves the
             // card available for retry.
-            delete(PREVIOUS_SERVICE)?;
-            if let Some(mut value) = previous.0.remove(account) {
-                value.zeroize();
-                write(keychain, lock, PREVIOUS_SERVICE, &previous)?;
+            if let Some(previous) = &mut previous {
+                delete(PREVIOUS_SERVICE)?;
+                if let Some(mut value) = previous.0.remove(account) {
+                    value.zeroize();
+                    write(keychain, lock, PREVIOUS_SERVICE, previous)?;
+                }
             }
             delete(SERVICE)?;
             if let Some(mut value) = map.0.remove(account) {

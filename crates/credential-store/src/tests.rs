@@ -289,14 +289,17 @@ fn home_child() {
 #[test]
 fn human_identity_slots_stay_separate() {
     assert_eq!(HUMAN_ACCOUNT, "human");
-    assert_eq!(human_service(true), "xyz.block.buzz.desktop.identity.debug");
-    assert_eq!(human_service(false), "xyz.block.buzz.desktop.identity");
+    let prefix = option_env!("BUZZ_DISTRIBUTION_ID").unwrap_or("xyz.block.buzz.desktop");
+    assert_eq!(human_service(true), format!("{prefix}.identity.debug"));
+    assert_eq!(human_service(false), format!("{prefix}.identity"));
     assert_eq!(HUMAN_SERVICE, human_service(cfg!(debug_assertions)));
-    assert_eq!(
-        human_store(true),
-        "dev.local.buzz.foundation.identity.debug"
-    );
-    assert_eq!(human_store(false), "dev.local.buzz.foundation.identity");
+    let previous = if distribution::ISOLATED {
+        prefix
+    } else {
+        "dev.local.buzz.foundation"
+    };
+    assert_eq!(human_store(true), format!("{previous}.identity.debug"));
+    assert_eq!(human_store(false), format!("{previous}.identity"));
     assert_eq!(HUMAN_STORE, human_store(cfg!(debug_assertions)));
     assert_eq!(PREVIOUS_HUMAN_SERVICE, HUMAN_STORE);
 }
@@ -327,7 +330,22 @@ fn read_or_copy_copies_only_when_absent_and_returns_what_is_saved() {
         *saved.borrow_mut() = Some("old");
         Ok(())
     };
-    assert_eq!(read_or_copy(current, copy), Ok(Some("old")));
+    assert_eq!(
+        read_or_copy(current, copy),
+        Ok(if distribution::ISOLATED {
+            None
+        } else {
+            Some("old")
+        })
+    );
+    assert_eq!(
+        *saved.borrow(),
+        if distribution::ISOLATED {
+            None
+        } else {
+            Some("old")
+        }
+    );
     // Saved under the current service: nothing is copied again.
     *saved.borrow_mut() = Some("new");
     assert_eq!(read_or_copy(current, || panic!("copied")), Ok(Some("new")));
@@ -345,7 +363,11 @@ fn read_or_copy_returns_failures_and_accepts_a_copy_another_app_made() {
     );
     assert_eq!(
         read_or_copy(none, || Err(Error::Denied)),
-        Err(Error::Denied)
+        if distribution::ISOLATED {
+            Ok(None)
+        } else {
+            Err(Error::Denied)
+        }
     );
     // Another app saved it while this copy was refused: its key is read back.
     let saved = std::cell::RefCell::new(None);
@@ -353,7 +375,14 @@ fn read_or_copy_returns_failures_and_accepts_a_copy_another_app_made() {
         *saved.borrow_mut() = Some("old");
         Err(Error::Busy)
     };
-    assert_eq!(read_or_copy(|| Ok(*saved.borrow()), raced), Ok(Some("old")));
+    assert_eq!(
+        read_or_copy(|| Ok(*saved.borrow()), raced),
+        Ok(if distribution::ISOLATED {
+            None
+        } else {
+            Some("old")
+        })
+    );
 }
 
 #[test]
@@ -411,6 +440,13 @@ fn a_me_build_reads_the_release_key_and_falls_back_only_when_it_is_absent() {
         release_or_own(release, read, || Ok(Zeroizing::new(b"own".to_vec())))
             .map(|value| value.to_vec())
     }
+    let expected = |official| {
+        if distribution::ISOLATED {
+            Ok(b"own".to_vec())
+        } else {
+            official
+        }
+    };
     let absent = Err(Error::Absent);
     // Not a me build: a release read would panic.
     let never = |_: &str| -> Result<Zeroizing<Vec<u8>>> { panic!("read a release item") };
@@ -421,9 +457,9 @@ fn a_me_build_reads_the_release_key_and_falls_back_only_when_it_is_absent() {
     );
     assert_eq!(
         run(true, Ok(b"release"), Ok(b"old")),
-        Ok(b"release".to_vec())
+        expected(Ok(b"release".to_vec()))
     );
-    assert_eq!(run(true, absent, Ok(b"old")), Ok(b"old".to_vec()));
+    assert_eq!(run(true, absent, Ok(b"old")), expected(Ok(b"old".to_vec())));
     assert_eq!(run(true, absent, absent), Ok(b"own".to_vec()));
     // A denied or broken release read never substitutes this build's key.
     for error in [
@@ -432,7 +468,46 @@ fn a_me_build_reads_the_release_key_and_falls_back_only_when_it_is_absent() {
         Error::Busy,
         Error::Unavailable,
     ] {
-        assert_eq!(run(true, Err(error), Ok(b"old")), Err(error));
-        assert_eq!(run(true, absent, Err(error)), Err(error));
+        assert_eq!(run(true, Err(error), Ok(b"old")), expected(Err(error)));
+        assert_eq!(run(true, absent, Err(error)), expected(Err(error)));
     }
+}
+
+#[test]
+fn distribution_human_slots_keep_official_defaults_and_isolate_custom_builds() {
+    if let Some(id) = option_env!("BUZZ_DISTRIBUTION_ID") {
+        assert_eq!(human_service(false), format!("{id}.identity"));
+        assert_eq!(human_service(true), format!("{id}.identity.debug"));
+        assert_eq!(human_store(false), human_service(false));
+        assert_eq!(human_store(true), human_service(true));
+    } else {
+        assert_eq!(human_service(false), "xyz.block.buzz.desktop.identity");
+        assert_eq!(human_store(false), "dev.local.buzz.foundation.identity");
+    }
+}
+
+#[test]
+fn distribution_automatic_copy_and_release_key_selection_never_cross_profiles() {
+    let custom = option_env!("BUZZ_DISTRIBUTION_ID").is_some();
+    let copies = std::cell::Cell::new(0);
+    let result = read_or_copy(
+        || Ok::<Option<()>, Error>(None),
+        || {
+            copies.set(copies.get() + 1);
+            Ok(())
+        },
+    );
+    assert_eq!(result, Ok(None));
+    assert_eq!(copies.get(), usize::from(!custom));
+    let reads = std::cell::Cell::new(0);
+    let result = release_or_own(
+        true,
+        |_| {
+            reads.set(reads.get() + 1);
+            Err(Error::Absent)
+        },
+        || Ok(Zeroizing::new(b"own".to_vec())),
+    );
+    assert_eq!(result.unwrap().as_slice(), b"own");
+    assert_eq!(reads.get(), if custom { 0 } else { 2 });
 }
