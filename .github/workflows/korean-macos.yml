@@ -1,0 +1,161 @@
+# 한글판 Apple Silicon DMG(서명·공증 없음)를 빌드해 릴리스에 첨부한다.
+# 원본 desktop-build.yml의 macOS build 작업을 따르되, 로컬 수동 빌드와 같은 정책을 쓴다:
+# - scripts/korean/build-dmg.mjs가 오버레이(Buzz Korean, ai.codepair.buzz-korean,
+#   buzz-ai.codepair.buzz-korean 스킴, 업데이터 off)와 BUZZ_DISTRIBUTION_ID를 넣고
+#   서명·업데이터·개발용 환경 변수를 빌드에서 뺀다.
+# - Apple 서명·공증, 업데이터 서명, FI(로그인 서버)·키 백업 서비스 변수와 비밀은 쓰지 않는다.
+# - aarch64만 빌드한다. 빌드한 앱은 실행하지 않고 DMG를 마운트해 내용만 검사한다.
+#
+# 트리거: 사람이 push한 korean-v* 태그, 또는 수동 실행(태그 지정).
+# korean-tag.yml이 GITHUB_TOKEN으로 만든 태그 push는 워크플로를 트리거하지 않으므로
+# korean-tag.yml이 태그를 만든 뒤 이 워크플로를 workflow_dispatch로 직접 호출한다.
+name: Korean macOS DMG
+
+on:
+  push:
+    tags: ["korean-v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "빌드할 한글판 태그 (예: korean-v1.0.5)"
+        required: true
+        type: string
+      release:
+        description: "릴리스에 DMG 첨부"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: korean-macos-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  macos:
+    name: macOS aarch64 DMG (unsigned)
+    # Apple Silicon 러너. build-dmg.mjs도 darwin/arm64가 아니면 거부한다.
+    runs-on: macos-15
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    env:
+      CARGO_TERM_COLOR: always
+      TAG: ${{ inputs.tag || github.ref_name }}
+      UPLOAD: ${{ github.event_name == 'push' || inputs.release }}
+    steps:
+      - name: Check tag
+        run: |
+          if [[ ! "$TAG" =~ ^korean-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Not a Korean release tag: $TAG"
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+      # 원본 macOS 작업과 같이 Hermit으로 bin/의 node·pnpm·Rust 핀을 쓰고 pnpm install까지 한다.
+      - uses: ./.github/actions/setup
+      - name: Check Apple Silicon runner and Rust host
+        run: |
+          test "$(uname -m)" = arm64 || { echo "::error::Runner is $(uname -m), not arm64"; exit 1; }
+          rustc -vV | grep -qx 'host: aarch64-apple-darwin' || { echo '::error::Rust host is not aarch64-apple-darwin'; exit 1; }
+          rustc --version
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: korean-macos-release
+      - name: Build unsigned app and DMG
+        id: build
+        env:
+          # 원본 macOS 작업과 같이 CI에서도 DMG 창 배치(Finder AppleScript)를 한다.
+          TAURI_BUNDLER_DMG_IGNORE_CI: "true"
+        run: ./bin/node scripts/korean/build-dmg.mjs
+      - name: Check the tag matches the app version
+        env:
+          VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          if [[ "$TAG" != "korean-v$VERSION" ]]; then
+            echo "::error::$TAG does not match app version $VERSION (korean/upstream.json)"
+            exit 1
+          fi
+      - name: Verify DMG contents
+        env:
+          DMG: ${{ steps.build.outputs.dmg }}
+          PRODUCT: ${{ steps.build.outputs.productName }}
+          VERSION: ${{ steps.build.outputs.version }}
+          IDENTIFIER: ${{ steps.build.outputs.identifier }}
+          SCHEME: ${{ steps.build.outputs.scheme }}
+        run: |
+          set -euo pipefail
+          mnt=$(mktemp -d "$RUNNER_TEMP/verify-dmg.XXXXXX")
+          hdiutil attach "$DMG" -readonly -nobrowse -mountpoint "$mnt" >/dev/null
+          trap 'hdiutil detach "$mnt" >/dev/null' EXIT
+          ls -la "$mnt"
+          app="$mnt/$PRODUCT.app"
+          test -d "$app" || { echo "::error::DMG has no $PRODUCT.app"; exit 1; }
+          info="$app/Contents/Info.plist"
+          read_plist() { /usr/libexec/PlistBuddy -c "Print :$1" "$info"; }
+          test "$(read_plist CFBundleIdentifier)" = "$IDENTIFIER" || { echo "::error::CFBundleIdentifier is $(read_plist CFBundleIdentifier)"; exit 1; }
+          test "$(read_plist CFBundleShortVersionString)" = "$VERSION" || { echo "::error::Version is $(read_plist CFBundleShortVersionString)"; exit 1; }
+          test "$(read_plist CFBundleURLTypes:0:CFBundleURLSchemes:0)" = "$SCHEME" || { echo '::error::Unexpected URL scheme'; exit 1; }
+          if read_plist CFBundleURLTypes:1 >/dev/null 2>&1 || read_plist CFBundleURLTypes:0:CFBundleURLSchemes:1 >/dev/null 2>&1; then
+            echo '::error::App declares more than the Korean URL scheme'; exit 1
+          fi
+          test -n "$(read_plist NSMicrophoneUsageDescription)"
+          exe="$app/Contents/MacOS/$(read_plist CFBundleExecutable)"
+          binaries=("$exe" "$app/Contents/Resources/bin/buzz" "$app/Contents/Resources/bin/buzz-agent-command" "$app/Contents/Resources/bin/goose-acp")
+          for binary in "${binaries[@]}"; do
+            test -x "$binary" || { echo "::error::Missing $binary"; exit 1; }
+            test "$(lipo -archs "$binary")" = arm64 || { echo "::error::$binary is not arm64"; exit 1; }
+          done
+          "$app/Contents/Resources/bin/buzz" --help >/dev/null || { echo '::error::buzz --help failed'; exit 1; }
+          # 공식 Buzz 키체인 서비스 이름이 하나도 없고 한글판 이름이 있어야 한다.
+          official='xyz\.block\.buzz\.(desktop\.)?(identity|agents|federated-session|claude-api-key|jev-key)'
+          for binary in "${binaries[@]}"; do
+            count=$(grep -acE "$official" "$binary" || true)
+            test "$count" -eq 0 || { echo "::error::$binary embeds official keychain names:"; grep -aoE "$official" "$binary" | sort -u; exit 1; }
+          done
+          grep -aqF "$IDENTIFIER.identity" "$exe" || { echo '::error::App lacks the Korean credential namespace'; exit 1; }
+          # 업데이터 off: 원본 업데이터 피드 주소가 없어야 한다.
+          if grep -aqE 'releases/download/(stable|preview)-feed' "$exe"; then
+            echo '::error::App embeds an updater feed'; exit 1
+          fi
+          # 서명하지 않은 빌드다. 참고로 서명 상태만 출력한다(ad-hoc 여부).
+          codesign --display --verbose=2 "$app" 2>&1 | grep -E '^(Signature|Identifier|Format|CodeDirectory)' || echo 'codesign: not signed'
+          echo "Verified $app"
+      - name: Stage DMG and checksum
+        env:
+          DMG: ${{ steps.build.outputs.dmg }}
+          ASSET: ${{ steps.build.outputs.asset }}
+        run: |
+          set -euo pipefail
+          mkdir release-assets
+          cp "$DMG" "release-assets/$ASSET"
+          cd release-assets
+          shasum -a 256 "$ASSET" | tee "$ASSET.sha256"
+          {
+            echo "### $ASSET"
+            echo '```'
+            cat "$ASSET.sha256"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: korean-macos-aarch64
+          path: release-assets/
+          if-no-files-found: error
+          retention-days: 14
+      # 릴리스가 없으면 초안으로 만든다: 공개는 사람이 확인한 뒤 한다.
+      - name: Attach to the release
+        if: env.UPLOAD == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ASSET: ${{ steps.build.outputs.asset }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --draft --title "Buzz Korean ${TAG#korean-v}" --notes "Buzz 한글판 ${TAG#korean-v}"
+          fi
+          gh release upload "$TAG" "release-assets/$ASSET" "release-assets/$ASSET.sha256" --clobber

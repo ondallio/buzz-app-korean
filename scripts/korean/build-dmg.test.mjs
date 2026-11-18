@@ -1,5 +1,16 @@
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, it } from "vitest";
-import { buildEnvironment, tauriArguments } from "./build-dmg.mjs";
+import {
+  buildEnvironment,
+  dmgName,
+  releaseAsset,
+  releaseFields,
+  TARGET,
+  tauriArguments,
+  writeGithubOutput,
+} from "./build-dmg.mjs";
 import { koreanReleaseConfig } from "./desktop-config.mjs";
 
 it("drops signing, updater and development inputs and adds the distribution ID", () => {
@@ -35,4 +46,37 @@ it("builds unsigned Apple Silicon app and DMG bundles with the locked lockfile",
   ).toEqual(["--bundles", "app,dmg"]);
   expect(args).toContain("aarch64-apple-darwin");
   expect(args.at(-1)).toBe("--locked");
+});
+
+it("names the DMG and a space-free release asset", () => {
+  const config = { productName: "Buzz Korean", version: "1.0.5" };
+  expect(TARGET).toBe("aarch64-apple-darwin");
+  expect(dmgName(config)).toBe("Buzz Korean_1.0.5_aarch64.dmg");
+  expect(releaseAsset(dmgName(config))).toBe("Buzz.Korean_1.0.5_aarch64.dmg");
+});
+
+it("reports the Korean identity for the workflow checks", () => {
+  const { config } = koreanReleaseConfig({ version: "1.0.5" });
+  expect(releaseFields(config)).toEqual({
+    version: "1.0.5",
+    productName: "Buzz Korean",
+    identifier: "ai.codepair.buzz-korean",
+    scheme: "buzz-ai.codepair.buzz-korean",
+  });
+});
+
+it("appends step outputs only when GitHub Actions provides a file", () => {
+  const directory = mkdtempSync(join(tmpdir(), "korean-output-"));
+  try {
+    const file = join(directory, "output");
+    writeGithubOutput({ dmg: "/a/Buzz Korean_1.0.5_aarch64.dmg" }, file);
+    writeGithubOutput({ version: "1.0.5" }, file);
+    expect(readFileSync(file, "utf8")).toBe(
+      "dmg=/a/Buzz Korean_1.0.5_aarch64.dmg\nversion=1.0.5\n",
+    );
+    expect(() => writeGithubOutput({ x: "a\nb=c" }, file)).toThrow();
+    expect(() => writeGithubOutput({ x: "y" }, undefined)).not.toThrow();
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

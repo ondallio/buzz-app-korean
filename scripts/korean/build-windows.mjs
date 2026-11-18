@@ -12,7 +12,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
-  appendFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -23,7 +22,12 @@ import {
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildEnvironment } from "./build-dmg.mjs";
+import {
+  buildEnvironment,
+  releaseAsset,
+  releaseFields,
+  writeGithubOutput,
+} from "./build-dmg.mjs";
 import { koreanReleaseConfig } from "./desktop-config.mjs";
 
 export const WINDOWS_TARGET = "x86_64-pc-windows-msvc";
@@ -80,8 +84,7 @@ export const installerName = ({ productName, version }) =>
   `${productName}_${version}_x64-setup.exe`;
 
 /** GitHub 릴리스 자산 이름: 공백 없이 (`Buzz.Korean_1.0.5_x64-setup.exe`). */
-export const releaseAssetName = (config) =>
-  installerName(config).replaceAll(" ", ".");
+export const releaseAssetName = (config) => releaseAsset(installerName(config));
 
 function build() {
   assert.ok(
@@ -124,18 +127,9 @@ function build() {
   const info = {
     installer: join(nsis, installers[0]),
     asset: releaseAssetName(config),
-    version: config.version,
-    productName: config.productName,
-    identifier: config.identifier,
-    scheme: config.plugins["deep-link"].desktop.schemes[0],
+    ...releaseFields(config),
   };
-  if (process.env.GITHUB_OUTPUT)
-    appendFileSync(
-      process.env.GITHUB_OUTPUT,
-      Object.entries(info)
-        .map(([key, value]) => `${key}=${value}\n`)
-        .join(""),
-    );
+  writeGithubOutput(info);
   process.stdout.write(`${JSON.stringify(info, null, 2)}\n`);
 }
 

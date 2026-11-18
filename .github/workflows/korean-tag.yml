@@ -2,7 +2,8 @@
 # korean-v<원본버전> 태그를 붙인다 (예: 원본 v1.0.5 → korean-v1.0.5).
 # 원본 배포 워크플로가 반응하는 v* 태그와 겹치지 않도록 korean- 접두사를 쓴다.
 # GITHUB_TOKEN으로 push한 태그는 다른 워크플로를 트리거하지 않으므로, 새 태그를
-# 만들면 Windows 설치 파일 빌드(korean-windows.yml)를 직접 실행한다.
+# 만들면 Windows 설치 파일(korean-windows.yml)과 macOS DMG(korean-macos.yml) 빌드를
+# 직접 실행한다. 두 빌드가 각자 초안 릴리스를 만들어 겹치지 않도록 초안은 여기서 먼저 만든다.
 name: Korean version tag
 
 on:
@@ -33,6 +34,16 @@ jobs:
           git push origin "refs/tags/$tag"
           echo "created $tag"
           echo "created=$tag" >> "$GITHUB_OUTPUT"
+      - name: Create the draft release for the new tag
+        if: steps.tag.outputs.created
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.tag.outputs.created }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --draft --title "Buzz Korean ${TAG#korean-v}" --notes "Buzz 한글판 ${TAG#korean-v}"
+          fi
       - name: Build the Windows installer for the new tag
         if: steps.tag.outputs.created
         env:
@@ -40,3 +51,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ steps.tag.outputs.created }}
         run: gh workflow run korean-windows.yml --ref "$GITHUB_REF_NAME" -f tag="$TAG" -f release=true
+      - name: Build the macOS DMG for the new tag
+        if: steps.tag.outputs.created
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.tag.outputs.created }}
+        run: gh workflow run korean-macos.yml --ref "$GITHUB_REF_NAME" -f tag="$TAG" -f release=true
