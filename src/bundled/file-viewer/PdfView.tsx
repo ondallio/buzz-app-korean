@@ -134,7 +134,7 @@ function Drawing({
       <canvas ref={canvas} hidden={failed} />
       {failed && (
         <p className={styles.note} role="alert">
-          This page couldn't be drawn.
+          {t("v1fv.pageDrawFailed")}
         </p>
       )}
     </>

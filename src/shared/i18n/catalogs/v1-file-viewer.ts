@@ -22,6 +22,13 @@ export const en = {
   "v1fv.zoomIn": "Zoom in",
   "v1fv.fitWidth": "Fit to width",
   "v1fv.pages": "{name} pages",
+  "v1fv.pageDrawFailed": "This page couldn't be drawn.",
+  "v1fv.tooLarge":
+    "{format} files open up to {limit} MB. Download it to read it.",
+  "v1fv.loadFailed":
+    "This file couldn't be loaded. Check your connection and try again.",
+  "v1fv.notText":
+    "This file isn't text. Download it to open it in another app.",
 } as const;
 
 export const ko: Record<keyof typeof en, string> = {
@@ -48,4 +55,11 @@ export const ko: Record<keyof typeof en, string> = {
   "v1fv.zoomIn": "확대",
   "v1fv.fitWidth": "너비에 맞추기",
   "v1fv.pages": "{name} 페이지",
+  "v1fv.pageDrawFailed": "이 페이지를 그리지 못했습니다.",
+  "v1fv.tooLarge":
+    "{format} 파일은 {limit}MB까지 열 수 있습니다. 다운로드해서 읽어 주세요.",
+  "v1fv.loadFailed":
+    "이 파일을 불러오지 못했습니다. 연결을 확인한 뒤 다시 시도하세요.",
+  "v1fv.notText":
+    "이 파일은 텍스트가 아닙니다. 다운로드해서 다른 앱으로 여세요.",
 };

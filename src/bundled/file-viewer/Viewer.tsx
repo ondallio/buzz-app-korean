@@ -34,10 +34,10 @@ type Loaded =
 function failureMessage(error: unknown, format: FileFormat): string {
   const limit = Math.round(maxBytes(format) / (1024 * 1024));
   if (error instanceof LoadError && error.reason === "too-large")
-    return `${formatLabel(format)} files open up to ${limit} MB. Download it to read it.`;
+    return t("v1fv.tooLarge", { format: formatLabel(format), limit });
   if (error instanceof LoadError && error.reason === "not-text")
-    return "This file isn't text. Download it to open it in another app.";
-  return "This file couldn't be loaded. Check your connection and try again.";
+    return t("v1fv.notText");
+  return t("v1fv.loadFailed");
 }
 
 function useBytes(
@@ -145,10 +145,7 @@ function Contents({
     );
   if (text === null || text === undefined)
     return (
-      <Unavailable
-        title={t("v1fv.cantOpen")}
-        message="This file isn't text. Download it to open it in another app."
-      />
+      <Unavailable title={t("v1fv.cantOpen")} message={t("v1fv.notText")} />
     );
   if (file.format !== "csv" && file.format !== "tsv")
     return (

@@ -11,7 +11,7 @@ export const en = {
     "No harness that runs agents on this computer is available. Check {link}.",
   "v1agent.create.setUpFirst": "Set up Goose, Codex or Claude first.",
   "v1agent.claude.keyOnce":
-    "Claude requires an API key to connect to your account. Create one at console.anthropic.com and paste it below. You only have to set this up once.",
+    "Buzz can help you configure your Claude setup with an API key, or use the Claude CLI to configure your own connection and refresh Buzz. Create a key at console.anthropic.com and paste it below.",
   "v1agent.claude.missing":
     "Claude is missing an API key. Add one in Settings → Claude.",
   "v1agent.claude.keyStored":
@@ -598,7 +598,7 @@ export const ko: Record<keyof typeof en, string> = {
     "이 컴퓨터에서 에이전트를 실행할 수 있는 하네스가 없습니다. {link}을 확인하세요.",
   "v1agent.create.setUpFirst": "Goose, Codex 또는 Claude를 먼저 설정하세요.",
   "v1agent.claude.keyOnce":
-    "Claude를 계정에 연결하려면 API 키가 필요합니다. console.anthropic.com에서 키를 만들어 아래에 붙여 넣어 주세요. 한 번만 설정하면 됩니다.",
+    "Buzz가 API 키로 Claude 설정을 도와드릴 수 있습니다. 또는 Claude CLI로 직접 연결을 설정한 뒤 Buzz를 새로고침하세요. console.anthropic.com에서 키를 만들어 아래에 붙여 넣으세요.",
   "v1agent.claude.missing":
     "Claude API 키가 없습니다. 설정 → Claude에서 키를 추가해 주세요.",
   "v1agent.claude.keyStored": "키는 이 컴퓨터에 안전하게 보관됩니다.",

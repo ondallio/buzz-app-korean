@@ -1,4 +1,6 @@
 export const en = {
+  "v1id.clockSkew":
+    "Your computer’s date and time look wrong. Check them in System Settings, then try again.",
   "v1id.decisionsSubtitle":
     "{agents}, {plugins} and features like {attention} can use this API for quick, inexpensive judgments, such as whether a watched event should wake your agent. Your chosen provider handles these questions and receives the message text sent with them, which may come from private channels.",
   "v1id.decisionsAgents": "Agents",
@@ -347,6 +349,8 @@ export const en = {
 } as const;
 
 export const ko: Record<keyof typeof en, string> = {
+  "v1id.clockSkew":
+    "컴퓨터의 날짜와 시간이 잘못된 것 같습니다. 시스템 설정에서 확인한 뒤 다시 시도하세요.",
   "v1id.decisionsSubtitle":
     "{agents}, {plugins}, {attention} 같은 기능은 이 API로 감시 중인 이벤트가 에이전트를 깨워야 하는지처럼 빠르고 비용이 적게 드는 판단을 할 수 있습니다. 선택한 제공자가 이 질문을 처리하며, 함께 전송되는 메시지 텍스트(비공개 채널의 내용일 수 있음)를 받습니다.",
   "v1id.decisionsAgents": "에이전트",

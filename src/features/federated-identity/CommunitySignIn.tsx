@@ -252,8 +252,7 @@ function Explanation({
   if (refusal === "clock-skew")
     return (
       <p role="alert" className="text-body-sm text-danger">
-        Your computer’s date and time look wrong. Check them in System Settings,
-        then try again.
+        {t("v1id.clockSkew")}
       </p>
     );
   if (ISSUER_REFUSALS.has(refusal))
