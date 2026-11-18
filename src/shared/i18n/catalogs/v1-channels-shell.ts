@@ -299,7 +299,7 @@ export const en = {
   "v1shell.workspace.saving": "Saving workspace…",
   "v1shell.workspace.settings": "Workspace settings",
   "v1shell.workspace.showFewerIn": "Show fewer chats in {name}",
-  "v1shell.workspace.showLess": "Show less",
+  "v1shell.workspace.showLess": "Show fewer",
   "v1shell.workspace.showMoreIn": "Show more chats in {name}",
 } as const;
 

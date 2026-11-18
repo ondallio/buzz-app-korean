@@ -20,7 +20,6 @@ import {
   canTransferOwnership,
   editableMemberRoles,
   type MemberChange,
-  transferRefusal,
 } from "../../features/channel-members/administration-protocol";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
 import {
@@ -405,10 +404,12 @@ export function MemberRow({
                 aria-describedby={profiled ? undefined : transferReason}
                 onClick={() => choose("owner")}
               >
-                Transfer ownership
+                {t("v105ch.members.transfer")}
               </MenuItem>
               {!profiled && (
-                <MenuNote id={transferReason}>{transferRefusal}</MenuNote>
+                <MenuNote id={transferReason}>
+                  {t("v105ch.members.transferRefusal")}
+                </MenuNote>
               )}
               {canRemove && <MenuSeparator />}
             </>
@@ -418,7 +419,9 @@ export function MemberRow({
               {t(
                 place === "chat"
                   ? "channelPages.members.removeChat"
-                  : "channelPages.members.removeChannel",
+                  : place === "DM"
+                    ? "v105ch.members.removeFromDm"
+                    : "channelPages.members.removeChannel",
               )}
             </MenuItem>
           )}

@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   createContext,
   useCallback,
@@ -314,19 +315,24 @@ function SectionUnavailable({
   inventory?: boolean;
   title?: string | undefined;
 }) {
+  useLanguage();
   return (
     <>
       <p role="alert">
         {inventory
-          ? "Conversations couldn’t open."
-          : "This optional control is unavailable. Other settings and channel recovery remain available."}
+          ? t("v1shell.nav.sidebarFailed")
+          : t("v105ch.sidebar.optionalUnavailable")}
       </p>
       <Button
         size="sm"
-        aria-label={title ? `Retry ${title}` : undefined}
+        aria-label={
+          title ? t("activityGroup.retryName", { name: title }) : undefined
+        }
         onClick={retry}
       >
-        {inventory && !title ? "Retry sidebar" : "Retry"}
+        {inventory && !title
+          ? t("v1shell.nav.retrySidebar")
+          : t("channelForms.retry")}
       </Button>
     </>
   );
