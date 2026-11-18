@@ -33,7 +33,7 @@ Claude·Codex·Goose·Pi 같은 에이전트를 내 컴퓨터에서 실행해 �
 
 ## 설치
 
-1. [Releases](https://github.com/ondallio/buzz-app-korean/releases)에서 `Buzz Korean_<버전>_aarch64.dmg`를 내려받습니다. (Apple Silicon Mac 전용)
+1. [Releases](https://github.com/ondallio/buzz-app-korean/releases)에서 `Buzz.Korean_<버전>_aarch64.dmg`를 내려받습니다. (Apple Silicon Mac 전용)
 2. DMG를 열고 `Buzz Korean.app`을 응용 프로그램 폴더로 끌어다 놓습니다.
 3. 처음 열 때 "확인되지 않은 개발자" 경고가 나오면 앱을 **우클릭 → 열기**를 누릅니다.
    (또는 시스템 설정 → 개인정보 보호 및 보안 → **그래도 열기**)
@@ -80,6 +80,11 @@ bin/node scripts/korean/build-dmg.mjs   # 서명 없는 한글판 DMG
   bin/pnpm check
   ```
 - 어색한 번역이나 영어로 남은 화면은 [이슈](https://github.com/ondallio/buzz-app-korean/issues)로 알려주세요.
+
+## 문의
+
+- 이메일: info@codepair.ai
+- 버그·번역 제안: [GitHub 이슈](https://github.com/ondallio/buzz-app-korean/issues)
 
 ## 라이선스
 
