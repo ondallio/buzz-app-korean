@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { resolveForward, type ResolvedForward } from "./resolve-forward";
 import type { RelaySession } from "../relay/session";
 import type { OutboxRecovery } from "../relay/outbox";
@@ -33,16 +34,14 @@ export function followUpMessage(
         message.channelId,
       );
       if (message.recipients.some((key) => !channel.members?.includes(key)))
-        throw new Error(
-          "A queued recipient is no longer a member of this chat.",
-        );
+        throw new Error(t("v1msg.queue.recipientLeft"));
     },
     publish(recovery?: OutboxRecovery) {
       const channel = session.channels
         .list()
         .channels.find((row) => row.id === message.channelId);
       if (!channel || channel.archived || channel.readOnly)
-        throw new Error("This chat is no longer available for sending.");
+        throw new Error(t("v1msg.queue.chatUnavailable"));
       if (
         !ownSolo(channel, session.viewer) ||
         message.recipients.some(
@@ -53,12 +52,9 @@ export function followUpMessage(
               .selectable.some((agent) => agent.pubkey === key),
         )
       )
-        throw new Error(
-          "This Solo chat or its recipients are no longer available.",
-        );
+        throw new Error(t("v1msg.queue.soloUnavailable"));
       if (message.forward) {
-        if (!source)
-          throw new Error("Reload this forwarded message before sending it.");
+        if (!source) throw new Error(t("v105msg.queue.reloadForward"));
         const resolved = source;
         const send = () =>
           session.messages.forward(

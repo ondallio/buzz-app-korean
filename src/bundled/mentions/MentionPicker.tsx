@@ -1,3 +1,9 @@
+import { t, useLanguage } from "../../shared/i18n";
+import {
+  localMessage,
+  resolveMessage,
+  type DisplayMessage,
+} from "../../shared/i18n/deferred-message";
 import { useProfileGeneration } from "../../features/relay/react";
 import { TeamMentionAvatars } from "./TeamMentionAvatars";
 import {
@@ -22,6 +28,7 @@ import { useTeamMentions } from "./use-team-mentions";
 import { useMentionChoices } from "./use-mention-choices";
 import type { ComposerSession } from "../../features/messages/composer-session";
 import {
+  managedByDetail,
   outsideMentionDetail,
   remoteMentionDetail,
 } from "./mention-candidates";
@@ -37,6 +44,56 @@ import styles from "./Mentions.module.css";
 
 import type { ComposerToolProps } from "../../features/conversation/contracts";
 import { avatarMedia } from "../../shared/avatar-source";
+
+// Only canonical strings produced by the bundled mention helpers enter this map.
+const mentionTextKeys = {
+  "Channel membership changed. Reopen to review adding this recipient.":
+    "mentionPicker.changedRecipient",
+  Archived: "mentionPicker.archived",
+  "No longer available. Change your search to refresh choices.":
+    "mentionPicker.unavailableRecipient",
+  "Team changed or unavailable. Reopen to refresh.":
+    "mentionPicker.changedTeam",
+  "Channel membership changed. Reopen to review adding this team.":
+    "mentionPicker.changedTeamMembership",
+  "This team has no agents.": "mentionPicker.emptyTeam",
+  "Teams can mention at most 32 agents.": "mentionPicker.teamLimit",
+  "A team member is unavailable. Edit the team or refresh choices.":
+    "mentionPicker.unavailableTeamMember",
+  "Loading legacy teams…": "mentionPicker.loadingLegacyTeams",
+  "Could not load legacy teams. Retry to refresh.":
+    "mentionPicker.legacyTeamsFailed",
+  "Could not search community people. Retry to refresh.":
+    "mentionPicker.communityPeopleFailed",
+  Remote: "mentionPicker.remote",
+  "Not in DM · Will not be notified": "mentionPicker.outsideDm",
+  "Not in channel": "mentionPicker.outsideChannel",
+} as const;
+function knownMentionText(source: string | undefined): string | undefined {
+  const key = Object.entries(mentionTextKeys).find(
+    ([message]) => message === source,
+  )?.[1];
+  return key ? t(key) : source;
+}
+function teamCaption(
+  team: ReturnType<typeof useTeamMentions>["choices"][number],
+): string {
+  if (team.disabled) return knownMentionText(team.detail) ?? team.detail;
+  const display = team.presentation;
+  if (!display) return team.detail;
+  if (!display.outside)
+    return t("mentionPicker.savedTeam", { count: display.count });
+  return t(
+    display.destination === "dm"
+      ? "mentionPicker.teamOutsideDm"
+      : display.destination === "channel"
+        ? "mentionPicker.teamAddsChannel"
+        : display.destination === "chat"
+          ? "mentionPicker.teamAddsChat"
+          : "mentionPicker.teamOutsideChannel",
+    { count: display.count, outside: display.outside },
+  );
+}
 
 /** Select identities from the shared relay roster, never from display-name matching. */
 export function MentionPicker({
@@ -60,9 +117,10 @@ export function MentionPicker({
   /** Return typing to the draft when the agent menu closes. */
   focusDraft?: ComposerToolProps["focus"];
 }) {
+  useLanguage();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<DisplayMessage>();
   const trigger = useRef<HTMLButtonElement>(null);
   const controls = useRef<HTMLFieldSetElement>(null);
   const accepted = useRef(false);
@@ -112,10 +170,7 @@ export function MentionPicker({
     void session.profiles
       .ensure(memberKey.split(":"), "background")
       .catch(() => {
-        if (current)
-          setError(
-            "Names unavailable. Exact public keys still identify recipients.",
-          );
+        if (current) setError(localMessage("mentionPicker.namesUnavailable"));
       });
     return () => {
       current = false;
@@ -215,7 +270,7 @@ export function MentionPicker({
         ref={controls}
         disabled={disabled}
         className={styles.pickerControls}
-        aria-label="Mention controls"
+        aria-label={t("mentionPicker.controls")}
       >
         <PopoverTrigger
           disabled={disabled}
@@ -228,10 +283,12 @@ export function MentionPicker({
                 size="toolbar"
                 ref={trigger}
                 type="button"
-                aria-label={`Sending to ${audience.recipients
-                  .map((person) => person.name)
-                  .join(", ")}. Change agents`}
-                title="Change agents"
+                aria-label={t("mentionPicker.sendingAgents", {
+                  names: audience.recipients
+                    .map((person) => person.name)
+                    .join(", "),
+                })}
+                title={t("mentionPicker.changeAgents")}
                 icon={<CaretDownIcon size={16} aria-hidden="true" />}
               />
             ) : audience ? (
@@ -243,10 +300,12 @@ export function MentionPicker({
                 type="button"
                 aria-label={
                   audience.recipients.length
-                    ? `Sending to ${audience.recipients
-                        .map((person) => person.name)
-                        .join(", ")}. Change agents`
-                    : "Choose agent"
+                    ? t("mentionPicker.sendingAgents", {
+                        names: audience.recipients
+                          .map((person) => person.name)
+                          .join(", "),
+                      })
+                    : t("mentionPicker.chooseAgent")
                 }
               >
                 <AvatarStack
@@ -261,7 +320,7 @@ export function MentionPicker({
                     shape: "squircle",
                   }))}
                 />
-                {audience.recipients[0]?.name ?? "Choose agent"}
+                {audience.recipients[0]?.name ?? t("mentionPicker.chooseAgent")}
                 <CaretDownIcon size={12} aria-hidden="true" />
               </Button>
             ) : (
@@ -271,8 +330,8 @@ export function MentionPicker({
                 size="toolbar"
                 ref={trigger}
                 type="button"
-                aria-label="Mention a member"
-                title="Mention a member"
+                aria-label={t("mentionPicker.mentionMember")}
+                title={t("mentionPicker.mentionMember")}
                 icon={<AtIcon size={20} aria-hidden="true" />}
               />
             )
@@ -290,7 +349,7 @@ export function MentionPicker({
             overflow: "hidden",
             display: "flex",
           }}
-          aria-label="Mention a member or agent"
+          aria-label={t("mentionPicker.popup")}
           finalFocus={
             // The agent menu stays open across picks; closing it resumes
             // typing in the draft, unless focus went somewhere else. The
@@ -310,11 +369,19 @@ export function MentionPicker({
               label={
                 !audience &&
                 allowsOutsideMentions(channel, draftRoster, inviteAgents)
-                  ? "Search community people and agents"
+                  ? t("mentionPicker.searchCommunity")
                   : draftRoster
-                    ? "Search recipients"
-                    : "Search members and agents"
+                    ? t("mentionPicker.searchRecipients")
+                    : t("mentionPicker.searchMembers")
               }
+              placeholder={t("mentionPicker.searchPlaceholder")}
+              clearLabel={t(
+                draftRoster
+                  ? "mentionPicker.clearRecipients"
+                  : inviteAgents
+                    ? "mentionPicker.clearMembers"
+                    : "mentionPicker.clearCommunity",
+              )}
               value={search}
               onValueChange={setSearch}
               disabled={disabled}
@@ -331,23 +398,23 @@ export function MentionPicker({
             {!draftRoster && inviteAgents && (
               <p>
                 {parentAdmission
-                  ? "Agents you mention join this channel when you send, with access to its history."
-                  : "Agents you mention join this chat when you send, with access to its history."}
+                  ? t("mentionPicker.inviteChannel")
+                  : t("mentionPicker.inviteChat")}
               </p>
             )}
             {model.directory.loading && (
-              <p role="status">Searching community…</p>
+              <p role="status">{t("mentionPicker.searchingCommunity")}</p>
             )}
             {model.directory.error && (
               <>
-                <p role="status">{model.directory.error}</p>
+                <p role="status">{knownMentionText(model.directory.error)}</p>
                 <Button type="button" onClick={model.directory.retry}>
-                  Retry community search
+                  {t("mentionPicker.retryCommunity")}
                 </Button>
               </>
             )}
             {agents.status === "loading" && !candidates.length && (
-              <p role="status">Loading agents…</p>
+              <p role="status">{t("mentionPicker.loadingAgents")}</p>
             )}
             {(agents.status === "error" || !!agents.error) && (
               <Button
@@ -358,7 +425,7 @@ export function MentionPicker({
                   )
                 }
               >
-                Retry agent list
+                {t("mentionPicker.retryAgents")}
               </Button>
             )}
             {model.archives.status === "error" && (
@@ -366,32 +433,34 @@ export function MentionPicker({
                 type="button"
                 onClick={() => void session.archives?.refresh()}
               >
-                Retry archive information
+                {t("mentionPicker.retryArchives")}
               </Button>
             )}
             {teams.status && (
               <p role="status">
-                {teams.status}{" "}
+                {knownMentionText(teams.status)}{" "}
                 {teams.canRetry && (
-                  <Button onClick={teams.retry}>Retry legacy teams</Button>
+                  <Button onClick={teams.retry}>
+                    {t("mentionPicker.retryLegacyTeams")}
+                  </Button>
                 )}
               </p>
             )}
-            {error && <p role="status">{error}</p>}
+            {error && <p role="status">{resolveMessage(error)}</p>}
             {!draftRoster && list.error && (
               <>
-                <p role="alert">Could not refresh channel membership.</p>
+                <p role="alert">{t("mentionPicker.membershipFailed")}</p>
                 <Button
                   disabled={disabled}
                   type="button"
                   onClick={() => session.channels.refreshList?.()}
                 >
-                  Retry channel membership
+                  {t("mentionPicker.retryMembership")}
                 </Button>
               </>
             )}
             {!draftRoster && (!inviteAgents || !!channel) && !members && (
-              <p role="status">Channel membership unavailable.</p>
+              <p role="status">{t("mentionPicker.membershipUnavailable")}</p>
             )}
             <div
               className={`${styles.mentionChoices} buzz-thin-scrollbar`}
@@ -409,7 +478,20 @@ export function MentionPicker({
                   execution,
                 }) => {
                   const managedBy = model.managedBy.get(recipient.pubkey);
-                  const remoteDetail = remoteMentionDetail(execution);
+                  const remoteDetail = knownMentionText(
+                    remoteMentionDetail(execution),
+                  );
+                  const manager = session.profiles.owner?.(recipient.pubkey);
+                  const managerName = manager
+                    ? profiles.get(manager)?.name?.trim()
+                    : undefined;
+                  const managerCaption =
+                    managedBy &&
+                    managerName &&
+                    managedBy ===
+                      managedByDetail(manager, session.viewer, profiles)
+                      ? t("mentionPicker.managedBy", { name: managerName })
+                      : managedBy;
                   // Each addressed agent's row shows a check; fill is only
                   // the keyboard and pointer highlight.
                   const addressed = !!audience?.recipients.some(
@@ -448,9 +530,14 @@ export function MentionPicker({
                                 <RobotIcon />
                               </span>
                             )}
-                            {agent && <span className="sr-only"> Agent</span>}
+                            {agent && (
+                              <span className="sr-only">
+                                {" "}
+                                {t("mentionPicker.agent")}
+                              </span>
+                            )}
                           </span>
-                          {reason && <small>{reason}</small>}
+                          {reason && <small>{knownMentionText(reason)}</small>}
                           {(remoteDetail ||
                             otherName ||
                             managedBy ||
@@ -460,7 +547,7 @@ export function MentionPicker({
                               {[
                                 otherName,
                                 remoteDetail,
-                                managedBy,
+                                managerCaption,
                                 members?.includes(recipient.pubkey)
                                   ? undefined
                                   : inviteAgents &&
@@ -470,9 +557,18 @@ export function MentionPicker({
                                         recipient.pubkey,
                                       )
                                     ? parentAdmission
-                                      ? "Adds to channel when you send"
-                                      : "Adds to chat when you send"
-                                    : outsideMentionDetail(channel, elsewhere),
+                                      ? t("mentionPicker.addsChannel")
+                                      : t("mentionPicker.addsChat")
+                                    : elsewhere
+                                      ? t("mentionPicker.inHost", {
+                                          host: elsewhere,
+                                        })
+                                      : knownMentionText(
+                                          outsideMentionDetail(
+                                            channel,
+                                            elsewhere,
+                                          ),
+                                        ),
                               ]
                                 .filter(Boolean)
                                 .join(" · ")}
@@ -526,26 +622,36 @@ export function MentionPicker({
                   }
                   trailing={
                     <span className="text-caption text-subtle">
-                      {team.detail}
+                      {teamCaption(team)}
                     </span>
                   }
-                  aria-label={`${team.name} · ${team.detail}`}
+                  aria-label={t("mentionPicker.teamNameDetail", {
+                    name: team.name,
+                    detail: teamCaption(team),
+                  })}
                   onClick={() => chooseTeam(team)}
                 />
               ))}
               {members && !candidates.length && !teams.choices.length && (
-                <p>No matching channel members.</p>
+                <p>{t("mentionPicker.noMembers")}</p>
               )}
               {audience?.named && (
                 <p className="text-caption text-subtle">
-                  Your message tags{" "}
-                  {audience.recipients.map((person) => person.name).join(", ")},
-                  so picks here add or remove tags.
+                  {t("mentionPicker.namedTags", {
+                    names: audience.recipients
+                      .map((person) => person.name)
+                      .join(", "),
+                  })}
                 </p>
               )}
               <p role="status" className="sr-only">
                 {highlightedLabel
-                  ? `${highlightedLabel}. Press Enter to ${audience ? "add or remove this agent" : "mention"}.`
+                  ? t(
+                      audience
+                        ? "mentionPicker.announceToggle"
+                        : "mentionPicker.announceMention",
+                      { name: highlightedLabel },
+                    )
                   : ""}
               </p>
             </div>

@@ -1,4 +1,5 @@
 import { useConversationPresentation } from "../conversation/ConversationPresentation";
+import { formattingLocale, t, useLanguage } from "../../shared/i18n";
 import { prepareReviewEntrance } from "./use-review-entrance";
 import { useMediaCorners } from "./use-media-corners";
 import { MediaViewer } from "./MediaAttachment";
@@ -35,7 +36,7 @@ export function AttachmentImage({
   onOpenReview,
   onOpenLink,
   keepMounted,
-  label = "Open image attachment",
+  label = t("attachmentMedia.imageOpenAttachment"),
 }: {
   label?: string;
   attachment: Attachment;
@@ -52,6 +53,7 @@ export function AttachmentImage({
   /** Pins the owning row in a virtualized list; returns the release. */
   keepMounted?: (() => () => void) | undefined;
 }) {
+  const language = useLanguage();
   const active = useConversationPresentation();
   const corners = useMediaCorners();
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -132,7 +134,7 @@ export function AttachmentImage({
         style={style}
         role="status"
       >
-        <span>Image unavailable</span>
+        <span>{t("mediaViewing.image.unavailable")}</span>
       </span>
     );
   return (
@@ -178,7 +180,10 @@ export function AttachmentImage({
             )}
             {overlayCount > 0 && (
               <span className={styles.imageOverflow} aria-hidden="true">
-                +{overlayCount}
+                +
+                {new Intl.NumberFormat(formattingLocale(language)).format(
+                  overlayCount,
+                )}
               </span>
             )}
           </span>
@@ -195,7 +200,7 @@ export function AttachmentImage({
         viewerOpen &&
         createPortal(
           <MediaViewer
-            title="Image attachment"
+            title={t("attachmentMedia.imageTitle")}
             close={() => setViewerOpen(false)}
           >
             <MediaContextMenu
@@ -207,7 +212,7 @@ export function AttachmentImage({
               <img
                 className={styles.mediaViewerImage}
                 src={source}
-                alt="Attachment preview"
+                alt={t("mediaViewing.image.preview")}
               />
             </MediaContextMenu>
           </MediaViewer>,

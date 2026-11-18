@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import { isPrivateForwardSource } from "./is-private-forward-source";
 import { snapshotMessage } from "../relay/forwarded-message";
 import type { RelaySession } from "../relay/session";
@@ -27,7 +28,7 @@ export async function resolveForward(
     !reference ||
     reference.origin !== splitPartition(session.scope)?.communityOrigin
   )
-    throw new Error("This message belongs to another community.");
+    throw new Error(t("v105msg.forward.otherCommunityShort"));
   const aborted = AbortSignal.any([signal, AbortSignal.timeout(15000)]);
   aborted.throwIfAborted();
   await session.channels.resolve?.([reference.channelId], { signal: aborted });
@@ -41,11 +42,7 @@ export async function resolveForward(
     const row = await new Promise<import("../relay/contracts").ChannelMessage>(
       (resolve, reject) => {
         const fail = () =>
-          reject(
-            new Error(
-              "Couldn't load this message. It may have been deleted, or you no longer have access.",
-            ),
-          );
+          reject(new Error(t("v105msg.forward.sourceUnavailable")));
         const update = () => {
           const state = linkedMessage(view.snapshot(), reference.id);
           if (state.ready && state.message) resolve(state.message);

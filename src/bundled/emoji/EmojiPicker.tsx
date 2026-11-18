@@ -358,8 +358,8 @@ export function EmojiPicker({
             size="sm"
             variant="ghost"
             type="button"
-            aria-label="Add emoji"
-            title="Add emoji"
+            aria-label={t("customEmoji.add")}
+            title={t("customEmoji.add")}
             hint="familiar"
             icon={<PlusIcon size="1rem" aria-hidden="true" />}
             onClick={addCustomEmoji}
@@ -367,7 +367,7 @@ export function EmojiPicker({
         ) : (
           <Button size="sm" variant="ghost" onClick={addCustomEmoji}>
             <PlusIcon size="1rem" aria-hidden="true" />
-            Add emoji
+            {t("customEmoji.add")}
           </Button>
         )}
       </span>,
@@ -381,8 +381,8 @@ export function EmojiPicker({
           size="sm"
           variant="ghost"
           type="button"
-          aria-label="Choose default skin tone"
-          title="Choose default skin tone"
+          aria-label={t("emojiPicker.mart.skins.choose")}
+          title={t("emojiPicker.mart.skins.choose")}
           hint="familiar"
           aria-expanded={skinTone.open}
           emoji={toneHand(skinTone.tone)}
@@ -451,7 +451,7 @@ export function EmojiPicker({
               setOpen(false);
             }}
           >
-            Remove emoji
+            {t("v105msg.emoji.remove")}
           </Button>
         </div>
       )}

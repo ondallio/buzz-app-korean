@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { isPrivateForwardSource } from "./is-private-forward-source";
 import { snapshotAttachments } from "../relay/forwarded-message";
 import { useEffect, useState } from "react";
@@ -86,13 +87,13 @@ export function useComposerForward(
   const problem = !reference
     ? undefined
     : !session
-      ? "Open this conversation in the main window to paste a forwarded message."
+      ? t("v105msg.forward.openMainWindow")
       : !sameCommunity
-        ? "This message belongs to another community. Switch communities to forward it."
+        ? t("v105msg.forward.otherCommunity")
         : resolved?.error || resolved?.source?.problem
           ? (resolved.error ?? resolved.source?.problem)
           : source.unavailable
-            ? "Couldn't load this message. It may have been deleted, or you no longer have access."
+            ? t("v105msg.forward.sourceUnavailable")
             : forwardRow
               ? host?.messages.forwardProblem(
                   destination,
@@ -126,11 +127,12 @@ export function ComposerForward({
   scope: string;
   onRemove(): void;
 }) {
+  useLanguage();
   return (
     <div className={styles.composerPreview}>
       <div className={styles.removeForward}>
         <IconButton
-          aria-label="Remove forwarded message"
+          aria-label={t("v105msg.forward.remove")}
           icon={<XIcon size={16} />}
           onClick={onRemove}
         />
@@ -156,14 +158,19 @@ export function ComposerForward({
           />
           {snapshotAttachments(state.row).length > 0 && (
             <span className="text-body-sm">
-              {snapshotAttachments(state.row).length} attachments included
+              {t(
+                snapshotAttachments(state.row).length === 1
+                  ? "v105msg.forward.attachmentIncluded"
+                  : "v105msg.forward.attachmentsIncluded",
+                { count: snapshotAttachments(state.row).length },
+              )}
             </span>
           )}
         </ForwardedMessage>
       ) : (
         !state.problem && (
           <p role="status" className="text-body-sm">
-            Loading forwarded message…
+            {t("v105msg.forward.loadingForwarded")}
           </p>
         )
       )}

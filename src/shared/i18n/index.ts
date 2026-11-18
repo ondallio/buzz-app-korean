@@ -279,6 +279,10 @@ import {
   en as v1FileViewerEn,
   ko as v1FileViewerKo,
 } from "./catalogs/v1-file-viewer";
+import {
+  en as v105MessagesEn,
+  ko as v105MessagesKo,
+} from "./catalogs/v105-messages";
 import { languagePreference, type Language } from "./language";
 import { formatMessage } from "./messages";
 
@@ -385,6 +389,7 @@ export const english = {
   ...v1ShellEn,
   ...v1FileViewerEn,
   ...v105AgentsPluginsEn,
+  ...v105MessagesEn,
 } as const;
 export const korean: Partial<Record<keyof typeof english, string>> = {
   ...coreKo,
@@ -473,6 +478,7 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...v1ShellKo,
   ...v1FileViewerKo,
   ...v105AgentsPluginsKo,
+  ...v105MessagesKo,
 };
 export type TranslationKey = keyof typeof english;
 type Variables<S extends string> =

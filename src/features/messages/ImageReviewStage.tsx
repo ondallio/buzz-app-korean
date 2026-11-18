@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useImageGalleryMotion } from "./use-image-gallery-motion";
 import { MIN_ZOOM, useImageViewport } from "./use-image-viewport";
 import { useMediaControls } from "./use-media-controls";
@@ -56,6 +57,7 @@ export function ImageReviewStage({
   onOpenLink,
   allowCopy = true,
 }: ImageReviewStageProps) {
+  useLanguage();
   const stage = useRef<HTMLDivElement>(null);
   const image = useRef<HTMLImageElement>(null);
   const previousButton = useRef<HTMLButtonElement>(null);
@@ -228,7 +230,7 @@ export function ImageReviewStage({
   if (!selected)
     return (
       <p className={styles.mediaReviewUnavailable} role="status">
-        Image unavailable
+        {t("mediaViewing.image.unavailable")}
       </p>
     );
   return (
@@ -243,7 +245,7 @@ export function ImageReviewStage({
       <div
         ref={stage}
         role="group"
-        aria-label="Image gallery"
+        aria-label={t("mediaViewing.image.gallery")}
         tabIndex={-1}
         data-controls-idle={idle || undefined}
         data-controls-revealed={feedbackVisible || undefined}
@@ -315,7 +317,7 @@ export function ImageReviewStage({
               data-gallery-departing={!current ? "" : undefined}
               data-review-chrome={!current ? "" : undefined}
               src={item.source}
-              alt={current ? "Attachment preview" : ""}
+              alt={current ? t("mediaViewing.image.preview") : ""}
               aria-describedby={current ? zoomHint : undefined}
               aria-hidden={!current || undefined}
               draggable={false}
@@ -328,12 +330,12 @@ export function ImageReviewStage({
               className={styles.mediaReviewUnavailable}
               role="status"
             >
-              Image unavailable
+              {t("mediaViewing.image.unavailable")}
             </p>
           );
         })}
         <p id={zoomHint} className="sr-only">
-          Click the image to zoom.
+          {t("mediaViewing.image.zoomHint")}
         </p>
         <div
           className={styles.imageReviewToolbar}
@@ -347,19 +349,22 @@ export function ImageReviewStage({
                 size="sm"
                 type="button"
                 ref={previousButton}
-                aria-label="Previous image"
+                aria-label={t("mediaViewing.image.previous")}
                 disabled={selectedIndex === 0}
                 onClick={() => choose(selectedIndex - 1)}
                 icon={<CaretLeftIcon size={18} aria-hidden="true" />}
               />
               <span aria-live="polite" aria-atomic="true">
-                {selectedIndex + 1} / {attachments.length}
+                {t("mediaViewing.position", {
+                  index: selectedIndex + 1,
+                  count: attachments.length,
+                })}
               </span>
               <IconButton
                 size="sm"
                 type="button"
                 ref={nextButton}
-                aria-label="Next image"
+                aria-label={t("mediaViewing.image.next")}
                 disabled={selectedIndex === attachments.length - 1}
                 onClick={() => choose(selectedIndex + 1)}
                 icon={<CaretRightIcon size={18} aria-hidden="true" />}
@@ -370,7 +375,7 @@ export function ImageReviewStage({
             <IconButton
               size="sm"
               type="button"
-              aria-label="Zoom out"
+              aria-label={t("mediaViewing.image.zoomOut")}
               disabled={zoom <= MIN_ZOOM}
               onClick={() => setBoundedZoom(zoom - ZOOM_STEP)}
               icon={<MinusIcon size={16} aria-hidden="true" />}
@@ -379,7 +384,10 @@ export function ImageReviewStage({
               variant="ghost"
               size="sm"
               type="button"
-              aria-label={`Image zoom: ${Math.round(zoom * 100)}%. Zoom to ${nextZoom * 100}%`}
+              aria-label={t("mediaViewing.image.zoomLabel", {
+                percent: Math.round(zoom * 100),
+                nextPercent: nextZoom * 100,
+              })}
               onClick={() => setBoundedZoom(nextZoom)}
             >
               {Math.round(zoom * 100)}%
@@ -387,7 +395,7 @@ export function ImageReviewStage({
             <IconButton
               size="sm"
               type="button"
-              aria-label="Zoom in"
+              aria-label={t("mediaViewing.image.zoomIn")}
               disabled={zoom >= maxZoom}
               onClick={() => setBoundedZoom(zoom + ZOOM_STEP)}
               icon={<PlusIcon size={16} aria-hidden="true" />}
@@ -398,8 +406,8 @@ export function ImageReviewStage({
               hint="familiar"
               size="sm"
               type="button"
-              aria-label="Copy image"
-              title="Copy image"
+              aria-label={t("mediaViewing.image.copy")}
+              title={t("mediaViewing.image.copy")}
               disabled={!canCopyImage}
               loading={copying}
               onClick={() => void copyImage()}
@@ -408,9 +416,11 @@ export function ImageReviewStage({
           )}
           {copyNotice && (
             <span role={copyNotice === "error" ? "alert" : "status"}>
-              {copyNotice === "success"
-                ? "Image copied"
-                : "Couldn't copy image"}
+              {t(
+                copyNotice === "success"
+                  ? "mediaViewing.image.copied"
+                  : "mediaViewing.image.copyFailed",
+              )}
             </span>
           )}
           {nativeSource && source && (
@@ -428,8 +438,8 @@ export function ImageReviewStage({
               role="link"
               render={<a href={source} download />}
               size="sm"
-              aria-label="Download image"
-              title="Download image"
+              aria-label={t("mediaViewing.download.image")}
+              title={t("mediaViewing.download.image")}
               icon={<DownloadIcon size={17} />}
             />
           )}
@@ -450,8 +460,8 @@ export function ImageReviewStage({
                 />
               }
               size="sm"
-              aria-label="Open image in browser"
-              title="Open image in browser"
+              aria-label={t("mediaViewing.image.open")}
+              title={t("mediaViewing.image.open")}
               icon={<ArrowSquareOutIcon size={17} />}
             />
           )}

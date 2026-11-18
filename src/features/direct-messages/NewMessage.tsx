@@ -581,12 +581,16 @@ export function NewMessage({
       <div className={styles.feedback}>
         {joining.length > 0 && (
           <p role="status">
-            Sending adds{" "}
-            {new Intl.ListFormat(undefined, { type: "conjunction" }).format(
-              joining.map((person) => person.name),
-            )}{" "}
-            to this DM. {joining.length === 1 ? "It" : "They"} can read its
-            earlier messages.
+            {t(
+              joining.length === 1
+                ? "v105msg.dm.joiningOne"
+                : "v105msg.dm.joiningMany",
+              {
+                names: new Intl.ListFormat(undefined, {
+                  type: "conjunction",
+                }).format(joining.map((person) => person.name)),
+              },
+            )}
           </p>
         )}
         {busy && (

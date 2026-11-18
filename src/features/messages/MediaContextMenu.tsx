@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import {
   cloneElement,
   useEffect,
@@ -61,6 +62,7 @@ export function MediaContextMenu({
   onView?: (() => void) | undefined;
   children: ReactElement<HTMLAttributes<HTMLElement>>;
 }) {
+  useLanguage();
   const active = useConversationPresentation();
   const notify = useMediaActionNotification();
   const dismiss = useToastDismiss();
@@ -92,7 +94,7 @@ export function MediaContextMenu({
     if (downloadSource && pending.has(downloadSource)) return;
     if (downloadSource) pending.add(downloadSource);
     const notice = downloadSource
-      ? notify("Starting download…", "info")
+      ? notify(t("v105msg.media.startingDownload"), "info")
       : undefined;
     try {
       await action();
@@ -206,7 +208,11 @@ export function MediaContextMenu({
                 <MenuIcon>
                   <ArrowsOutIcon size={16} />
                 </MenuIcon>
-                Open {kind}
+                {t(
+                  kind === "image"
+                    ? "v105msg.media.openImage"
+                    : "v105msg.media.openVideo",
+                )}
               </MenuItem>
             )}
             {kind === "image" && allowCopy && (
@@ -220,30 +226,38 @@ export function MediaContextMenu({
                         return Promise.reject(new Error("Image unavailable"));
                       return copyImageToClipboard(target.image);
                     },
-                    "Image copied",
-                    "Couldn’t copy image. Try again.",
+                    t("mediaViewing.image.copied"),
+                    t("v105msg.media.copyImageFailed"),
                   )
                 }
               >
                 <MenuIcon>
                   <CopyIcon size={16} />
                 </MenuIcon>
-                Copy image
+                {t("mediaViewing.image.copy")}
               </MenuItem>
             )}
             <MenuItem
               onClick={() =>
                 void run(
                   () => writeClipboardText(target.url),
-                  `${kind === "image" ? "Image" : "Video"} URL copied`,
-                  "Couldn’t copy URL. Try again.",
+                  t(
+                    kind === "image"
+                      ? "v105msg.media.imageUrlCopied"
+                      : "v105msg.media.videoUrlCopied",
+                  ),
+                  t("v105msg.media.copyUrlFailed"),
                 )
               }
             >
               <MenuIcon>
                 <LinkIcon size={16} />
               </MenuIcon>
-              Copy {kind} URL
+              {t(
+                kind === "image"
+                  ? "v105msg.media.copyImageUrl"
+                  : "v105msg.media.copyVideoUrl",
+              )}
             </MenuItem>
             <MenuSeparator />
             {native ? (
@@ -251,8 +265,8 @@ export function MediaContextMenu({
                 onClick={() =>
                   void run(
                     () => downloadNativeMedia(target.source, name),
-                    "Saved to Downloads",
-                    "Couldn’t download. Try again.",
+                    t("mediaViewing.download.saved"),
+                    t("mediaViewing.download.retryHint"),
                     target.source,
                   )
                 }
@@ -260,14 +274,22 @@ export function MediaContextMenu({
                 <MenuIcon>
                   <DownloadIcon size={16} />
                 </MenuIcon>
-                Download {kind}
+                {t(
+                  kind === "image"
+                    ? "mediaViewing.download.image"
+                    : "mediaViewing.download.video",
+                )}
               </MenuItem>
             ) : (
               <MenuLinkItem href={target.source} download={name} closeOnClick>
                 <MenuIcon>
                   <DownloadIcon size={16} />
                 </MenuIcon>
-                Download {kind}
+                {t(
+                  kind === "image"
+                    ? "mediaViewing.download.image"
+                    : "mediaViewing.download.video",
+                )}
               </MenuLinkItem>
             )}
           </MenuPopup>
