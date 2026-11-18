@@ -24,13 +24,13 @@ export const en = {
   "shell.window.failed": "Window action failed. Try again.",
   "shell.profile.label": "Your profile",
   "shell.profile.avatar": "Your avatar",
-  "shell.profile.statusUnavailable": "Your status is unavailable",
+  "shell.profile.statusUnavailable": "Your availability is unknown",
   "shell.profile.status": "Your status: {status}",
   "shell.profile.edit": "{name}, edit profile",
   "shell.profile.online": "Online",
   "shell.profile.away": "Away",
   "shell.profile.offline": "Offline",
-  "shell.profile.unknown": "Status unavailable",
+  "shell.profile.unknown": "Availability unknown",
   "shell.profile.targetOnline": "online",
   "shell.profile.targetAway": "away",
   "shell.profile.targetOffline": "offline",
@@ -39,7 +39,8 @@ export const en = {
   "shell.profile.availabilityUpdating":
     "Availability: {status}, updating to {target}",
   "shell.profile.updating": "Updating to {target}…",
-  "shell.profile.confirmFailed": "Could not confirm your status. Try again.",
+  "shell.profile.confirmFailed":
+    "Could not confirm your availability. Try again.",
   "shell.profile.setStatus": "Set a status",
   "shell.profile.setStatusLabel": "Set a status: {status}",
   "shell.profile.updatesUnavailable":
@@ -78,13 +79,13 @@ export const ko: Record<keyof typeof en, string> = {
   "shell.window.failed": "창 작업에 실패했습니다. 다시 시도하세요.",
   "shell.profile.label": "내 프로필",
   "shell.profile.avatar": "내 아바타",
-  "shell.profile.statusUnavailable": "내 상태를 확인할 수 없습니다",
+  "shell.profile.statusUnavailable": "내 접속 상태를 알 수 없습니다",
   "shell.profile.status": "내 상태: {status}",
   "shell.profile.edit": "{name} 프로필 편집",
   "shell.profile.online": "온라인",
   "shell.profile.away": "자리 비움",
   "shell.profile.offline": "오프라인",
-  "shell.profile.unknown": "상태를 확인할 수 없음",
+  "shell.profile.unknown": "접속 상태 알 수 없음",
   "shell.profile.targetOnline": "온라인",
   "shell.profile.targetAway": "자리 비움",
   "shell.profile.targetOffline": "오프라인",
@@ -93,7 +94,8 @@ export const ko: Record<keyof typeof en, string> = {
   "shell.profile.availabilityUpdating":
     "접속 상태: {status}, {target} 상태로 변경 중",
   "shell.profile.updating": "{target} 상태로 변경 중…",
-  "shell.profile.confirmFailed": "상태를 확인하지 못했습니다. 다시 시도하세요.",
+  "shell.profile.confirmFailed":
+    "접속 상태를 확인하지 못했습니다. 다시 시도하세요.",
   "shell.profile.setStatus": "상태 설정",
   "shell.profile.setStatusLabel": "상태 설정: {status}",
   "shell.profile.updatesUnavailable":

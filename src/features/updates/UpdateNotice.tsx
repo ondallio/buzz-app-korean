@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { useSyncExternalStore } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 import { ToastNotice } from "../../shared/design-system/ui/Toast";
@@ -5,6 +6,7 @@ import type { Updates } from "./updates";
 
 /** Reports a failed install and its retry outside Settings; the top-bar action offers ready updates. */
 export function UpdateNotice({ updates }: { updates: Updates }) {
+  useLanguage();
   const status = useSyncExternalStore(
     updates.subscribe,
     updates.snapshot,
@@ -26,23 +28,26 @@ export function UpdateNotice({ updates }: { updates: Updates }) {
     idle: "",
     ready: "",
     installing: "",
-    checking: "Checking for updates...",
-    available: "Preparing update...",
-    downloading: "Downloading update...",
-    "up-to-date": "You're on the latest version.",
-    unavailable:
-      "Automatic updates aren't available on this build. Download the latest release manually.",
+    checking: t("settingsHost.noticeChecking"),
+    available: t("settingsHost.noticePreparing"),
+    downloading: t("settingsHost.noticeDownloading"),
+    "up-to-date": t("settingsHost.updateLatest"),
+    unavailable: t("settingsHost.updateUnavailable"),
     error: "",
   };
   return (
     <ToastNotice
-      title={state === "error" ? "Update failed" : "Software Updates"}
+      title={
+        state === "error"
+          ? t("settingsHost.updateFailed")
+          : t("settingsHost.updatesRecoveryTitle")
+      }
       description={
         status.state === "error" ? status.message : descriptions[state]
       }
       tone={state === "error" ? "error" : "info"}
       onDismiss={updates.dismissNotice}
-      closeLabel="Dismiss update notification"
+      closeLabel={t("settingsHost.dismissUpdate")}
     >
       <Button
         type="button"
@@ -50,7 +55,7 @@ export function UpdateNotice({ updates }: { updates: Updates }) {
         loading={["checking", "available", "downloading"].includes(state)}
         onClick={() => void updates.checkForUpdate()}
       >
-        Retry
+        {t("settingsHost.retry")}
       </Button>
     </ToastNotice>
   );

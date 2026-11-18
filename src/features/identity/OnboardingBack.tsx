@@ -1,3 +1,4 @@
+import { t, useLanguage } from "../../shared/i18n";
 import { ArrowLeftIcon } from "../../shared/design-system/icons";
 import {
   IconButton,
@@ -5,15 +6,16 @@ import {
 } from "../../shared/design-system/ui/IconButton";
 
 export function OnboardingBack({
-  "aria-label": label = "Back",
+  "aria-label": label,
   ...props
 }: Omit<IconButtonProps, "icon" | "emoji" | "aria-label"> & {
   "aria-label"?: string;
 }) {
+  useLanguage();
   return (
     <IconButton
       {...props}
-      aria-label={label}
+      aria-label={label === undefined ? t("identity.back") : label}
       icon={<ArrowLeftIcon />}
       size="lg"
       shape="round"

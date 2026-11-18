@@ -1,6 +1,7 @@
 import { navigationOwner } from "./shell/presentation";
 import { resolveSidebarContext } from "../features/sidebar/contracts";
 // FOUNDATION: Startup, navigation, contributed pages, and built-in Settings.
+import { t, useLanguage } from "../shared/i18n";
 import { AgentAvatarArtworkProvider } from "../features/agents/AgentAvatarArtworkProvider";
 import { Welcome } from "../features/identity/Welcome";
 import { NewMenu } from "./shell/NewMenu";
@@ -123,8 +124,10 @@ export function App({ services }: { services: AppServices }) {
 }
 
 function ConnectedApp({ services }: { services: AppServices }) {
+  useLanguage();
   return (
     <ToastProvider
+      labels={{ region: t("toast.region"), dismiss: t("toast.dismiss") }}
       portalContainer={document.getElementById("buzz-toast-root") ?? undefined}
     >
       <AgentCompletionNotifications services={services} />
@@ -162,6 +165,7 @@ function Presented({
 }
 
 function ConnectedAppContent({ services }: { services: AppServices }) {
+  useLanguage();
   const { plugins } = services;
   const [workspaceElement, setWorkspaceElement] =
     useState<HTMLDivElement | null>(null);
@@ -501,7 +505,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
   // Keep the parser launch surface through local bootstrap, not network refresh.
   if (!settings && restoring)
     return document.getElementById("buzz-launch") ? null : (
-      <div className="buzz-launch" role="status" aria-label="Opening Buzz">
+      <div className="buzz-launch" role="status" aria-label={t("app.opening")}>
         <LoadingWindowHeader />
         <picture>
           <source
@@ -611,7 +615,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
         retryFocus.current = focused && after !== before ? after : undefined;
       }}
     >
-      Try again
+      {t("app.retry")}
     </Button>
   );
   // The way out must lead elsewhere: Messages itself may be what failed. A
@@ -633,7 +637,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
         variant={variant}
         onClick={() => select("buzz.channels/channels")}
       >
-        Go to Messages
+        {t("app.messages")}
       </Button>
     ) : null;
   // A link or access failure returns to where the person came from; opened
@@ -651,7 +655,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
             : services.navigation.back()
         }
       >
-        Go back
+        {t("app.back")}
       </Button>
     ) : (
       messagesButton("primary")
@@ -661,29 +665,29 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
       {failureKind === "denied" ? (
         <EmptyState
           icon={<LockIcon />}
-          title="You don’t have access to this"
-          description="It belongs to another account or a community you haven’t joined."
+          title={t("app.denied")}
+          description={t("app.deniedHelp")}
           action={leaveFailure}
         />
       ) : failureKind === "link" ? (
         <EmptyState
           icon={<LinkBreakIcon />}
-          title="This link doesn’t work"
-          description="It may be incomplete or out of date. Ask whoever shared it for a new link."
+          title={t("app.badLink")}
+          description={t("app.badLinkHelp")}
           action={leaveFailure}
         />
       ) : failureKind === "offline" ? (
         <EmptyState
           icon={<CloudOffIcon />}
-          title="Can’t connect"
+          title={t("app.offline")}
           description={
             retriedEntry === route.state.entry.id
               ? keepTrying
-                ? "Still can’t connect. We’ll keep trying."
-                : "Still can’t connect. Check your connection, then try again."
+                ? t("app.stillRetry")
+                : t("app.stillOffline")
               : keepTrying
-                ? "Check your connection. We’ll keep trying."
-                : "Check your connection, then try again."
+                ? t("app.retrying")
+                : t("app.checkConnection")
           }
           action={
             <>
@@ -696,8 +700,10 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
         // Its details' Enable owns every restriction and admin gate.
         <EmptyState
           icon={<WarningCircleIcon />}
-          title={`${route.turnedOff.name} is turned off`}
-          description={`Turn it on in Manage plugins to open this ${settings ? "section" : "page"}.`}
+          title={t("app.pluginOff", { name: route.turnedOff.name })}
+          description={t(
+            settings ? "v1shell.app.pluginHelpSection" : "app.pluginHelp",
+          )}
           action={
             <>
               <Button
@@ -707,7 +713,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
                   openSettingsSection("plugins", route.turnedOff?.id)
                 }
               >
-                Manage plugins
+                {t("app.plugins")}
               </Button>
               {messagesButton("quiet")}
             </>
@@ -716,8 +722,8 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
       ) : route.failure || failureReason === "not-found" ? (
         <EmptyState
           icon={<WarningCircleIcon />}
-          title="This page isn’t available"
-          description="It may have been removed, or you may need to update Buzz."
+          title={t("app.unavailable")}
+          description={t("app.removedHelp")}
           action={
             <>
               {messagesButton("primary")}
@@ -728,8 +734,8 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
       ) : (
         <EmptyState
           icon={<WarningCircleIcon />}
-          title="This page isn’t available"
-          description="It didn’t load this time. Try again in a moment."
+          title={t("app.unavailable")}
+          description={t("app.loadHelp")}
           action={
             <>
               {retryButton("primary")}
@@ -747,7 +753,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
         label={
           <span className="page-status-label">
             <TypingDots />
-            Loading…
+            {t("app.loading")}
           </span>
         }
       >
@@ -867,13 +873,13 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
         <Dialog
           // The inert launch surface would swallow the modal's initial focus.
           open={settings && !launching}
-          title="Settings"
+          title={t("app.settings")}
           visit
-          closeLabel="Close Settings"
+          closeLabel={t("app.closeSettings")}
           size="expanded"
           container={workspaceElement}
           navigation={{
-            label: "Settings sections",
+            label: t("app.settingsSections"),
             content: (
               <SettingsSidebar
                 cards={services.settingsCards}
@@ -981,12 +987,12 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
           </div>
           {confirmSettingsDiscard && settings && settingsUnsaved && (
             <AlertDialog
-              title="Discard changes?"
-              description="Your profile has unsaved changes."
+              title={t("app.discardTitle")}
+              description={t("app.discardHelp")}
               onClose={keepSettings}
               actions={
                 <>
-                  <Button onClick={keepSettings}>Keep editing</Button>
+                  <Button onClick={keepSettings}>{t("app.keepEditing")}</Button>
                   <Button
                     variant="destructive"
                     onClick={() => {
@@ -1000,7 +1006,7 @@ function ConnectedAppContent({ services }: { services: AppServices }) {
                       }
                     }}
                   >
-                    Discard changes
+                    {t("app.discard")}
                   </Button>
                 </>
               }

@@ -7,6 +7,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { t, useLanguage } from "../../shared/i18n";
 import { OwnedContribution } from "../../plugins/OwnedContribution";
 import { contributionKey } from "../../features/conversation/ContributionBoundary";
 import { resolveSidebarContext } from "../../features/sidebar/contracts";
@@ -41,6 +42,7 @@ const PageSidebarState = createContext<PageSidebar | undefined>(undefined);
 
 /** The legacy page contract participates as one opaque slot in the same host. */
 const pageSource: SidebarSectionSource["component"] = ({ target, render }) => {
+  useLanguage();
   const state = useContext(PageSidebarState);
   const Sidebar = state?.page.sidebar;
   if (!state || !Sidebar) return null;
@@ -55,9 +57,11 @@ const pageSource: SidebarSectionSource["component"] = ({ target, render }) => {
           resetIdentity={state.resetIdentity}
           fallback={
             <div className="shell-sidebar-default">
-              <SidebarFrame label={`${state.page.title} sidebar`}>
+              <SidebarFrame
+                label={t("app.sidebar", { page: state.page.title })}
+              >
                 <SidebarList>
-                  <p role="alert">This page’s sidebar is unavailable.</p>
+                  <p role="alert">{t("app.sidebarUnavailable")}</p>
                   {state.children}
                 </SidebarList>
               </SidebarFrame>
@@ -90,6 +94,7 @@ export function PrimarySidebar({
   replacement?: Omit<PageSidebar, "children"> | undefined;
   pendingReplacement?: boolean;
 }) {
+  useLanguage();
   const contexts = useSyncExternalStore(
     registry.contextSubscribe ?? noSubscription,
     registry.contextSnapshot ?? noContexts,
@@ -135,7 +140,7 @@ export function PrimarySidebar({
     };
   }, [registry, context, adapted]);
   const fallback = (
-    <SidebarContextFrame label="Page navigation">
+    <SidebarContextFrame label={t("app.navigation")}>
       <SidebarList>{children}</SidebarList>
     </SidebarContextFrame>
   );

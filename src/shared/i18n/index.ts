@@ -293,6 +293,10 @@ import {
   en as v1WorkflowsIntegrationsEn,
   ko as v1WorkflowsIntegrationsKo,
 } from "./catalogs/v1-workflows-integrations";
+import {
+  en as v105ShellIdentityEn,
+  ko as v105ShellIdentityKo,
+} from "./catalogs/v105-shell-identity";
 
 export const english = {
   ...coreEn,
@@ -380,6 +384,7 @@ export const english = {
   ...v1IdentitySettingsEn,
   ...v1ShellEn,
   ...v1FileViewerEn,
+  ...v105ShellIdentityEn,
 } as const;
 export const korean: Partial<Record<keyof typeof english, string>> = {
   ...coreKo,
@@ -467,6 +472,7 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...v1IdentitySettingsKo,
   ...v1ShellKo,
   ...v1FileViewerKo,
+  ...v105ShellIdentityKo,
 };
 export type TranslationKey = keyof typeof english;
 type Variables<S extends string> =

@@ -1,20 +1,23 @@
 import { useSyncExternalStore } from "react";
+import { t, useLanguage } from "../../shared/i18n";
 import { Button } from "../../shared/design-system/ui/Button";
 import { DownloadIcon } from "../../shared/design-system/icons";
 import type { Updates } from "./updates";
 
 /** Top-bar restart action, shown while a downloaded update is ready or installing. */
 export function UpdateAction({ updates }: { updates: Updates }) {
+  useLanguage();
   const { state } = useSyncExternalStore(
     updates.subscribe,
     updates.snapshot,
     updates.snapshot,
   );
   if (state !== "ready" && state !== "installing") return null;
-  const label =
+  const label = t(
     state === "ready"
-      ? "Update ready. Restart Buzz to install"
-      : "Updating Buzz";
+      ? "v105shell.update.readyRestart"
+      : "v105shell.update.updating",
+  );
   return (
     <Button
       type="button"
@@ -26,7 +29,7 @@ export function UpdateAction({ updates }: { updates: Updates }) {
       onClick={() => void updates.installAndRelaunch()}
     >
       <DownloadIcon size={16} />
-      Update
+      {t("v105shell.update.update")}
     </Button>
   );
 }
