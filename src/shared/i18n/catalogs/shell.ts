@@ -54,7 +54,7 @@ export const en = {
 
 export const ko: Record<keyof typeof en, string> = {
   "shell.sidebar.all": "전체",
-  "shell.sidebar.solo": "솔로",
+  "shell.sidebar.solo": "1:1 채팅",
   "shell.sidebar.team": "팀",
   "shell.sidebar.scope": "탐색 범위",
   "shell.sidebar.label": "사이드바",
