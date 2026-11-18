@@ -9,7 +9,13 @@
 // - 빌드한 앱을 실행하거나 /Applications에 설치하지 않는다.
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { koreanReleaseConfig } from "./desktop-config.mjs";
@@ -86,6 +92,7 @@ function main() {
       stdio: "inherit",
     },
   );
+  rmSync(run, { recursive: true, force: true });
   if (result.error) throw result.error;
   assert.equal(result.status, 0, `tauri build failed (${result.status})`);
 
