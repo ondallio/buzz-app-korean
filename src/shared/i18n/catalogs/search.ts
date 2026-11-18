@@ -281,7 +281,7 @@ export const ko: Record<keyof typeof en, string> = {
   "search.markAllTitle": "모두 읽음으로 표시할까요?",
   "search.markAllDescription":
     "{name}의 모든 대화를 읽음으로 표시합니다. 나중에 대화를 다시 읽지 않음으로 표시할 수 있습니다.",
-  "search.communication": "커뮤니케이션",
+  "search.communication": "소통",
   "search.agentTools": "에이전트 도구",
   "search.developerTools": "개발 도구 및 연동",
   "search.peopleCommunities": "사람과 커뮤니티",
