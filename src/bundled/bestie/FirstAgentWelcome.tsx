@@ -3,6 +3,7 @@ import { useAgentPortraitSource } from "../agents/AgentCard";
 import messageStyles from "../../features/messages/Messages.module.css";
 import { RobotIcon } from "../../shared/design-system/icons";
 import { Avatar } from "../../shared/design-system/ui/Avatar";
+import { t, useLanguage } from "../../shared/i18n";
 import {
   replaceView,
   subscribeView,
@@ -55,12 +56,13 @@ export function FirstAgentWelcome({
   picture?: string | undefined;
   community?: string | undefined;
 }) {
+  useLanguage();
   const { src } = useAgentPortraitSource({ name, picture }, community);
   return (
     <article
       className={`${messageStyles.message} ${styles.welcome}`}
       data-layout="timeline"
-      aria-label="Welcome to Buzz"
+      aria-label={t("fubestie.welcome.label")}
     >
       <span className={messageStyles.messageGutter} />
       <div className={messageStyles.messageBody}>
@@ -68,7 +70,7 @@ export function FirstAgentWelcome({
           <div className={messageStyles.messageAvatar}>
             <Avatar
               src={src}
-              alt={`${name} avatar`}
+              alt={t("fubestie.welcome.avatar", { name })}
               fallback={name}
               shape="squircle"
             />
@@ -84,17 +86,10 @@ export function FirstAgentWelcome({
           </div>
           <div className={messageStyles.messageBubble}>
             <div className={messageStyles.text}>
-              <h3>Welcome to Buzz!</h3>
-              <p>
-                Since I’m your first agent, you can find me at the top of the
-                left sidebar. As you create more agents, you can change who
-                shows up there by making a different one your Bestie.
-              </p>
-              <p>
-                In addition to any instructions you’ve given me during setup, I
-                can also answer questions about working in Buzz.
-              </p>
-              <p>Ask away, or tell me what you’d like to work on.</p>
+              <h3>{t("fubestie.welcome.title")}</h3>
+              <p>{t("fubestie.welcome.findMe")}</p>
+              <p>{t("fubestie.welcome.questions")}</p>
+              <p>{t("fubestie.welcome.askAway")}</p>
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import type { ComputeActivityData } from "./ComputeActivity";
+import { t, useLanguage } from "../../shared/i18n";
 import styles from "./Compute.module.css";
 
 /** Reuses the floating widget's renderer with the settings owner's status feed. */
@@ -12,6 +13,7 @@ export function EmbeddedActivity({
   sharing: boolean;
   state: string;
 }) {
+  useLanguage();
   const frame = useRef<HTMLIFrameElement>(null);
   const send = useCallback(() => {
     const status = {
@@ -39,7 +41,7 @@ export function EmbeddedActivity({
     <iframe
       ref={frame}
       className={styles.embeddedWidget}
-      title="Live compute activity"
+      title={t("fubestie.activity.live")}
       src="/compute-widget.html?embedded=true"
       onLoad={send}
     />

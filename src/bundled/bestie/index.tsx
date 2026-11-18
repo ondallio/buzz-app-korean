@@ -9,6 +9,7 @@ import type { Agents } from "../../features/agents/service";
 import type { RelayData } from "../../features/relay/service";
 import { useRelayConnection } from "../../features/relay/react";
 import { BestieIcon } from "../../shared/design-system/icons";
+import { t, useLanguage } from "../../shared/i18n";
 import { Button } from "../../shared/design-system/ui/Button";
 import { EmptyState } from "../../shared/design-system/ui/EmptyState";
 import { FullPageSurface } from "../../shared/design-system/ui/FullPageSurface";
@@ -75,14 +76,15 @@ export const apply: PluginModule["apply"] = (ctx) => {
 };
 
 function BestieStatus({ children }: { children: ReactNode }) {
+  useLanguage();
   return (
     <div className="h-full min-h-0">
-      <FullPageSurface aria-label="Bestie">
+      <FullPageSurface aria-label={t("fubestie.bestie")}>
         <div className="flex h-full min-h-0 flex-col">
           <PanelHeader
             title={
               <PanelHeaderLabel
-                title="Bestie"
+                title={t("fubestie.bestie")}
                 icon={<BestieIcon size="1rem" />}
               />
             }
@@ -107,6 +109,7 @@ function BestieDestination({
   agents: Agents;
   pageNavigation?: PageNavigation | undefined;
 }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const saved = useSavedAgentState(connection.session, connection.scope ?? "");
   const established =
@@ -120,20 +123,21 @@ function BestieDestination({
           icon={<BestieIcon />}
           title={
             connection.status === "connecting"
-              ? "Connecting…"
+              ? t("fubestie.connecting")
               : connection.status === "error"
-                ? "This community is unavailable"
-                : "No community selected"
+                ? t("fubestie.communityUnavailable")
+                : t("fubestie.noCommunity")
           }
           description={
             connection.status === "connecting"
-              ? "Your Bestie opens once this community is connected."
-              : (connection.error ??
-                "Choose a community to continue with your Bestie.")
+              ? t("fubestie.page.opensOnceConnected")
+              : (connection.error ?? t("fubestie.page.chooseCommunity"))
           }
           action={
             connection.status === "error" ? (
-              <Button onClick={relay.tryAgain}>Retry connection</Button>
+              <Button onClick={relay.tryAgain}>
+                {t("fubestie.retryConnection")}
+              </Button>
             ) : undefined
           }
         />
@@ -145,18 +149,20 @@ function BestieDestination({
         <EmptyState
           icon={<BestieIcon />}
           title={
-            saved.error ? "Your Bestie is unavailable" : "Loading your Bestie…"
+            saved.error
+              ? t("fubestie.page.unavailable")
+              : t("fubestie.loadingBestie")
           }
           description={
             saved.error ? (
               <span role="alert">{saved.error}</span>
             ) : (
-              <span role="status">Reading your saved choice.</span>
+              <span role="status">{t("fubestie.page.readingChoice")}</span>
             )
           }
           action={
             saved.error ? (
-              <Button onClick={saved.retry}>Try again</Button>
+              <Button onClick={saved.retry}>{t("fubestie.tryAgain")}</Button>
             ) : undefined
           }
         />

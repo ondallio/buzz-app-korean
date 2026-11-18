@@ -18,6 +18,23 @@ import {
   upgradedFeature,
   withFeature,
 } from "./features";
+import { t } from "../../shared/i18n";
+
+/** A feature's name, translated when shown. */
+export function featureTitle(feature: Feature): string {
+  switch (feature.id) {
+    case "memory":
+      return t("v105agent.bestie.feature.memory");
+    case "notes.hourly":
+      return t("v105agent.bestie.feature.hourlyNotes");
+    case "dream.nightly":
+      return t("v105agent.bestie.feature.nightlyReview");
+    case "checkin.hourly":
+      return t("v105agent.bestie.feature.everyHour");
+    default:
+      return feature.title;
+  }
+}
 
 /** What saving a feature needs. A caller of agents here only can leave out
  * `hostedInstructions`. */
@@ -47,10 +64,10 @@ export function cannotEdit(
       !feature.timer &&
       agents.hostedInstructions?.(agent.pubkey)
       ? undefined
-      : "Not available with remote agents yet.";
+      : t("fubestie.save.remoteUnavailable");
   // A type without `adopt` has no instructions, as `updateKind` says.
   if (!agents.types().find(({ key }) => key === agent.type)?.adopt)
-    return "This agent's type has no instructions to add this to.";
+    return t("fubestie.save.noInstructions");
   // Without a confirmed copy its instructions aren't shown, so a save here
   // would replace them.
   return agent.configProblem;
@@ -115,7 +132,7 @@ function featureAttention(
       if (agent.attention[slug]) attention[slug] = null;
   const timer = on && feature.timer;
   if (timer) {
-    if (!channel) throw new Error("A check-in needs your DM with the agent.");
+    if (!channel) throw new Error(t("fubestie.save.checkInNeedsDm"));
     attention[interestSlug(timer.id)] = {
       type: "interest",
       instructions: timer.interest,
@@ -281,7 +298,9 @@ export async function restoreFeature(
 ) {
   const next = restoredFeature(instructionsOf(agent), feature);
   if (next === undefined)
-    throw new Error(`Fix ${feature.title}'s markers in Instructions.`);
+    throw new Error(
+      t("fubestie.save.fixMarkers", { feature: featureTitle(feature) }),
+    );
   await saveInstructions(agents, agent, next);
 }
 
@@ -294,7 +313,7 @@ function saveInstructions(
 ) {
   if (agent.place === "hosted") {
     const hosted = agents.hostedInstructions?.(agent.pubkey);
-    if (!hosted) throw new Error("Not available with remote agents yet.");
+    if (!hosted) throw new Error(t("fubestie.save.remoteUnavailable"));
     // Its provider replaces the copy this switch shows, never a newer one.
     return hosted.set(instructions, instructionsOf(agent));
   }

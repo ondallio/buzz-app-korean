@@ -7,6 +7,7 @@ import { avatarMedia } from "../../shared/avatar-source";
 import { Avatar } from "../../shared/design-system/ui/Avatar";
 import { InlineHeader } from "../../shared/design-system/ui/Header";
 import { UsersIcon } from "../../shared/design-system/icons";
+import { t, useLanguage } from "../../shared/i18n";
 import { useIdentityNames } from "../../features/identity-names/react";
 
 type Inventory = {
@@ -30,6 +31,7 @@ export function CommunityMesh({
   relay: RelayData;
   refreshKey?: number;
 }) {
+  useLanguage();
   const snapshot = useSyncExternalStore(relay.subscribe, relay.snapshot);
   const directory = snapshot.session.profiles;
   const profiles = useSyncExternalStore(
@@ -93,7 +95,7 @@ export function CommunityMesh({
   const memberName = (pubkey: string) =>
     resolveName(
       pubkey,
-      profiles.get(pubkey)?.name || "Unnamed member",
+      profiles.get(pubkey)?.name || t("fubestie.community.unnamedMember"),
       memberKeys,
     );
   const shared = groupDevices(entries, snapshot.viewer, memberName);
@@ -107,44 +109,55 @@ export function CommunityMesh({
         id={titleId}
         level={2}
         icon={<UsersIcon size={20} />}
-        title="Community mesh"
+        title={t("fubestie.community.title")}
         subtitle={
           !inventory?.entries.length
-            ? "Devices members are sharing with this community."
+            ? t("fubestie.community.subtitle")
             : contributors === 1
-              ? "1 person is contributing compute."
-              : `${contributors} people are contributing compute.`
+              ? t("fubestie.community.contributorOne")
+              : t("fubestie.community.contributorMany", {
+                  count: contributors,
+                })
         }
       />
       {!isTauri() ? (
-        <p role="status">Open Buzz desktop to see community mesh.</p>
+        <p role="status">{t("fubestie.community.openDesktop")}</p>
       ) : error ? (
         <p role="alert">{error}</p>
       ) : !inventory ? (
-        <p role="status">Loading community mesh…</p>
+        <p role="status">{t("fubestie.community.loading")}</p>
       ) : inventory.entries.length === 0 ? (
-        <p role="status">No one is sharing compute yet.</p>
+        <p role="status">{t("fubestie.community.empty")}</p>
       ) : (
         <>
           <dl className={styles.metrics}>
             <div>
-              <dt className="text-metadata">Shared memory</dt>
+              <dt className="text-metadata">
+                {t("fubestie.community.sharedMemory")}
+              </dt>
               <dd className="m-0 text-heading tabular-nums">
                 {sharedGb == null
-                  ? "Not reported"
+                  ? t("fubestie.community.notReported")
                   : `${Math.round(sharedGb)} GB`}
               </dd>
             </div>
             <div>
-              <dt className="text-metadata">Devices</dt>
+              <dt className="text-metadata">
+                {t("fubestie.community.devices")}
+              </dt>
               <dd className="m-0 text-heading tabular-nums">{shared.length}</dd>
             </div>
             <div>
-              <dt className="text-metadata">Models available</dt>
+              <dt className="text-metadata">
+                {t("fubestie.community.models")}
+              </dt>
               <dd className="m-0 text-heading tabular-nums">{modelCount}</dd>
             </div>
           </dl>
-          <ul aria-label="Shared devices" className={styles.devices}>
+          <ul
+            aria-label={t("fubestie.community.sharedDevices")}
+            className={styles.devices}
+          >
             {shared.map((device) => {
               const picture = profiles.get(device.memberPubkey)?.picture;
               return (
@@ -157,7 +170,7 @@ export function CommunityMesh({
                   />
                   <div className={styles.deviceBody}>
                     <p className="m-0 text-body">
-                      {device.name ?? "Unnamed device"}
+                      {device.name ?? t("fubestie.community.unnamedDevice")}
                       <span className="text-secondary">
                         {" · "}
                         {device.owner}
@@ -176,7 +189,7 @@ export function CommunityMesh({
                     className={`m-0 text-body-sm text-secondary ${styles.deviceMemory}`}
                   >
                     {device.vramGb == null
-                      ? "Not reported"
+                      ? t("fubestie.community.notReported")
                       : `${Math.round(device.vramGb)} GB`}
                   </p>
                 </li>
@@ -217,7 +230,9 @@ function groupDevices(
       memberPubkey: entry.memberPubkey,
       self: entry.memberPubkey === viewer,
       owner:
-        entry.memberPubkey === viewer ? "You" : memberName(entry.memberPubkey),
+        entry.memberPubkey === viewer
+          ? t("fubestie.community.you")
+          : memberName(entry.memberPubkey),
       name: entry.deviceName,
       vramGb: entry.vramGb,
       models: [],
@@ -246,6 +261,7 @@ export function modelLabel(ref: string): string {
   const name = (path.split("/").at(-1) ?? path)
     .replace(/[-_.]gguf$/i, "")
     .replace(/@[\w.-]+$/, "");
-  if (/^sha256-[0-9a-f]+$/i.test(name)) return "Local model";
+  if (/^sha256-[0-9a-f]+$/i.test(name))
+    return t("fubestie.community.localModel");
   return quant ? `${name} · ${quant}` : name;
 }

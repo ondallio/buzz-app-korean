@@ -14,6 +14,7 @@ import { EmptyState } from "../../shared/design-system/ui/EmptyState";
 import { Avatar } from "../../shared/design-system/ui/Avatar";
 import { ChoiceRow } from "../../shared/design-system/ui/ChoiceRow";
 import { Combobox } from "../../shared/design-system/ui/Combobox";
+import { t, useLanguage } from "../../shared/i18n";
 import { AgentCreateDialog } from "../agents/AgentCreateDialog";
 import { RemoteBestieConfirm, remoteAgent } from "../agents/BestieChoice";
 import { rememberFirstAgent } from "./FirstAgentWelcome";
@@ -21,7 +22,6 @@ import { EmptyBestieAvatar } from "./EmptyBestieAvatar";
 
 const message = (reason: unknown) =>
   reason instanceof Error ? reason.message : String(reason);
-const chooseInstruction = "Choose an eligible agent or create a new one:";
 
 /** The one Bestie selection owner, shared by first setup and stale-choice recovery. */
 export function BestieChooser({
@@ -39,6 +39,8 @@ export function BestieChooser({
   title?: string;
   description?: string;
 }) {
+  useLanguage();
+  const chooseInstruction = t("fubestie.chooser.instruction");
   const choices = useAgentChoices(session, true, true);
   useNamesRevision(session.names, true);
   const { types } = useAgents(agents);
@@ -73,7 +75,7 @@ export function BestieChooser({
         .selectable.some((agent) => agent.pubkey === pubkey)
     ) {
       setSelected("");
-      setError("That agent is no longer available. Choose another.");
+      setError(t("fubestie.chooser.agentGone"));
       return;
     }
     if (!confirmedRemote && remoteAgent(agents.find(pubkey)?.place)) {
@@ -136,13 +138,15 @@ export function BestieChooser({
         icon={firstAgent ? <EmptyBestieAvatar /> : <BestieIcon />}
         title={
           title ??
-          (firstAgent ? "Create your first agent" : "Choose your bestie agent")
+          (firstAgent
+            ? t("fubestie.chooser.firstTitle")
+            : t("fubestie.chooser.title"))
         }
         description={
           description ??
           (firstAgent
-            ? "Buzz is better with your agents. Create one to get started."
-            : "Choose the agent you want close at hand. Your Bestie gets a pinned DM and is selected for new Solo chats.")
+            ? t("fubestie.chooser.firstDescription")
+            : t("fubestie.chooser.description"))
         }
         action={
           <div className="flex w-full max-w-sm flex-col items-center gap-3">
@@ -179,15 +183,15 @@ export function BestieChooser({
                 >
                   {items.find((agent) => agent.pubkey === selected)?.label ??
                     (pending && !available.length
-                      ? "Loading agents…"
-                      : "Choose your bestie")}
+                      ? t("fubestie.chooser.loadingAgents")
+                      : t("fubestie.chooser.placeholder"))}
                 </Combobox.Trigger>
                 <Combobox.Popup
                   search
                   size="compact"
                   side="bottom"
                   collisionAvoidance={{ side: "none", align: "shift" }}
-                  empty="No matching agents."
+                  empty={t("fubestie.chooser.noMatches")}
                 >
                   <Combobox.List>
                     {(agent: (typeof items)[number]) => (
@@ -217,12 +221,12 @@ export function BestieChooser({
             )}
             {!firstAgent && !available.length && !pending && !shownError && (
               <p className="m-0 text-body-sm text-muted" role="status">
-                You don’t have an eligible agent in this community yet.
+                {t("fubestie.chooser.noneEligible")}
               </p>
             )}
             {saving && (
               <p className="m-0 text-body-sm text-muted" role="status">
-                Saving your Bestie…
+                {t("fubestie.chooser.saving")}
               </p>
             )}
             {shownError && !remote && (
@@ -242,7 +246,9 @@ export function BestieChooser({
                   setCreating(true);
                 }}
               >
-                {firstAgent ? "Create an agent" : "Create agent"}
+                {firstAgent
+                  ? t("fubestie.chooser.createAn")
+                  : t("fubestie.chooser.create")}
               </Button>
               {(choices.error || choices.archives.error || created) && (
                 <Button
@@ -252,7 +258,7 @@ export function BestieChooser({
                   disabled={saving || refreshing}
                   onClick={() => void retry()}
                 >
-                  Try again
+                  {t("fubestie.tryAgain")}
                 </Button>
               )}
             </div>
@@ -263,7 +269,7 @@ export function BestieChooser({
         <RemoteBestieConfirm
           name={
             items.find((agent) => agent.pubkey === remote.pubkey)?.label ??
-            "this agent"
+            t("v105agent.bestie.thisAgent")
           }
           pending={saving}
           error={error}

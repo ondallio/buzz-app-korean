@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Header } from "../../shared/design-system/ui/Header";
+import { t, useLanguage } from "../../shared/i18n";
 import styles from "./Compute.module.css";
 
 export function ConsumerComputeView({
@@ -22,12 +23,13 @@ export function ConsumerComputeView({
   refreshDisabled: boolean;
   refresh: () => void;
 }) {
+  useLanguage();
   return (
     <section
-      aria-label="Compute consumer"
+      aria-label={t("fubestie.mesh.consumer")}
       className={`${styles.content} text-body`}
     >
-      <Header title="Shared compute" actions={headerControl} />
+      <Header title={t("navigation.sharedCompute")} actions={headerControl} />
       {children}
       <p
         role="status"
@@ -50,7 +52,7 @@ export function ConsumerComputeView({
             onClick={refresh}
             disabled={refreshDisabled}
           >
-            Retry
+            {t("fubestie.mesh.retry")}
           </Button>
         </div>
       )}

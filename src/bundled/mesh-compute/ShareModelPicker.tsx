@@ -10,6 +10,7 @@ import {
 import { Button } from "../../shared/design-system/ui/Button";
 import { Input } from "../../shared/design-system/ui/Input";
 import { Select } from "../../shared/design-system/ui/Select";
+import { t, useLanguage } from "../../shared/i18n";
 import styles from "./Compute.module.css";
 
 type Catalog = {
@@ -27,12 +28,6 @@ type Catalog = {
 };
 const CUSTOM = "__custom__";
 const AUTO = "__auto__";
-const FIT_LABELS: Record<string, string> = {
-  comfortable: "fits comfortably",
-  tight: "fits, tight on memory",
-  tradeoff: "may be slow on this machine",
-  too_large: "too large for this machine",
-};
 
 export function ShareModelPicker({
   model,
@@ -60,6 +55,7 @@ export function ShareModelPicker({
   runningModel?: string | null;
   resetDisabled?: boolean;
 }) {
+  useLanguage();
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [custom, setCustom] = useState(false);
@@ -72,9 +68,7 @@ export function ShareModelPicker({
     const deadline = setTimeout(() => {
       if (active) {
         active = false;
-        setError(
-          "Model choices took too long to load. Retry, or choose a custom model.",
-        );
+        setError(t("fubestie.picker.timeout"));
       }
     }, 30000);
     void invoke<Catalog>("mesh_compute_catalog")
@@ -117,13 +111,13 @@ export function ShareModelPicker({
         <dl className={styles.deviceTiles}>
           <div className={styles.deviceTile}>
             <dt>
-              <MonitorIcon size={18} /> Hardware
+              <MonitorIcon size={18} /> {t("fubestie.picker.hardware")}
             </dt>
             <dd>{catalog?.gpuName ?? "—"}</dd>
           </div>
           <div className={styles.deviceTile}>
             <dt>
-              <CpuIcon size={18} /> AI memory{" "}
+              <CpuIcon size={18} /> {t("fubestie.picker.aiMemory")}{" "}
             </dt>
             <dd className={styles.memoryValue}>
               <span
@@ -138,14 +132,14 @@ export function ShareModelPicker({
                   className={`${styles.headerStatus} ${styles.fit}`}
                   data-fit={entry.fit}
                 >
-                  Too large
+                  {t("fubestie.picker.tooLarge")}
                 </span>
               )}
             </dd>
           </div>
           <div className={`${styles.deviceTile} ${styles.modelTile}`}>
             <dt>
-              <RobotIcon size={18} /> Model{" "}
+              <RobotIcon size={18} /> {t("fubestie.picker.model")}{" "}
               <span className={styles.headerStatus}>
                 {entry && (
                   <span>
@@ -153,8 +147,8 @@ export function ShareModelPicker({
                       className={styles.statusBadge}
                       title={
                         entry.installed
-                          ? "GGUF cached; additional serving files may download"
-                          : "Downloads when sharing starts"
+                          ? t("fubestie.picker.cachedTitle")
+                          : t("fubestie.picker.downloadTitle")
                       }
                     >
                       {entry.installed ? (
@@ -163,8 +157,12 @@ export function ShareModelPicker({
                         <DownloadIcon size={14} />
                       )}
                       {entry.installed
-                        ? "Cached"
-                        : `Download ${entry.size ?? "required"}`}
+                        ? t("fubestie.picker.cached")
+                        : entry.size
+                          ? t("fubestie.picker.downloadSize", {
+                              size: entry.size,
+                            })
+                          : t("fubestie.picker.downloadRequired")}
                     </span>
                   </span>
                 )}
@@ -172,15 +170,16 @@ export function ShareModelPicker({
             </dt>
             <dd className={styles.modelChoice}>
               <Select
-                label="Model to share"
+                label={t("fubestie.picker.label")}
                 variant="compact"
                 value={auto ? AUTO : custom ? CUSTOM : displayModel}
                 valueLabel={
                   auto
-                    ? "Auto"
-                    : (entry?.name ?? (displayModel || "Select model"))
+                    ? t("fubestie.picker.auto")
+                    : (entry?.name ??
+                      (displayModel || t("fubestie.picker.select")))
                 }
-                valueTitle={displayModel || "Automatic model selection"}
+                valueTitle={displayModel || t("fubestie.picker.automatic")}
                 disabled={disabled && (resetDisabled ?? disabled)}
                 onValueChange={(value) => {
                   setCustom(value === CUSTOM);
@@ -193,23 +192,23 @@ export function ShareModelPicker({
                     options: [
                       {
                         value: AUTO,
-                        label: "Auto",
+                        label: t("fubestie.picker.auto"),
                         disabled: resetDisabled ?? disabled,
                       },
                     ],
                   },
                   {
-                    label: "Recommended and curated",
+                    label: t("fubestie.picker.curated"),
                     options: (catalog?.entries ?? [])
                       .filter((entry) => entry.curated)
                       .map((entry) => ({
                         value: entry.model,
-                        label: `${entry.name}${entry.model === catalog?.recommended ? " — recommended" : ""}${optionDetail(entry)}`,
+                        label: `${entry.name}${entry.model === catalog?.recommended ? t("fubestie.picker.recommended") : ""}${optionDetail(entry)}`,
                         disabled: disabled || tooLarge(entry, displayModel),
                       })),
                   },
                   {
-                    label: "Other models",
+                    label: t("fubestie.picker.other"),
                     options: [
                       ...(!custom && !auto && displayModel && !entry
                         ? [
@@ -229,7 +228,7 @@ export function ShareModelPicker({
                         })),
                       {
                         value: CUSTOM,
-                        label: "Custom model or local GGUF",
+                        label: t("fubestie.picker.custom"),
                         disabled,
                       },
                     ],
@@ -238,7 +237,7 @@ export function ShareModelPicker({
               />
               {custom && (
                 <label htmlFor={id} className="text-body-sm">
-                  Model reference or local GGUF path
+                  {t("fubestie.picker.customPath")}
                   <Input
                     id={id}
                     value={model}
@@ -255,13 +254,13 @@ export function ShareModelPicker({
         <p role="alert">
           {error}{" "}
           <Button disabled={disabled} onClick={() => setAttempt(attempt + 1)}>
-            Retry model catalog
+            {t("fubestie.picker.retry")}
           </Button>
         </p>
       ) : (
         !catalog && (
           <p role="status" className="sr-only">
-            Loading model choices…
+            {t("fubestie.picker.loading")}
           </p>
         )
       )}
@@ -270,7 +269,7 @@ export function ShareModelPicker({
         catalog?.recommended &&
         runningModel !== catalog.recommended && (
           <p className="text-body-sm text-secondary">
-            Auto selection applies next time sharing starts.
+            {t("fubestie.picker.autoNextTime")}
           </p>
         )}
       {children}
@@ -278,10 +277,23 @@ export function ShareModelPicker({
   );
 }
 
-const fitLabel = (fit: string) => FIT_LABELS[fit] ?? fit.replaceAll("_", " ");
+function fitLabel(fit: string): string {
+  switch (fit) {
+    case "comfortable":
+      return t("fubestie.picker.fitComfortable");
+    case "tight":
+      return t("fubestie.picker.fitTight");
+    case "tradeoff":
+      return t("fubestie.picker.fitTradeoff");
+    case "too_large":
+      return t("fubestie.picker.fitTooLarge");
+    default:
+      return fit.replaceAll("_", " ");
+  }
+}
 
 function optionDetail(entry: Catalog["entries"][number]): string {
-  return `${entry.size ? ` · ${entry.size}` : ""}${entry.installed ? " · installed" : " · download"}${entry.fit === "unknown" ? "" : ` · ${fitLabel(entry.fit)}`}`;
+  return `${entry.size ? ` · ${entry.size}` : ""} · ${entry.installed ? t("fubestie.picker.installed") : t("fubestie.picker.download")}${entry.fit === "unknown" ? "" : ` · ${fitLabel(entry.fit)}`}`;
 }
 
 /** A model this machine can't hold is not offered, unless it's already chosen. */

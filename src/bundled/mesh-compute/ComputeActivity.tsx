@@ -1,4 +1,5 @@
 import { CaretRightIcon } from "../../shared/design-system/icons";
+import { t, useLanguage } from "../../shared/i18n";
 import styles from "./Compute.module.css";
 
 export type ComputeActivityData = {
@@ -17,14 +18,18 @@ export function ComputeActivity({
 }: {
   data: ComputeActivityData | null;
 }) {
+  useLanguage();
   const format = (value: number | null) =>
     value == null
       ? "—"
       : value.toLocaleString(undefined, { maximumFractionDigits: 1 });
   return (
-    <section aria-label="Shared-compute activity" className={styles.activity}>
+    <section
+      aria-label={t("fubestie.activity.title")}
+      className={styles.activity}
+    >
       <div className={styles.activityHeader}>
-        <h2 className="m-0 text-body">Shared-compute activity</h2>
+        <h2 className="m-0 text-body">{t("fubestie.activity.title")}</h2>
         <span className={`${styles.sessionStatus} text-caption text-secondary`}>
           <span
             className={styles.statusLight}
@@ -34,20 +39,20 @@ export function ComputeActivity({
             aria-hidden="true"
           />
           {data?.activeRequests == null
-            ? "This session"
+            ? t("fubestie.activity.thisSession")
             : data.activeRequests > 0
-              ? "Processing"
-              : "Standby"}
+              ? t("fubestie.activity.processing")
+              : t("fubestie.activity.standby")}
         </span>
       </div>
       {data ? (
         <dl className={styles.metrics}>
           {(
             [
-              ["Output tokens", data.outputTokens],
-              ["Completed requests", data.completedRequests],
-              ["Other sharing nodes", data.sharingNodes],
-              ["Tokens / sec (avg)", data.tokensPerSecond],
+              [t("fubestie.activity.outputTokens"), data.outputTokens],
+              [t("fubestie.activity.completed"), data.completedRequests],
+              [t("fubestie.activity.sharingNodes"), data.sharingNodes],
+              [t("fubestie.activity.tokensPerSecond"), data.tokensPerSecond],
             ] as const
           ).map(([label, value]) => (
             <div key={label} className={styles.metric}>
@@ -58,12 +63,18 @@ export function ComputeActivity({
               </dt>
               <dd
                 className={`${styles.readout} m-0 text-body`}
-                title={value == null ? "Not available" : format(value)}
+                title={
+                  value == null
+                    ? t("fubestie.activity.notAvailable")
+                    : format(value)
+                }
               >
                 {value == null ? (
                   <>
                     <span aria-hidden="true">—</span>
-                    <span className="sr-only">Not available</span>
+                    <span className="sr-only">
+                      {t("fubestie.activity.notAvailable")}
+                    </span>
                   </>
                 ) : (
                   format(value)
@@ -74,7 +85,7 @@ export function ComputeActivity({
         </dl>
       ) : (
         <p className="text-body-sm text-secondary">
-          Activity is currently unavailable.
+          {t("fubestie.activity.unavailable")}
         </p>
       )}
       <details className={styles.details}>
@@ -84,16 +95,16 @@ export function ComputeActivity({
             size={16}
             aria-hidden="true"
           />
-          Details
+          {t("fubestie.activity.details")}
         </summary>
         {data && (
           <dl className={styles.secondaryMetrics}>
             {(
               [
-                ["Other nodes seen", data.otherNodes],
-                ["Finished requests", data.finishedRequests],
-                ["Active requests", data.activeRequests],
-                ["Retries", data.retries],
+                [t("fubestie.activity.otherNodes"), data.otherNodes],
+                [t("fubestie.activity.finished"), data.finishedRequests],
+                [t("fubestie.activity.active"), data.activeRequests],
+                [t("fubestie.activity.retries"), data.retries],
               ] as const
             ).map(([label, value]) => (
               <div key={label} className={styles.metric}>

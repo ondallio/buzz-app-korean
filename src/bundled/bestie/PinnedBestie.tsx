@@ -17,6 +17,7 @@ import { Button } from "../../shared/design-system/ui/Button";
 import { EmptyState } from "../../shared/design-system/ui/EmptyState";
 import { FullPageSurface } from "../../shared/design-system/ui/FullPageSurface";
 import { LoadingRegion } from "../../shared/design-system/ui/LoadingRegion";
+import { t, useLanguage } from "../../shared/i18n";
 import {
   PanelHeader,
   PanelHeaderLabel,
@@ -42,6 +43,7 @@ export function PinnedBestie({
   agents: Agents;
   navigation?: PageNavigation | undefined;
 }) {
+  useLanguage();
   const connection = useRelayConnection(relay);
   const { session, scope, viewer } = connection;
   const saved = useSavedAgent(session, scope ?? "");
@@ -65,7 +67,9 @@ export function PinnedBestie({
       ? bestieChat(channels.channels, viewer, saved)
       : undefined;
   const identity = agent ?? known;
-  const name = identity ? (identity.managedName ?? identity.name) : "Bestie";
+  const name = identity
+    ? (identity.managedName ?? identity.name)
+    : t("fubestie.bestie");
   const icon = identity ? (
     <AgentPortrait
       agent={{ name, picture: identity.avatar }}
@@ -83,20 +87,21 @@ export function PinnedBestie({
       <Notice
         title={
           connection.status === "connecting"
-            ? "Connecting…"
+            ? t("fubestie.connecting")
             : connection.status === "error"
-              ? "This community is unavailable"
-              : "No community selected"
+              ? t("fubestie.communityUnavailable")
+              : t("fubestie.noCommunity")
         }
         description={
           connection.status === "connecting"
-            ? "Your bestie conversation opens once this community is connected."
-            : (connection.error ??
-              "Choose a community to chat with your bestie.")
+            ? t("fubestie.pinned.opensOnceConnected")
+            : (connection.error ?? t("fubestie.pinned.chooseCommunity"))
         }
         action={
           connection.status === "error" ? (
-            <Button onClick={relay.tryAgain}>Retry connection</Button>
+            <Button onClick={relay.tryAgain}>
+              {t("fubestie.retryConnection")}
+            </Button>
           ) : undefined
         }
       />
@@ -124,25 +129,23 @@ export function PinnedBestie({
       choices.archives.status === "loading";
     content =
       pending && !choices.error ? (
-        <LoadingRegion pending label="Loading your Bestie…">
+        <LoadingRegion pending label={t("fubestie.loadingBestie")}>
           <Notice
-            title="Loading your Bestie…"
-            description="Reading the agents available in this community."
+            title={t("fubestie.loadingBestie")}
+            description={t("fubestie.pinned.readingAgents")}
           />
         </LoadingRegion>
       ) : choices.error || !choices.complete ? (
         <Notice
-          title="Your agents are unavailable"
-          description={
-            choices.error ?? "Buzz couldn’t finish reading your agents."
-          }
+          title={t("fubestie.pinned.agentsUnavailable")}
+          description={choices.error ?? t("fubestie.pinned.agentsUnreadable")}
           action={
             <Button
               onClick={() =>
                 void session.agentChoices.refresh(true, { fresh: true })
               }
             >
-              Try again
+              {t("fubestie.tryAgain")}
             </Button>
           }
         />
@@ -155,8 +158,8 @@ export function PinnedBestie({
               scope={scope}
               community={connection.origin}
               agents={agents}
-              title={`${name} is no longer here`}
-              description="Choose an eligible agent, or create one to make your new Bestie."
+              title={t("fubestie.pinned.goneTitle", { name })}
+              description={t("fubestie.pinned.goneDescription")}
             />
           </div>
         </div>
@@ -165,11 +168,8 @@ export function PinnedBestie({
     content =
       channels.status === "error" || channels.status === "unavailable" ? (
         <Notice
-          title="Your chats are unavailable"
-          description={
-            channels.error ??
-            "Buzz couldn’t read your chats, so this one can’t be opened."
-          }
+          title={t("fubestie.pinned.chatsUnavailable")}
+          description={channels.error ?? t("fubestie.pinned.chatsUnreadable")}
           action={
             <Button
               onClick={() =>
@@ -178,15 +178,15 @@ export function PinnedBestie({
                   : session.channels.ensureList()
               }
             >
-              Try again
+              {t("fubestie.tryAgain")}
             </Button>
           }
         />
       ) : channels.status !== "ready" ? (
-        <LoadingRegion pending label="Loading your chats…">
+        <LoadingRegion pending label={t("fubestie.pinned.loadingChats")}>
           <Notice
-            title="Loading your conversation…"
-            description={`Looking for your DM with ${name}.`}
+            title={t("fubestie.pinned.loadingConversation")}
+            description={t("fubestie.pinned.lookingForDm", { name })}
           />
         </LoadingRegion>
       ) : (
@@ -208,7 +208,7 @@ export function PinnedBestie({
   if (active && scope && channel && saved) return content;
   return (
     <div className="h-full min-h-0">
-      <FullPageSurface aria-label="Bestie">
+      <FullPageSurface aria-label={t("fubestie.bestie")}>
         <div className="flex h-full min-h-0 flex-col">
           {header}
           {content}
@@ -241,6 +241,7 @@ function DirectMessage({
   icon: React.ReactNode;
   channel: ChannelSummary | undefined;
 }) {
+  useLanguage();
   const [attempt, retry] = useState(0);
   const [error, setError] = useState<string>();
   // biome-ignore lint/correctness/useExhaustiveDependencies: Retry deliberately starts a fresh open attempt.
@@ -255,16 +256,14 @@ function DirectMessage({
             .snapshot()
             .selectable.some((choice) => choice.pubkey === agent.pubkey)
         )
-          throw new Error(
-            "This agent is no longer available in this community.",
-          );
+          throw new Error(t("fubestie.pinned.agentUnavailable"));
         await session.directMessages.open([agent.pubkey], controller.signal);
       } catch (reason) {
         if (!controller.signal.aborted)
           setError(
             reason instanceof Error
               ? reason.message
-              : "Buzz couldn’t open this conversation.",
+              : t("fubestie.pinned.openFailed"),
           );
       }
     })();
@@ -289,12 +288,14 @@ function DirectMessage({
   if (error || attempt > 0)
     return (
       <Notice
-        title="Couldn’t open this conversation"
-        description={error ?? `Trying your DM with ${agent.name} again…`}
+        title={t("fubestie.pinned.openFailedTitle")}
+        description={
+          error ?? t("fubestie.pinned.retryingDm", { name: agent.name })
+        }
         announce={error ? "alert" : "status"}
         action={
           <Button loading={!error} onClick={() => retry((value) => value + 1)}>
-            Try again
+            {t("fubestie.tryAgain")}
           </Button>
         }
       />
@@ -302,11 +303,11 @@ function DirectMessage({
   return (
     <LoadingRegion
       pending
-      label={`Opening your conversation with ${agent.name}…`}
+      label={t("fubestie.pinned.openingWith", { name: agent.name })}
     >
       <Notice
-        title="Opening your conversation…"
-        description={`Connecting to your DM with ${agent.name}.`}
+        title={t("fubestie.pinned.opening")}
+        description={t("fubestie.pinned.connectingDm", { name: agent.name })}
       />
     </LoadingRegion>
   );

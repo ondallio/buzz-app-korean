@@ -15,6 +15,7 @@ import {
 } from "../../shared/design-system/ui/Menu";
 import { PreferenceRow } from "../../shared/design-system/ui/PreferenceRow";
 import { SettingsGroup } from "../../shared/design-system/ui/SettingsGroup";
+import { t, useLanguage } from "../../shared/i18n";
 import { compareRecent } from "../channels/sidebar-sections";
 
 /** The private channels `viewer` is in, most recent first: those `bestie` is
@@ -54,10 +55,10 @@ async function removeMember(
     pubkey,
     // Already gone: nothing to send.
     (role) => (role ? { expectedRole: role, role: "remove" } : undefined),
-    "Member roles are unavailable. Try again.",
+    t("fubestie.privates.rolesUnavailable"),
   );
   if (result.status !== "confirmed")
-    throw new Error(result.error ?? "The removal isn't confirmed. Try again.");
+    throw new Error(result.error ?? t("fubestie.privates.removalUnconfirmed"));
 }
 
 const message = (error: unknown) =>
@@ -81,6 +82,7 @@ export function PrivateChannels({
   bestie: string;
   former?: string;
 }) {
+  useLanguage();
   const list = useChannelList(session.channels);
   const { joined, others } = privateChannels(
     list.channels,
@@ -203,7 +205,7 @@ export function PrivateChannels({
     );
   const remove = (channels: readonly ChannelSummary[]) =>
     run(channels, false, (id) => removeMember(session, id, bestie));
-  const name = former ?? "Bestie";
+  const name = former ?? t("fubestie.bestie");
   const removable = joined.filter((channel) => !channel.cached);
   const adding = addable.some((channel) => busy.has(channel.id));
   // A failure stops showing once the channel is as the change wanted anyway.
@@ -216,11 +218,11 @@ export function PrivateChannels({
     <div ref={section} className="contents">
       <InlineHeader
         id={headingId}
-        title={`Private channels ${name} can read`}
+        title={t("fubestie.privates.title", { name })}
         subtitle={
           former
-            ? "Leaving it in a channel is fine: it reads along as a guest and can't post there."
-            : "Bestie already reads every public channel. In a channel you add it to, it reads along as a guest and can't post there."
+            ? t("fubestie.privates.formerSubtitle")
+            : t("fubestie.privates.subtitle")
         }
       />
       <SettingsGroup>
@@ -233,20 +235,22 @@ export function PrivateChannels({
                 variant="outline"
                 loading={busy.has(channel.id)}
                 disabled={channel.cached}
-                aria-label={`Remove ${name} from #${channel.name}`}
+                aria-label={t("fubestie.privates.removeFrom", {
+                  name,
+                  channel: channel.name,
+                })}
                 onClick={() => setRemoving(channel)}
               >
-                Remove
+                {t("fubestie.privates.remove")}
               </Button>
             }
           />
         ))}
         {list.status === "error" ? (
           <PreferenceRow
-            title="Couldn't load your private channels"
+            title={t("fubestie.privates.loadFailed")}
             subtitle={
-              list.error ??
-              `${name} may be in channels that aren't shown here. Try again.`
+              list.error ?? t("fubestie.privates.mayBeElsewhereRetry", { name })
             }
             trailing={(label) => (
               <Button
@@ -254,27 +258,27 @@ export function PrivateChannels({
                 aria-describedby={label["aria-labelledby"]}
                 onClick={retry}
               >
-                Retry
+                {t("fubestie.privates.retry")}
               </Button>
             )}
           />
         ) : list.coverage === "partial" ? (
           <PreferenceRow
-            title="Only some of your private channels are loaded"
-            subtitle={`${name} may be in channels that aren't shown here.`}
+            title={t("fubestie.privates.partial")}
+            subtitle={t("fubestie.privates.mayBeElsewhere", { name })}
           />
         ) : list.status !== "ready" ? (
           !joined.length && (
-            <PreferenceRow title="Loading your private channels…" />
+            <PreferenceRow title={t("fubestie.privates.loading")} />
           )
         ) : (
           !joined.length &&
           (former ? (
-            <PreferenceRow title="Not in any of your private channels" />
+            <PreferenceRow title={t("fubestie.privates.none")} />
           ) : (
             <PreferenceRow
-              title="Not in any of your private channels yet"
-              subtitle="Add Bestie to the ones you want it to catch you up on."
+              title={t("fubestie.privates.noneYet")}
+              subtitle={t("fubestie.privates.noneYetHint")}
             />
           ))
         )}
@@ -283,7 +287,7 @@ export function PrivateChannels({
         {former
           ? removable.length > 0 && (
               <PreferenceRow
-                title={`Remove ${name} from all of them`}
+                title={t("fubestie.privates.removeFromAllTitle", { name })}
                 trailing={(label) => (
                   <Button
                     variant="outline"
@@ -291,7 +295,7 @@ export function PrivateChannels({
                     loading={removable.some((channel) => busy.has(channel.id))}
                     onClick={() => setConfirming(removable)}
                   >
-                    Remove from all
+                    {t("fubestie.privates.removeFromAll")}
                   </Button>
                 )}
               />
@@ -299,8 +303,8 @@ export function PrivateChannels({
           : addable.length > 0 && (
               <>
                 <PreferenceRow
-                  title="Add to a channel"
-                  subtitle="Pick one of your private channels."
+                  title={t("fubestie.privates.addOne")}
+                  subtitle={t("fubestie.privates.addOneHint")}
                   trailing={(label) => (
                     <MenuRoot>
                       <MenuTrigger
@@ -309,7 +313,7 @@ export function PrivateChannels({
                             variant="outline"
                             aria-describedby={label["aria-labelledby"]}
                           >
-                            Choose…
+                            {t("fubestie.privates.choose")}
                           </Button>
                         }
                       />
@@ -328,11 +332,15 @@ export function PrivateChannels({
                   )}
                 />
                 <PreferenceRow
-                  title="Add to all my private channels"
+                  title={t("fubestie.privates.addAllTitle")}
                   subtitle={
                     complete
-                      ? `${addable.length} ${addable.length === 1 ? "channel" : "channels"} without Bestie. Each channel's members see that you added it.`
-                      : "Available once all your private channels have loaded."
+                      ? addable.length === 1
+                        ? t("fubestie.privates.withoutBestieOne")
+                        : t("fubestie.privates.withoutBestieMany", {
+                            count: addable.length,
+                          })
+                      : t("fubestie.privates.addAllPending")
                   }
                   trailing={(label) => (
                     <Button
@@ -342,7 +350,7 @@ export function PrivateChannels({
                       disabled={!complete}
                       onClick={() => setConfirming(addable)}
                     >
-                      Add to all
+                      {t("fubestie.privates.addToAll")}
                     </Button>
                   )}
                 />
@@ -360,8 +368,13 @@ export function PrivateChannels({
       )}
       {removing && (
         <AlertDialog
-          title={`Remove ${name} from #${removing.name}?`}
-          description={`${name} stops reading this channel. Its members see that you removed it.`}
+          title={t("fubestie.privates.removeConfirmTitle", {
+            name,
+            channel: removing.name,
+          })}
+          description={t("fubestie.privates.removeConfirmDescription", {
+            name,
+          })}
           initialFocus={cancelRemove}
           onClose={() => setRemoving(undefined)}
           actions={
@@ -371,7 +384,7 @@ export function PrivateChannels({
                 ref={cancelRemove}
                 onClick={() => setRemoving(undefined)}
               >
-                Cancel
+                {t("fubestie.privates.cancel")}
               </Button>
               <Button
                 variant="destructive"
@@ -380,7 +393,7 @@ export function PrivateChannels({
                   void remove([removing]);
                 }}
               >
-                {`Remove ${name}`}
+                {t("fubestie.privates.removeName", { name })}
               </Button>
             </>
           }
@@ -388,17 +401,32 @@ export function PrivateChannels({
       )}
       {confirming && (
         <AlertDialog
-          title={`${former ? `Remove ${name} from` : "Add Bestie to"} ${confirming.length} private ${confirming.length === 1 ? "channel" : "channels"}?`}
+          title={
+            former
+              ? confirming.length === 1
+                ? t("fubestie.privates.removeAllConfirmOne", { name })
+                : t("fubestie.privates.removeAllConfirmMany", {
+                    name,
+                    count: confirming.length,
+                  })
+              : confirming.length === 1
+                ? t("fubestie.privates.addAllConfirmOne")
+                : t("fubestie.privates.addAllConfirmMany", {
+                    count: confirming.length,
+                  })
+          }
           description={
             former
-              ? `Members of each channel will see that you removed ${name}.`
-              : "Members of each channel will see that you added Bestie."
+              ? t("fubestie.privates.membersSeeRemoved", { name })
+              : t("fubestie.privates.membersSeeAdded")
           }
           initialFocus={former ? undefined : proceed}
           onClose={() => setConfirming(undefined)}
           actions={
             <>
-              <Button onClick={() => setConfirming(undefined)}>Cancel</Button>
+              <Button onClick={() => setConfirming(undefined)}>
+                {t("fubestie.privates.cancel")}
+              </Button>
               <Button
                 ref={proceed}
                 variant={former ? "destructive" : "prominent"}
@@ -407,7 +435,9 @@ export function PrivateChannels({
                   void (former ? remove : add)(confirming);
                 }}
               >
-                {former ? "Remove from all" : "Add to all"}
+                {former
+                  ? t("fubestie.privates.removeFromAll")
+                  : t("fubestie.privates.addToAll")}
               </Button>
             </>
           }

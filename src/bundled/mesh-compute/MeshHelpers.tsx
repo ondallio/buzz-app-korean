@@ -5,11 +5,17 @@ import { Button } from "../../shared/design-system/ui/Button";
 import { InlineHeader } from "../../shared/design-system/ui/Header";
 import { PreferenceRow } from "../../shared/design-system/ui/PreferenceRow";
 import { SettingsGroup } from "../../shared/design-system/ui/SettingsGroup";
+import { t, useLanguage } from "../../shared/i18n";
 import { DEFAULT_MESH_AGENT_CONFIG, meshAgentConfig } from "./meshAgent";
-import { MESH_AGENT_PRESETS, type MeshAgentPreset } from "./meshAgentPresets";
+import {
+  MESH_AGENT_PRESETS,
+  type MeshAgentPreset,
+  presetSummary,
+} from "./meshAgentPresets";
 
 /** Presets use the same creation service as Agents; editing stays in Settings. */
 export function MeshHelpers({ agents }: { agents: Agents }) {
+  useLanguage();
   const state = useSyncExternalStore(agents.subscribe, agents.snapshot);
   const title = useId();
   const busy = useRef(false);
@@ -66,8 +72,8 @@ export function MeshHelpers({ agents }: { agents: Agents }) {
     <section aria-labelledby={title} className="grid gap-3">
       <InlineHeader
         id={title}
-        title="Helpers"
-        subtitle="Create a helper, then add it to a conversation. Members serving its model can read the prompts and conversation history sent to them. Find your helpers in Agents."
+        title={t("fubestie.helpers.title")}
+        subtitle={t("fubestie.helpers.subtitle")}
       />
       <SettingsGroup>
         {[...MESH_AGENT_PRESETS, null].map((preset) => {
@@ -77,8 +83,8 @@ export function MeshHelpers({ agents }: { agents: Agents }) {
           return (
             <PreferenceRow
               key={preset?.id ?? "custom"}
-              title={made ? `${name} — Created` : name}
-              subtitle={`${preset?.summary ?? "Start with the default assistant instructions."} ${mode === "chat" ? "Chat: no tools." : "Agent: the serving member’s model directs shell and files on this machine, plus Buzz access; workspace ~/.buzz. Tool output and core memory may be sent to that member."}`}
+              title={made ? t("fubestie.helpers.createdTitle", { name }) : name}
+              subtitle={`${preset ? presetSummary(preset) : t("fubestie.helpers.defaultSummary")} ${mode === "chat" ? t("fubestie.helpers.chatMode") : t("fubestie.helpers.agentMode")}`}
               trailing={
                 <Button
                   size="sm"
@@ -90,11 +96,18 @@ export function MeshHelpers({ agents }: { agents: Agents }) {
                   }
                   loading={pending === name}
                   aria-label={
-                    made ? `${name} created as ${made.name}` : `Create ${name}`
+                    made
+                      ? t("fubestie.helpers.createdAs", {
+                          name,
+                          agent: made.name,
+                        })
+                      : t("fubestie.helpers.createName", { name })
                   }
                   onClick={() => void create(preset)}
                 >
-                  {made ? "Created" : "Create"}
+                  {made
+                    ? t("fubestie.helpers.created")
+                    : t("fubestie.helpers.create")}
                 </Button>
               }
             />
@@ -103,8 +116,7 @@ export function MeshHelpers({ agents }: { agents: Agents }) {
       </SettingsGroup>
       {state.status !== "ready" && (
         <p role="status" className="m-0 text-body-sm text-secondary">
-          {state.error ??
-            "Waiting for agents to be available in this community."}
+          {state.error ?? t("fubestie.helpers.waiting")}
         </p>
       )}
       {error && (
@@ -114,7 +126,7 @@ export function MeshHelpers({ agents }: { agents: Agents }) {
       )}
       {created && (
         <p role="status" className="m-0 text-body-sm text-secondary">
-          {created} created. Find it in Agents and add it to a conversation.
+          {t("fubestie.helpers.createdNotice", { created })}
         </p>
       )}
     </section>

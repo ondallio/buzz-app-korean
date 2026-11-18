@@ -56,6 +56,7 @@ import type { ChannelSummary } from "../../features/relay/contracts";
 import type { RelaySession } from "../../features/relay/session";
 import { GearIcon, SidebarRightIcon } from "../../shared/design-system/icons";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
+import { t, useLanguage } from "../../shared/i18n";
 import {
   bestieBaseTarget,
   bestieRoute,
@@ -90,6 +91,7 @@ export function BestieConversation({
   community?: string | undefined;
   icon: ReactNode;
 }) {
+  useLanguage();
   const bestie = agent.name;
   const welcome = useFirstAgentWelcome(scope, agent.pubkey, channel.id);
   const settingsTrigger = useRef<HTMLButtonElement>(null);
@@ -389,7 +391,7 @@ export function BestieConversation({
       ? [
           {
             id: "settings",
-            label: "Channel settings",
+            label: t("channelPages.channelSettings"),
             icon: <GearIcon size="1rem" />,
             close: closeSettings,
             content: (
@@ -468,8 +470,10 @@ export function BestieConversation({
       ref={secondary.splitTrigger}
       size="sm"
       variant="ghost"
-      aria-label="Toggle tab pane"
-      title={expanded ? "Close tab pane" : "Open tab pane"}
+      aria-label={t("channelPages.togglePane")}
+      title={
+        expanded ? t("channelPages.closePane") : t("channelPages.openPane")
+      }
       aria-expanded={expanded}
       icon={<SidebarRightIcon size="1rem" />}
       onClick={() =>
@@ -501,7 +505,7 @@ export function BestieConversation({
         >
           <section
             className={styles.work}
-            aria-label={`Chat with ${bestie}`}
+            aria-label={t("search.chatWith", { name: bestie })}
             ref={main}
             tabIndex={-1}
           >
@@ -514,7 +518,7 @@ export function BestieConversation({
                 <Panel>
                   <PanelWorkspace
                     main
-                    label="Bestie conversation tabs"
+                    label={t("fubestie.conversation.mainTabs")}
                     focusOnMount={false}
                     value={secondary.selectedMain}
                     select={(id) =>
@@ -612,7 +616,9 @@ export function BestieConversation({
                                 onOpenThread={openThread}
                               />
                               <ConversationComposer
-                                label={`Message ${bestie}`}
+                                label={t("directMessage.messageTo", {
+                                  names: bestie,
+                                })}
                                 shown={
                                   secondary.selectedMain === "conversation"
                                 }
@@ -641,7 +647,7 @@ export function BestieConversation({
                 {sideItems.length > 0 && (
                   <Panel>
                     <PanelWorkspace
-                      label="Bestie panel tabs"
+                      label={t("fubestie.conversation.panelTabs")}
                       items={sideItems}
                       value={secondary.selectedTab}
                       select={secondary.selectPanelTab}

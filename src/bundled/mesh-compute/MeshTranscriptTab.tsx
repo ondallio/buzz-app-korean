@@ -3,6 +3,7 @@ import type { AgentViewProps } from "../../features/agents/service";
 import { ActivityTranscript } from "../../features/agents/ActivityTranscript";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Select } from "../../shared/design-system/ui/Select";
+import { t, useLanguage } from "../../shared/i18n";
 import { meshAgentConfig, type MeshAgentConfig } from "./meshAgent";
 import type {
   GooseTranscript,
@@ -18,6 +19,7 @@ export function createMeshTranscriptTab(
     agent,
     conversation,
   }: AgentViewProps<MeshAgentConfig>) {
+    useLanguage();
     const workspace = meshAgentConfig(agent.config).workspace;
     const [rows, setRows] = useState<MeshHistoryRow[]>();
     const [selected, setSelected] = useState("");
@@ -88,21 +90,21 @@ export function createMeshTranscriptTab(
             loading={loading}
             onClick={() => setAttempt((value) => value + 1)}
           >
-            Refresh
+            {t("fubestie.transcript.refresh")}
           </Button>
         </div>
         {rows && rows.length > 0 && (
           <Select
-            label="Session"
+            label={t("fubestie.transcript.session")}
             variant="field"
             value={selected}
             onValueChange={setSelected}
             groups={[
               {
-                label: "Recent sessions",
+                label: t("fubestie.transcript.recent"),
                 options: rows.map((row) => ({
                   value: row.sessionId,
-                  label: `${new Date(row.at).toLocaleString()} · ${row.root ? "Thread" : "Channel"} ${row.channelId.slice(0, 8)}`,
+                  label: `${new Date(row.at).toLocaleString()} · ${row.root ? t("fubestie.transcript.thread") : t("fubestie.transcript.channel")} ${row.channelId.slice(0, 8)}`,
                 })),
               },
             ]}
@@ -110,17 +112,15 @@ export function createMeshTranscriptTab(
         )}
         {error ? (
           <p role="alert" className="m-0 text-body-sm">
-            Could not read the transcript: {error}. Try Refresh.
+            {t("fubestie.transcript.readFailed", { error })}
           </p>
         ) : loading ? (
           <p role="status" className="m-0 text-body-sm text-subtle">
-            Reading saved Mesh sessions…
+            {t("fubestie.transcript.reading")}
           </p>
         ) : rows?.length === 0 ? (
           <p className="m-0 text-body-sm text-subtle">
-            No matching Mesh sessions in recent history for this workspace. Chat
-            mode has no tool transcript. Sessions from older builds may not be
-            listed.
+            {t("fubestie.transcript.none")}
           </p>
         ) : (
           transcript && (
@@ -130,8 +130,8 @@ export function createMeshTranscriptTab(
               state={() => "unknown"}
               before={
                 <p className="m-0 text-body-sm text-subtle">
-                  Saved snapshot; Refresh to see newer activity.
-                  {transcript.more ? " Showing the latest 50 turns." : ""}
+                  {t("fubestie.transcript.snapshot")}
+                  {transcript.more ? t("fubestie.transcript.latest50") : ""}
                 </p>
               }
             />

@@ -41,6 +41,7 @@ import {
   cannotEdit,
   type FeatureAgents,
   featureOn,
+  featureTitle,
   instructionsOf,
   restoreFeature,
   saveFeature,
@@ -462,22 +463,7 @@ function FeatureSwitch({
   );
 }
 
-/** Feature names and descriptions, translated when shown. */
-function featureTitle(feature: Feature): string {
-  switch (feature.id) {
-    case "memory":
-      return t("v105agent.bestie.feature.memory");
-    case "notes.hourly":
-      return t("v105agent.bestie.feature.hourlyNotes");
-    case "dream.nightly":
-      return t("v105agent.bestie.feature.nightlyReview");
-    case "checkin.hourly":
-      return t("v105agent.bestie.feature.everyHour");
-    default:
-      return feature.title;
-  }
-}
-
+/** Feature descriptions, translated when shown. */
 function featureDescription(feature: Feature): string {
   switch (feature.id) {
     case "memory":

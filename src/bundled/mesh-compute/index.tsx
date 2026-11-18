@@ -14,6 +14,8 @@ import { Button } from "../../shared/design-system/ui/Button";
 import { Switch } from "../../shared/design-system/ui/Switch";
 import { Accordion } from "../../shared/design-system/ui/Accordion";
 import { CpuIcon } from "../../shared/design-system/icons";
+import { t, useLanguage } from "../../shared/i18n";
+import { rich } from "../../shared/i18n/rich";
 import { ShareModelPicker } from "./ShareModelPicker";
 import { CommunityMesh } from "./CommunityMesh";
 import { ConsumerComputeView } from "./ConsumerComputeView";
@@ -107,7 +109,7 @@ export const apply: PluginModule["apply"] = (ctx) => {
   // promise: retry the current community once, then surface the real error.
   const currentLease = async () => {
     const selected = lease;
-    if (!selected) throw new Error("Connect to a community first");
+    if (!selected) throw new Error(t("fubestie.mesh.connectFirst"));
     try {
       return { selected, id: await selected };
     } catch (error) {
@@ -249,7 +251,7 @@ export const apply: PluginModule["apply"] = (ctx) => {
       description:
         "Runs on this community's shared compute: plain chat, or goose with shell, file and Buzz tools.",
       defaults: () => ({ config: DEFAULT_MESH_AGENT_CONFIG }),
-      summary: () => "Shared compute",
+      summary: () => t("navigation.sharedCompute"),
       Create: ({ disabled }) => (
         <CommunityComputePage setupOnly disabled={disabled} />
       ),
@@ -277,6 +279,7 @@ export const apply: PluginModule["apply"] = (ctx) => {
     setupOnly?: boolean;
     disabled?: boolean;
   }) {
+    useLanguage();
     const snapshot = useSyncExternalStore(
       ctx.relay.subscribe,
       ctx.relay.snapshot,
@@ -288,7 +291,9 @@ export const apply: PluginModule["apply"] = (ctx) => {
       if (isTauri() && status?.sharing)
         void openWidget().catch((reason) => {
           if (active && !disposed)
-            setError(`Couldn’t open activity widget: ${String(reason)}`);
+            setError(
+              t("fubestie.mesh.widgetFailed", { reason: String(reason) }),
+            );
         });
       return () => {
         active = false;
@@ -467,9 +472,7 @@ export const apply: PluginModule["apply"] = (ctx) => {
           if (!current() || selected !== lease)
             throw new Error("Community changed");
           if (latest.boundCommunity !== viewedCommunity)
-            throw new Error(
-              "Open Shared compute settings to switch communities first",
-            );
+            throw new Error(t("fubestie.mesh.switchInSettings"));
           // A second creation view must not replace sharing started elsewhere.
           if (latest.sharing) {
             setStatus(latest);
@@ -570,7 +573,7 @@ export const apply: PluginModule["apply"] = (ctx) => {
           isTauri() && status && !otherCommunity ? (
             <div className={styles.sharingControl}>
               <Switch
-                aria-label="Share compute"
+                aria-label={t("fubestie.mesh.shareCompute")}
                 checked={shareOn}
                 onCheckedChange={(next) => {
                   if (next) void share();
@@ -591,12 +594,12 @@ export const apply: PluginModule["apply"] = (ctx) => {
         }
         status={
           !isTauri()
-            ? "Open Buzz desktop to use shared compute."
+            ? t("fubestie.mesh.openDesktop")
             : !status
-              ? "Checking shared compute…"
+              ? t("fubestie.mesh.checking")
               : leaseReady
                 ? shareStatus(status, phase, community?.name, modelNames)
-                : "Checking shared compute…"
+                : t("fubestie.mesh.checking")
         }
         error={error ?? status?.settingsError ?? status?.reason}
         attention={
@@ -614,54 +617,63 @@ export const apply: PluginModule["apply"] = (ctx) => {
         {community?.name &&
           (status?.sharing && !otherCommunity ? (
             <p className="m-0 text-body">
-              Sharing{" "}
-              <strong title={status.sharing}>
-                {modelNames[status.sharing] ?? status.sharing}
-              </strong>{" "}
-              with <strong>{community.name}</strong>
+              {rich("fubestie.mesh.sharingWith", {
+                model: (
+                  <strong title={status.sharing}>
+                    {modelNames[status.sharing] ?? status.sharing}
+                  </strong>
+                ),
+                community: <strong>{community.name}</strong>,
+              })}
             </p>
           ) : (
             <p className="m-0 text-body-sm text-secondary">
-              Shared compute for <strong>{community.name}</strong>
+              {rich("fubestie.mesh.sharedComputeFor", {
+                community: <strong>{community.name}</strong>,
+              })}
             </p>
           ))}
         {otherCommunity && (
-          <section aria-label="Bound compute community">
+          <section aria-label={t("fubestie.mesh.boundCommunity")}>
             <p>
-              {status?.sharing ? "Sharing" : "Compute connected"} in{" "}
-              {boundCommunity}. Navigation does not move it.
+              {status?.sharing
+                ? t("fubestie.mesh.sharingIn", {
+                    community: boundCommunity ?? "",
+                  })
+                : t("fubestie.mesh.connectedIn", {
+                    community: boundCommunity ?? "",
+                  })}
             </p>
             {replaceConfirmed ? (
               <>
                 <p>
-                  Stop that community’s local Mesh agents and compute before
-                  switching to {viewedCommunity}?
+                  {t("fubestie.mesh.stopBeforeSwitch", {
+                    community: viewedCommunity ?? "",
+                  })}
                 </p>
                 <Button disabled={busy} onClick={() => void replace()}>
-                  Stop agents and switch compute
+                  {t("fubestie.mesh.stopAndSwitch")}
                 </Button>
                 <Button
                   disabled={busy}
                   onClick={() => setReplaceConfirmed(false)}
                 >
-                  Cancel
+                  {t("fubestie.mesh.cancel")}
                 </Button>
               </>
             ) : (
               <Button disabled={busy} onClick={() => setReplaceConfirmed(true)}>
-                Use compute in this community instead
+                {t("fubestie.mesh.useHere")}
               </Button>
             )}
           </section>
         )}
         {isTauri() && status && !otherCommunity && (
-          <section aria-label="Share compute">
+          <section aria-label={t("fubestie.mesh.shareCompute")}>
             <p className="m-0 text-body-sm text-secondary">
-              Let {community?.name ?? "this community"} run prompts on this
-              machine. Auto picks the best model for your hardware; you can also
-              choose one. Members serving your helper’s model can read its
-              prompts, conversation history and, in Agent mode, tool output and
-              core memory. Sharing resumes when you reopen Buzz.
+              {community?.name
+                ? t("fubestie.mesh.shareIntro", { community: community.name })
+                : t("fubestie.mesh.shareIntroDefault")}
             </p>
             {status.sharing && status.download && !status.download.done && (
               <DownloadProgress download={status.download} />
@@ -685,8 +697,8 @@ export const apply: PluginModule["apply"] = (ctx) => {
                     <div className={styles.widgetPopout}>
                       <IconButton
                         size="xs"
-                        aria-label="Open activity widget"
-                        title="Open activity widget"
+                        aria-label={t("fubestie.mesh.openWidget")}
+                        title={t("fubestie.mesh.openWidget")}
                         icon={<ArrowSquareOutIcon size={16} />}
                         variant="subtle"
                         disabled={!status.sharing}
@@ -695,7 +707,9 @@ export const apply: PluginModule["apply"] = (ctx) => {
                           void openWidget().catch((reason) => {
                             if (!disposed)
                               setError(
-                                `Couldn’t open activity widget: ${String(reason)}`,
+                                t("fubestie.mesh.widgetFailed", {
+                                  reason: String(reason),
+                                }),
                               );
                           });
                         }}
@@ -743,7 +757,7 @@ export const apply: PluginModule["apply"] = (ctx) => {
               items={[
                 {
                   value: "Community and activity",
-                  title: "Community and activity",
+                  title: t("fubestie.mesh.communityActivity"),
                   content: (
                     <>
                       {phase === "ready" && !otherCommunity && (
@@ -781,38 +795,38 @@ function shareStatus(
   communityName: string | undefined,
   modelNames: Record<string, string> = {},
 ): string {
-  const where = communityName ?? "your community";
+  const where = communityName ?? t("fubestie.mesh.yourCommunity");
   const model =
     status.sharing && (modelNames[status.sharing] ?? status.sharing);
   const enabled = Boolean(model || status.savedSharing?.enabled);
   if (phase === "failed") {
-    const cause = status.lifecycle?.reason
-      ? ` ${status.lifecycle.reason}.`
-      : "";
-    return enabled
-      ? `Mesh needs recovery.${cause} Sharing is still enabled for next launch; turn it off to disable automatic sharing. Restart Buzz before starting Mesh again.`
-      : `Mesh needs recovery.${cause} Shutdown could not be confirmed. Restart Buzz before starting Mesh again.`;
+    const reason = status.lifecycle?.reason;
+    if (enabled)
+      return reason
+        ? t("fubestie.mesh.recoveryEnabledCause", { reason })
+        : t("fubestie.mesh.recoveryEnabled");
+    return reason
+      ? t("fubestie.mesh.recoveryCause", { reason })
+      : t("fubestie.mesh.recovery");
   }
   if (phase === "stopping")
     return status.finishingJoin
-      ? "Stopping, finishing a peer connection…"
-      : "Stopping…";
+      ? t("fubestie.mesh.stoppingPeer")
+      : t("fubestie.mesh.stopping");
   if (!model) {
     if (status.savedSharing?.enabled)
-      return "Sharing is enabled but not running. Turn it off and on to start it again.";
+      return t("fubestie.mesh.enabledNotRunning");
     // Consumer-only node (started for agents): Thomas's "connected" wording.
-    if (phase === "starting")
-      return "Sharing is off. Connecting to community compute…";
-    if (phase === "ready")
-      return "Sharing is off. Connected to community compute.";
-    return "Sharing is off.";
+    if (phase === "starting") return t("fubestie.mesh.offConnecting");
+    if (phase === "ready") return t("fubestie.mesh.offConnected");
+    return t("fubestie.mesh.off");
   }
-  if (phase === "starting") return `Starting ${model}…`;
+  if (phase === "starting") return t("fubestie.mesh.starting", { model });
   if (phase === "ready")
     return status.modelReady
-      ? `Sharing ${model} with ${where}.`
-      : `Preparing ${model} — not serving yet.`;
-  return `Selected for sharing: ${model}`;
+      ? t("fubestie.mesh.sharingModelWith", { model, community: where })
+      : t("fubestie.mesh.preparing", { model });
+  return t("fubestie.mesh.selected", { model });
 }
 
 function DownloadProgress({
@@ -827,13 +841,15 @@ function DownloadProgress({
   return (
     <div>
       <progress
-        aria-label="Model download"
+        aria-label={t("fubestie.mesh.modelDownload")}
         max={100}
         value={percent}
         className="w-full"
       />
       <span className="text-body-sm text-secondary">
-        {`Downloading ${download.file ?? download.label}`}
+        {t("fubestie.mesh.downloading", {
+          file: download.file ?? download.label,
+        })}
         {percent === undefined
           ? "…"
           : ` · ${percent}% (${(received / 1e9).toFixed(2)} GB / ${(total / 1e9).toFixed(2)} GB)`}

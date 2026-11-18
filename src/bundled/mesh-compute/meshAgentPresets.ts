@@ -3,6 +3,7 @@
 // small. Picking one fills the prompt and mode; the owner edits and saves as
 // usual. The main Shared compute page offers these before agent creation.
 import type { MeshMode } from "./meshAgent";
+import { t } from "../../shared/i18n";
 
 export type MeshAgentPreset = Readonly<{
   id: string;
@@ -62,3 +63,17 @@ Supported requests: convert an image format (for example HEIC or PNG to JPG/WebP
 If the request is ambiguous, ask one short question instead of guessing.`,
   },
 ];
+
+/** A preset's summary, translated when shown. Its name is the agent's name. */
+export function presetSummary(preset: MeshAgentPreset): string {
+  switch (preset.id) {
+    case "thread-summarizer":
+      return t("fubestie.preset.threadSummarizer");
+    case "translator":
+      return t("fubestie.preset.translator");
+    case "media-converter":
+      return t("fubestie.preset.mediaConverter");
+    default:
+      return preset.summary;
+  }
+}

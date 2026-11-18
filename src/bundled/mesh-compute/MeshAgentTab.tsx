@@ -5,6 +5,7 @@ import { Field } from "../../shared/design-system/ui/Field";
 import { Input } from "../../shared/design-system/ui/Input";
 import { Select } from "../../shared/design-system/ui/Select";
 import { Textarea } from "../../shared/design-system/ui/Textarea";
+import { t, useLanguage } from "../../shared/i18n";
 import {
   DEFAULT_WORKSPACE,
   type MeshAgentConfig,
@@ -12,32 +13,36 @@ import {
   meshAgentConfig,
   validWorkspace,
 } from "./meshAgent";
-import { MESH_AGENT_PRESETS } from "./meshAgentPresets";
+import { MESH_AGENT_PRESETS, presetSummary } from "./meshAgentPresets";
 
 const options = (choices: readonly (readonly [string, string])[]) => [
   { label: "", options: choices.map(([value, label]) => ({ value, label })) },
 ];
-const MODES = options([
-  ["chat", "Chat"],
-  ["agent", "Agent"],
-]);
-const MODE_DESCRIPTIONS: Record<MeshMode, string> = {
-  chat: "Answers from the conversation alone, with no tools. Suits small models.",
-  agent: "Works with shell, project skills and Buzz tools.",
-};
-const SCOPES = options([
-  ["thread", "One session per thread"],
-  ["channel", "One session per channel"],
-]);
+const modes = () =>
+  options([
+    ["chat", t("fubestie.meshTab.chat")],
+    ["agent", t("fubestie.meshTab.agent")],
+  ]);
+const modeDescription = (mode: MeshMode) =>
+  mode === "chat"
+    ? t("fubestie.meshTab.chatDescription")
+    : t("fubestie.meshTab.agentDescription");
+const scopes = () =>
+  options([
+    ["thread", t("fubestie.meshTab.perThread")],
+    ["channel", t("fubestie.meshTab.perChannel")],
+  ]);
 const CUSTOM = "custom";
-const PRESETS = options([
-  [CUSTOM, "Custom"],
-  ...MESH_AGENT_PRESETS.map((preset) => [preset.id, preset.name] as const),
-]);
+const presets = () =>
+  options([
+    [CUSTOM, t("fubestie.meshTab.custom")],
+    ...MESH_AGENT_PRESETS.map((preset) => [preset.id, preset.name] as const),
+  ]);
 
 /** The Mesh type's settings: a starting preset, prompt, mode, sessions and
  * working directory. */
 export function MeshAgentTab({ agent, save }: AgentViewProps<MeshAgentConfig>) {
+  useLanguage();
   const saved = meshAgentConfig(agent.config);
   const [draft, setDraft] = useState(saved);
   const [saving, setSaving] = useState(false);
@@ -71,13 +76,12 @@ export function MeshAgentTab({ agent, save }: AgentViewProps<MeshAgentConfig>) {
       }}
     >
       <Select
-        label="Start from"
+        label={t("fubestie.meshTab.startFrom")}
         variant="field"
         value={draft.preset ?? CUSTOM}
-        groups={PRESETS}
+        groups={presets()}
         description={
-          preset?.summary ??
-          "Pick an example to fill the prompt and mode, then edit as you like."
+          preset ? presetSummary(preset) : t("fubestie.meshTab.startFromHint")
         }
         onValueChange={(value) => {
           const picked = MESH_AGENT_PRESETS.find((item) => item.id === value);
@@ -95,8 +99,8 @@ export function MeshAgentTab({ agent, save }: AgentViewProps<MeshAgentConfig>) {
         }}
       />
       <Field
-        label="Prompt"
-        description="The system prompt for every reply. Replies come from this community's shared compute."
+        label={t("fubestie.meshTab.prompt")}
+        description={t("fubestie.meshTab.promptDescription")}
       >
         <Textarea
           rows={8}
@@ -107,11 +111,11 @@ export function MeshAgentTab({ agent, save }: AgentViewProps<MeshAgentConfig>) {
         />
       </Field>
       <Select
-        label="Mode"
+        label={t("fubestie.meshTab.mode")}
         variant="field"
         value={draft.mode}
-        groups={MODES}
-        description={MODE_DESCRIPTIONS[draft.mode]}
+        groups={modes()}
+        description={modeDescription(draft.mode)}
         onValueChange={(value) =>
           setDraft({
             ...draft,
@@ -120,10 +124,10 @@ export function MeshAgentTab({ agent, save }: AgentViewProps<MeshAgentConfig>) {
         }
       />
       <Select
-        label="Sessions"
+        label={t("fubestie.meshTab.sessions")}
         variant="field"
         value={draft.scope}
-        groups={SCOPES}
+        groups={scopes()}
         onValueChange={(value) =>
           setDraft({
             ...draft,
@@ -133,9 +137,13 @@ export function MeshAgentTab({ agent, save }: AgentViewProps<MeshAgentConfig>) {
       />
       {draft.mode !== "chat" && (
         <Field
-          label="Workspace"
-          description={`Where its shell runs, and where it finds project skills. An absolute path, or ${DEFAULT_WORKSPACE}.`}
-          error={workspaceValid ? undefined : "Use an absolute path."}
+          label={t("fubestie.meshTab.workspace")}
+          description={t("fubestie.meshTab.workspaceDescription", {
+            workspace: DEFAULT_WORKSPACE,
+          })}
+          error={
+            workspaceValid ? undefined : t("fubestie.meshTab.absolutePath")
+          }
         >
           <Input
             value={draft.workspace}
@@ -158,7 +166,7 @@ export function MeshAgentTab({ agent, save }: AgentViewProps<MeshAgentConfig>) {
           disabled={!changed || !workspaceValid}
           focusableWhenDisabled
         >
-          Save
+          {t("fubestie.meshTab.save")}
         </Button>
       </div>
     </form>

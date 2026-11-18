@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
 import { PreferenceRow } from "../../shared/design-system/ui/PreferenceRow";
 import { SettingsGroup } from "../../shared/design-system/ui/SettingsGroup";
+import { t, useLanguage } from "../../shared/i18n";
 import type { MeshStatus } from "./index";
 
 /** Creation borrows the existing compute page's lifecycle; no setup record or runner. */
@@ -24,6 +25,7 @@ export function MeshCreateSetup({
   share(): void;
   refresh(): void;
 }) {
+  useLanguage();
   const [choice, setChoice] = useState<"share" | "use" | null>(null);
   const confirmation = useRef<HTMLParagraphElement>(null);
   const phase = status?.lifecycle?.state;
@@ -34,9 +36,7 @@ export function MeshCreateSetup({
   const failure =
     error ??
     status?.settingsError ??
-    (phase === "failed"
-      ? "Shared compute needs recovery. Open Settings → Shared compute."
-      : null);
+    (phase === "failed" ? t("fubestie.setup.needsRecovery") : null);
   const confirmed =
     choice === "use" || (choice === "share" && sharing && !failure);
   useEffect(() => {
@@ -51,11 +51,9 @@ export function MeshCreateSetup({
     phase !== "failed" &&
     phase !== "stopping";
   return (
-    <section aria-label="Set up shared compute" className="grid gap-2">
+    <section aria-label={t("fubestie.setup.label")} className="grid gap-2">
       <p className="m-0 text-body-sm text-secondary">
-        Members serving your model can read the prompts and conversation history
-        sent to them. In Agent mode, this includes tool output and core memory;
-        their model directs tools on this computer.
+        {t("fubestie.setup.privacy")}
       </p>
       {confirmed ? (
         <div className="grid gap-2">
@@ -66,10 +64,10 @@ export function MeshCreateSetup({
             className="m-0 text-body"
           >
             {choice === "use"
-              ? "Using community compute. You can create your agent now."
+              ? t("fubestie.setup.usingCommunity")
               : phase === "ready"
-                ? "This computer is sharing. You can create your agent now."
-                : "Sharing is starting. Downloads continue in the background; you can create your agent now."}
+                ? t("fubestie.setup.sharing")
+                : t("fubestie.setup.sharingStarting")}
           </p>
           {choice === "use" && (
             <Button
@@ -77,7 +75,7 @@ export function MeshCreateSetup({
               disabled={disabled || busy}
               onClick={() => setChoice(null)}
             >
-              Change
+              {t("fubestie.setup.change")}
             </Button>
           )}
         </div>
@@ -85,13 +83,13 @@ export function MeshCreateSetup({
         <>
           <SettingsGroup>
             <PreferenceRow
-              title="Use this computer"
-              subtitle="Auto picks and downloads a model in the background. Create your agent while it starts."
+              title={t("fubestie.setup.useThis")}
+              subtitle={t("fubestie.setup.useThisHint")}
               trailing={
                 <Button
                   size="sm"
                   variant="primary"
-                  aria-label="Start sharing with Auto"
+                  aria-label={t("fubestie.setup.startAuto")}
                   disabled={disabled || busy || !canShare}
                   loading={busy}
                   onClick={() => {
@@ -99,21 +97,21 @@ export function MeshCreateSetup({
                     share();
                   }}
                 >
-                  Start sharing
+                  {t("fubestie.setup.start")}
                 </Button>
               }
             />
             <PreferenceRow
-              title="Use community compute"
-              subtitle="No download. Needs someone in your community to be sharing."
+              title={t("fubestie.setup.useCommunity")}
+              subtitle={t("fubestie.setup.useCommunityHint")}
               trailing={
                 <Button
                   size="sm"
-                  aria-label="Continue without sharing"
+                  aria-label={t("fubestie.setup.continueWithout")}
                   disabled={disabled || busy}
                   onClick={() => setChoice("use")}
                 >
-                  Continue
+                  {t("fubestie.setup.continue")}
                 </Button>
               }
             />
@@ -121,12 +119,12 @@ export function MeshCreateSetup({
           {(busy || !status || otherCommunity) && (
             <p role="status" className="m-0 text-body-sm text-secondary">
               {busy
-                ? "Starting shared compute. You can create your agent while setup continues."
+                ? t("fubestie.setup.startingCompute")
                 : !status
-                  ? "Checking shared compute…"
+                  ? t("fubestie.mesh.checking")
                   : otherCommunity
-                    ? "This computer is connected to another community. Switch communities in Settings → Shared compute to share here."
-                    : "You can change sharing in Settings → Shared compute."}
+                    ? t("fubestie.setup.otherCommunity")
+                    : t("fubestie.setup.changeLater")}
             </p>
           )}
         </>
@@ -137,7 +135,7 @@ export function MeshCreateSetup({
             {failure}
           </p>
           <Button size="sm" disabled={disabled || busy} onClick={refresh}>
-            Check again
+            {t("fubestie.setup.checkAgain")}
           </Button>
         </div>
       )}
