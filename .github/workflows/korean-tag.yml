@@ -44,13 +44,14 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --verify-tag --draft --title "Buzz Korean ${TAG#korean-v}" --notes "Buzz 한글판 ${TAG#korean-v}"
           fi
+      # Windows is built but kept off the release until Claude and Codex run there.
       - name: Build the Windows installer for the new tag
         if: steps.tag.outputs.created
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ steps.tag.outputs.created }}
-        run: gh workflow run korean-windows.yml --ref "$GITHUB_REF_NAME" -f tag="$TAG" -f release=true
+        run: gh workflow run korean-windows.yml --ref "$GITHUB_REF_NAME" -f tag="$TAG" -f release=false
       - name: Build the macOS DMG for the new tag
         if: steps.tag.outputs.created
         env:
