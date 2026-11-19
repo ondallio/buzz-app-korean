@@ -5,6 +5,7 @@ import { expect, it } from "vitest";
 import {
   buildEnvironment,
   dmgName,
+  macosConfig,
   releaseAsset,
   releaseFields,
   TARGET,
@@ -38,14 +39,22 @@ it("drops signing, updater and development inputs and adds the distribution ID",
   });
 });
 
-it("builds unsigned Apple Silicon app and DMG bundles with the locked lockfile", () => {
+it("builds Apple Silicon app and DMG bundles with the locked lockfile", () => {
   const args = tauriArguments(".local/korean-builds/run/release.json");
-  expect(args).toContain("--no-sign");
+  expect(args).not.toContain("--no-sign");
   expect(
     args.slice(args.indexOf("--bundles"), args.indexOf("--bundles") + 2),
   ).toEqual(["--bundles", "app,dmg"]);
   expect(args).toContain("aarch64-apple-darwin");
   expect(args.at(-1)).toBe("--locked");
+});
+
+it("ad-hoc signs the bundle without dropping other bundle settings", () => {
+  const { config } = koreanReleaseConfig({ version: "1.0.5" });
+  const signed = macosConfig(config);
+  expect(signed.bundle.macOS.signingIdentity).toBe("-");
+  expect(signed.bundle.createUpdaterArtifacts).toBe(false);
+  expect(signed.identifier).toBe(config.identifier);
 });
 
 it("names the DMG and a space-free release asset", () => {

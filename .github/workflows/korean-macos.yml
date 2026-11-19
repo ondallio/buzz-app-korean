@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   macos:
-    name: macOS aarch64 DMG (unsigned)
+    name: macOS aarch64 DMG (ad-hoc signed)
     # Apple Silicon 러너. build-dmg.mjs도 darwin/arm64가 아니면 거부한다.
     runs-on: macos-15
     timeout-minutes: 120
@@ -66,7 +66,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: korean-macos-release
-      - name: Build unsigned app and DMG
+      - name: Build ad-hoc signed app and DMG
         id: build
         env:
           # 원본 macOS 작업과 같이 CI에서도 DMG 창 배치(Finder AppleScript)를 한다.
@@ -104,6 +104,11 @@ jobs:
             echo '::error::App declares more than the Korean URL scheme'; exit 1
           fi
           test -n "$(read_plist NSMicrophoneUsageDescription)"
+          # 묶음 전체가 ad-hoc 서명돼야 macOS가 알림·Dock 배지 권한을 묻는다.
+          codesign --verify --deep --strict "$app" || { echo '::error::App bundle signature is invalid'; exit 1; }
+          signature=$(codesign -dv "$app" 2>&1)
+          grep -qx "Identifier=$IDENTIFIER" <<<"$signature" || { echo "::error::Bundle is not signed as $IDENTIFIER"; exit 1; }
+          grep -q '^Sealed Resources' <<<"$signature" || { echo '::error::Bundle resources are not sealed'; exit 1; }
           exe="$app/Contents/MacOS/$(read_plist CFBundleExecutable)"
           binaries=("$exe" "$app/Contents/Resources/bin/buzz" "$app/Contents/Resources/bin/buzz-agent-command" "$app/Contents/Resources/bin/goose-acp")
           for binary in "${binaries[@]}"; do

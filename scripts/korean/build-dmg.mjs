@@ -1,4 +1,4 @@
-// 한글판 Apple Silicon DMG를 서명·공증 없이 로컬에서 빌드한다.
+// 한글판 Apple Silicon DMG를 ad-hoc 서명(무료)으로, 공증 없이 빌드한다.
 //
 // 사용: bin/node scripts/korean/build-dmg.mjs            (로컬 Mac 또는 GitHub Actions macOS)
 //       bin/node scripts/korean/build-dmg.mjs --dry-run  (어느 OS에서나 설정만 출력)
@@ -46,14 +46,23 @@ export function buildEnvironment(environment, release) {
   return { ...kept, ...release.environment, CI: "true" };
 }
 
-/** tauri build 인자: 서명 없이 app·dmg만, 오버레이 적용, Cargo.lock 고정. */
+/** 앱 묶음 전체를 ad-hoc 서명한다. 서명 없는 묶음은 macOS가 알림·Dock 배지
+ * 권한 요청을 거절한다(UNErrorDomain 1). */
+export const macosConfig = (config) => ({
+  ...config,
+  bundle: {
+    ...config.bundle,
+    macOS: { ...config.bundle?.macOS, signingIdentity: "-" },
+  },
+});
+
+/** tauri build 인자: app·dmg만, 오버레이 적용, Cargo.lock 고정. */
 export function tauriArguments(overlay) {
   return [
     "exec",
     "tauri",
     "build",
     "--ci",
-    "--no-sign",
     "--bundles",
     "app,dmg",
     "--target",
@@ -107,10 +116,14 @@ function build() {
   const run = join(root, ".local/korean-builds", `run-${Date.now()}`);
   mkdirSync(run, { recursive: true, mode: 0o700 });
   const overlay = join(run, "release.json");
-  writeFileSync(overlay, `${JSON.stringify(release.config, null, 2)}\n`, {
-    flag: "wx",
-    mode: 0o600,
-  });
+  writeFileSync(
+    overlay,
+    `${JSON.stringify(macosConfig(release.config), null, 2)}\n`,
+    {
+      flag: "wx",
+      mode: 0o600,
+    },
+  );
   const result = spawnSync(
     join(root, "bin/pnpm"),
     tauriArguments(relative(root, overlay)),

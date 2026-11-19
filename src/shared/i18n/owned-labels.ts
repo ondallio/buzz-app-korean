@@ -91,6 +91,11 @@ const groups: Readonly<Record<string, OwnedLabel>> = {
   plugins: ["Plugins", "navigation.plugins"],
 };
 
+/** Builderlab builds title some of the same settings cards differently. */
+const builderlabSettings: Readonly<Record<string, OwnedLabel>> = {
+  "buzz.pairing/mobile": ["Mobile app", "navigation.mobileApp"],
+};
+
 function label(
   table: Readonly<Record<string, OwnedLabel>>,
   id: string,
@@ -142,7 +147,10 @@ export function ownedSettingsLabel(
   title: string,
   language: Language,
 ): string {
-  return label(settings, key, title, language);
+  const localized = label(settings, key, title, language);
+  return localized === title
+    ? label(builderlabSettings, key, title, language)
+    : localized;
 }
 
 /** Host group IDs are separate from arbitrary contributed group names. */
