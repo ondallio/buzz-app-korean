@@ -16,8 +16,7 @@ import {
 } from "../../features/relay-staff/contract";
 import { describe, type Tracked } from "./session";
 
-export const UNSUPPORTED_BROWSING =
-  "This relay doesn't support community browsing yet.";
+export const unsupportedBrowsing = () => t("furs.unsupportedBrowsing");
 
 /** A community as a row knows it. `id` is null when its source was removed. */
 export type CommunityRef = { id: string; host: string };
@@ -198,16 +197,21 @@ export function CommunityBadge({
   id: string | null;
   host: string | null;
 }) {
+  useLanguage();
   const { open } = useContext(NavContext);
   const base =
     "inline-flex max-w-full items-center rounded-full border px-2 py-0.5 text-caption";
   if (!id || !host)
-    return <span className={`${base} text-secondary`}>community removed</span>;
+    return (
+      <span className={`${base} text-secondary`}>
+        {t("furs.communityRemoved")}
+      </span>
+    );
   return (
     <button
       type="button"
       className={base}
-      title={`Open ${host}`}
+      title={t("furs.openCommunity", { host })}
       onClick={() => open({ id, host })}
     >
       <span className="truncate">{host}</span>
@@ -216,12 +220,11 @@ export function CommunityBadge({
 }
 
 export function NotConnected({ host }: { host: string }) {
+  useLanguage();
   const { connectedHost } = useContext(NavContext);
   if (!connectedHost || connectedHost === host) return null;
   return (
-    <span className="text-caption text-warning">
-      Not the community you're connected to.
-    </span>
+    <span className="text-caption text-warning">{t("furs.notConnected")}</span>
   );
 }
 
@@ -265,6 +268,7 @@ export function GroupedList<T extends Grouped>({
   limit: number;
   headings?: boolean;
 }) {
+  useLanguage();
   const capped = items.length >= limit;
   return (
     <div className="flex flex-col gap-4">
@@ -274,11 +278,7 @@ export function GroupedList<T extends Grouped>({
             {headings && <CommunityBadge id={group.id} host={group.host} />}
             <span
               className="rounded-full bg-secondary px-2 py-0.5 text-caption font-medium"
-              title={
-                capped
-                  ? "The relay returned its maximum; there may be more"
-                  : undefined
-              }
+              title={capped ? t("furs.maxReturned") : undefined}
             >
               {group.items.length}
               {capped && "+"}
@@ -299,8 +299,7 @@ export const containsSecretKey = (text: string) =>
   /nsec1[02-9ac-hj-np-z]{6,}/i.test(text);
 
 /** Shown wherever `containsSecretKey` refuses an input. */
-export const SECRET_KEY_WARNING =
-  "That looks like a private key. Never paste it here.";
+export const secretKeyWarning = () => t("adminStaff.privateKey");
 
 /** Hex, `note1…` or `nevent1…` (optionally `nostr:`-prefixed) as a hex event ID. */
 export function eventIdInput(text: string): string | null {

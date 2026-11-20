@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { t, useLanguage } from "../../shared/i18n";
 import { Button } from "../../shared/design-system/ui/Button";
 import { SearchField } from "../../shared/design-system/ui/SearchField";
 import { Tabs } from "../../shared/design-system/ui/Tabs";
@@ -18,8 +19,8 @@ import {
   listButton,
   Loading,
   NotConnected,
-  SECRET_KEY_WARNING,
-  UNSUPPORTED_BROWSING,
+  secretKeyWarning,
+  unsupportedBrowsing,
   useRetry,
   type CommunityRef,
 } from "./ui";
@@ -36,6 +37,7 @@ export function Communities({
   connectedHost: string;
   onOpen(community: CommunityRef): void;
 }) {
+  useLanguage();
   const { context } = useSession();
   const [query, setQuery] = useState("");
   const settled = useDebounced(query.trim().toLowerCase());
@@ -86,7 +88,9 @@ export function Communities({
       >
         <span className="flex-1 truncate">{community.host}</span>
         {connected && (
-          <span className="text-caption text-secondary">Connected</span>
+          <span className="text-caption text-secondary">
+            {t("furs.connected")}
+          </span>
         )}
       </button>
     </li>
@@ -95,14 +99,14 @@ export function Communities({
   return (
     <div className="flex flex-col gap-3">
       <SearchField
-        label="Search communities"
-        placeholder="Search by host (e.g. team.example.com)"
+        label={t("furs.searchCommunities")}
+        placeholder={t("furs.searchPlaceholder")}
         value={query}
         onValueChange={setQuery}
       />
       {secret && (
         <p className="text-body-sm text-danger" role="alert">
-          {SECRET_KEY_WARNING}
+          {secretKeyWarning()}
         </p>
       )}
       {/* The directory's own alert already explains a missing route. */}
@@ -117,7 +121,7 @@ export function Communities({
       {retry.failure && (
         <Failure
           failure={retry.failure}
-          unsupportedText={UNSUPPORTED_BROWSING}
+          unsupportedText={unsupportedBrowsing()}
           onRetry={retry.retry}
           retrying={retry.retrying}
         />
@@ -127,14 +131,16 @@ export function Communities({
         !pages.failure &&
         items.length === 0 &&
         !shownPinned && (
-          <p className="text-body-sm text-secondary">No communities found.</p>
+          <p className="text-body-sm text-secondary">
+            {t("furs.noCommunities")}
+          </p>
         )}
       <ul className="flex flex-col gap-1">{items.map((c) => row(c, false))}</ul>
       {pages.loading && <Loading />}
       {!secret && pages.next && !pages.loading && (
         <div>
           <Button size="sm" variant="outline" onClick={pages.more}>
-            Load more
+            {t("furs.loadMore")}
           </Button>
         </div>
       )}
@@ -143,10 +149,10 @@ export function Communities({
 }
 
 const SECTIONS = [
-  { value: "reports", label: "Reports" },
-  { value: "restrictions", label: "Restrictions" },
-  { value: "members", label: "Members" },
-  { value: "actions", label: "Actions" },
+  { value: "reports", label: "furs.section.reports" },
+  { value: "restrictions", label: "furs.section.restrictions" },
+  { value: "members", label: "furs.section.members" },
+  { value: "actions", label: "furs.section.actions" },
 ] as const;
 type Section = (typeof SECTIONS)[number]["value"];
 
@@ -158,22 +164,28 @@ export function CommunityPage({
   community: CommunityRef;
   onBack(): void;
 }) {
+  useLanguage();
   const [section, setSection] = useState<Section>("reports");
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2">
-        <Button size="sm" variant="ghost" aria-label="Back" onClick={onBack}>
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label={t("furs.back")}
+          onClick={onBack}
+        >
           <ArrowLeftIcon />
         </Button>
         <CommunityBadge id={community.id} host={community.host} />
         <NotConnected host={community.host} />
       </div>
       <Tabs
-        label="Community sections"
+        label={t("furs.communitySections")}
         variant="panel"
         value={section}
         onValueChange={setSection}
-        items={[...SECTIONS]}
+        items={SECTIONS.map((item) => ({ ...item, label: t(item.label) }))}
         renderPanel={(value) =>
           value === "reports" ? (
             <Reports communityId={community.id} />

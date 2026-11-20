@@ -47,7 +47,7 @@ export const ko: Record<keyof typeof en, string> = {
   "adminStaff.add": "추가",
   "adminStaff.empty": "등록된 운영진이 없습니다.",
   "adminStaff.you": "나",
-  "adminStaff.roleFor": "{name}의 역할",
+  "adminStaff.roleFor": "{name} 님의 역할",
   "adminStaff.remove": "제거",
   "adminStaff.fixedSource":
     "릴레이 설정에 지정되어 있어 여기서 제거할 수 없습니다",
@@ -55,8 +55,8 @@ export const ko: Record<keyof typeof en, string> = {
   "adminStaff.removeSelf":
     "내 운영진 권한을 제거합니다. 이 작업을 되돌리지 못할 수 있습니다.",
   "adminStaff.cancel": "취소",
-  "adminStaff.removeModerator": "{name}님의 릴레이 중재자 권한이 제거됩니다.",
-  "adminStaff.removeOperator": "{name}님의 릴레이 운영자 권한이 제거됩니다.",
+  "adminStaff.removeModerator": "{name} 님의 릴레이 중재자 권한이 제거됩니다.",
+  "adminStaff.removeOperator": "{name} 님의 릴레이 운영자 권한이 제거됩니다.",
   "adminStaff.source.config": "설정",
   "adminStaff.source.ownerFallback": "소유자(대체 지정)",
   "adminStaff.source.db": "데이터베이스",

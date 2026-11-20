@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { t, useLanguage, type TranslationKey } from "../../shared/i18n";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Header } from "../../shared/design-system/ui/Header";
 import {
@@ -6,9 +7,16 @@ import {
   CircleNotchIcon,
   WarningCircleIcon,
 } from "../../shared/design-system/icons";
-import { Console, SCREENS, type Screen } from "./Console";
+import { Console, type Screen } from "./Console";
 import { createSession, SessionProvider } from "./session";
 import type { Access, Staff } from "./staff";
+
+const HEADINGS = {
+  reports: ["navigation.reports", "furs.subtitle.reports"],
+  feedback: ["navigation.feedback", "furs.subtitle.feedback"],
+  communities: ["navigation.communities", "furs.subtitle.communities"],
+  staff: ["navigation.staff", "furs.subtitle.staff"],
+} as const satisfies Record<Screen, readonly [TranslationKey, TranslationKey]>;
 
 export function RelayStaff({
   staff,
@@ -19,6 +27,7 @@ export function RelayStaff({
   screen: Screen;
   active(): boolean;
 }) {
+  useLanguage();
   useSyncExternalStore(staff.subscribe, () => staff.visible());
   const contextKey = useSyncExternalStore(staff.subscribe, staff.contextKey);
   const context = staff.context();
@@ -35,15 +44,17 @@ export function RelayStaff({
   return (
     <div className="flex flex-col gap-4">
       <Header
-        title={SCREENS[screen].title}
-        subtitle={`${SCREENS[screen].subtitle} ${new URL(context.origin).host}.`}
+        title={t(HEADINGS[screen][0])}
+        subtitle={t(HEADINGS[screen][1], {
+          host: new URL(context.origin).host,
+        })}
         actions={
           <Button
             size="sm"
             loading={access?.state === "probing"}
             onClick={() => void staff.probe(context, true)}
           >
-            Check again
+            {t("furs.checkAgain")}
           </Button>
         }
       />
@@ -84,10 +95,11 @@ function Authorized({
 }
 
 function AccessStatus({ access }: { access: Access | null }) {
+  useLanguage();
   if (access?.state !== "authorized")
     return (
       <p className="flex items-center gap-2 text-body-sm text-secondary">
-        <CircleNotchIcon className="animate-spin" /> Checking your access…
+        <CircleNotchIcon className="animate-spin" /> {t("furs.checkingAccess")}
       </p>
     );
   const { role, authMode } = access.probe;
@@ -97,8 +109,7 @@ function AccessStatus({ access }: { access: Access | null }) {
         className="flex items-center gap-2 text-body-sm text-warning"
         role="status"
       >
-        <WarningCircleIcon /> Admin auth is disabled on this relay. The console
-        is read-only; taking action requires BUZZ_ADMIN_AUTH=nip98.
+        <WarningCircleIcon /> {t("furs.authDisabled")}
       </p>
     );
   return (
@@ -106,7 +117,15 @@ function AccessStatus({ access }: { access: Access | null }) {
       className="flex items-center gap-2 text-body-sm text-success"
       role="status"
     >
-      <CheckCircleIcon /> Connected as {role ?? "staff"}
+      <CheckCircleIcon />{" "}
+      {t("furs.connectedAs", {
+        role:
+          role === "operator"
+            ? t("adminStaff.role.operator")
+            : role === "moderator"
+              ? t("adminStaff.role.moderator")
+              : (role ?? t("furs.staffRole")),
+      })}
     </p>
   );
 }

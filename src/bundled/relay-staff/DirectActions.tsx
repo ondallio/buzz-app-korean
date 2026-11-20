@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { t, useLanguage, type TranslationKey } from "../../shared/i18n";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Combobox } from "../../shared/design-system/ui/Combobox";
 import { Field } from "../../shared/design-system/ui/Field";
@@ -38,9 +39,9 @@ import {
   containsSecretKey,
   eventIdInput,
   NotConnected,
-  SECRET_KEY_WARNING,
+  secretKeyWarning,
   time,
-  UNSUPPORTED_BROWSING,
+  unsupportedBrowsing,
   useRetry,
   type CommunityRef,
 } from "./ui";
@@ -50,30 +51,30 @@ import { typedPublicKey } from "../../shared/identity/public-key";
 type Action = "ban" | "timeout" | "delete";
 type Intent = Extract<StaffRequest, { route: "directAction" }>;
 
-const LABELS: Record<Action, string> = {
-  ban: "Ban member",
-  timeout: "Time out member",
-  delete: "Delete message",
-};
+const LABEL_KEYS = {
+  ban: "furs.direct.ban",
+  timeout: "furs.direct.timeout",
+  delete: "furs.direct.delete",
+} as const satisfies Record<Action, TranslationKey>;
+const ACTIONS = Object.keys(LABEL_KEYS) as Action[];
+const actionLabel = (action: Action) => t(LABEL_KEYS[action]);
 
-export const STAFF_COPY =
-  "Relay staff can't be banned or timed out. Remove their staff role first.";
-export const UNSUPPORTED_ACTIONS =
-  "This relay doesn't support direct actions yet.";
+export const staffCopy = () => t("furs.staffTarget");
+export const unsupportedActions = () => t("furs.unsupportedActions");
 
 export function directFailure(failure: StaffFailure) {
-  if (failure.code === "target_is_staff") return STAFF_COPY;
+  if (failure.code === "target_is_staff") return staffCopy();
   if (failure.code === "request_id_conflict")
-    return "This request id was already used for a different action. Review again to send it with a new id.";
-  if (unsupported(failure)) return UNSUPPORTED_ACTIONS;
+    return t("furs.requestIdConflict");
+  if (unsupported(failure)) return unsupportedActions();
   return describe(failure);
 }
 
 /** Why a lookup failed; "not found" only when the relay said so. */
 function lookupFailure(failure: StaffFailure) {
-  if (unsupported(failure)) return UNSUPPORTED_BROWSING;
+  if (unsupported(failure)) return unsupportedBrowsing();
   if (failure.code === "event_not_found" || failure.code === "not_found")
-    return "Not found in this community.";
+    return t("furs.notFound");
   return describe(failure);
 }
 
@@ -151,13 +152,20 @@ export function DirectActionsProvider({ children }: { children: ReactNode }) {
     DIRECT,
     (outcome, intent) => {
       if (outcome.ok && outcome.value.state === "succeeded") {
-        notify(`${LABELS[intent.action]}: done`, "success");
+        notify(
+          t("furs.actionDone", { action: actionLabel(intent.action) }),
+          "success",
+        );
         setDraft(emptyDraft(intent.communityHost));
         return;
       }
       if (!outcome.ok && shownHost.current !== intent.communityHost)
         notify(
-          `${LABELS[intent.action]} in ${intent.communityHost} failed: ${directFailure(outcome.failure)}`,
+          t("furs.actionFailed", {
+            action: actionLabel(intent.action),
+            host: intent.communityHost,
+            reason: directFailure(outcome.failure),
+          }),
           "error",
         );
     },
@@ -206,18 +214,15 @@ function validate(draft: Draft, eventId: string | null): Problems {
   const secs = Number(draft.secs);
   return {
     ...(draft.action === "delete" && !eventId
-      ? { target: "Enter a 64-hex event id, or a note1… or nevent1… link." }
+      ? { target: t("furs.needEventId") }
       : {}),
     ...(draft.action !== "delete" && !draft.member
-      ? {
-          member:
-            "Choose a member: search by name, or paste an npub or hex key.",
-        }
+      ? { member: t("furs.needMember") }
       : {}),
     ...(draft.action === "timeout" && !(Number.isInteger(secs) && secs > 0)
-      ? { secs: "Duration must be a whole number of seconds above zero." }
+      ? { secs: t("furs.needDuration") }
       : {}),
-    ...(containsSecretKey(draft.reason) ? { reason: SECRET_KEY_WARNING } : {}),
+    ...(containsSecretKey(draft.reason) ? { reason: secretKeyWarning() } : {}),
   };
 }
 
@@ -232,6 +237,7 @@ function LookupFailure({
   read: Tracked<unknown>;
   reload(): void;
 }) {
+  useLanguage();
   const retry = useRetry(
     read.state === "failed" ? read.failure : null,
     read.settled,
@@ -244,34 +250,36 @@ function LookupFailure({
         {lookupFailure(retry.failure)}
       </p>
       <Button size="sm" loading={retry.retrying} onClick={retry.retry}>
-        Retry
+        {t("adminStaff.retry")}
       </Button>
     </div>
   );
 }
 
 function MemberState({ member }: { member: MemberDetailDto }) {
+  useLanguage();
   const facts = [
     member.role === null
-      ? "Not on the community roster"
-      : `Role: ${member.role}`,
-    member.banned ? "Currently banned" : null,
+      ? t("furs.notOnRoster")
+      : t("furs.memberRole", { role: member.role }),
+    member.banned ? t("furs.currentlyBanned") : null,
     member.mutedUntil
-      ? `Timed out until ${absoluteTime(member.mutedUntil)}`
+      ? t("furs.timedOutUntil", { time: absoluteTime(member.mutedUntil) })
       : null,
-    member.isStaff ? "Relay staff" : null,
+    member.isStaff ? t("furs.relayStaff") : null,
   ].filter(Boolean);
   return <p className="text-caption text-secondary">{facts.join(" · ")}</p>;
 }
 
 function EventPreview({ event }: { event: EventPreviewDto }) {
+  useLanguage();
   return (
     <div className="flex flex-col gap-1 rounded-md border px-3 py-2 text-caption">
       <Person pubkey={event.authorPubkey} />
       <p className="whitespace-pre-wrap break-words">{event.content}</p>
       {event.deletedAt && (
         <p className="text-secondary">
-          Already deleted {time(event.deletedAt)}.
+          {t("furs.alreadyDeleted", { time: time(event.deletedAt) })}
         </p>
       )}
     </div>
@@ -288,6 +296,7 @@ function useLookup<R extends StaffRequest>(
 }
 
 export function ActionsSection({ community }: { community: CommunityRef }) {
+  useLanguage();
   const { context, canMutate } = useSession();
   const c = useController();
   const host = community.host;
@@ -322,15 +331,14 @@ export function ActionsSection({ community }: { community: CommunityRef }) {
   const problems = draft.checked ? validate(draft, eventId) : {};
   const blocked =
     draft.action !== "delete" && member?.state === "ok" && member.value.isStaff
-      ? STAFF_COPY
+      ? staffCopy()
       : null;
 
   if (c.frozen && c.frozen.intent.communityHost !== host)
     return (
       <div className="flex flex-col gap-2 text-body-sm">
         <p>
-          Finish or discard the pending action in{" "}
-          <code>{c.frozen.intent.communityHost}</code>.
+          {t("furs.finishPending", { host: c.frozen.intent.communityHost })}
         </p>
         <ConfirmStep readOnly />
       </div>
@@ -384,22 +392,22 @@ export function ActionsSection({ community }: { community: CommunityRef }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <Field label="Action" nativeLabel={false}>
+      <Field label={t("furs.actionField")} nativeLabel={false}>
         <RadioGroup<Action>
           name={`direct-action-${host}`}
           value={shown.action}
           disabled={locked}
           onValueChange={(action) => set({ action })}
         >
-          {(Object.keys(LABELS) as Action[]).map((action) => (
-            <Radio key={action} value={action} label={LABELS[action]} />
+          {ACTIONS.map((action) => (
+            <Radio key={action} value={action} label={actionLabel(action)} />
           ))}
         </RadioGroup>
       </Field>
       {shown.action === "delete" ? (
         <Field
-          label="Event id"
-          description="Hex, note1… or nevent1…"
+          label={t("furs.eventIdField")}
+          description={t("furs.eventIdHint")}
           error={problems.target}
         >
           <Input
@@ -436,7 +444,7 @@ export function ActionsSection({ community }: { community: CommunityRef }) {
         </p>
       )}
       {shown.action === "timeout" && (
-        <Field label="Duration (seconds)" error={problems.secs}>
+        <Field label={t("furs.durationSeconds")} error={problems.secs}>
           <Input
             type="number"
             disabled={locked}
@@ -446,7 +454,7 @@ export function ActionsSection({ community }: { community: CommunityRef }) {
         </Field>
       )}
       <Field
-        label="Reason (optional)"
+        label={t("furs.reasonOptional")}
         description={reasonAudience(shown.action)}
         error={problems.reason}
       >
@@ -475,7 +483,7 @@ export function ActionsSection({ community }: { community: CommunityRef }) {
             }
             onClick={review}
           >
-            Review
+            {t("furs.review")}
           </Button>
         </div>
       )}
@@ -485,6 +493,7 @@ export function ActionsSection({ community }: { community: CommunityRef }) {
 
 /** The reviewed intent, leading with its community. */
 function ConfirmStep({ readOnly = false }: { readOnly?: boolean }) {
+  useLanguage();
   const { canMutate } = useSession();
   const c = useController();
   if (!c.frozen) return null;
@@ -492,17 +501,21 @@ function ConfirmStep({ readOnly = false }: { readOnly?: boolean }) {
   return (
     <div className="flex flex-col gap-2 rounded-md border px-3 py-2 text-body-sm">
       <p className="flex flex-wrap items-center gap-1.5">
-        In <CommunityBadge id={community.id} host={community.host} />
+        {t("furs.in")}{" "}
+        <CommunityBadge id={community.id} host={community.host} />
         <NotConnected host={intent.communityHost} />
       </p>
       <p>
-        {LABELS[intent.action]}{" "}
+        {t("furs.actionLead", { action: actionLabel(intent.action) })}{" "}
         {intent.action === "delete" ? (
           <code className="break-all">{intent.target}</code>
         ) : (
           <PersonName pubkey={intent.target} name={name} label={keyLabel} />
         )}
-        {intent.expirationSecs ? ` for ${intent.expirationSecs}s` : ""}?
+        {intent.expirationSecs
+          ? t("furs.forSeconds", { secs: intent.expirationSecs })
+          : ""}
+        ?
       </p>
       {intent.action !== "delete" && (
         <code className="break-all font-mono text-caption text-secondary">
@@ -511,10 +524,12 @@ function ConfirmStep({ readOnly = false }: { readOnly?: boolean }) {
       )}
       {member && <MemberState member={member} />}
       {preview && <EventPreview event={preview} />}
-      <p>Reason: {intent.reason ?? "(none)"}</p>
+      <p>
+        {t("furs.reasonLine", { reason: intent.reason ?? t("furs.noReason") })}
+      </p>
       {c.pending && (
         <p className="text-secondary" role="status">
-          Accepted; the relay is still applying it. Retry to check.
+          {t("furs.stillApplying")}
         </p>
       )}
       <div className="flex gap-1.5">
@@ -527,8 +542,8 @@ function ConfirmStep({ readOnly = false }: { readOnly?: boolean }) {
             onClick={c.confirm}
           >
             {c.errorFor(intent.communityHost) || c.pending
-              ? "Retry"
-              : "Confirm"}
+              ? t("adminStaff.retry")
+              : t("furs.confirm")}
           </Button>
         )}
         <Button
@@ -537,7 +552,7 @@ function ConfirmStep({ readOnly = false }: { readOnly?: boolean }) {
           disabled={c.submitting}
           onClick={c.discard}
         >
-          Discard
+          {t("furs.discard")}
         </Button>
       </div>
     </div>
@@ -564,6 +579,7 @@ export function MemberPicker({
   error?: string | undefined;
   onChange(member: Member | null): void;
 }) {
+  useLanguage();
   const { context } = useSession();
   const [query, setQuery] = useState("");
   /** Results open as they arrive; Escape or a click away closes them. */
@@ -605,7 +621,7 @@ export function MemberPicker({
           disabled={disabled}
           onClick={() => onChange(null)}
         >
-          Change
+          {t("furs.change")}
         </Button>
       </div>
     );
@@ -638,19 +654,19 @@ export function MemberPicker({
         }}
       >
         <Combobox.Control
-          label="Member"
-          triggerLabel="Show members"
+          label={t("furs.member")}
+          triggerLabel={t("furs.showMembers")}
           loading={searching && results.state === "loading"}
-          placeholder="Search by name, or paste an npub or hex key"
+          placeholder={t("furs.memberPlaceholder")}
           error={
             secret
-              ? SECRET_KEY_WARNING
+              ? secretKeyWarning()
               : searching && retry.failure
                 ? lookupFailure(retry.failure)
                 : error
           }
         />
-        <Combobox.Popup empty="No members found.">
+        <Combobox.Popup empty={t("furs.noMembers")}>
           <Combobox.List>
             {(candidate: Member) => (
               <Combobox.Item key={candidate.pubkey} value={candidate}>
@@ -667,7 +683,7 @@ export function MemberPicker({
       {searching && retry.failure && (
         <div>
           <Button size="sm" loading={retry.retrying} onClick={retry.retry}>
-            Retry search
+            {t("furs.retrySearch")}
           </Button>
         </div>
       )}
@@ -683,6 +699,7 @@ export function MembersSection({
   communityHost: string;
   onAct(): void;
 }) {
+  useLanguage();
   const { canMutate } = useSession();
   const c = useController();
   const [member, setMember] = useState<Member | null>(null);
@@ -707,7 +724,7 @@ export function MembersSection({
                 onAct();
               }}
             >
-              {action === "ban" ? "Ban" : "Time out"}
+              {action === "ban" ? t("furs.ban") : t("furs.timeOut")}
             </Button>
           ))}
         </div>

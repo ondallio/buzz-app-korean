@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { t, useLanguage } from "../../shared/i18n";
 import { AlertDialog } from "../../shared/design-system/ui/AlertDialog";
 import { Button } from "../../shared/design-system/ui/Button";
 import type {
@@ -7,7 +8,7 @@ import type {
 } from "../../features/relay-staff/contract";
 import { describe, usePages, useSession, useWrite } from "./session";
 import { NamesSource, Person, PeopleScope, usePeople } from "./people";
-import { Failure, Loading, UNSUPPORTED_BROWSING, useRetry } from "./ui";
+import { Failure, Loading, unsupportedBrowsing, useRetry } from "./ui";
 
 type Lift = { pubkey: string; kind: "ban" | "timeout" };
 type LiftRequest = Extract<StaffRequest, { route: "liftRestriction" }>;
@@ -22,6 +23,7 @@ function active(row: RestrictionDto, now = new Date()) {
 }
 
 export function Restrictions({ communityHost }: { communityHost: string }) {
+  useLanguage();
   const { context, canMutate } = useSession();
   const pages = usePages(
     (cursor) => ({
@@ -58,12 +60,12 @@ export function Restrictions({ communityHost }: { communityHost: string }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-caption font-medium text-secondary">
-        Active restrictions
+        {t("furs.activeRestrictions")}
       </p>
       {retry.failure && (
         <Failure
           failure={retry.failure}
-          unsupportedText={UNSUPPORTED_BROWSING}
+          unsupportedText={unsupportedBrowsing()}
           onRetry={retry.retry}
           retrying={retry.retrying}
         />
@@ -75,7 +77,7 @@ export function Restrictions({ communityHost }: { communityHost: string }) {
       )}
       {!pages.loading && !pages.failure && pages.items.length === 0 && (
         <p className="text-body-sm text-secondary">
-          No active bans or timeouts.
+          {t("furs.noRestrictions")}
         </p>
       )}
       <PeopleScope people={names}>
@@ -92,10 +94,14 @@ export function Restrictions({ communityHost }: { communityHost: string }) {
                   <Person pubkey={row.pubkey} />
                 </span>
                 {banned && (
-                  <span className="text-caption text-danger">banned</span>
+                  <span className="text-caption text-danger">
+                    {t("furs.banned")}
+                  </span>
                 )}
                 {timedOut && (
-                  <span className="text-caption text-secondary">timeout</span>
+                  <span className="text-caption text-secondary">
+                    {t("furs.timedOut")}
+                  </span>
                 )}
                 {banned && (
                   <Button
@@ -106,7 +112,7 @@ export function Restrictions({ communityHost }: { communityHost: string }) {
                       setLifting({ pubkey: row.pubkey, kind: "ban" })
                     }
                   >
-                    Lift ban
+                    {t("furs.liftBan")}
                   </Button>
                 )}
                 {timedOut && (
@@ -118,7 +124,7 @@ export function Restrictions({ communityHost }: { communityHost: string }) {
                       setLifting({ pubkey: row.pubkey, kind: "timeout" })
                     }
                   >
-                    Clear timeout
+                    {t("furs.clearTimeout")}
                   </Button>
                 )}
               </li>
@@ -129,24 +135,35 @@ export function Restrictions({ communityHost }: { communityHost: string }) {
       {pages.loading && !retry.retrying && <Loading />}
       {pages.next && !pages.loading && (
         <Button size="sm" onClick={pages.more}>
-          Load more
+          {t("furs.loadMore")}
         </Button>
       )}
       {lifting && (
         <AlertDialog
-          title={lifting.kind === "ban" ? "Lift ban?" : "Clear timeout?"}
-          description={`${names.text(lifting.pubkey)} will be able to post in ${communityHost} again.`}
+          title={
+            lifting.kind === "ban"
+              ? t("furs.liftBanTitle")
+              : t("furs.clearTimeoutTitle")
+          }
+          description={t("furs.liftDescription", {
+            name: names.text(lifting.pubkey),
+            host: communityHost,
+          })}
           initialFocus={proceed}
           onClose={() => setLifting(null)}
           actions={
             <>
-              <Button onClick={() => setLifting(null)}>Cancel</Button>
+              <Button onClick={() => setLifting(null)}>
+                {t("adminStaff.cancel")}
+              </Button>
               <Button
                 ref={proceed}
                 variant="prominent"
                 onClick={() => lift(lifting)}
               >
-                {lifting.kind === "ban" ? "Lift ban" : "Clear timeout"}
+                {lifting.kind === "ban"
+                  ? t("furs.liftBan")
+                  : t("furs.clearTimeout")}
               </Button>
             </>
           }

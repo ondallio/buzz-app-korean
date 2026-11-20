@@ -1,3 +1,4 @@
+import { t } from "../../shared/i18n";
 import {
   createContext,
   useCallback,
@@ -210,13 +211,15 @@ export function useRead<R extends StaffRequest>(
 export function describe(failure: StaffFailure) {
   switch (failure.category) {
     case "unauthorized":
-      return "The relay did not accept your signature.";
+      return t("adminStaff.signatureRejected");
     case "forbidden":
-      return failure.message || "You do not have permission to do that.";
+      return failure.message || t("adminStaff.permissionDenied");
     case "intercepted":
-      return "A network gateway (such as VPN or SSO) intercepted the request.";
+      return t("adminStaff.intercepted");
     case "ambiguous":
-      return `The relay did not confirm the result. ${failure.message}`.trim();
+      return failure.message.trim()
+        ? t("adminStaff.unconfirmedDetail", { message: failure.message.trim() })
+        : t("adminStaff.unconfirmed");
     default:
       return failure.message;
   }

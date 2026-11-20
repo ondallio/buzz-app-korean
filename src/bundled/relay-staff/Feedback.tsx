@@ -6,6 +6,7 @@ import {
   usePeople,
 } from "./people";
 import { useEffect, useState } from "react";
+import { t, useLanguage, type TranslationKey } from "../../shared/i18n";
 import { createPortal } from "react-dom";
 import { MediaViewer } from "../../features/messages/MediaAttachment";
 import viewer from "../../features/messages/Messages.module.css";
@@ -51,6 +52,13 @@ const PREVIEW_TYPES = new Set([
   "image/webp",
 ]);
 const STATUSES: FeedbackStatus[] = ["new", "reviewed", "archived"];
+const STATUS_LABELS = {
+  new: "furs.feedbackStatus.new",
+  reviewed: "furs.feedbackStatus.reviewed",
+  archived: "furs.feedbackStatus.archived",
+} as const satisfies Record<FeedbackStatus, TranslationKey>;
+const statusLabel = (status: FeedbackStatus) =>
+  STATUS_LABELS[status] ? t(STATUS_LABELS[status]) : status;
 
 type Attachment = Omit<AttachmentRef, "feedbackId">;
 type StatusRequest = Extract<StaffRequest, { route: "setFeedbackStatus" }>;
@@ -98,6 +106,7 @@ export function attachmentBudget(attachments: Attachment[]) {
 export const FEEDBACK_LIMIT = 100;
 
 export function Feedback() {
+  useLanguage();
   const { context } = useSession();
   const [selected, setSelected] = useState<string | null>(null);
   const [list, reload] = useRead({ route: "listFeedback" }, [context]);
@@ -116,7 +125,7 @@ export function Feedback() {
     <Loaded read={list} onRetry={reload}>
       {(items) =>
         items.length === 0 ? (
-          <p className="text-body-sm text-secondary">No feedback found.</p>
+          <p className="text-body-sm text-secondary">{t("furs.noFeedback")}</p>
         ) : (
           <PeopleScope people={people}>
             <NamesSource />
@@ -136,12 +145,13 @@ export function Feedback() {
                       </span>
                       {item.status !== "new" && (
                         <span className="text-caption text-secondary">
-                          {item.status}
+                          {statusLabel(item.status)}
                         </span>
                       )}
                     </span>
                     <span className="block truncate text-caption text-secondary">
-                      submitter: <PersonName pubkey={item.submitterPubkey} />
+                      {t("furs.submitterInline")}{" "}
+                      <PersonName pubkey={item.submitterPubkey} />
                     </span>
                     <span className="text-caption text-secondary">
                       {time(item.receivedAt)}
@@ -166,6 +176,7 @@ function FeedbackDetail({
   onBack(): void;
   onChanged(): void;
 }) {
+  useLanguage();
   const { context } = useSession();
   const [detail, reloadDetail] = useRead({ route: "getFeedback", id }, [
     context,
@@ -174,7 +185,7 @@ function FeedbackDetail({
   return (
     <div className="flex flex-col gap-4">
       <Button size="sm" variant="ghost" onClick={onBack}>
-        <ArrowLeftIcon /> Back to feedback
+        <ArrowLeftIcon /> {t("furs.backToFeedback")}
       </Button>
       <Loaded read={detail} onRetry={reloadDetail}>
         {(feedback) => (
@@ -192,6 +203,7 @@ function FeedbackBody({
   feedback: FeedbackDto;
   onChanged(): void;
 }) {
+  useLanguage();
   const { canMutate } = useSession();
   const notify = useToastNotification();
   const [status, setStatus] = useState(feedback.status);
@@ -201,7 +213,12 @@ function FeedbackBody({
     (outcome) => {
       if (!outcome.ok) return notify(describe(outcome.failure), "error");
       setStatus(outcome.value.status);
-      notify(`Feedback marked ${outcome.value.status}`, "success");
+      notify(
+        t("furs.feedbackMarked", {
+          status: statusLabel(outcome.value.status),
+        }),
+        "success",
+      );
       onChanged();
     },
   );
@@ -214,28 +231,28 @@ function FeedbackBody({
   return (
     <>
       <div className="flex flex-col gap-1.5 rounded-md border px-3 py-2.5">
-        <Row label="Community">
+        <Row label={t("furs.row.community")}>
           <CommunityBadge
             id={feedback.communityId}
             host={feedback.communityHost}
           />
         </Row>
-        <Row label="Submitter">
+        <Row label={t("furs.row.submitter")}>
           <Person pubkey={feedback.submitterPubkey} />
         </Row>
-        <Row label="Category">{feedback.category}</Row>
-        <Row label="Event ID" mono>
+        <Row label={t("furs.row.category")}>{feedback.category}</Row>
+        <Row label={t("furs.row.eventId")} mono>
           {feedback.eventId}
         </Row>
-        <Row label="Sent">{time(feedback.eventCreatedAt)}</Row>
-        <Row label="Received">{time(feedback.receivedAt)}</Row>
+        <Row label={t("furs.row.sent")}>{time(feedback.eventCreatedAt)}</Row>
+        <Row label={t("furs.row.received")}>{time(feedback.receivedAt)}</Row>
         <p className="mt-2 whitespace-pre-wrap break-words text-body-sm">
           {feedback.body}
         </p>
         <NamesSource />
       </div>
       {canMutate ? (
-        <Field label="Status">
+        <Field label={t("furs.status")}>
           <RadioGroup<FeedbackStatus>
             name={`feedback-status-${feedback.id}`}
             value={shownStatus}
@@ -243,21 +260,21 @@ function FeedbackBody({
             onValueChange={change}
           >
             {STATUSES.map((option) => (
-              <Radio key={option} value={option} label={option} />
+              <Radio key={option} value={option} label={statusLabel(option)} />
             ))}
           </RadioGroup>
         </Field>
       ) : (
         <div className="flex flex-col gap-1.5">
           <span className="text-caption font-medium text-secondary">
-            Status
+            {t("furs.status")}
           </span>
-          <span className="text-body-sm">{status}</span>
+          <span className="text-body-sm">{statusLabel(status)}</span>
         </div>
       )}
       {(shown.length > 0 || hidden > 0) && (
         <div className="flex flex-col gap-3">
-          <h4 className="text-body-sm font-medium">Attachments</h4>
+          <h4 className="text-body-sm font-medium">{t("furs.attachments")}</h4>
           {shown.map((attachment) => (
             <AttachmentView
               key={attachment.sha256}
@@ -266,8 +283,12 @@ function FeedbackBody({
           ))}
           {hidden > 0 && (
             <p className="text-caption text-secondary">
-              {hidden} attachment{hidden === 1 ? "" : "s"} not shown (display
-              limit reached).
+              {t(
+                hidden === 1
+                  ? "furs.attachmentHiddenOne"
+                  : "furs.attachmentHiddenMany",
+                { count: hidden },
+              )}
             </p>
           )}
         </div>
@@ -278,6 +299,7 @@ function FeedbackBody({
 
 /** PNG, JPEG, GIF and WebP preview inline; every attachment can be saved. */
 function AttachmentView({ attachment }: { attachment: AttachmentRef }) {
+  useLanguage();
   const session = useSession();
   const notify = useToastNotification();
   const image = previewType(attachment.mime);
@@ -320,7 +342,7 @@ function AttachmentView({ attachment }: { attachment: AttachmentRef }) {
     setSaving(true);
     const result = await session.saveAttachment(attachment);
     setSaving(false);
-    if (result.state === "saved") notify("Attachment saved", "success");
+    if (result.state === "saved") notify(t("furs.attachmentSaved"), "success");
     if (result.state === "failed") notify(describe(result.failure), "error");
   };
 
@@ -333,26 +355,26 @@ function AttachmentView({ attachment }: { attachment: AttachmentRef }) {
           <>
             <button
               type="button"
-              aria-label="Open image"
+              aria-label={t("furs.openImage")}
               className="w-fit cursor-zoom-in"
               onClick={() => setViewing(true)}
             >
               <img
                 src={preview.url}
-                alt="Feedback attachment"
+                alt={t("furs.feedbackAttachment")}
                 className="max-h-80 max-w-full rounded-md border object-contain"
               />
             </button>
             {viewing &&
               createPortal(
                 <MediaViewer
-                  title="Image attachment"
+                  title={t("furs.imageAttachment")}
                   close={() => setViewing(false)}
                 >
                   <img
                     className={viewer.mediaViewerImage}
                     src={preview.url}
-                    alt="Feedback attachment, full size"
+                    alt={t("furs.feedbackAttachmentFull")}
                   />
                 </MediaViewer>,
                 document.body,
@@ -371,7 +393,7 @@ function AttachmentView({ attachment }: { attachment: AttachmentRef }) {
       <span className="flex items-center gap-2 text-secondary">
         {attachment.mime} · {Math.ceil(attachment.size / 1024)} KiB
         <Button size="sm" loading={saving} onClick={() => void save()}>
-          Save
+          {t("furs.save")}
         </Button>
       </span>
     </div>

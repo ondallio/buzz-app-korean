@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { t, useLanguage, type TranslationKey } from "../../shared/i18n";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Field } from "../../shared/design-system/ui/Field";
 import { Input } from "../../shared/design-system/ui/Input";
@@ -35,26 +36,26 @@ import {
   Loaded,
   NotConnected,
   Row,
-  SECRET_KEY_WARNING,
+  secretKeyWarning,
   time,
 } from "./ui";
 
-const LABELS: Record<ReportAction, string> = {
-  delete: "Delete",
-  kick: "Kick",
-  ban: "Ban",
-  timeout: "Timeout",
-  dismiss: "Dismiss",
-  escalate: "Escalate",
-};
+const LABEL_KEYS = {
+  delete: "furs.action.delete",
+  kick: "furs.action.kick",
+  ban: "furs.action.ban",
+  timeout: "furs.action.timeout",
+  dismiss: "furs.action.dismiss",
+  escalate: "furs.action.escalate",
+} as const satisfies Record<ReportAction, TranslationKey>;
+const actionLabel = (action: ReportAction) => t(LABEL_KEYS[action]);
 
 /** Where a reason is delivered, so staff know who reads it. */
 export function reasonAudience(action: ReportAction) {
-  if (action === "delete")
-    return "Sent verbatim to the affected user and posted publicly in the room.";
+  if (action === "delete") return t("furs.audience.delete");
   if (action === "dismiss" || action === "escalate")
-    return "Sent verbatim to the reporter.";
-  return "Sent verbatim to the affected user.";
+    return t("furs.audience.reporter");
+  return t("furs.audience.affected");
 }
 
 /** Kick needs the report's channel; a blob can only be dismissed or escalated. */
@@ -72,10 +73,11 @@ function allowedActions(report: ReportDto): ReportAction[] {
 }
 
 function resolutionLabel(resolution: ReportResolution) {
-  if (resolution.activeAction) return LABELS[resolution.activeAction.action];
-  if (resolution.status === "dismissed") return LABELS.dismiss;
-  if (resolution.status === "escalated") return LABELS.escalate;
-  return resolution.status;
+  if (resolution.activeAction)
+    return actionLabel(resolution.activeAction.action);
+  if (resolution.status === "dismissed") return actionLabel("dismiss");
+  if (resolution.status === "escalated") return actionLabel("escalate");
+  return statusLabel(resolution.status);
 }
 
 function Target({ report }: { report: ReportDto }) {
@@ -83,10 +85,10 @@ function Target({ report }: { report: ReportDto }) {
   if (kind === "event")
     return report.targetAuthorPubkey ? (
       <>
-        message by <PersonName pubkey={report.targetAuthorPubkey} />
+        {t("furs.messageBy")} <PersonName pubkey={report.targetAuthorPubkey} />
       </>
     ) : (
-      <>message {report.target.slice(0, 12)}…</>
+      <>{t("furs.messageId", { id: report.target.slice(0, 12) })}</>
     );
   return kind === "pubkey" ? (
     <PersonName pubkey={report.target} />
@@ -98,9 +100,22 @@ function Target({ report }: { report: ReportDto }) {
 /** The relay's maximum page; it returns no total and the list isn't paged. */
 export const REPORT_LIMIT = 200;
 
-const STATUSES = ["open", "processing", "resolved", "dismissed", "escalated"];
+const STATUS_KEYS = {
+  open: "furs.reportStatus.open",
+  processing: "furs.reportStatus.processing",
+  resolved: "furs.reportStatus.resolved",
+  dismissed: "furs.reportStatus.dismissed",
+  escalated: "furs.reportStatus.escalated",
+} as const satisfies Record<string, TranslationKey>;
+const STATUSES = Object.keys(STATUS_KEYS) as (keyof typeof STATUS_KEYS)[];
+function statusLabel(status: string) {
+  return status in STATUS_KEYS
+    ? t(STATUS_KEYS[status as keyof typeof STATUS_KEYS])
+    : status;
+}
 
 export function Reports({ communityId }: { communityId?: string }) {
+  useLanguage();
   const { context } = useSession();
   const [selected, setSelected] = useState<string | null>(null);
   const [status, setStatus] = useState("");
@@ -142,15 +157,18 @@ export function Reports({ communityId }: { communityId?: string }) {
   return (
     <div className="flex flex-col gap-3">
       <Select
-        label="Status"
+        label={t("furs.status")}
         variant="compact"
         value={status}
         groups={[
           {
             label: "",
             options: [
-              { value: "", label: "All statuses" },
-              ...STATUSES.map((value) => ({ value, label: value })),
+              { value: "", label: t("furs.allStatuses") },
+              ...STATUSES.map((value) => ({
+                value,
+                label: statusLabel(value),
+              })),
             ],
           },
         ]}
@@ -159,7 +177,7 @@ export function Reports({ communityId }: { communityId?: string }) {
       <Loaded read={list} onRetry={reload}>
         {(reports) =>
           reports.length === 0 ? (
-            <p className="text-body-sm text-secondary">No reports found.</p>
+            <p className="text-body-sm text-secondary">{t("furs.noReports")}</p>
           ) : (
             <PeopleScope people={people}>
               <NamesSource />
@@ -175,14 +193,15 @@ export function Reports({ communityId }: { communityId?: string }) {
                       onClick={() => setSelected(report.id)}
                     >
                       <span className="block font-medium">
-                        {report.reportType || "Report"}
+                        {report.reportType || t("furs.report")}
                       </span>
                       <span className="block truncate text-caption text-secondary">
-                        reporter: <PersonName pubkey={report.reporterPubkey} />{" "}
-                        · target: <Target report={report} />
+                        {t("furs.reporterInline")}{" "}
+                        <PersonName pubkey={report.reporterPubkey} /> ·{" "}
+                        {t("furs.targetInline")} <Target report={report} />
                       </span>
                       <span className="flex items-center gap-1.5 text-caption text-secondary">
-                        {report.status}
+                        {statusLabel(report.status)}
                         {report.status === "processing" && (
                           <CircleNotchIcon className="animate-spin" />
                         )}
@@ -215,6 +234,7 @@ function ReportDetail({
   onBack(): void;
   onChanged(): void;
 }) {
+  useLanguage();
   const { context, canMutate } = useSession();
   const [detail, reload] = useRead({ route: "getReport", id }, [context, id]);
   const notify = useToastNotification();
@@ -226,7 +246,10 @@ function ReportDetail({
   // gone once its action changes the report's status.
   const resolve = useWrite<ResolveRequest>(`resolve ${id}`, (outcome, sent) => {
     if (outcome.ok) {
-      notify(`Report resolved: ${resolutionLabel(outcome.value)}`, "success");
+      notify(
+        t("furs.reportResolved", { action: resolutionLabel(outcome.value) }),
+        "success",
+      );
       return changed();
     }
     // Dismiss and Escalate carry no replay protection on the relay: a retry
@@ -234,10 +257,7 @@ function ReportDetail({
     // held request and ask for a fresh decision against the reloaded report.
     if (decisionOnly(sent.action) && unresolved(outcome)) {
       resolve.discard();
-      notify(
-        "The relay did not confirm the result. Check the report and decide again.",
-        "error",
-      );
+      notify(t("furs.decideAgain"), "error");
       return changed();
     }
     notify(describe(outcome.failure), "error");
@@ -262,8 +282,8 @@ function ReportDetail({
     const now = detail.value.status;
     notify(
       now === "open" || now === "processing"
-        ? "Report reopened"
-        : `Your reopen went through, but the report has since been ${now}.`,
+        ? t("furs.reportReopened")
+        : t("furs.reopenedSince", { status: statusLabel(now) }),
       "success",
     );
   }, [reopened, detail, notify]);
@@ -275,8 +295,8 @@ function ReportDetail({
     if (undone) resolve.release(undone);
     notify(
       outcome.ok
-        ? "Enforcement cancelled. The report is open again."
-        : `Cancel rejected: ${describe(outcome.failure)}`,
+        ? t("furs.enforcementCancelled")
+        : t("furs.cancelRejected", { reason: describe(outcome.failure) }),
       outcome.ok ? "success" : "error",
     );
     changed();
@@ -305,7 +325,7 @@ function ReportDetail({
   return (
     <div className="flex flex-col gap-4">
       <Button size="sm" variant="ghost" onClick={onBack}>
-        <ArrowLeftIcon /> Back to reports
+        <ArrowLeftIcon /> {t("furs.backToReports")}
       </Button>
       <Loaded read={detail} onRetry={reload}>
         {(report) => (
@@ -330,6 +350,7 @@ function ReportDetail({
 }
 
 function ReportFields({ report }: { report: ReportDetailDto }) {
+  useLanguage();
   const people = usePeople([
     report.reporterPubkey,
     report.targetKind.toLowerCase() === "pubkey" ? report.target : null,
@@ -341,55 +362,57 @@ function ReportFields({ report }: { report: ReportDetailDto }) {
     <PeopleScope people={people}>
       <div className="flex flex-col gap-1.5 rounded-md border px-3 py-2.5">
         <p className="mb-2 text-body-sm font-medium">
-          {report.reportType} · {report.status}
+          {report.reportType} · {statusLabel(report.status)}
         </p>
-        <Row label="ID" mono>
+        <Row label={t("furs.row.id")} mono>
           {report.id}
         </Row>
-        <Row label="Community">
+        <Row label={t("furs.row.community")}>
           <CommunityBadge id={report.communityId} host={report.communityHost} />
         </Row>
-        <Row label="Event ID" mono>
+        <Row label={t("furs.row.eventId")} mono>
           {report.reportEventId}
         </Row>
-        <Row label="Reporter">
+        <Row label={t("furs.row.reporter")}>
           <Person pubkey={report.reporterPubkey} />
         </Row>
-        <Row label="Target kind">{report.targetKind}</Row>
+        <Row label={t("furs.row.targetKind")}>{report.targetKind}</Row>
         {report.targetKind.toLowerCase() === "pubkey" ? (
-          <Row label="Target">
+          <Row label={t("furs.row.target")}>
             <Person pubkey={report.target} />
           </Row>
         ) : (
-          <Row label="Target" mono>
+          <Row label={t("furs.row.target")} mono>
             {report.target}
           </Row>
         )}
-        <Row label="Channel" mono>
+        <Row label={t("furs.row.channel")} mono>
           {report.channelId}
         </Row>
-        <Row label="Note">{report.note}</Row>
-        <Row label="Resolved by">
+        <Row label={t("furs.row.note")}>{report.note}</Row>
+        <Row label={t("furs.row.resolvedBy")}>
           {report.resolvedBy && <Person pubkey={report.resolvedBy} />}
         </Row>
-        <Row label="Resolved at">{time(report.resolvedAt)}</Row>
-        <Row label="Action ID" mono>
+        <Row label={t("furs.row.resolvedAt")}>{time(report.resolvedAt)}</Row>
+        <Row label={t("furs.row.actionId")} mono>
           {report.actionId}
         </Row>
-        <Row label="Created">{time(report.createdAt)}</Row>
+        <Row label={t("furs.row.created")}>{time(report.createdAt)}</Row>
         {report.message && (
           <div className="mt-3 flex flex-col gap-1.5 rounded-md border px-3 py-2.5">
             <p className="text-caption font-semibold text-secondary">
-              Reported message
+              {t("furs.reportedMessage")}
               {report.message.deletedAt && (
-                <span className="ml-1.5 text-danger">(deleted)</span>
+                <span className="ml-1.5 text-danger">{t("furs.deleted")}</span>
               )}
             </p>
-            <Row label="Author">
+            <Row label={t("furs.row.author")}>
               <Person pubkey={report.message.authorPubkey} />
             </Row>
-            <Row label="Content">{report.message.content}</Row>
-            <Row label="Sent">{time(report.message.createdAt)}</Row>
+            <Row label={t("furs.row.content")}>{report.message.content}</Row>
+            <Row label={t("furs.row.sent")}>
+              {time(report.message.createdAt)}
+            </Row>
           </div>
         )}
         <NamesSource />
@@ -398,13 +421,13 @@ function ReportFields({ report }: { report: ReportDetailDto }) {
   );
 }
 
-const ENFORCEMENT: Record<ActionRecordDto["status"], string> = {
-  pending: "Enforcement pending…",
-  enforcing: "Enforcing…",
-  succeeded: "Enforcement succeeded",
-  failed: "Enforcement failed",
-  cancelled: "Enforcement cancelled",
-};
+const ENFORCEMENT = {
+  pending: "furs.enforcement.pending",
+  enforcing: "furs.enforcement.enforcing",
+  succeeded: "furs.enforcement.succeeded",
+  failed: "furs.enforcement.failed",
+  cancelled: "furs.enforcement.cancelled",
+} as const satisfies Record<ActionRecordDto["status"], TranslationKey>;
 
 /**
  * Only a failed action can be cancelled, which reopens the report. Pending
@@ -417,6 +440,7 @@ function Enforcement({
   reportId: string;
   action: ActionRecordDto;
 }) {
+  useLanguage();
   const { canMutate } = useSession();
   const write = useWrite<CancelRequest>(`cancel ${reportId}`);
   const cancel = () =>
@@ -424,7 +448,7 @@ function Enforcement({
   const message = action.errorMessage?.includes(
     "kick target was already absent",
   )
-    ? "No channel membership to remove. Use Timeout or Ban for open channels."
+    ? t("furs.kickAbsent")
     : action.errorMessage;
   return (
     <div className="flex flex-col gap-2 rounded-md border px-3 py-2.5 text-body-sm">
@@ -432,7 +456,7 @@ function Enforcement({
         {(action.status === "pending" || action.status === "enforcing") && (
           <CircleNotchIcon className="animate-spin" />
         )}
-        {ENFORCEMENT[action.status]}
+        {t(ENFORCEMENT[action.status])}
         <span className="font-mono text-caption text-secondary">
           {action.action}
         </span>
@@ -440,7 +464,7 @@ function Enforcement({
       {message && <p className="text-caption text-secondary">{message}</p>}
       {action.status === "failed" && canMutate && (
         <Button size="sm" loading={write.busy} onClick={() => cancel()}>
-          Cancel and reopen
+          {t("furs.cancelAndReopen")}
         </Button>
       )}
     </div>
@@ -448,6 +472,7 @@ function Enforcement({
 }
 
 function Resolve({ report }: { report: ReportDto }) {
+  useLanguage();
   const write = useWrite<ResolveRequest>(`resolve ${report.id}`);
   const [action, setAction] = useState<ReportAction | null>(null);
   const [reason, setReason] = useState("");
@@ -476,7 +501,7 @@ function Resolve({ report }: { report: ReportDto }) {
 
   return (
     <div className="flex flex-col gap-3 rounded-md border px-3 py-2.5">
-      <Field label="Resolve report" nativeLabel={false}>
+      <Field label={t("furs.resolveReport")} nativeLabel={false}>
         <RadioGroup<ReportAction | null>
           name={`resolve-${report.id}`}
           value={shown}
@@ -484,14 +509,14 @@ function Resolve({ report }: { report: ReportDto }) {
           onValueChange={setAction}
         >
           {allowedActions(report).map((option) => (
-            <Radio key={option} value={option} label={LABELS[option]} />
+            <Radio key={option} value={option} label={actionLabel(option)} />
           ))}
         </RadioGroup>
       </Field>
       {shown === "timeout" && (
-        <Field label="Duration (seconds)">
+        <Field label={t("furs.durationSeconds")}>
           <Input
-            placeholder="e.g. 3600"
+            placeholder={t("furs.durationPlaceholder")}
             type="number"
             min={1}
             disabled={locked}
@@ -501,9 +526,9 @@ function Resolve({ report }: { report: ReportDto }) {
         </Field>
       )}
       <Field
-        label="Reason (optional)"
+        label={t("furs.reasonOptional")}
         description={shown ? reasonAudience(shown) : undefined}
-        error={secret ? SECRET_KEY_WARNING : undefined}
+        error={secret ? secretKeyWarning() : undefined}
       >
         <Input
           disabled={locked}
@@ -514,7 +539,7 @@ function Resolve({ report }: { report: ReportDto }) {
       {shown && (
         <>
           <p className="flex flex-wrap items-center gap-1.5 text-caption text-secondary">
-            In{" "}
+            {t("furs.in")}{" "}
             <CommunityBadge
               id={report.communityId}
               host={report.communityHost}
@@ -528,12 +553,14 @@ function Resolve({ report }: { report: ReportDto }) {
             disabled={!write.frozen && (secret || !validDuration)}
             onClick={() => submit()}
           >
-            {write.frozen ? "Retry" : "Confirm"}: {LABELS[shown]} in{" "}
-            {report.communityHost}
+            {t(write.frozen ? "furs.retryIn" : "furs.confirmIn", {
+              action: actionLabel(shown),
+              host: report.communityHost,
+            })}
           </Button>
           {write.frozen && !write.busy && (
             <Button size="sm" variant="ghost" onClick={write.discard}>
-              Discard
+              {t("furs.discard")}
             </Button>
           )}
           <WriteError write={write} />
@@ -545,6 +572,7 @@ function Resolve({ report }: { report: ReportDto }) {
 
 /** Re-triage only: reopening never reverses enforcement already taken. */
 function Reopen({ report }: { report: ReportDto }) {
+  useLanguage();
   const write = useWrite<ReopenRequest>(`reopen ${report.id}`);
   const [reason, setReason] = useState("");
   const secret = containsSecretKey(reason);
@@ -557,16 +585,18 @@ function Reopen({ report }: { report: ReportDto }) {
     });
   return (
     <div className="flex flex-col gap-3 rounded-md border px-3 py-2.5">
-      <p className="text-caption font-medium text-secondary">Reopen report</p>
+      <p className="text-caption font-medium text-secondary">
+        {t("furs.reopenReport")}
+      </p>
       <p className="text-caption text-secondary">
-        Moves this report back to the open queue for re-triage.{" "}
+        {t("furs.reopenExplain")}{" "}
         {report.actionId
-          ? "The enforcement action already taken is not reversed: reopening does not un-ban, un-timeout, or restore a deleted message."
-          : "Reopening does not reverse any enforcement action."}
+          ? t("furs.reopenKeepsAction")
+          : t("furs.reopenNoReverse")}
       </p>
       <Field
-        label="Reopen reason (optional)"
-        error={secret ? SECRET_KEY_WARNING : undefined}
+        label={t("furs.reopenReason")}
+        error={secret ? secretKeyWarning() : undefined}
       >
         <Input
           disabled={write.frozen !== null}
@@ -580,11 +610,11 @@ function Reopen({ report }: { report: ReportDto }) {
         disabled={!write.frozen && secret}
         onClick={() => submit()}
       >
-        {write.frozen ? "Retry reopen" : "Reopen report"}
+        {write.frozen ? t("furs.retryReopen") : t("furs.reopenReport")}
       </Button>
       {write.frozen && !write.busy && (
         <Button size="sm" variant="ghost" onClick={write.discard}>
-          Discard
+          {t("furs.discard")}
         </Button>
       )}
       <WriteError write={write} />
