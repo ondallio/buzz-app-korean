@@ -1,5 +1,7 @@
 # Buzz 한글판 (비공식)
 
+[![번역 검증](https://github.com/ondallio/buzz-app-korean/actions/workflows/korean-verify.yml/badge.svg)](https://github.com/ondallio/buzz-app-korean/actions/workflows/korean-verify.yml)
+
 [Buzz](https://github.com/block/buzz-app) 데스크톱 앱의 **비공식 한국어·영어 버전**입니다.
 Block의 공식 배포판이 아니며, 커뮤니티에서 원본 오픈소스에 한글 번역을 입혀 관리합니다.
 
@@ -44,7 +46,12 @@ Claude·Codex·Goose·Pi 같은 에이전트를 내 컴퓨터에서 실행해 �
 그래서 공식 Buzz의 계정이 자동으로 넘어오지 않습니다. 같은 계정을 쓰려면 공식 Buzz의
 설정 → 신원에서 비밀 키를 복사해 한글판 첫 화면에 붙여넣으세요.
 
-- 앱에는 Apple 개발자 서명·공증이 없습니다. 내려받은 파일의 SHA-256 값은 릴리스 설명에 있습니다.
+- 앱에는 Apple 개발자 서명·공증이 없습니다. 대신 내려받은 파일을 이렇게 확인할 수 있습니다.
+  - 파일마다 붙은 `.sha256` 파일과 해시 값을 비교합니다.
+  - [GitHub CLI](https://cli.github.com/)로 이 저장소의 GitHub Actions에서 빌드된 파일인지 확인합니다.
+    ```sh
+    gh attestation verify Buzz.Korean_<버전>_aarch64.dmg -R ondallio/buzz-app-korean
+    ```
 - 앱 안의 자동 업데이트는 꺼져 있습니다. 새 버전은 Releases에서 내려받아 덮어 설치합니다.
 
 ### 소스에서 빌드
@@ -57,6 +64,17 @@ bin/node scripts/korean/build-dmg.mjs   # 서명 없는 한글판 DMG
 
 `bin/` 폴더의 [Hermit](https://cashapp.github.io/hermit/)이 Node, pnpm, Rust 등 필요한 도구 버전을 자동으로 맞춥니다.
 데스크톱 빌드에는 [Tauri 준비 사항](https://v2.tauri.app/start/prerequisites/)이 필요합니다.
+
+### 공식 소스에 패치로 적용
+
+릴리스마다 `buzz-korean-v<버전>.patch`가 있습니다. 같은 버전의 공식 소스에 적용하면 한글판 소스와 똑같아집니다.
+(릴리스 전에 CI가 직접 적용해 보고 확인합니다.)
+
+```sh
+git -c core.autocrlf=false clone --branch v1.0.5 https://github.com/block/buzz-app.git
+cd buzz-app
+git apply ../buzz-korean-v1.0.5.patch
+```
 
 ## 업데이트 방식
 

@@ -39,6 +39,8 @@ jobs:
     timeout-minutes: 120
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     defaults:
       run:
         shell: bash
@@ -150,6 +152,11 @@ jobs:
             cat "$ASSET.sha256"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      # 이 태그의 소스와 워크플로로 GitHub Actions에서 빌드했다는 출처 증명.
+      # 확인: gh attestation verify <파일> -R ondallio/buzz-app-korean
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: release-assets/${{ steps.build.outputs.asset }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: korean-windows-x64

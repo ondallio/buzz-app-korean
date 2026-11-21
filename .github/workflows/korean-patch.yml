@@ -1,0 +1,119 @@
+# 한글판 소스 패치: 원본 block/buzz-app 릴리스에 그대로 적용하면 한글판 태그와
+# 똑같은 소스가 되는 패치를 만들어 릴리스에 첨부한다.
+# 원본 커밋은 태그 시점의 korean/upstream.json에서 읽는다. 첨부 전에 원본에 패치를
+# 적용해 한글판 태그의 트리와 같은지 확인한다.
+#
+# 트리거: 사람이 push한 korean-v* 태그, 또는 수동 실행(태그 지정, 기존 릴리스 보충용).
+# korean-tag.yml이 GITHUB_TOKEN으로 만든 태그 push는 워크플로를 트리거하지 않으므로
+# korean-tag.yml이 태그를 만든 뒤 이 워크플로를 workflow_dispatch로 직접 호출한다.
+name: Korean source patch
+
+on:
+  push:
+    tags: ["korean-v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "패치를 만들 한글판 태그 (예: korean-v1.0.5)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: korean-patch-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    name: Source patch against upstream
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Check tag
+        run: |
+          if [[ ! "$TAG" =~ ^korean-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Not a Korean release tag: $TAG"
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+      - name: Make the patch
+        id: patch
+        run: |
+          set -euo pipefail
+          repo=$(jq -r .repository korean/upstream.json)
+          upstream_tag=$(jq -r .tag korean/upstream.json)
+          commit=$(jq -r .commit korean/upstream.json)
+          if [[ "$TAG" != "korean-$upstream_tag" ]]; then
+            echo "::error::$TAG does not match korean/upstream.json ($upstream_tag)"
+            exit 1
+          fi
+          git fetch --no-tags --depth=1 "https://github.com/$repo.git" "$commit"
+          asset="buzz-korean-${TAG#korean-}.patch"
+          mkdir release-assets
+          git diff --binary "$commit" HEAD > "release-assets/$asset"
+          test -s "release-assets/$asset" || { echo '::error::Empty patch'; exit 1; }
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+          echo "upstream=$repo@$upstream_tag ($commit)" >> "$GITHUB_OUTPUT"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Check the patch rebuilds the Korean tree
+        env:
+          ASSET: ${{ steps.patch.outputs.asset }}
+          COMMIT: ${{ steps.patch.outputs.commit }}
+        run: |
+          set -euo pipefail
+          check="$RUNNER_TEMP/patch-check"
+          git worktree add --detach "$check" "$COMMIT"
+          git -C "$check" apply --index "$GITHUB_WORKSPACE/release-assets/$ASSET"
+          test "$(git -C "$check" write-tree)" = "$(git rev-parse 'HEAD^{tree}')" || {
+            echo '::error::Patched upstream does not match the Korean tag'
+            exit 1
+          }
+          git worktree remove --force "$check"
+      - name: Stage checksum
+        env:
+          ASSET: ${{ steps.patch.outputs.asset }}
+          UPSTREAM: ${{ steps.patch.outputs.upstream }}
+        run: |
+          set -euo pipefail
+          cd release-assets
+          sha256sum "$ASSET" | tee "$ASSET.sha256"
+          {
+            echo "### $ASSET"
+            echo "Base: $UPSTREAM"
+            echo '```'
+            cat "$ASSET.sha256"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      # 이 태그의 소스와 워크플로로 GitHub Actions에서 빌드했다는 출처 증명.
+      # 확인: gh attestation verify <파일> -R ondallio/buzz-app-korean
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: release-assets/${{ steps.patch.outputs.asset }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: korean-source-patch
+          path: release-assets/
+          if-no-files-found: error
+          retention-days: 14
+      # 릴리스가 없으면 초안으로 만든다: 공개는 사람이 확인한 뒤 한다.
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ASSET: ${{ steps.patch.outputs.asset }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --draft --title "Buzz Korean ${TAG#korean-v}" --notes "Buzz 한글판 ${TAG#korean-v}"
+          fi
+          gh release upload "$TAG" "release-assets/$ASSET" "release-assets/$ASSET.sha256" --clobber

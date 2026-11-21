@@ -1,0 +1,45 @@
+# 한글판 번역 검증: 모든 영어 키에 한국어가 있는지, 변수({name} 등)가 짝지어 있는지,
+# 중복 키가 없는지, macOS 메뉴·Info.plist 번역이 맞는지 확인한다.
+# 린트·타입·테스트는 원본 CI(ci.yml)가 맡고, 이 워크플로는 번역만 빠르게 본다.
+name: Korean translation check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: korean-verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  catalogs:
+    name: Translation catalogs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Check catalogs
+        run: |
+          set -euo pipefail
+          status=0
+          ./bin/node scripts/localization/check-catalogs.mjs > catalog-check.json || status=$?
+          {
+            echo '### 번역 검증'
+            jq -r '"- 번역 키: \(.catalogKeys)개, 한국어: \(.koreanEntries)개",
+                   "- 누락 \(.validation.missing | length) · 불필요 \(.validation.unexpected | length) · 변수 불일치 \(.validation.variables | length) · 중복 \(.validation.duplicates | length)",
+                   "- macOS 메뉴 키: \(.nativeMenus.keys)개",
+                   "- macOS 메뉴·Info.plist 오류: \([.nativeMenus.errors[], .nativeResources.errors[]] | add | length)개"' catalog-check.json
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" -ne 0 ]; then
+            echo '::error::Translation catalogs have problems; see catalog-check.json below'
+            jq . catalog-check.json
+          fi
+          exit "$status"

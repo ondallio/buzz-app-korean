@@ -4,6 +4,7 @@
 # GITHUB_TOKEN으로 push한 태그는 다른 워크플로를 트리거하지 않으므로, 새 태그를
 # 만들면 Windows 설치 파일(korean-windows.yml)과 macOS DMG(korean-macos.yml) 빌드를
 # 직접 실행한다. 두 빌드가 각자 초안 릴리스를 만들어 겹치지 않도록 초안은 여기서 먼저 만든다.
+# 빌드는 새 태그를 ref로 실행해, 출처 증명에 main이 아닌 태그와 그 커밋이 기록되게 한다.
 name: Korean version tag
 
 on:
@@ -51,11 +52,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ steps.tag.outputs.created }}
-        run: gh workflow run korean-windows.yml --ref "$GITHUB_REF_NAME" -f tag="$TAG" -f release=false
+        run: gh workflow run korean-windows.yml --ref "$TAG" -f tag="$TAG" -f release=false
       - name: Build the macOS DMG for the new tag
         if: steps.tag.outputs.created
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ steps.tag.outputs.created }}
-        run: gh workflow run korean-macos.yml --ref "$GITHUB_REF_NAME" -f tag="$TAG" -f release=true
+        run: gh workflow run korean-macos.yml --ref "$TAG" -f tag="$TAG" -f release=true
+      - name: Make the source patch for the new tag
+        if: steps.tag.outputs.created
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.tag.outputs.created }}
+        run: gh workflow run korean-patch.yml --ref "$TAG" -f tag="$TAG"
