@@ -2,12 +2,15 @@
 import {
   type AriaAttributes,
   type ReactElement,
+  type Ref,
   useEffect,
   useId,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
+import { sessionScope } from "../../features/agent-harness/session-scope";
 import type { AgentCardDraft } from "../../features/agents/agent-card";
 import {
   agentAvatars,
@@ -19,19 +22,29 @@ import {
   UsesLine,
 } from "../../features/agents/AISettings";
 import {
+  bounded,
   followRecommended,
+  onRecommended,
   recommendedCandidates,
+  type RecommendedCandidate,
   withRecommended,
 } from "../../features/agents/recommended";
 import { useRecommendedPick } from "../../features/agents/useRecommendedPick";
 import type {
   Agent,
+  AgentViewProps,
   Agents,
   RegisteredAgentType,
   NewAgent,
   AgentCreationRequest,
   AgentUpdateRequest,
 } from "../../features/agents/service";
+import { compactAt } from "../../features/agents/compact-at";
+import { AgentSaveFooter } from "../../features/agents/AgentSaveButton";
+import {
+  applySettingsProposal,
+  type AgentSettingsProposal,
+} from "../../features/agents/settings-proposal";
 import { PlugIcon, RobotIcon } from "../../shared/design-system/icons";
 import { Tooltip } from "../../shared/design-system/ui/Tooltip";
 import { Button } from "../../shared/design-system/ui/Button";
@@ -42,6 +55,7 @@ import styles from "./AgentCreate.module.css";
 import { SettingsGroup } from "../../shared/design-system/ui/SettingsGroup";
 import { PreferenceRow } from "../../shared/design-system/ui/PreferenceRow";
 import { Field } from "../../shared/design-system/ui/Field";
+import { InlineHeader } from "../../shared/design-system/ui/Header";
 import { Input } from "../../shared/design-system/ui/Input";
 import { useNamePrompt, useShake } from "./useNamePrompt";
 import { MigrationPreview } from "./AgentSettingsHost";
@@ -98,6 +112,103 @@ const startingConfig = (type: RegisteredAgentType | undefined) => {
   }
 };
 
+function ProposedSettings({
+  headingRef,
+  saved,
+  proposed,
+  draft,
+}: {
+  headingRef: Ref<HTMLHeadingElement>;
+  saved: unknown;
+  proposed: AgentSettingsProposal;
+  draft: unknown;
+}) {
+  const headingId = useId();
+  const current = (saved ?? {}) as AgentSettingsProposal;
+  const next = (draft ?? {}) as AgentSettingsProposal;
+  const leavingRecommended = onRecommended(current) && !onRecommended(next);
+  const labels = {
+    model: t("agentCreate.model"),
+    effort: t("agentCreate.thinking"),
+    scope: t("v1agent.settings.sessions"),
+    workspace: t("v1agent.settings.workspace"),
+    voice: t("v106ag.voice.title"),
+    apps: t("v1agent.codex.appsAndPlugins"),
+    compactAt: t("v106ag.compactAt"),
+  } as const;
+  const value = (settings: AgentSettingsProposal, key: keyof typeof labels) => {
+    if (key === "scope") {
+      const scope = sessionScope(settings.scope);
+      return scope === "community"
+        ? t("v106ag.scope.perCommunity")
+        : scope === "channel"
+          ? t("v1agent.claudeTabs.perChannel")
+          : t("v1agent.claudeTabs.perThread");
+    }
+    if (key === "apps")
+      return settings.apps === true ? t("v106ag.on") : t("v106ag.off");
+    if (key === "compactAt") {
+      const tokens = compactAt(settings.compactAt);
+      return tokens
+        ? t("v106ag.tokensK", { count: tokens / 1000 })
+        : t("v106ag.harnessDefault");
+    }
+    if (key === "workspace")
+      return typeof settings.workspace === "string" && settings.workspace.trim()
+        ? settings.workspace.trim()
+        : "~/.buzz";
+    if ((key === "model" || key === "effort") && onRecommended(settings))
+      return t("v1agent.codex.recommended");
+    const text = settings[key];
+    return typeof text === "string" && text ? text : t("agentModel.default");
+  };
+  const rows = (Object.keys(labels) as (keyof typeof labels)[]).flatMap(
+    (key) => {
+      if (
+        proposed[key] === undefined &&
+        !(leavingRecommended && key === "model")
+      )
+        return [];
+      const before = value(current, key);
+      const after = value(next, key);
+      return before === after ? [] : [{ label: labels[key], before, after }];
+    },
+  );
+  return (
+    <section aria-labelledby={headingId} className="flex flex-col gap-2">
+      <InlineHeader
+        ref={headingRef}
+        id={headingId}
+        level={2}
+        title={t("v106ag.proposed.title")}
+        tabIndex={-1}
+      />
+      {rows.length ? (
+        <SettingsGroup>
+          {rows.map(({ label, before, after }) => (
+            <PreferenceRow
+              key={label}
+              title={label}
+              subtitle={
+                <>
+                  {before}
+                  <span aria-hidden="true"> → </span>
+                  <span className="sr-only">{t("v106ag.proposed.to")}</span>
+                  {after}
+                </>
+              }
+            />
+          ))}
+        </SettingsGroup>
+      ) : (
+        <p className="m-0 text-body-sm text-subtle">
+          {t("v106ag.proposed.same")}
+        </p>
+      )}
+    </section>
+  );
+}
+
 export function AgentCreateDialog({
   agents,
   types,
@@ -131,7 +242,11 @@ export function AgentCreateDialog({
 }) {
   useLanguage();
   const edited = update?.agent;
+  const reviewingSettings = !!update?.request.settings;
   const [open, setOpen] = useState(true);
+  const [settingsActions, setSettingsActions] = useState<HTMLDivElement | null>(
+    null,
+  );
   const [name, setName] = useState(
     update
       ? (update.request.name ?? update.agent.name)
@@ -159,7 +274,12 @@ export function AgentCreateDialog({
       types[0]?.key ??
       "",
   );
-  const type = types.find((item) => item.key === typeKey) ?? types[0];
+  const choices = reviewingSettings
+    ? types.filter((item) => item.settingsProposal)
+    : types;
+  const type =
+    choices.find((item) => item.key === typeKey) ??
+    (reviewingSettings ? undefined : types[0]);
   const migration = (item: RegisteredAgentType | undefined) => {
     if (!edited || !item || item.key === edited.type) return undefined;
     try {
@@ -189,8 +309,64 @@ export function AgentCreateDialog({
       : config;
   };
   const [config, setConfig] = useState(() => seed(type));
+  const proposedSettings =
+    update && type?.key === (update.request.type ?? update.request.agentType)
+      ? update.request.settings
+      : undefined;
+  const modelProposal =
+    proposedSettings?.model !== undefined ||
+    proposedSettings?.effort !== undefined;
+  const recommendedType = types.find((item) => item.key === update?.agent.type);
+  const resolveRecommended =
+    update &&
+    !update.agent.executionBinding &&
+    onRecommended(update.agent.config) &&
+    (update.request.settings?.model !== undefined ||
+      update.request.settings?.effort !== undefined)
+      ? recommendedType?.settingsProposal?.resolveRecommended
+      : undefined;
+  const [candidate, setCandidate] = useState<RecommendedCandidate | null>();
+  useEffect(() => {
+    if (!resolveRecommended) return;
+    let current = true;
+    void resolveRecommended().then(
+      (value) => current && setCandidate(value),
+      () => current && setCandidate(null),
+    );
+    return () => {
+      current = false;
+    };
+  }, [resolveRecommended]);
+  const checkingProposal =
+    modelProposal && Boolean(resolveRecommended) && candidate === undefined;
+  const proposedConfig = useMemo(() => {
+    if (!proposedSettings) return config;
+    const manual =
+      candidate && modelProposal
+        ? followRecommended(
+            config,
+            config as { model: string; effort: string },
+            candidate,
+          )
+        : config;
+    return applySettingsProposal(manual, proposedSettings);
+  }, [candidate, config, modelProposal, proposedSettings]);
+  const Settings = reviewingSettings
+    ? type?.tabs?.find((tab) => tab.role === "settings")?.component
+    : undefined;
+  const settingsAgent = useMemo(
+    () =>
+      edited && type
+        ? { ...edited, type: type.key, config: proposedConfig }
+        : undefined,
+    [edited, type, proposedConfig],
+  );
+  const Form = reviewingSettings ? "div" : "form";
   const [automatic, setAutomatic] = useState(recommendable);
-  const recommendation = useRecommendedPick(types, recommendable);
+  // Asked again when Automatic is chosen again, or its pick stopped being
+  // ready: a harness may have been signed in or out since the dialog opened.
+  const [asked, setAsked] = useState(0);
+  const recommendation = useRecommendedPick(types, recommendable, asked);
   const { pick } = recommendation.status === "found" ? recommendation : {};
   // No local harness can run an Automatic agent here: one thing to set up.
   const nothingSetUp =
@@ -204,7 +380,9 @@ export function AgentCreateDialog({
   const [configurationReady, setConfigurationReady] = useState(false);
   const avatarRef = useRef<{ prepare(): Promise<string> }>(null);
   const nameField = useRef<HTMLInputElement>(null);
+  const proposalHeading = useRef<HTMLHeadingElement>(null);
   const createButton = useRef<HTMLButtonElement>(null);
+  const settingsSaveButton = useRef<HTMLButtonElement>(null);
   const introContinue = useRef<HTMLButtonElement>(null);
   const previousIntro = useRef(false);
   useLayoutEffect(() => {
@@ -236,7 +414,10 @@ export function AgentCreateDialog({
       ?.focus();
   }, [harnessId, type?.key]);
   const CreateAction = type?.CreateAction;
-  const canCreate = !Configuration || configurationReady;
+  // The harness's own setup rows say when it is ready. Automatic shows none:
+  // its pick already found the harness ready, and `waiting` covers no pick.
+  const picked = automatic && !!pick && pick.type.key === type?.key;
+  const canCreate = !Configuration || configurationReady || picked;
   const close = () => setOpen(false);
   const chooseModel = (
     item: RegisteredAgentType,
@@ -282,6 +463,7 @@ export function AgentCreateDialog({
   const chooseAutomatic = (on: boolean) => {
     if (on === automatic) return;
     setAutomatic(on);
+    if (on) setAsked((count) => count + 1);
     setDirty(true);
     setError("");
     // While the pick runs, its effect takes the harness once known.
@@ -299,10 +481,15 @@ export function AgentCreateDialog({
   };
   // Automatic has nothing to create with until, and unless, a pick is found.
   const waiting = automatic && !type?.remote && !pick;
-  const create = async (introduced = false) => {
-    if (!type || pending || avatarBusy || !canCreate || waiting) return;
+  const create = async (introduced = false, settings?: { config: unknown }) => {
+    if (!type || pending || waiting || (!settings && !canCreate)) return;
+    if (avatarBusy) {
+      if (settings) throw new Error(t("v106ag.create.waitPicture"));
+      return;
+    }
     if (!name.trim()) {
       namePrompt.prompt();
+      if (settings) throw new Error(t("agentCreate.nameAgent"));
       return;
     }
     if (!update && type.remote && !introduced) {
@@ -312,6 +499,14 @@ export function AgentCreateDialog({
     setPending(true);
     setError("");
     try {
+      // The pick was ready when found; it may have been signed out since.
+      // A check that fails or takes too long counts as not ready.
+      if (picked && !(await bounded(pick.type.recommends?.(pick.candidate)))) {
+        setAsked((count) => count + 1);
+        setError(t("v106ag.create.notReady", { harness: pick.type.title }));
+        setPending(false);
+        return;
+      }
       const picture =
         (await avatarRef.current?.prepare()) ??
         (avatar.kind === "emoji" ? "" : avatar.picture);
@@ -319,22 +514,27 @@ export function AgentCreateDialog({
         type: type.key,
         name: name.trim(),
         ...(picture ? { picture } : {}),
-        ...(config !== undefined
-          ? {
-              config:
-                automatic && pick?.type.key === type.key
-                  ? withRecommended(config as object)
-                  : config,
-            }
-          : {}),
+        ...(settings
+          ? { config: settings.config }
+          : config !== undefined
+            ? {
+                config:
+                  automatic && pick?.type.key === type.key
+                    ? withRecommended(config as object)
+                    : config,
+              }
+            : {}),
       };
       if (update) await update.onSave(input);
       else onCreated(await (onCreate ? onCreate(input) : agents.create(input)));
     } catch (reason) {
-      setError(message(reason));
       setPending(false);
+      if (settings) throw reason;
+      setError(message(reason));
     }
   };
+  const saveSettings: AgentViewProps["save"] = (config) =>
+    create(false, { config });
   const harnessControl = (
     <PreferenceRow
       id={harnessId}
@@ -347,11 +547,11 @@ export function AgentCreateDialog({
             align="end"
             value={type?.key ?? ""}
             leading={<TypeIcon type={type} size={20} />}
-            disabled={pending || types.length < 2}
+            disabled={pending || choices.length < 2}
             groups={[true, false]
               .map((remote) => ({
                 label: t(remote ? "agentCreate.remote" : "agentCreate.local"),
-                options: types
+                options: choices
                   .filter((item) => Boolean(item.remote) === remote)
                   .map((item) => ({
                     value: item.key,
@@ -362,7 +562,7 @@ export function AgentCreateDialog({
               .filter((group) => group.options.length > 0)}
             onValueChange={choose}
           />
-          {CreateAction && (
+          {CreateAction && !reviewingSettings && (
             <CreateAction
               key={type.key}
               {...(edited ? { agent: edited } : {})}
@@ -453,7 +653,7 @@ export function AgentCreateDialog({
       )}
       height="content"
       chromeSpacing="padded"
-      initialFocus={nameField}
+      initialFocus={reviewingSettings ? proposalHeading : nameField}
       // A started draft only closes from the close button.
       dismissOnOutsideClick={!dirty}
       onEscape={() => {
@@ -481,6 +681,8 @@ export function AgentCreateDialog({
               {t("agentCreate.continue")}
             </Button>
           </>
+        ) : reviewingSettings ? (
+          <div ref={setSettingsActions} />
         ) : (
           <SetUpFirst when={nothingSetUp}>
             <Button
@@ -507,22 +709,44 @@ export function AgentCreateDialog({
       }
     >
       {/* Preserve the draft and avatar preparation while showing the introduction. */}
-      <form
+      <Form
         hidden={showRemoteIntro}
-        id={form}
+        id={reviewingSettings ? undefined : form}
         className={styles.form}
         data-error={error ? "" : undefined}
         aria-label={
-          edited
-            ? t("agentCreate.edit", { name: edited.name })
-            : t("agentCreate.newForm")
+          reviewingSettings
+            ? undefined
+            : edited
+              ? t("agentCreate.edit", { name: edited.name })
+              : t("agentCreate.newForm")
         }
-        onSubmit={(event) => {
-          event.preventDefault();
-          void create();
-        }}
+        onFocusCapture={
+          reviewingSettings
+            ? (event) =>
+                reveal(
+                  event.target instanceof HTMLElement ? event.target : null,
+                )
+            : undefined
+        }
+        onSubmit={
+          reviewingSettings
+            ? undefined
+            : (event) => {
+                event.preventDefault();
+                void create();
+              }
+        }
       >
         <div className={styles.createStack}>
+          {update && proposedSettings && !checkingProposal && (
+            <ProposedSettings
+              headingRef={proposalHeading}
+              saved={update.agent.config}
+              proposed={proposedSettings}
+              draft={proposedConfig}
+            />
+          )}
           <section
             aria-label={t("agentCreate.identity")}
             className={styles.profileIdentity}
@@ -560,6 +784,19 @@ export function AgentCreateDialog({
                   placeholder={t("agentCreate.name")}
                   value={name}
                   disabled={pending}
+                  onKeyDown={
+                    reviewingSettings
+                      ? (event) => {
+                          if (
+                            event.key !== "Enter" ||
+                            event.nativeEvent.isComposing
+                          )
+                            return;
+                          event.preventDefault();
+                          settingsSaveButton.current?.click();
+                        }
+                      : undefined
+                  }
                   onChange={(event) => {
                     setName(event.target.value);
                     namePrompt.named(event.target.value);
@@ -577,7 +814,9 @@ export function AgentCreateDialog({
               reveal(event.target instanceof HTMLElement ? event.target : null)
             }
           >
-            {recommendable && !type?.remote ? (
+            {reviewingSettings ? (
+              <SettingsGroup>{harnessControl}</SettingsGroup>
+            ) : recommendable && !type?.remote ? (
               // Local harnesses only. A hosted type, chosen under Manual's
               // Harness, keeps its own group below, as on main.
               <SettingsGroup>
@@ -603,7 +842,23 @@ export function AgentCreateDialog({
                     )
                   }
                 >
-                  {localRows}
+                  {Configuration ? (
+                    // Its own Model and Thinking rows, which wait on its
+                    // setup, such as a sign-in, and report when it is ready.
+                    <Configuration
+                      key={type.key}
+                      rowsOnly
+                      config={config}
+                      disabled={pending}
+                      harnessControl={harnessControl}
+                      onReadyChange={setConfigurationReady}
+                      onChange={(next, options) =>
+                        chooseModel(type, next, options)
+                      }
+                    />
+                  ) : (
+                    localRows
+                  )}
                 </AISettings>
                 {nothingSetUp && (
                   <PreferenceRow
@@ -638,7 +893,35 @@ export function AgentCreateDialog({
               <SettingsGroup>{localRows}</SettingsGroup>
             )}
           </section>
-          {Create ? (
+          {reviewingSettings ? (
+            checkingProposal ? (
+              <Checking />
+            ) : Settings && settingsAgent && !edited?.configProblem ? (
+              <AgentSaveFooter.Provider
+                value={{
+                  target: settingsActions,
+                  dialog: true,
+                  submitButton: settingsSaveButton,
+                }}
+              >
+                <Settings
+                  key={settingsAgent.type}
+                  agent={settingsAgent}
+                  save={saveSettings}
+                  settingsHost={{
+                    pendingSave: saveSettings,
+                    proposedModelOrEffort: modelProposal,
+                    proposedVoice: proposedSettings?.voice !== undefined,
+                  }}
+                />
+              </AgentSaveFooter.Provider>
+            ) : (
+              <p role="alert" className="m-0 text-body-sm text-danger">
+                {edited?.configProblem ??
+                  t("v106ag.create.settingsUnavailable")}
+              </p>
+            )
+          ) : Create ? (
             <Create
               key={type.key}
               config={config}
@@ -663,7 +946,7 @@ export function AgentCreateDialog({
           )}
         </div>
         {!showRemoteIntro && errorMessage}
-      </form>
+      </Form>
       {showRemoteIntro && (
         <div className="grid gap-3">
           <RemoteAgentIntroduction

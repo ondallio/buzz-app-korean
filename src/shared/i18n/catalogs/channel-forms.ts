@@ -40,7 +40,7 @@ export const en = {
   "channelForms.create.title": "Create a channel",
   "channelForms.create.inGroup": "Create a channel in {group}",
   "channelForms.create.starred": "Starred",
-  "channelForms.create.savedGroup": "saved group",
+  "channelForms.create.savedGroup": "saved workspace",
   "channelForms.create.privateTitle": "Make channel private?",
   "channelForms.create.publicTitle": "Make channel public?",
   "channelForms.create.unsaved": "Your channel draft has unsaved changes.",
@@ -49,9 +49,9 @@ export const en = {
   "channelForms.create.private": "Private",
   "channelForms.create.action": "Create channel",
   "channelForms.create.groupGone":
-    "This group is no longer available. Close this dialog and create from another sidebar group or Channels.",
+    "This workspace is no longer available. Choose another workspace or Team.",
   "channelForms.create.groupLoading":
-    "Wait for saved sidebar groups to load, then try again.",
+    "Wait for saved workspaces to load, then try again.",
   "channelForms.create.failed": "The channel could not be created.",
   "channelForms.create.templateAdds": "Adds {names}",
   "channelForms.create.templateStarts": "Starts the Canvas",
@@ -393,7 +393,7 @@ export const ko: Record<keyof typeof en, string> = {
   "channelForms.create.title": "채널 만들기",
   "channelForms.create.inGroup": "{group}에 채널 만들기",
   "channelForms.create.starred": "즐겨찾기",
-  "channelForms.create.savedGroup": "저장된 그룹",
+  "channelForms.create.savedGroup": "저장된 작업 공간",
   "channelForms.create.privateTitle": "채널을 비공개로 만들까요?",
   "channelForms.create.publicTitle": "채널을 공개로 만들까요?",
   "channelForms.create.unsaved":
@@ -403,9 +403,9 @@ export const ko: Record<keyof typeof en, string> = {
   "channelForms.create.private": "비공개",
   "channelForms.create.action": "채널 만들기",
   "channelForms.create.groupGone":
-    "이 그룹을 더 이상 사용할 수 없습니다. 대화상자를 닫고 다른 사이드바 그룹이나 채널 화면에서 만드세요.",
+    "이 작업 공간은 더 이상 사용할 수 없습니다. 다른 작업 공간이나 팀을 선택하세요.",
   "channelForms.create.groupLoading":
-    "저장된 사이드바 그룹을 불러온 뒤 다시 시도하세요.",
+    "저장된 작업 공간을 불러온 뒤 다시 시도하세요.",
   "channelForms.create.failed": "채널을 만들지 못했습니다.",
   "channelForms.create.templateAdds": "{names} 추가",
   "channelForms.create.templateStarts": "캔버스 시작",

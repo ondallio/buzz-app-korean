@@ -85,7 +85,7 @@ const accessOptions = () =>
     description: t(accessLabels[option.value][1]),
   }));
 
-/** Clear the Solo label, drop the chat's project filing, then hand off navigation. */
+/** Clear the Solo label, keeping the chat's workspace, then hand off navigation. */
 export function ConvertToChannel({
   session,
   id,
@@ -256,20 +256,6 @@ export function ConvertToChannel({
           updateChatConversion(session, id, exact);
         }
         active.throwIfAborted();
-        // A channel is no longer filed in a Solo project.
-        const projects = session.soloPreferences;
-        if (projects.snapshot().status !== "unsupported") {
-          await projects.refresh();
-          active.throwIfAborted();
-          const filing = projects.snapshot();
-          if (filing.status !== "ready")
-            throw new Error(
-              filing.error ?? t("v105sweep.solo.convert.workspacesUnreadable"),
-            );
-          if (filing.data?.assignments[id])
-            await projects.assign(id, undefined);
-          active.throwIfAborted();
-        }
         updateChatConversion(session, id, undefined);
         if (!active.aborted) {
           notify(t("v105sweep.solo.convert.done"), "success");

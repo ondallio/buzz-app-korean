@@ -125,6 +125,7 @@ export function MeshAgentTab({ agent, save }: AgentViewProps<MeshAgentConfig>) {
       />
       <Select
         label={t("fubestie.meshTab.sessions")}
+        description={t("v106ag.scope.description")}
         variant="field"
         value={draft.scope}
         groups={scopes()}

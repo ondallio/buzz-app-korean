@@ -567,7 +567,7 @@ export const en = {
   "v1wf.watch.deleteTimer": "Delete this timer?",
   "v1wf.watch.deleteWatch": "Delete this watch?",
   "v1wf.watch.deleteTimerDescription":
-    "This deletes the timer. The agent will stop watching for this trigger. This cannot be undone.",
+    "This deletes the “{title}” timer. The agent will stop watching for this trigger. This cannot be undone.",
   "v1wf.watch.deleteWatchDescription":
     "This deletes the watch. The agent will stop watching for this trigger. This cannot be undone.",
   "v1wf.watch.watchDetailsFor": "Watch details for {label}",
@@ -1250,7 +1250,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1wf.watch.deleteTimer": "이 타이머를 삭제할까요?",
   "v1wf.watch.deleteWatch": "이 지켜보기를 삭제할까요?",
   "v1wf.watch.deleteTimerDescription":
-    "타이머를 삭제합니다. 에이전트가 이 트리거를 더 이상 지켜보지 않습니다. 되돌릴 수 없습니다.",
+    "“{title}” 타이머를 삭제합니다. 에이전트가 이 트리거를 더 이상 지켜보지 않습니다. 되돌릴 수 없습니다.",
   "v1wf.watch.deleteWatchDescription":
     "지켜보기를 삭제합니다. 에이전트가 이 트리거를 더 이상 지켜보지 않습니다. 되돌릴 수 없습니다.",
   "v1wf.watch.watchDetailsFor": "{label} 지켜보기 세부 정보",

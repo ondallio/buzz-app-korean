@@ -118,63 +118,73 @@ function ActivityRow({
       setPending(false);
     }
   };
+  // The error sits outside the row, so Mark as read stays centered on the dot.
   return (
-    <div
-      className={`${activityStyles.activityItem} ${activityStyles.activityItemWithAction}`}
-    >
-      <NavigationItem
-        type="button"
-        aria-label={t(
-          noun === "thread"
-            ? "v1shell.activity.openThread"
-            : "v1shell.activity.openMention",
-          { name, preview },
-        )}
-        onClick={onOpen}
-        icon={
-          item.workflowOwnerId ? (
-            <WorkflowAvatar
-              alt={t("messageRow.workflow")}
-              fallback={t("messageRow.workflow")}
-              fallbackContent={<LightningIcon size={20} />}
-              shape="squircle"
-            />
-          ) : (
-            <Avatar
-              name={name}
-              src={avatarMedia(profile?.picture, session.media)}
-              shape={isAgent ? "squircle" : "circle"}
-              className={activityStyles.activityAvatar ?? ""}
-            />
-          )
-        }
-        label={
-          <span className={activityStyles.activityItemBody}>
-            <span className={activityStyles.activityItemHeading}>
-              <strong>{name}</strong>
-              <span className={activityStyles.activityTimestamp}>
-                {elapsed(item.createdAt)}
-              </span>
-            </span>
-            <span className={styles.activityItemPreview}>{preview}</span>
-          </span>
-        }
-      />
-      <span className={activityStyles.activityItemAction}>
-        <IconButton
-          size="toolbar"
-          icon={<EnvelopeOpenIcon />}
+    <>
+      <div
+        className={`${activityStyles.activityItem} ${activityStyles.activityItemUnread}`}
+      >
+        <NavigationItem
+          type="button"
           aria-label={t(
             noun === "thread"
-              ? "v1shell.activity.markThread"
-              : "v1shell.activity.markMention",
-            { name },
+              ? "v1shell.activity.openThread"
+              : "v1shell.activity.openMention",
+            { name, preview },
           )}
-          title={t("inbox.markRead")}
-          loading={pending}
-          onClick={() => void markRead()}
+          onClick={onOpen}
+          icon={
+            item.workflowOwnerId ? (
+              <WorkflowAvatar
+                alt={t("messageRow.workflow")}
+                fallback={t("messageRow.workflow")}
+                fallbackContent={<LightningIcon size={20} />}
+                shape="squircle"
+              />
+            ) : (
+              <Avatar
+                name={name}
+                src={avatarMedia(profile?.picture, session.media)}
+                shape={isAgent ? "squircle" : "circle"}
+                className={activityStyles.activityAvatar ?? ""}
+              />
+            )
+          }
+          label={
+            <span className={activityStyles.activityItemBody}>
+              <span className={activityStyles.activityItemHeading}>
+                <strong>{name}</strong>
+                <span className={activityStyles.activityTimestamp}>
+                  {elapsed(item.createdAt)}
+                </span>
+              </span>
+              <span className={styles.activityItemPreview}>{preview}</span>
+            </span>
+          }
+          trailing={
+            <span
+              className={activityStyles.activityUnreadDot}
+              aria-hidden="true"
+              data-activity-unread=""
+            />
+          }
         />
-      </span>
+        <span className={activityStyles.activityItemAction}>
+          <IconButton
+            size="toolbar"
+            icon={<EnvelopeOpenIcon />}
+            aria-label={t(
+              noun === "thread"
+                ? "v1shell.activity.markThread"
+                : "v1shell.activity.markMention",
+              { name },
+            )}
+            title={t("inbox.markRead")}
+            loading={pending}
+            onClick={() => void markRead()}
+          />
+        </span>
+      </div>
       {error && (
         <p className={styles.activityReadError} role="alert">
           {t(
@@ -184,7 +194,7 @@ function ActivityRow({
           )}
         </p>
       )}
-    </div>
+    </>
   );
 }
 

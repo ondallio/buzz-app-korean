@@ -17,6 +17,7 @@ import { ClaudeSettings, type ClaudeConnection } from "./ClaudeSettings";
 import { ApiKeyForm } from "../../features/settings/ApiKeyForm";
 import inlineStyles from "../../shared/InlineReference.module.css";
 import { ENV, type Spawn } from "./claude";
+import { PROCESS_LIMIT } from "./sessions";
 import type { ClaudeSetup } from "./setup";
 
 const NO_KEY =
@@ -198,6 +199,14 @@ export class ClaudeAuth {
   /** The person's own setup, asked once until it is checked again. An
    * answer Claude could not give is not kept. A change of answer is a change
    * of credentials, so listeners are told. */
+  /** The person's own setup, or none when the host is too full to ask, as
+   * for any check that cannot make room. */
+  private settled() {
+    return this.connection().catch((error: unknown) => {
+      if (error === PROCESS_LIMIT) return undefined;
+      throw error;
+    });
+  }
   private connection() {
     const spawn = this.spawn;
     if (!spawn) return Promise.resolve(undefined);
@@ -211,8 +220,11 @@ export class ClaudeAuth {
         }
         return own;
       },
-      () => {
+      (error: unknown) => {
         if (this.own === asking) this.own = undefined;
+        // A full host is not a missing setup: the turn makes room and asks
+        // again.
+        if (error === PROCESS_LIMIT) throw error;
         return undefined;
       },
     );
@@ -231,7 +243,7 @@ export class ClaudeAuth {
   async check(): Promise<Connection | undefined> {
     this.saved = undefined;
     this.own = undefined;
-    const own = await this.connection();
+    const own = await this.settled();
     if (own) return own;
     return (await this.has()) ? {} : undefined;
   }
@@ -242,7 +254,7 @@ export class ClaudeAuth {
   private readonly credentials = async () => {
     this.saved = undefined;
     this.own = undefined;
-    const [own, key] = await Promise.all([this.connection(), this.has()]);
+    const [own, key] = await Promise.all([this.settled(), this.has()]);
     return { own: !!own, key };
   };
 

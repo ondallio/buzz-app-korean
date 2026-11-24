@@ -10,17 +10,17 @@ export const en = {
   "sidebarSectionParent.sortTitle": "Sort {title}",
   "sidebarSectionParent.recent": "Recent",
   "sidebarSectionParent.alpha": "A–Z",
-  "sidebarSectionParent.createSection": "Create section",
+  "sidebarSectionParent.createSection": "Create workspace",
   "sidebarSectionParent.moveUp": "Move up",
   "sidebarSectionParent.moveDown": "Move down",
-  "sidebarSectionParent.removeSection": "Remove section",
+  "sidebarSectionParent.removeSection": "Remove workspace",
   "sidebarSectionParent.removeTitle": "Remove {title}?",
   "sidebarSectionParent.removeAssigned":
-    "Assigned channels will move back to Channels. This does not delete any channels.",
+    "Assigned conversations will return to their default sections.",
   "sidebarSectionParent.removeOne":
-    "{count} channel will move back to Channels. This does not delete any channels.",
+    "{count} conversation will return to their default sections.",
   "sidebarSectionParent.removeMany":
-    "{count} channels will move back to Channels. This does not delete any channels.",
+    "{count} conversations will return to their default sections.",
   "sidebarSectionParent.removing":
     "Removing section and waiting for confirmation…",
   "sidebarSectionParent.creationUnavailable": "Channel creation unavailable",
@@ -39,17 +39,17 @@ export const ko: Record<keyof typeof en, string> = {
   "sidebarSectionParent.sortTitle": "{title} 정렬",
   "sidebarSectionParent.recent": "최근 활동순",
   "sidebarSectionParent.alpha": "이름순",
-  "sidebarSectionParent.createSection": "섹션 만들기",
+  "sidebarSectionParent.createSection": "작업 공간 만들기",
   "sidebarSectionParent.moveUp": "위로 이동",
   "sidebarSectionParent.moveDown": "아래로 이동",
-  "sidebarSectionParent.removeSection": "섹션 제거",
-  "sidebarSectionParent.removeTitle": "{title} 섹션을 제거할까요?",
+  "sidebarSectionParent.removeSection": "작업 공간 제거",
+  "sidebarSectionParent.removeTitle": "{title} 작업 공간을 제거할까요?",
   "sidebarSectionParent.removeAssigned":
-    "할당된 채널은 채널 섹션으로 돌아갑니다. 채널이 삭제되지는 않습니다.",
+    "할당된 대화는 기본 섹션으로 돌아갑니다.",
   "sidebarSectionParent.removeOne":
-    "채널 {count}개가 채널 섹션으로 돌아갑니다. 채널이 삭제되지는 않습니다.",
+    "대화 {count}개가 기본 섹션으로 돌아갑니다.",
   "sidebarSectionParent.removeMany":
-    "채널 {count}개가 채널 섹션으로 돌아갑니다. 채널이 삭제되지는 않습니다.",
+    "대화 {count}개가 기본 섹션으로 돌아갑니다.",
   "sidebarSectionParent.removing": "섹션을 제거하고 확인을 기다리는 중입니다…",
   "sidebarSectionParent.creationUnavailable": "채널을 만들 수 없음",
   "sidebarSectionParent.forums": "포럼",

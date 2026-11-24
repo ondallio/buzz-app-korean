@@ -18,6 +18,7 @@ export function MeshHelpers({ agents }: { agents: Agents }) {
   useLanguage();
   const state = useSyncExternalStore(agents.subscribe, agents.snapshot);
   const title = useId();
+  const disclosure = useId();
   const busy = useRef(false);
   const [pending, setPending] = useState<string>();
   const [created, setCreated] = useState("");
@@ -73,7 +74,7 @@ export function MeshHelpers({ agents }: { agents: Agents }) {
       <InlineHeader
         id={title}
         title={t("fubestie.helpers.title")}
-        subtitle={t("fubestie.helpers.subtitle")}
+        subtitle={<span id={disclosure}>{t("fubestie.helpers.subtitle")}</span>}
       />
       <SettingsGroup>
         {[...MESH_AGENT_PRESETS, null].map((preset) => {
@@ -88,6 +89,7 @@ export function MeshHelpers({ agents }: { agents: Agents }) {
               trailing={
                 <Button
                   size="sm"
+                  aria-describedby={disclosure}
                   disabled={
                     !type ||
                     state.status !== "ready" ||

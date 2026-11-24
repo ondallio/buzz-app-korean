@@ -96,7 +96,7 @@ export const en = {
   "accessDialogs.openAgain": "Open the sign-in page again",
   "accessDialogs.authorizeTitle": "Authorize external identity",
   "accessDialogs.authorizeDescription":
-    "For an application such as Nexus that keeps its own agent key. Only authorize a public key you recognize: this ownership proof has no time or event-kind limits.",
+    "Use this for an application that keeps its own agent key. Only authorize a public key you recognize. This ownership proof has no time or event-kind limits.",
   "accessDialogs.applicationKey": "Application public key (hex)",
   "accessDialogs.applicationKeyDescription":
     "Copy this public key from the application’s identity settings.",
@@ -223,7 +223,7 @@ export const ko: Record<keyof typeof en, string> = {
   "accessDialogs.openAgain": "로그인 페이지 다시 열기",
   "accessDialogs.authorizeTitle": "외부 신원 허용",
   "accessDialogs.authorizeDescription":
-    "자체 에이전트 키를 보관하는 Nexus 같은 앱에 사용합니다. 이 소유권 증명에는 시간이나 이벤트 종류 제한이 없으므로 알고 있는 공개 키만 허용해 주세요.",
+    "자체 에이전트 키를 보관하는 앱에 사용합니다. 알고 있는 공개 키만 허용해 주세요. 이 소유권 증명에는 시간이나 이벤트 종류 제한이 없습니다.",
   "accessDialogs.applicationKey": "앱 공개 키 (hex)",
   "accessDialogs.applicationKeyDescription":
     "앱의 신원 설정에서 이 공개 키를 복사해 주세요.",

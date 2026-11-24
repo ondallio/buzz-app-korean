@@ -1,7 +1,9 @@
 import { t, useLanguage } from "../../shared/i18n";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { ResolvePull } from "./ResolvePull";
 import type { PullChecklist as Checklist } from "./pull";
 import { Button } from "../../shared/design-system/ui/Button";
+import { ToastNotice } from "../../shared/design-system/ui/Toast";
 import { Tabs } from "../../shared/design-system/ui/Tabs";
 import {
   useCallback,
@@ -10,6 +12,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type MouseEvent,
   type ReactNode,
 } from "react";
 import {
@@ -466,6 +469,27 @@ export function GitHubPanel({
   );
 }
 
+/** Tauri's automatic link opener skips Command-clicks, which left the panel's
+ * GitHub links doing nothing; send them to the browser as message links do. */
+function openCommandClickInBrowser(event: MouseEvent<HTMLElement>) {
+  if (
+    event.defaultPrevented ||
+    !event.metaKey ||
+    event.button !== 0 ||
+    !isTauri()
+  )
+    return;
+  const anchor =
+    event.target instanceof Element ? event.target.closest("a[href]") : null;
+  if (
+    !(anchor instanceof HTMLAnchorElement) ||
+    (anchor.protocol !== "https:" && anchor.protocol !== "http:")
+  )
+    return;
+  event.preventDefault();
+  return invoke("plugin:opener|open_url", { url: anchor.href });
+}
+
 function ObjectPanel({
   reference,
   gh,
@@ -498,6 +522,7 @@ function ObjectPanel({
   useClockFormat();
   const isPull = reference.kind === "pull";
   const pull = usePullPanel(states, reference.url, isPull);
+  const [openFailed, setOpenFailed] = useState(false);
   const [view, setView] = useState(
     () => memory.get(reference.url, channelId).view ?? "summary",
   );
@@ -565,7 +590,17 @@ function ObjectPanel({
     </h2>
   );
   return (
-    <div className={styles.root}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: Delegates Command-clicks on the links inside; it adds no interaction of its own.
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Command-click is a pointer gesture on a link, which keeps its own keyboard behavior.
+    <div
+      className={styles.root}
+      onClick={(event) => {
+        const opening = openCommandClickInBrowser(event);
+        if (!opening) return;
+        setOpenFailed(false);
+        opening.catch(() => setOpenFailed(true));
+      }}
+    >
       <div className={styles.identity}>
         <span className={styles.icon}>
           <Icon size={22} aria-hidden="true" />
@@ -876,6 +911,12 @@ function ObjectPanel({
         <p className={styles.note}>
           {loaded.signedIn ? t("githubRead.signedIn") : t("githubRead.public")}
         </p>
+      )}
+      {openFailed && (
+        <ToastNotice
+          title={t("v1msg.link.browserFailed")}
+          onDismiss={() => setOpenFailed(false)}
+        />
       )}
     </div>
   );

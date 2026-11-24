@@ -11,7 +11,7 @@ import {
 } from "../../features/conversation/LinkLabelContext";
 import { LinkLabel } from "../links/InlineLink";
 import inlineStyles from "../../shared/InlineReference.module.css";
-import { issueIcons, issueState, stateIcons } from "./pull-state-view";
+import { issueIcons, issueState, pullLinkIcon } from "./pull-state-view";
 import { displayIssue, displayPull } from "./pull-state-display";
 import { useLanguage } from "../../shared/i18n";
 import type { PullStates } from "./pull-states";
@@ -43,7 +43,7 @@ export function PullLink({ url, states }: { url: string; states: PullStates }) {
   const shown = state && (issue ? issueState(state) : state.state);
   const Icon = issue
     ? issueIcons[state ? issueState(state) : "open"]
-    : stateIcons[state?.state ?? "open"];
+    : pullLinkIcon(state);
   const words = (issue ? displayIssue : displayPull)({
     state,
     failed: read === "failed",

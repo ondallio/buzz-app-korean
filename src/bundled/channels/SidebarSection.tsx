@@ -1,4 +1,3 @@
-import { RenameSidebarSection } from "./RenameSidebarSection";
 import { SidebarActiveDialog } from "./SidebarActiveDialog";
 import { FadingLabel } from "./FadingLabel";
 import {
@@ -8,6 +7,7 @@ import {
   type DOMAttributes,
   type ReactNode,
   type Ref,
+  type RefObject,
 } from "react";
 import {
   MenuGroup,
@@ -34,7 +34,6 @@ import {
   ChatUnreadIcon,
   DotsThreeIcon,
   Filter2Icon,
-  PencilSimpleIcon,
   PlusIcon,
   TextAaIcon,
   TimerIcon,
@@ -50,11 +49,27 @@ import type { ChannelSummary } from "../../features/relay/contracts";
 import type { SidebarSortMode } from "../../features/relay/sidebar-sort";
 import { DEFAULT_ACTIVE_WINDOW_SECONDS } from "../../features/relay/sidebar-preferences";
 import type { SidebarFilter } from "./useSidebarFilters";
-import type { SidebarSectionEdit } from "../../features/relay/sidebar-preferences";
 import { SidebarGroupIcon } from "./SidebarGroupIcon";
 import { SidebarStarIcon } from "./SidebarStarIcon";
 import { ChannelSidebarMenuItem } from "./ChannelSidebarMenuItem";
 import styles from "./Channels.module.css";
+
+/** Built-in section titles are English data; translate only at display. */
+export function displaySectionTitle(sectionKey: string, title: string) {
+  return sectionKey === "starred" && title === "Starred"
+    ? t("channelForms.create.starred")
+    : sectionKey === "channels" && title === "Channels"
+      ? t("channelPages.channels")
+      : sectionKey === "channels" && title === "Team"
+        ? t("shell.sidebar.team")
+        : sectionKey === "solo" && title === "Solo"
+          ? t("v105ch.sidebar.soloSection")
+          : sectionKey === "forums" && title === "Forums"
+            ? t("sidebarSectionParent.forums")
+            : sectionKey === "dms" && title === "Direct messages"
+              ? t("search.dms")
+              : title;
+}
 
 export function SidebarSection({
   sectionKey,
@@ -66,7 +81,6 @@ export function SidebarSection({
   headerActions,
   headerNotice,
   hideMoreActions = false,
-  persistentChevron = false,
   createChannel,
   createSection,
   newMessage,
@@ -80,7 +94,7 @@ export function SidebarSection({
   dragging = false,
   move,
   onRemove,
-  onRename,
+  menuActions,
   channelCount,
   removalFocus,
   children,
@@ -94,10 +108,14 @@ export function SidebarSection({
   headerActions?: ReactNode;
   headerNotice?: ReactNode;
   onRemove?: (() => unknown) | undefined;
-  onRename?: ((edit: SidebarSectionEdit) => unknown) | undefined;
+  menuActions?:
+    | ((
+        dismiss: () => void,
+        trigger: RefObject<HTMLButtonElement | null>,
+      ) => ReactNode)
+    | undefined;
   hideMoreActions?: boolean;
   /** Keep the disclosure affordance visible instead of revealing it on hover. */
-  persistentChevron?: boolean;
   channelCount?: number | undefined;
   removalFocus?: (() => HTMLElement | null | undefined) | undefined;
   createChannel?:
@@ -148,16 +166,7 @@ export function SidebarSection({
   children: ReactNode;
 }) {
   useLanguage();
-  const displayTitle =
-    sectionKey === "starred" && title === "Starred"
-      ? t("channelForms.create.starred")
-      : sectionKey === "channels" && title === "Channels"
-        ? t("channelPages.channels")
-        : sectionKey === "forums" && title === "Forums"
-          ? t("sidebarSectionParent.forums")
-          : sectionKey === "dms" && title === "Direct messages"
-            ? t("search.dms")
-            : title;
+  const displayTitle = displaySectionTitle(sectionKey, title);
   const activeDays =
     (filter?.activeWindowSeconds ?? DEFAULT_ACTIVE_WINDOW_SECONDS) / 86400;
   const id = useId();
@@ -168,11 +177,9 @@ export function SidebarSection({
   if (hideMoreActions && menuOpen) setMenuOpen(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const [activeOpen, setActiveOpen] = useState(false);
-  const [renameOpen, setRenameOpen] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [removeError, setRemoveError] = useState("");
   const canRemove = !!onRemove && sectionKey.startsWith("group:");
-  const canRename = !!onRename && !!session && sectionKey.startsWith("group:");
   const remove = async () => {
     if (!onRemove || removing) return;
     setRemoving(true);
@@ -278,7 +285,7 @@ export function SidebarSection({
                             <MenuIcon>
                               <TimerIcon size={14} />
                             </MenuIcon>
-                            {t("sidebarSectionDialogs.activeTitle")}
+                            {t("v106ch.section.active")}
                             {filter.value === "active" && (
                               <MenuTrailing>
                                 {t(
@@ -309,7 +316,8 @@ export function SidebarSection({
                                 </MenuGroupLabel>
                                 {channels.rows.map((channel) => {
                                   const select = () => {
-                                    onToggle(true);
+                                    if (channel.channelType !== "solo")
+                                      onToggle(true);
                                     channels.select(channel.id);
                                     setMenuOpen(false);
                                   };
@@ -436,19 +444,8 @@ export function SidebarSection({
                       </MenuItem>
                     </>
                   )}
-                  {canRename && (
-                    <MenuItem
-                      onClick={() => {
-                        setMenuOpen(false);
-                        setRenameOpen(true);
-                      }}
-                    >
-                      <MenuIcon>
-                        <PencilSimpleIcon size={14} />
-                      </MenuIcon>
-                      {t("sidebarSectionDialogs.renameTitle")}
-                    </MenuItem>
-                  )}
+                  {menuActions?.(() => setMenuOpen(false), actionsTrigger)}
+
                   {canRemove && (
                     <>
                       <MenuSeparator />
@@ -489,17 +486,6 @@ export function SidebarSection({
                   filter.dismissError?.();
                   setActiveOpen(false);
                 }}
-                finalFocus={actionsTrigger}
-              />
-            )}
-            {renameOpen && onRename && session && (
-              <RenameSidebarSection
-                title={title}
-                icon={typeof icon === "string" ? icon : undefined}
-                session={session}
-                scope={session.scope}
-                rename={onRename}
-                close={() => setRenameOpen(false)}
                 finalFocus={actionsTrigger}
               />
             )}
@@ -577,6 +563,7 @@ export function SidebarSection({
           {/* biome-ignore lint/a11y/noStaticElementInteractions: summary has native keyboard activation. */}
           <summary
             ref={dragHandle?.ref}
+            tabIndex={0}
             {...dragHandle?.listeners}
             aria-label={displayTitle}
             aria-controls={id}
@@ -593,17 +580,13 @@ export function SidebarSection({
               ) : (
                 icon
               )}
-              <FadingLabel
-                className={`${styles.sectionTitle} ${
-                  persistentChevron ? styles.scopeSectionTitle : ""
-                }`}
-              >
+              <FadingLabel className={styles.sectionTitle}>
                 {displayTitle}
               </FadingLabel>
             </span>
             <span
               className={`${styles.sidebarIcon} ${styles.sectionChevron}`}
-              data-navigation-reveal={persistentChevron ? undefined : ""}
+              data-navigation-reveal=""
             >
               <CaretDownIcon strokeWidth={2.5} size={15} />
             </span>

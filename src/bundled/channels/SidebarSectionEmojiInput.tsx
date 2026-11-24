@@ -68,7 +68,12 @@ export function SidebarSectionEmojiInput({
             }}
             icon={
               icon ? (
-                <span className={styles.icon}>
+                <span
+                  className={styles.icon}
+                  data-unicode={
+                    !(icon.startsWith(":") && icon.endsWith(":")) || undefined
+                  }
+                >
                   <SidebarGroupIcon icon={icon} session={session} />
                 </span>
               ) : (

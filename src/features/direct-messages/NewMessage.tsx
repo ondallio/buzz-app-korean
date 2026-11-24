@@ -18,6 +18,7 @@ import {
 } from "../conversation/Conversation";
 import type { ConversationHostServices } from "../conversation/ConversationHost";
 import { composerMarkdown } from "../messages/composer-markdown";
+import { restoreChatLinks } from "../messages/composer-chat-cards";
 import {
   useCallback,
   useEffect,
@@ -58,6 +59,7 @@ const recoveryKey = "direct-message:new";
 type Pending = {
   id: string;
   channelId: string;
+  workspace?: string;
   recipients: string;
   draft: MentionDraft;
   attachments: readonly (readonly string[])[];
@@ -135,6 +137,11 @@ function recovered(operations: readonly OutgoingEvent[], viewer?: string) {
   return {
     id: item.event.id,
     channelId,
+    ...(typeof value.workspace === "string" &&
+    value.workspace.trim() &&
+    value.workspace.length <= 256
+      ? { workspace: value.workspace }
+      : {}),
     recipients: keyFor(people),
     draft: mentionDraft(value.draft),
     attachments: item.event.tags.filter(([name]) => name === "imeta"),
@@ -154,11 +161,13 @@ export function NewMessage({
   onStarted,
   visit,
   intent,
+  workspace,
 }: {
   session: RelaySession;
   scope: string;
   /** The person this visit was opened from, such as by their profile's Message. */
   intent?: MessageIntent | undefined;
+  workspace?: string | undefined;
   /** The visit presenting this composer, a Back stop only once drafted. */
   visit?: PageNavigation | undefined;
   extensions?: ConversationExtensions | undefined;
@@ -405,8 +414,8 @@ export function NewMessage({
       if (
         current &&
         (current.recipients !== key ||
-          JSON.stringify(current.draft) !==
-            JSON.stringify(mentionDraft(draft)) ||
+          JSON.stringify(mentionDraft(restoreChatLinks(current.draft))) !==
+            JSON.stringify(mentionDraft(restoreChatLinks(draft))) ||
           (files &&
             JSON.stringify(current.attachments) !==
               JSON.stringify(attachments)))
@@ -444,12 +453,14 @@ export function NewMessage({
             value: JSON.stringify({
               people: recipients.map(recipientView),
               draft,
+              ...(workspace ? { workspace } : {}),
             }),
           },
         );
         current = {
           id: messageId,
           channelId: id,
+          ...(workspace ? { workspace } : {}),
           recipients: key,
           draft,
           attachments,
@@ -461,11 +472,18 @@ export function NewMessage({
         controller.signal,
       );
       controller.signal.throwIfAborted();
+      if (current.workspace) {
+        // Placement can recover through the sidebar without repeating delivery.
+        void session.sidebarPreferences
+          .assign(current.channelId, current.workspace)
+          .catch(() => {});
+      }
       // Clear disposable views before releasing durable recovery. A failed clear
       // retains the operation for confirmation-only retry, even across unmount.
       clearView(
         scope,
         draftKey,
+        `${draftKey}:files`,
         "direct-message:pending",
         "direct-message:recipients",
       );

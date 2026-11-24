@@ -310,6 +310,16 @@ import {
   ko as v105ShellIdentityKo,
 } from "./catalogs/v105-shell-identity";
 import { en as v105SweepEn, ko as v105SweepKo } from "./catalogs/v105-sweep";
+import {
+  en as v106ChannelsEn,
+  ko as v106ChannelsKo,
+} from "./catalogs/v106-channels";
+import {
+  en as v106MessagesEn,
+  ko as v106MessagesKo,
+} from "./catalogs/v106-messages";
+import { en as v106ShellEn, ko as v106ShellKo } from "./catalogs/v106-shell";
+import { en as v106AgentsEn, ko as v106AgentsKo } from "./catalogs/v106-agents";
 import { en as fuBestieEn, ko as fuBestieKo } from "./catalogs/fu-bestie";
 import {
   en as fuBuilderlabEn,
@@ -414,6 +424,10 @@ export const english = {
   ...v105ShellIdentityEn,
   ...v105ChannelsEn,
   ...v105SweepEn,
+  ...v106ChannelsEn,
+  ...v106MessagesEn,
+  ...v106ShellEn,
+  ...v106AgentsEn,
   ...fuBestieEn,
   ...fuBuilderlabEn,
   ...fuTermsEn,
@@ -512,6 +526,10 @@ export const korean: Partial<Record<keyof typeof english, string>> = {
   ...v105ShellIdentityKo,
   ...v105ChannelsKo,
   ...v105SweepKo,
+  ...v106ChannelsKo,
+  ...v106MessagesKo,
+  ...v106ShellKo,
+  ...v106AgentsKo,
   ...fuBestieKo,
   ...fuBuilderlabKo,
   ...fuTermsKo,

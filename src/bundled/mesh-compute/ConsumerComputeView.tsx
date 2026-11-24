@@ -8,6 +8,7 @@ import styles from "./Compute.module.css";
 
 export function ConsumerComputeView({
   headerControl,
+  headerDescription,
   children,
   status,
   attention = false,
@@ -16,6 +17,7 @@ export function ConsumerComputeView({
   refresh,
 }: {
   headerControl?: ReactNode;
+  headerDescription?: ReactNode;
   children?: ReactNode;
   status?: string | undefined;
   attention?: boolean;
@@ -29,7 +31,11 @@ export function ConsumerComputeView({
       aria-label={t("fubestie.mesh.consumer")}
       className={`${styles.content} text-body`}
     >
-      <Header title={t("navigation.sharedCompute")} actions={headerControl} />
+      <Header
+        title={t("navigation.sharedCompute")}
+        subtitle={headerDescription}
+        actions={headerControl}
+      />
       {children}
       <p
         role="status"

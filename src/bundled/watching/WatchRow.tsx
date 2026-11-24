@@ -104,22 +104,20 @@ export function createWatchComponents({
     const command =
       watch.type === "source" && watch.provider === "attention/command";
     const timer = agent.timers[slug];
-    const description = describe(
-      watch,
-      Date.now() / 1000,
-      watch.type === "timer" && timer?.armedAt === watch.armed_at
-        ? timer.used
-        : undefined,
-    );
+    const paused = interestPaused(agent.attention, watch.interest_id);
+    const description = describe(watch, Date.now() / 1000, timer, paused);
     // Timers have no name; a nameless watch is labelled by its Interest.
     const ownName = "name" in watch && watch.name;
     const label = heading(ownName || title(watch.interest_id ?? slug.slice(6)));
+    // Timers under one Interest share its label; their schedules tell them
+    // apart wherever a control names the row.
+    const rowName =
+      watch.type === "timer"
+        ? `${label.text}, ${description.title}`
+        : label.text;
     const completed = sourceCompleted(agent.sourceRuns, agent.attention[slug]);
     const state =
-      watch.enabled &&
-      !interestPaused(agent.attention, watch.interest_id) &&
-      !completed &&
-      !description.spent
+      watch.enabled && !paused && !completed && !description.spent
         ? "Active"
         : "Paused";
     const section = (label: string, content: React.ReactNode) => (
@@ -201,7 +199,7 @@ export function createWatchComponents({
           <button
             className="attention-heading"
             type="button"
-            aria-label={t("v1wf.watch.detailsFor", { label: label.text })}
+            aria-label={t("v1wf.watch.detailsFor", { label: rowName })}
             aria-expanded={open}
             aria-controls={detailsId}
             onClick={() => setOpen(!open)}
@@ -368,7 +366,7 @@ export function createWatchComponents({
                     size="xs"
                     style={{ paddingInlineStart: "var(--space-2)" }}
                     aria-label={t("v1wf.watch.watchStatusFor", {
-                      label: label.text,
+                      label: rowName,
                     })}
                   >
                     <span className="attention-pill-icon">
@@ -403,9 +401,7 @@ export function createWatchComponents({
                 size="compact"
                 align="end"
                 ref={popup}
-                aria-label={t("v1wf.watch.watchStatusFor", {
-                  label: label.text,
-                })}
+                aria-label={t("v1wf.watch.watchStatusFor", { label: rowName })}
                 finalFocus={() =>
                   row.current?.isConnected
                     ? true
@@ -441,9 +437,7 @@ export function createWatchComponents({
                   <MenuItem
                     tone="danger"
                     disabled={action.pending}
-                    aria-label={t("v1wf.watch.deleteLabel", {
-                      label: label.text,
-                    })}
+                    aria-label={t("v1wf.watch.deleteLabel", { label: rowName })}
                     onClick={() => {
                       // Pause/Resume share this action; a refused Pause's
                       // error must not open inside the dialog.
@@ -479,7 +473,9 @@ export function createWatchComponents({
             }
             description={
               watch.type === "timer"
-                ? t("v1wf.watch.deleteTimerDescription")
+                ? t("v1wf.watch.deleteTimerDescription", {
+                    title: description.title,
+                  })
                 : t("v1wf.watch.deleteWatchDescription")
             }
             pending={action.pending}
@@ -518,9 +514,7 @@ export function createWatchComponents({
             <details className="attention-watch-details">
               <summary
                 className="attention-disclosure text-body-sm text-subtle"
-                aria-label={t("v1wf.watch.watchDetailsFor", {
-                  label: label.text,
-                })}
+                aria-label={t("v1wf.watch.watchDetailsFor", { label: rowName })}
               >
                 <span className="attention-disclosure-icon">
                   <GearIcon size={16} aria-hidden={true} />
@@ -652,7 +646,7 @@ export function createWatchComponents({
             </details>
             <WatchActivity
               history={history}
-              label={label.text}
+              label={rowName}
               session={session}
               scope={scope}
               command={command}

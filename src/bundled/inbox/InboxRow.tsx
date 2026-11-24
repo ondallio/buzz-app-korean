@@ -1,6 +1,6 @@
 import { t, useLanguage } from "../../shared/i18n";
 import { rich } from "../../shared/i18n/rich";
-import { Children, useState } from "react";
+import { Children, useId, useState } from "react";
 import type { InboxReaction } from "../../features/relay/inbox-reactions";
 import { groupReactions } from "../../features/relay/fold";
 import { useReactionEmoji } from "../../features/messages/reaction-emoji";
@@ -25,6 +25,7 @@ import { dmLabel } from "./dm-label";
 import styles from "./Inbox.module.css";
 import rowStyles from "../../features/messages/MessageListRow.module.css";
 import { MessageListRow } from "../../features/messages/MessageListRow";
+import { PreviewText } from "../../features/messages/PreviewText";
 
 // Both catalogs put sender first. Keep its shrinkable strong and the remaining
 // whole-template text/glyphs in the original nonshrinking tail. The colocated
@@ -127,7 +128,7 @@ export const rowProfileIds = (
 export function InboxRowButton({
   item,
   identity: { sender, context, profile },
-  media,
+  session,
   feed,
   time,
   previewId,
@@ -135,7 +136,7 @@ export function InboxRowButton({
 }: {
   item: InboxItem;
   identity: ReturnType<typeof rowIdentity>;
-  media: RelaySession["media"];
+  session: RelaySession;
   feed: InboxFeedSnapshot;
   time: ReactNode;
   previewId?: string | undefined;
@@ -161,7 +162,7 @@ export function InboxRowButton({
           src={
             item.workflowOwnerId
               ? undefined
-              : avatarMedia(profile?.picture, media)
+              : avatarMedia(profile?.picture, session.media)
           }
           shape={
             item.workflowOwnerId || profile?.isAgent ? "squircle" : "circle"
@@ -178,8 +179,17 @@ export function InboxRowButton({
       unread={unread}
       previewId={previewId}
       preview={
-        incompletePreview(feed, [item.previewMessageId, ...item.messageIds]) ??
-        rowPreview(item.preview)
+        incompletePreview(feed, [
+          item.previewMessageId,
+          ...item.messageIds,
+        ]) ?? (
+          <PreviewText
+            text={rowPreview(item.preview)}
+            mentions={item.previewMentions}
+            session={session}
+            channelId={item.channelId}
+          />
+        )
       }
     />
   );
@@ -204,6 +214,9 @@ export function ReactionRowButton({
 } & Pick<ComponentProps<typeof NavigationItem>, "selected" | "onClick">) {
   useLanguage();
   const reactionName = useReactionName();
+  // Its name reads the preview as shown, with mention chips' labels.
+  const nameId = useId();
+  const previewId = `${nameId}-preview`;
   const authors = [...new Set(item.events.map((event) => event.pubkey))];
   const names = authors
     .slice(0, authors.length === 3 ? 3 : 2)
@@ -260,11 +273,7 @@ export function ReactionRowButton({
   return (
     <NavigationItem
       {...props}
-      aria-label={t("inbox.reactedAria", {
-        sender,
-        reactions: emojiNames,
-        preview,
-      })}
+      aria-labelledby={`${nameId} ${previewId}`}
       icon={
         <Avatar
           size="default"
@@ -277,6 +286,12 @@ export function ReactionRowButton({
       trailing={<span className={rowStyles.unreadSlot} aria-hidden="true" />}
       label={
         <span className={rowStyles.content}>
+          <span id={nameId} hidden>
+            {t("v106ch.inbox.reactedLabel", {
+              sender,
+              reactions: emojiNames,
+            })}
+          </span>
           <span className={rowStyles.heading}>
             <span className={rowStyles.identity}>
               <span className={styles.reactionHeading}>
@@ -307,8 +322,16 @@ export function ReactionRowButton({
               {time}
             </time>
           </span>
-          <span className={`text-body text-subtle ${styles.reactionPreview}`}>
-            {preview}
+          <span
+            id={previewId}
+            className={`text-body text-subtle ${styles.reactionPreview}`}
+          >
+            <PreviewText
+              text={preview}
+              mentions={item.message}
+              session={session}
+              channelId={item.message.channelId}
+            />
           </span>
           <span className={`text-caption ${rowStyles.source}`}>
             {t("inbox.inContext", { context })}

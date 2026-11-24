@@ -37,7 +37,7 @@ export const en = {
     "Couldn’t save this on this device. Try again.",
   "v105sweep.solo.newWorkspace.title": "New workspace",
   "v105sweep.solo.newWorkspace.description":
-    "The chats you start in this workspace begin with its folders and instructions.",
+    "Set defaults for new conversations.",
   "v105sweep.solo.newWorkspace.kept":
     "Name, folders and instructions are kept for the retry.",
   "v105sweep.solo.newWorkspace.unsaved":
@@ -72,11 +72,11 @@ export const en = {
   "v105sweep.solo.control.retry": "Retry workspaces",
   "v105sweep.solo.convert.title": "Convert to channel",
   "v105sweep.solo.convert.description":
-    "Move this conversation from Solo to Team. History, Canvas, members and lifetime stay the same.",
+    "Change this chat to a channel. It keeps its workspace, history, Canvas, members and lifetime.",
   "v105sweep.solo.convert.finish": "Finish conversion",
   "v105sweep.solo.convert.check": "Check status",
   "v105sweep.solo.convert.converted":
-    "Channel converted. Finish removing it from its Solo workspace.",
+    "Channel converted. Finish to return to the conversation.",
   "v105sweep.solo.convert.noPermission":
     "You don’t have permission to convert this chat.",
   "v105sweep.solo.convert.onlySolo": "Only a Solo chat can be converted.",
@@ -92,7 +92,7 @@ export const en = {
   "v105sweep.solo.settings.title": "Workspace settings",
   "v105sweep.solo.settings.workspaceName": "Workspace name",
   "v105sweep.solo.settings.nameInvalid":
-    "Use a workspace name of 1–120 characters.",
+    "Use a workspace name of 1–256 characters.",
   "v105sweep.solo.settings.savedChanged":
     "Saved settings changed while this draft was open. Your draft is kept; copy it before reloading.",
   "v105sweep.solo.settings.oldDraftKept":
@@ -254,8 +254,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v105sweep.solo.defaultLifetime.saveFailed":
     "이 기기에 저장하지 못했습니다. 다시 시도하세요.",
   "v105sweep.solo.newWorkspace.title": "새 작업 공간",
-  "v105sweep.solo.newWorkspace.description":
-    "이 작업 공간에서 시작하는 채팅은 작업 공간의 폴더와 지침을 가지고 시작합니다.",
+  "v105sweep.solo.newWorkspace.description": "새 대화의 기본값을 설정합니다.",
   "v105sweep.solo.newWorkspace.kept":
     "다시 시도할 수 있도록 이름, 폴더, 지침을 그대로 둡니다.",
   "v105sweep.solo.newWorkspace.unsaved":
@@ -290,11 +289,11 @@ export const ko: Record<keyof typeof en, string> = {
   "v105sweep.solo.control.retry": "작업 공간 다시 불러오기",
   "v105sweep.solo.convert.title": "채널로 전환",
   "v105sweep.solo.convert.description":
-    "이 대화를 1:1에서 팀으로 옮깁니다. 기록, 캔버스, 멤버, 유지 기간은 그대로 유지됩니다.",
+    "이 채팅을 채널로 바꿉니다. 작업 공간, 기록, 캔버스, 멤버, 유지 기간은 그대로 유지됩니다.",
   "v105sweep.solo.convert.finish": "전환 마무리",
   "v105sweep.solo.convert.check": "상태 확인",
   "v105sweep.solo.convert.converted":
-    "채널로 전환했습니다. 1:1 작업 공간에서 빼는 작업을 마무리하세요.",
+    "채널로 전환했습니다. 마무리하면 대화로 돌아갑니다.",
   "v105sweep.solo.convert.noPermission": "이 채팅을 전환할 권한이 없습니다.",
   "v105sweep.solo.convert.onlySolo": "1:1 채팅만 전환할 수 있습니다.",
   "v105sweep.solo.convert.finishExisting":
@@ -308,7 +307,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v105sweep.solo.settings.title": "작업 공간 설정",
   "v105sweep.solo.settings.workspaceName": "작업 공간 이름",
   "v105sweep.solo.settings.nameInvalid":
-    "작업 공간 이름은 1~120자로 입력하세요.",
+    "작업 공간 이름은 1~256자로 입력하세요.",
   "v105sweep.solo.settings.savedChanged":
     "이 초안을 여는 동안 저장된 설정이 바뀌었습니다. 초안은 그대로 있으니 다시 불러오기 전에 복사해 두세요.",
   "v105sweep.solo.settings.oldDraftKept":

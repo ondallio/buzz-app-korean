@@ -181,9 +181,9 @@ export const en = {
     "Shrinks, converts or clips attached media: HEIC to JPG, big videos to shareable MP4, a clip to a GIF. Needs ffmpeg on this machine.",
   "fubestie.mesh.consumer": "Compute consumer",
   "fubestie.mesh.retry": "Retry",
-  "fubestie.helpers.title": "Helpers",
+  "fubestie.helpers.title": "Tools",
   "fubestie.helpers.subtitle":
-    "Create a helper, then add it to a conversation. Members serving its model can read the prompts and conversation history sent to them. Find your helpers in Agents.",
+    "Members serving a tool’s model can read its prompts and conversation history.",
   "fubestie.helpers.createdTitle": "{name} — Created",
   "fubestie.helpers.defaultSummary":
     "Start with the default assistant instructions.",
@@ -214,7 +214,7 @@ export const en = {
   "fubestie.meshTab.promptDescription":
     "The system prompt for every reply. Replies come from this community's shared compute.",
   "fubestie.meshTab.mode": "Mode",
-  "fubestie.meshTab.sessions": "Sessions",
+  "fubestie.meshTab.sessions": "Session scope",
   "fubestie.meshTab.workspace": "Workspace",
   "fubestie.meshTab.workspaceDescription":
     "Where its shell runs, and where it finds project skills. An absolute path, or {workspace}.",
@@ -516,9 +516,9 @@ export const ko: Record<keyof typeof en, string> = {
     "첨부한 미디어를 줄이거나 변환하거나 잘라냅니다: HEIC를 JPG로, 큰 동영상을 공유하기 좋은 MP4로, 일부 구간을 GIF로. 이 컴퓨터에 ffmpeg가 필요합니다.",
   "fubestie.mesh.consumer": "컴퓨팅 사용",
   "fubestie.mesh.retry": "다시 시도",
-  "fubestie.helpers.title": "도우미",
+  "fubestie.helpers.title": "도구",
   "fubestie.helpers.subtitle":
-    "도우미를 만든 다음 대화에 추가하세요. 도우미의 모델을 제공하는 멤버는 그 멤버에게 전송된 프롬프트와 대화 기록을 읽을 수 있습니다. 도우미는 에이전트에서 찾을 수 있습니다.",
+    "도구의 모델을 제공하는 멤버는 그 도구의 프롬프트와 대화 기록을 읽을 수 있습니다.",
   "fubestie.helpers.createdTitle": "{name} — 만들어짐",
   "fubestie.helpers.defaultSummary": "기본 어시스턴트 지침으로 시작합니다.",
   "fubestie.helpers.chatMode": "채팅: 도구 없음.",
@@ -548,7 +548,7 @@ export const ko: Record<keyof typeof en, string> = {
   "fubestie.meshTab.promptDescription":
     "모든 답장에 쓰이는 시스템 프롬프트입니다. 답장은 이 커뮤니티의 공유 컴퓨팅에서 생성됩니다.",
   "fubestie.meshTab.mode": "모드",
-  "fubestie.meshTab.sessions": "세션",
+  "fubestie.meshTab.sessions": "세션 범위",
   "fubestie.meshTab.workspace": "작업 공간",
   "fubestie.meshTab.workspaceDescription":
     "셸이 실행되고 프로젝트 스킬을 찾는 위치입니다. 절대 경로 또는 {workspace}.",

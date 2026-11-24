@@ -1,8 +1,11 @@
 import { t, useLanguage } from "../../shared/i18n";
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import type { RelaySession } from "../relay/session";
-import { soloGroups, WorkspaceNameConflict } from "../relay/solo-preferences";
-import type { KitEntry, Lineup } from "../channel-templates/model";
+import { WorkspaceNameConflict } from "../relay/sidebar-edits";
+import type { Lineup } from "../channel-templates/model";
+import { useChannelTemplates } from "../channel-templates/local";
+import { useTemplateAgents } from "../channel-templates/useTemplateAgents";
+import { TemplateAgentsStatus } from "../channel-templates/TemplateAgentsStatus";
 import { emptyLineup, parseLineup } from "../channel-templates/model";
 import { Button } from "../../shared/design-system/ui/Button";
 import type { Dialog } from "../../shared/design-system/ui/Dialog";
@@ -18,6 +21,7 @@ import {
   projectTemplate,
   workspaceCanvas,
   type Workspace,
+  appliedTemplate,
 } from "./workspace";
 import { useLifetime } from "./Lifetime";
 import {
@@ -26,9 +30,10 @@ import {
   instructionsCanvas,
 } from "./ChatSettingsDialog";
 import { ChannelDurationField } from "../../bundled/channels/ChannelDurationField";
+import { SidebarSectionEmojiInput } from "../../bundled/channels/SidebarSectionEmojiInput";
 
 type Target =
-  | { kind: "project"; id: string; name: string }
+  | { kind: "project"; id: string; name: string; icon?: string | undefined }
   | { kind: "chat"; id: string; name: string };
 class CanvasSettingsError extends Error {}
 
@@ -52,8 +57,7 @@ export function WorkspaceSettings({
   const [raw, setRaw] = useState<string>();
   const [base, setBase] = useState<string>();
   const [recipeId, setRecipeId] = useState("");
-  const [lineup, setLineup] = useState<Lineup>(emptyLineup);
-  const [entries, setEntries] = useState<readonly KitEntry[]>([]);
+  const [savedLineup, setLineup] = useState<Lineup>(emptyLineup);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loadingCanvas, setLoadingCanvas] = useState(false);
@@ -61,22 +65,43 @@ export function WorkspaceSettings({
   const [status, setStatus] = useState("");
   const [canvasError, setCanvasError] = useState(false);
   const [reloadConfirmed, setReloadConfirmed] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState("");
+  // Untouched until a choice here; until then the list shows the applied one.
+  const [selectedTemplate, setSelectedTemplate] = useState<string>();
+  const [appliedTemplateId] = useState(() =>
+    target.kind === "project"
+      ? appliedTemplate.read(session.scope, target.id)
+      : "",
+  );
+  const templates = useChannelTemplates();
+  const chosen = templates.find(({ id }) => id === selectedTemplate);
+  const templateSetup = useTemplateAgents(session, chosen);
+  // A chosen channel template replaces the saved agents with its own here.
+  const lineup: Lineup = chosen
+    ? { teamIds: [], agents: templateSetup.agents, canvas: savedLineup.canvas }
+    : savedLineup;
   const [projectName, setProjectName] = useState(target.name);
   const [nameConflict, setNameConflict] = useState(false);
   const confirmedName = useRef(target.name);
   const renamedName = useRef<string | undefined>(undefined);
   const keptName = useRef(target.name);
+  const initialIcon = target.kind === "project" ? (target.icon ?? "") : "";
+  const [icon, setIcon] = useState(initialIcon);
+  const confirmedIcon = useRef(initialIcon);
+  const keptIcon = useRef(initialIcon);
   const nextName = projectName.trim();
   const nameChanged =
     target.kind === "project" && nextName !== confirmedName.current;
+  const iconChanged =
+    target.kind === "project" && icon !== confirmedIcon.current;
   const nameError =
-    target.kind === "project" && (!nextName || nextName.length > 120)
+    target.kind === "project" && (!nextName || nextName.length > 256)
       ? t("v105sweep.solo.settings.nameInvalid")
       : undefined;
   const alive = useRef(true);
   const inFlight = useRef(false);
   const confirmedCanvas = useRef("");
+  const confirmedWorkspace = useRef("");
+  const historical = useRef<{ canvas: string; workspace: string }>(undefined);
   // What reopening would show: the saved settings, or this device's kept draft.
   const kept = useRef("");
   const snapshot = (canvas: string | undefined, { agents, teamIds }: Lineup) =>
@@ -97,8 +122,13 @@ export function WorkspaceSettings({
       const value = readWorkspace(canvas);
       setWorkspace(value);
       setRaw(undefined);
+      const normalized = instructionsCanvas(value, undefined);
+      historical.current =
+        normalized === undefined
+          ? { canvas, workspace: JSON.stringify(value) }
+          : undefined;
       // Dirty tracking follows the form's normalized legacy instructions.
-      return workspaceCanvas(value);
+      return normalized ?? JSON.stringify(value);
     } catch {
       setRaw(canvas);
       return canvas;
@@ -122,15 +152,14 @@ export function WorkspaceSettings({
           throw new Error(
             kit.error ?? t("v105sweep.solo.newWorkspace.defaultsUnavailable"),
           );
-        const groups = soloGroups(kit.entries);
-        if (
-          groups &&
-          !groups.record.deleted &&
-          groups.record.value.type === "groups"
-        )
-          confirmedName.current =
-            groups.record.value.groups.find((group) => group.id === target.id)
-              ?.name ?? confirmedName.current;
+        await session.sidebarPreferences.refresh();
+        if (!active()) return;
+        const groups = session.sidebarPreferences.snapshot().data;
+        const group = groups?.sections.find(({ id }) => id === target.id);
+        if (group) {
+          confirmedName.current = group.name;
+          confirmedIcon.current = group.icon ?? "";
+        }
         const id = await projectTemplateId(target.id);
         if (!active()) return;
         // Tombstones still own the revision even though they supply no defaults.
@@ -139,9 +168,12 @@ export function WorkspaceSettings({
             entry.record.value.type === "template" &&
             entry.record.value.id === id,
         );
-        const template = projectDefault(kit.entries, target.id, id);
+        const template = projectDefault(
+          kit.entries,
+          id,
+          groups?.legacyTemplates?.[target.id],
+        );
         setRecipeId(id);
-        setEntries(kit.entries);
         defaults = template ?? emptyLineup();
         setLineup(defaults);
         content = template?.canvas ?? "";
@@ -153,9 +185,19 @@ export function WorkspaceSettings({
         revision = head?.id;
       }
       confirmedCanvas.current = content;
+      try {
+        confirmedWorkspace.current = snapshot(
+          workspaceCanvas(readWorkspace(content)),
+          defaults,
+        );
+      } catch {
+        confirmedWorkspace.current = snapshot(content, defaults);
+      }
       if (target.kind === "project") {
         setProjectName(confirmedName.current);
         keptName.current = confirmedName.current;
+        setIcon(confirmedIcon.current);
+        keptIcon.current = confirmedIcon.current;
         setNameConflict(false);
       }
       const saved = replace ? null : readView<unknown>(scope, key, null);
@@ -171,6 +213,16 @@ export function WorkspaceSettings({
         if (target.kind === "project" && "lineup" in saved) {
           defaults = parseLineup(saved.lineup);
           setLineup(defaults);
+        }
+        if (
+          target.kind === "project" &&
+          "icon" in saved &&
+          typeof saved.icon === "string" &&
+          "iconBase" in saved &&
+          saved.icon !== saved.iconBase
+        ) {
+          setIcon(saved.icon);
+          keptIcon.current = saved.icon;
         }
         if (
           target.kind === "project" &&
@@ -231,6 +283,14 @@ export function WorkspaceSettings({
       alive.current = false;
     };
   }, []);
+  // Preserve an unchanged historical header when its replacement would not fit.
+  const rawCanvas =
+    raw ??
+    (JSON.stringify(workspace) === historical.current?.workspace
+      ? historical.current.canvas
+      : undefined);
+  const draftCanvas =
+    instructionsCanvas(workspace, raw) ?? JSON.stringify(workspace);
   const save = async () => {
     if (!active() || inFlight.current || nameConflict) return;
     inFlight.current = true;
@@ -253,7 +313,7 @@ export function WorkspaceSettings({
         }
         if (
           loaded &&
-          (raw ?? workspaceCanvas(workspace)) !== confirmedCanvas.current
+          instructionsCanvas(workspace, rawCanvas) !== confirmedCanvas.current
         ) {
           setStatus(t("v105sweep.solo.settings.savedUnsaved"));
           return;
@@ -261,13 +321,15 @@ export function WorkspaceSettings({
       } else {
         // Validate both drafts before admitting either publication.
         const canvas = loaded
-          ? raw === undefined
+          ? rawCanvas === undefined
             ? workspaceCanvas(workspace)
-            : workspaceCanvas({ folders: [], canvas: raw })
+            : workspaceCanvas({ folders: [], canvas: rawCanvas })
           : undefined;
         if (nameError) throw new Error(nameError);
         const template =
-          target.kind === "project" && canvas !== undefined
+          target.kind === "project" &&
+          canvas !== undefined &&
+          snapshot(canvas, lineup) !== confirmedWorkspace.current
             ? projectTemplate(session.scope, recipeId, nextName, {
                 ...lineup,
                 canvas,
@@ -284,24 +346,38 @@ export function WorkspaceSettings({
             base: base ?? null,
             lineup,
             ...(target.kind === "project"
-              ? { name: projectName, nameBase: confirmedName.current }
+              ? {
+                  name: projectName,
+                  nameBase: confirmedName.current,
+                  icon,
+                  iconBase: confirmedIcon.current,
+                }
               : {}),
           })
         )
           throw new CanvasSettingsError(
             t("v105sweep.solo.settings.draftNotSaved"),
           );
-        if (canvas !== undefined) kept.current = snapshot(canvas, lineup);
-        if (target.kind === "project") keptName.current = projectName;
-        if (nameChanged) {
-          await session.soloPreferences.renameSection(
+        if (canvas !== undefined) kept.current = snapshot(draftCanvas, lineup);
+        if (target.kind === "project") {
+          keptName.current = projectName;
+          keptIcon.current = icon;
+        }
+        if (nameChanged || iconChanged) {
+          await session.sidebarPreferences.renameSection(
             target.id,
-            nextName,
-            confirmedName.current,
+            {
+              ...(nameChanged ? { name: nextName } : {}),
+              ...(iconChanged ? { icon: icon || null } : {}),
+            },
+            nameChanged ? confirmedName.current : undefined,
           );
           confirmedName.current = nextName;
-          renamedName.current = nextName;
-          nameConfirmed = true;
+          confirmedIcon.current = icon;
+          if (nameChanged) {
+            renamedName.current = nextName;
+            nameConfirmed = true;
+          }
           if (
             !writeView(scope, key, {
               canvas,
@@ -309,6 +385,8 @@ export function WorkspaceSettings({
               lineup,
               name: nextName,
               nameBase: nextName,
+              icon,
+              iconBase: icon,
             })
           )
             throw new CanvasSettingsError(
@@ -316,19 +394,21 @@ export function WorkspaceSettings({
             );
         }
         if (!active()) return;
-        if (
-          canvas !== undefined &&
-          (target.kind === "project" || canvas !== confirmedCanvas.current)
-        ) {
+        if (canvas !== undefined) {
           if (template) {
             try {
-              await session.channelKit.save(template, base);
+              const id = await session.channelKit.save(template, base);
+              confirmedWorkspace.current = snapshot(canvas, lineup);
+              setBase(id);
             } catch (reason) {
               throw new CanvasSettingsError(
                 reason instanceof Error ? reason.message : String(reason),
               );
             }
-          } else {
+          } else if (
+            target.kind === "chat" &&
+            canvas !== confirmedCanvas.current
+          ) {
             const selected = await session.canvas
               .save(target.id, canvas, base)
               .catch((reason) => {
@@ -362,6 +442,8 @@ export function WorkspaceSettings({
             ? t("v105sweep.solo.settings.defaultsDraftKept")
             : t("v105sweep.solo.settings.changesDraftKept"),
         );
+      if (target.kind === "project" && selectedTemplate !== undefined)
+        appliedTemplate.write(session.scope, target.id, selectedTemplate);
       close();
     } catch (reason) {
       if (active()) {
@@ -377,14 +459,6 @@ export function WorkspaceSettings({
       if (alive.current) setBusy(false);
     }
   };
-  const templates = entries.flatMap((entry) =>
-    !entry.record.deleted &&
-    entry.record.value.type === "template" &&
-    !entry.record.value.id.startsWith("session-section-") &&
-    !entry.record.value.id.startsWith("me-section-")
-      ? [entry.record.value]
-      : [],
-  );
   return (
     <ChatSettingsDialog
       finalFocus={finalFocus}
@@ -392,9 +466,9 @@ export function WorkspaceSettings({
       dirty={
         // An uncertain details save stays with its owner and reopens to be checked.
         (lifetime.changed && !lifetime.checkOnly) ||
-        (target.kind === "project" && projectName !== keptName.current) ||
-        (loaded &&
-          snapshot(instructionsCanvas(workspace, raw), lineup) !== kept.current)
+        (target.kind === "project" &&
+          (projectName !== keptName.current || icon !== keptIcon.current)) ||
+        (loaded && snapshot(draftCanvas, lineup) !== kept.current)
       }
       busy={busy || lifetime.busy}
       title={
@@ -410,11 +484,13 @@ export function WorkspaceSettings({
       saveLoading={busy || lifetime.busy || loadingCanvas}
       saveDisabled={
         loadingCanvas ||
+        templateSetup.pending ||
         !!signal?.aborted ||
         (!loaded && !lifetime.eligible) ||
         !!nameError ||
         nameConflict ||
-        (nameChanged && !session.soloPreferences?.sectionRenameWritable) ||
+        ((nameChanged || iconChanged) &&
+          !session.sidebarPreferences.sectionRenameWritable) ||
         (lifetime.available &&
           !lifetime.checkOnly &&
           (lifetime.changed || !loaded || lifetime.unrelatedAttempt) &&
@@ -427,14 +503,28 @@ export function WorkspaceSettings({
           label={t("v105sweep.solo.settings.workspaceName")}
           error={nameError}
         >
-          <Input
-            value={projectName}
-            maxLength={120}
+          <SidebarSectionEmojiInput
+            session={session}
+            scope={scope}
+            icon={icon}
+            onIconChange={setIcon}
             disabled={
-              busy || !loaded || !session.soloPreferences?.sectionRenameWritable
+              busy ||
+              !loaded ||
+              !session.sidebarPreferences.sectionRenameWritable
             }
-            onChange={(event) => setProjectName(event.target.value)}
-          />
+          >
+            <Input
+              value={projectName}
+              maxLength={256}
+              disabled={
+                busy ||
+                !loaded ||
+                !session.sidebarPreferences.sectionRenameWritable
+              }
+              onChange={(event) => setProjectName(event.target.value)}
+            />
+          </SidebarSectionEmojiInput>
         </Field>
       )}
       {lifetime.available && lifetime.base && (
@@ -453,7 +543,12 @@ export function WorkspaceSettings({
             <Select
               label={t("v105sweep.solo.settings.template")}
               variant="field"
-              value={selectedTemplate}
+              value={
+                selectedTemplate ??
+                (templates.some(({ id }) => id === appliedTemplateId)
+                  ? appliedTemplateId
+                  : "")
+              }
               groups={[
                 {
                   label: "",
@@ -473,20 +568,19 @@ export function WorkspaceSettings({
                 const template = templates.find(
                   (template) => template.id === id,
                 );
-                if (template) {
-                  setLineup(template);
-                  adopt(template.canvas);
-                }
+                if (template) adopt(template.canvas);
                 if (!id) setLineup(emptyLineup());
                 setSelectedTemplate(id);
               }}
             />
           )}
+          <TemplateAgentsStatus setup={templateSetup} />
           <ChatInstructions
             workspace={workspace}
             onWorkspaceChange={setWorkspace}
             raw={raw}
             onRawChange={setRaw}
+            instructionScope={target.kind === "project" ? "workspace" : "chat"}
           />
           {target.kind === "project" &&
             (lineup.agents.length > 0 || lineup.teamIds.length > 0) && (

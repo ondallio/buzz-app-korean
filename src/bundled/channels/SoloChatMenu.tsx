@@ -4,14 +4,7 @@ import {
   type DisplayMessage,
 } from "../../shared/i18n/deferred-message";
 import { useSoloNavigation } from "../../features/channel-navigation/solo-navigation-react";
-import {
-  type ComponentProps,
-  type ReactNode,
-  useId,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { conversionLabel } from "../../features/solo/conversion";
 import { canConvertToChannel } from "../../features/solo/ConvertToChannel";
 import { canShareConversation } from "../../features/solo/share";
@@ -19,9 +12,6 @@ import { canEditLifetime } from "../../features/solo/Lifetime";
 import type { ChannelLifecycleAction } from "../../features/relay/channel-lifecycle-protocol";
 import type { ChannelSummary } from "../../features/relay/contracts";
 import type { RelaySession } from "../../features/relay/session";
-import { Button } from "../../shared/design-system/ui/Button";
-import { Dialog } from "../../shared/design-system/ui/Dialog";
-import { Input } from "../../shared/design-system/ui/Input";
 import {
   MenuIcon,
   MenuItem,
@@ -54,6 +44,7 @@ export function SoloChatMenuItems({
   onRename,
   onLifecycle,
   onReadResult,
+  includeChannelControls = true,
   children,
 }: {
   /** Additional actions at the end of the first menu group. */
@@ -71,12 +62,13 @@ export function SoloChatMenuItems({
   /** Absent where no owner can confirm lifecycle actions. */
   onLifecycle?: ((action: ChannelLifecycleAction) => void) | undefined;
   /** The menu closes at once; its host reports a failed read change. */
-  onReadResult(error?: DisplayMessage): void;
+  onReadResult?(error?: DisplayMessage): void;
+  includeChannelControls?: boolean;
 }) {
   useLanguage();
   const handoff = useChannelNavigation();
   const regions = useSoloNavigation(session);
-  const preferences = session.soloPreferences;
+  const preferences = session.sidebarPreferences;
   const snapshot = useSyncExternalStore(
     preferences.subscribe,
     preferences.snapshot,
@@ -89,25 +81,26 @@ export function SoloChatMenuItems({
   const active = !channel.archived;
   return (
     <>
-      {session.unread.sync().capability === "frontier-sync" && (
-        <ChannelReadMenuItem
-          unread={session.unread}
-          channelId={channel.id}
-          pending={false}
-          closeOnClick
-          run={(action) =>
-            action().then(
-              () => onReadResult(),
-              (error: unknown) =>
-                onReadResult(
-                  error instanceof Error
-                    ? error.message
-                    : localMessage("channelsMenus.read.fallback"),
-                ),
-            )
-          }
-        />
-      )}
+      {includeChannelControls &&
+        session.unread.sync().capability === "frontier-sync" && (
+          <ChannelReadMenuItem
+            unread={session.unread}
+            channelId={channel.id}
+            pending={false}
+            closeOnClick
+            run={(action) =>
+              action().then(
+                () => onReadResult?.(),
+                (error: unknown) =>
+                  onReadResult?.(
+                    error instanceof Error
+                      ? error.message
+                      : localMessage("channelsMenus.read.fallback"),
+                  ),
+              )
+            }
+          />
+        )}
       {onRename && (
         <MenuItem onClick={onRename}>
           <MenuIcon>
@@ -169,7 +162,9 @@ export function SoloChatMenuItems({
           {t("channelsMenus.solo.share")}
         </MenuItem>
       )}
-      <ChannelCopyLinkMenuItem channelId={channel.id} />
+      {includeChannelControls && (
+        <ChannelCopyLinkMenuItem channelId={channel.id} />
+      )}
       {active &&
         !regions.managed.has(channel.id) &&
         onConvert &&
@@ -196,68 +191,5 @@ export function SoloChatMenuItems({
           />
         )}
     </>
-  );
-}
-
-export function NewWorkspaceDialog({
-  name,
-  create,
-  close,
-  finalFocus,
-}: {
-  name: string;
-  create: (name: string) => boolean;
-  close: () => void;
-  finalFocus?: ComponentProps<typeof Dialog>["finalFocus"];
-}) {
-  useLanguage();
-  const [value, setValue] = useState("");
-  const [blocked, setBlocked] = useState(false);
-  const form = useId();
-  const input = useRef<HTMLInputElement>(null);
-  return (
-    <Dialog
-      size="compact"
-      open
-      onOpenChange={(open) => {
-        if (!open) close();
-      }}
-      title={t("channelsMenus.workspace.title")}
-      description={t("channelsMenus.workspace.description", { name })}
-      initialFocus={input}
-      finalFocus={finalFocus}
-      actions={
-        <>
-          <Button onClick={close}>{t("channelsMenus.cancel")}</Button>
-          <Button
-            form={form}
-            type="submit"
-            variant="prominent"
-            disabled={!value.trim()}
-          >
-            {t("channelsMenus.workspace.create")}
-          </Button>
-        </>
-      }
-    >
-      <form
-        id={form}
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (value.trim()) setBlocked(!create(value.trim()));
-        }}
-      >
-        <Input
-          ref={input}
-          aria-label={t("channelsMenus.workspace.name")}
-          placeholder={t("channelsMenus.workspace.name")}
-          required
-          maxLength={80}
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-        />
-      </form>
-      {blocked && <p role="alert">{t("channelsMenus.workspace.blocked")}</p>}
-    </Dialog>
   );
 }

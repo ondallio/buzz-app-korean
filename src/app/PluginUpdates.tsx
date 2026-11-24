@@ -14,6 +14,7 @@ import type { PluginManager } from "../plugins/manager";
 import { pendingManaged } from "../plugins/managed";
 import { canRetryPlugin } from "../plugins/manager";
 import type { PluginInstallRequests } from "../plugins/installer";
+import type { ManagedChange } from "../plugins/types";
 import {
   createPluginUpdates,
   type PluginUpdate,
@@ -279,6 +280,17 @@ export function PluginUpdates({
       (update.candidate.publisher ?? null) !== (previous.publisher ?? null)
     );
   };
+  const managed =
+    configuration.status === "ready" ? configuration.managed : undefined;
+  const [seenAutomatic, setSeenAutomatic] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const automatic =
+    managed?.status === "ready"
+      ? (managed.automatic ?? []).filter(
+          (change) => !seenAutomatic.has(automaticKey(change)),
+        )
+      : [];
   const [recovering, setRecovering] = useState<readonly string[]>([]);
   const [checking, setChecking] = useState<readonly string[]>([]);
   const checkAgain = async (id: string) => {
@@ -298,12 +310,42 @@ export function PluginUpdates({
         checking,
         checkAgain,
         busy: state.busy || !!action,
-        recommended: pendingManaged(
-          configuration.status === "ready" ? configuration.managed : undefined,
-        ).map((entry) => entry.id),
+        recommended: pendingManaged(managed).map((entry) => entry.id),
       }}
     >
       {children}
+      {managed?.status === "ready" && automatic.length > 0 && (
+        <ToastNotice
+          key={automatic.map(automaticKey).join(" ")}
+          title={automaticTitle(managed.source, automatic)}
+          description={
+            automatic.length > 1
+              ? automatic.map((change) => change.name).join(", ")
+              : automatic[0]?.action === "installed"
+                ? t("v106sh.plugins.automaticInstalledDetail")
+                : t("v106sh.plugins.automaticUpdatedDetail", {
+                    source: managed.source,
+                  })
+          }
+          tone="info"
+          timeout={8000}
+          onDismiss={() =>
+            setSeenAutomatic(
+              (seen) => new Set([...seen, ...automatic.map(automaticKey)]),
+            )
+          }
+          closeLabel={t("v106sh.plugins.automaticDismiss")}
+          navigation={{
+            label: t("pluginManagement.updates.manage"),
+            open: () =>
+              void navigation.open({
+                version: 1,
+                kind: "settings",
+                section: "plugins",
+              }),
+          }}
+        />
+      )}
       {updates
         .filter(
           (update) =>
@@ -419,6 +461,29 @@ export function PluginUpdates({
           ) : null;
         })}
     </Context>
+  );
+}
+
+const automaticKey = (change: ManagedChange) =>
+  `${change.id}:${change.revision}`;
+
+function automaticTitle(source: string, changes: readonly ManagedChange[]) {
+  const [change] = changes;
+  if (changes.length === 1 && change)
+    return t(
+      change.action === "installed"
+        ? "v106sh.plugins.automaticInstalledOne"
+        : "v106sh.plugins.automaticUpdatedOne",
+      { source, name: change.name },
+    );
+  const actions = new Set(changes.map((item) => item.action));
+  return t(
+    actions.size > 1
+      ? "v106sh.plugins.automaticChangedMany"
+      : change?.action === "installed"
+        ? "v106sh.plugins.automaticInstalledMany"
+        : "v106sh.plugins.automaticUpdatedMany",
+    { source, count: changes.length },
   );
 }
 

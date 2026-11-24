@@ -76,6 +76,9 @@ export const en = {
   "fuplugins.name.buzz.pairing": "Pair mobile",
   "fuplugins.description.buzz.pairing":
     "Pair a mobile device with your Buzz account and community.",
+  "fuplugins.name.buzz.performance-diagnostics": "Performance diagnostics",
+  "fuplugins.description.buzz.performance-diagnostics":
+    "Let agents request short performance snapshots of this app, including aggregate activity across connected communities.",
   "fuplugins.name.buzz.pi": "Pi",
   "fuplugins.description.buzz.pi": "Run local Pi agents in Buzz.",
   "fuplugins.name.buzz.plugin-development": "Plugin development",
@@ -215,6 +218,9 @@ export const ko: Record<keyof typeof en, string> = {
   "fuplugins.name.buzz.pairing": "모바일 기기 연결",
   "fuplugins.description.buzz.pairing":
     "모바일 기기를 Buzz 계정 및 커뮤니티와 연결합니다.",
+  "fuplugins.name.buzz.performance-diagnostics": "성능 진단",
+  "fuplugins.description.buzz.performance-diagnostics":
+    "에이전트가 이 앱의 짧은 성능 스냅숏을 요청할 수 있게 합니다. 연결된 커뮤니티 전체의 활동 합계도 포함됩니다.",
   "fuplugins.name.buzz.pi": "Pi",
   "fuplugins.description.buzz.pi": "Buzz에서 로컬 Pi 에이전트를 실행합니다.",
   "fuplugins.name.buzz.plugin-development": "플러그인 개발",

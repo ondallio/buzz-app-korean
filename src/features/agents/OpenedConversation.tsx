@@ -15,6 +15,7 @@ import type { AgentConversation } from "./service";
 type Saved = Readonly<
   Partial<ChannelLabel> & {
     channelId: string;
+    community?: true;
     root?: string;
     at?: number;
   }
@@ -33,6 +34,7 @@ export function useOpenedSession<T extends Saved>(
   conversation: AgentConversation | undefined,
   find: (place: Place, signal: AbortSignal) => Promise<T | undefined>,
   label?: (channelId: string) => ChannelLabel | undefined,
+  scope?: "thread" | "channel" | "community",
 ): { session?: T; searching?: boolean; error?: string } {
   const places: Place[] = conversation
     ? [
@@ -43,12 +45,16 @@ export function useOpenedSession<T extends Saved>(
       ]
     : [];
   const bound = (place: Place) =>
-    saved.find(
-      (item) => item.channelId === place.channelId && item.root === place.root,
+    saved.find((item) =>
+      scope === "community"
+        ? item.community
+        : !item.community &&
+          item.channelId === place.channelId &&
+          item.root === place.root,
     );
   const exact = places[0] && bound(places[0]);
   const key = conversation
-    ? `${conversation.channelId}/${conversation.rootId ?? ""}`
+    ? `${scope ?? ""}:${conversation.channelId}/${conversation.rootId ?? ""}`
     : "";
   const [found, setFound] = useState<{
     key: string;
@@ -207,7 +213,11 @@ export function ConversationName({
   title?: string;
   className?: string;
 }) {
-  const Icon = session.name === undefined ? undefined : channelIcon(session);
+  useLanguage();
+  const Icon =
+    session.community || session.name === undefined
+      ? undefined
+      : channelIcon(session);
   return (
     <span
       className={`flex min-w-0 items-center gap-1 overflow-hidden ${className}`}
@@ -215,7 +225,9 @@ export function ConversationName({
     >
       {Icon && <Icon size={16} className="shrink-0" aria-hidden="true" />}
       <span className="truncate">
-        {session.name || session.channelId.slice(0, 8)}
+        {session.community
+          ? t("v106msg.opened.communitySession")
+          : session.name || session.channelId.slice(0, 8)}
       </span>
     </span>
   );
@@ -248,9 +260,11 @@ export function OpenedConversation({
   useClockFormat();
   useLanguage();
   const id = useId();
-  const place = (session ? session.root : conversation.rootId)
-    ? "thread"
-    : "channel";
+  const place = session?.community
+    ? "community"
+    : (session ? session.root : conversation.rootId)
+      ? "thread"
+      : "channel";
   return (
     <section aria-labelledby={id} className={styles.section}>
       <InlineHeader

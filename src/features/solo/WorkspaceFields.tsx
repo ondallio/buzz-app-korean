@@ -30,11 +30,13 @@ export function WorkspaceFields({
   onChange,
   disabled = false,
   instructionRows = 5,
+  instructionScope = "chat",
 }: {
   value: Workspace;
   disabled?: boolean;
   /** Edit surfaces with room to spare give Instructions more visible lines. */
   instructionRows?: number;
+  instructionScope?: "chat" | "workspace";
   onChange(value: Workspace): void;
 }) {
   useLanguage();
@@ -152,7 +154,11 @@ export function WorkspaceFields({
           onChange={(event) =>
             onChange({ ...value, canvas: event.target.value })
           }
-          placeholder={t("v105sweep.solo.fields.instructionsPlaceholder")}
+          placeholder={
+            instructionScope === "workspace"
+              ? t("v106msg.workspaceFields.instructionsPlaceholder")
+              : t("v105sweep.solo.fields.instructionsPlaceholder")
+          }
         />
       </Field>
       <div className={styles.fields}>
