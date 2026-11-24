@@ -231,7 +231,8 @@ export const en = {
   "settings.shortcut.edit-message": "Edit selected message",
   "settings.shortcut.react-to-message": "React to selected message",
   "settings.shortcut.reply-to-message": "Reply in thread to selected message",
-  "settings.shortcut.mark-message-unread": "Mark unread from selected message",
+  "settings.shortcut.mark-message-unread":
+    "Mark as unread from selected message",
   "settings.shortcut.delete-message": "Delete selected message",
   "settings.shortcut.react-to-latest": "React to latest message",
   "settings.shortcut.home": "Home",

@@ -24,7 +24,8 @@ import { PanelHeader } from "../../shared/design-system/ui/PanelHeader";
 import styles from "./Panels.module.css";
 import type { TabDragHost } from "./useTabDrag";
 
-type Item = {
+/** One retained tab, with content and lifecycle owned by the hosting page. */
+export type PanelWorkspaceItem = {
   id: string;
   label: string;
   icon?: ReactNode;
@@ -105,20 +106,8 @@ function focusWhenReady(panel: HTMLElement, tab: HTMLElement) {
   return stop;
 }
 
-/** The channel owns target tabs; private details retain their feature's lifetime. */
-export function PanelWorkspace({
-  items,
-  value,
-  select,
-  actions,
-  identity,
-  main = false,
-  label: labelProp,
-  focusOnMount = true,
-  adoptSelection,
-  tabMenu,
-  drag,
-}: {
+/** Presentation options for the host tab workspace; navigation stays page-owned. */
+export type PanelWorkspaceProps = {
   /** The channel owner closes tabs across both panes, including hidden tabs. */
   tabMenu?:
     | {
@@ -128,7 +117,7 @@ export function PanelWorkspace({
       }
     | undefined;
   drag?: TabDragHost | undefined;
-  items: Item[];
+  items: PanelWorkspaceItem[];
   value: string;
   select(id: string): void;
   /** Header icon actions owned by the hosting page. */
@@ -145,7 +134,22 @@ export function PanelWorkspace({
   focusOnMount?: boolean;
   /** A new value adopts the current selection without moving focus. */
   adoptSelection?: unknown;
-}) {
+};
+
+/** The channel owns target tabs; private details retain their feature's lifetime. */
+export function PanelWorkspace({
+  items,
+  value,
+  select,
+  actions,
+  identity,
+  main = false,
+  label: labelProp,
+  focusOnMount = true,
+  adoptSelection,
+  tabMenu,
+  drag,
+}: PanelWorkspaceProps) {
   useLanguage();
   const label = labelProp ?? t("channelForms.settings.tabs");
   const prefix = useId();

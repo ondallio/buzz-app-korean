@@ -49,6 +49,7 @@ export type PullChecklist = Readonly<{
   queued: boolean;
   methods: readonly MergeMethod[];
   method: MergeMethod;
+  /** The repository allows auto-merge and the viewer may turn it on. */
   canEnableAutoMerge: boolean;
   canDisableAutoMerge: boolean;
   autoMerge?:
@@ -64,7 +65,7 @@ export type PullView = Readonly<{
 /** What the panel reads of a pull request's repository, beside the pull
  * request, in the store's query. */
 export const PANEL_REPOSITORY_FIELDS =
-  "viewerDefaultMergeMethod mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed";
+  "viewerDefaultMergeMethod mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed autoMergeAllowed";
 /** What the panel reads of the pull request itself. */
 export const PANEL_PULL_FIELDS = `id title body bodyHTML createdAt updatedAt mergedAt
       author{login avatarUrl} mergedBy{login}
@@ -89,6 +90,7 @@ export type PullData = {
     mergeCommitAllowed?: boolean;
     squashMergeAllowed?: boolean;
     rebaseMergeAllowed?: boolean;
+    autoMergeAllowed?: boolean;
     pullRequest: {
       id: string;
       title: string;
@@ -296,7 +298,8 @@ export function parsePull(
         preferred && methods.includes(preferred)
           ? preferred
           : (methods[0] ?? "MERGE"),
-      canEnableAutoMerge: !!pull.viewerCanEnableAutoMerge,
+      canEnableAutoMerge:
+        !!repository.autoMergeAllowed && !!pull.viewerCanEnableAutoMerge,
       canDisableAutoMerge: !!pull.viewerCanDisableAutoMerge,
       autoMerge: pull.autoMergeRequest
         ? {

@@ -6,12 +6,14 @@ import { isBestiePage, useBestieConversation } from "./bestie-context";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
 import { MagnifyingGlassIcon } from "../../shared/design-system/icons/index";
 import { Dialog } from "../../shared/design-system/ui/Dialog";
+import { activeModal } from "../../shared/design-system/overlayLayer";
 import { Button } from "../../shared/design-system/ui/Button";
 import type { RegisteredPage } from "../../features/pages/service";
 import { communityDestination } from "../../features/communities/destination";
@@ -30,7 +32,9 @@ import { conversationFocusTarget } from "../focus-navigation";
 import { orderPages, shellPresentation } from "./presentation";
 import { matchName } from "../../features/search/match";
 import {
+  DEFAULT_SEARCH_STEPS,
   SearchChoices,
+  SearchStepsContext,
   type SearchInputProps,
   type SearchDestination,
   type SearchPlace,
@@ -70,6 +74,8 @@ const SEARCH_BINDING: KeyBinding = { key: "k", mod: true };
 const SEARCH_BINDINGS = [SEARCH_BINDING, { key: "t", mod: true }];
 const CONVERSATION_SEARCH_ID = "conversation-search";
 const CONVERSATION_SEARCH_BINDING: KeyBinding = { key: "f", mod: true };
+const PREVIOUS_RESULT_ID = "search-previous-result";
+const NEXT_RESULT_ID = "search-next-result";
 const NO_OVERRIDES: ShortcutBindingsSnapshot = { overrides: {}, error: null };
 const noSubscribe = () => () => {};
 const noOverrides = () => NO_OVERRIDES;
@@ -175,6 +181,12 @@ export function PageSearch({
   }, [open]);
   const beginScoped = useCallback(() => {
     if (!currentChannelId) return;
+    // From an open search it narrows what is typed, where it is.
+    if (openRef.current) {
+      setScopedChannelId(currentChannelId);
+      input.current?.focus();
+      return;
+    }
     composerChannel.current = undefined;
     returnFocus.current =
       document.activeElement instanceof HTMLElement
@@ -205,17 +217,56 @@ export function PageSearch({
         binding: CONVERSATION_SEARCH_BINDING,
         order: HOST_SHORTCUT_ORDER.search + 1,
         allowInEditable: true,
-        when: () => !!currentChannelId,
+        // Search's own dialog, but no other.
+        allowInModal: true,
+        when: () =>
+          !!currentChannelId && (openRef.current || !activeModal(document)),
         run: beginScoped,
       }),
     [services, currentChannelId, beginScoped],
   );
+  // The search field matches these itself: Base UI dialogs stop Up and Down
+  // before they reach the window dispatcher. Registering them lists them in
+  // Settings and saves rebinds; as local rows they never reserve or run.
+  useEffect(() => {
+    if (!services) return;
+    const remove = (
+      [
+        [
+          PREVIOUS_RESULT_ID,
+          "Previous search result",
+          DEFAULT_SEARCH_STEPS.previous,
+        ],
+        [NEXT_RESULT_ID, "Next search result", DEFAULT_SEARCH_STEPS.next],
+      ] as const
+    ).map(([id, title, binding], index) =>
+      services.shortcuts.registerHost(
+        {
+          id,
+          title,
+          binding,
+          order: HOST_SHORTCUT_ORDER.search + 3 + index,
+          run: () => {},
+        },
+        { local: true },
+      ),
+    );
+    return () => {
+      for (const dispose of remove) dispose();
+    };
+  }, [services]);
   // The hint follows the person's rebind, derived from the same binding object.
   const { overrides } = useSyncExternalStore(
     services?.shortcutBindings.subscribe ?? noSubscribe,
     services?.shortcutBindings.snapshot ?? noOverrides,
   );
   const binding = overrides[SEARCH_ID] ?? SEARCH_BINDING;
+  const previous =
+    overrides[PREVIOUS_RESULT_ID] ?? DEFAULT_SEARCH_STEPS.previous;
+  const next = overrides[NEXT_RESULT_ID] ?? DEFAULT_SEARCH_STEPS.next;
+  const steps = useMemo(() => ({ previous, next }), [previous, next]);
+  const conversationBinding =
+    overrides[CONVERSATION_SEARCH_ID] ?? CONVERSATION_SEARCH_BINDING;
   const apple = isApplePlatform(navigator.platform);
   // Every search surface reads pages from here, so rank and underline them
   // here too: the disconnected and personal-space views show this list as is.
@@ -283,7 +334,7 @@ export function PageSearch({
       },
     }));
   return (
-    <>
+    <SearchStepsContext.Provider value={steps}>
       <Button
         ref={trigger}
         variant="inverted"
@@ -367,6 +418,7 @@ export function PageSearch({
               )}
               scopedChannelId={scopedChannelId}
               currentChannelId={currentChannelId}
+              conversationBinding={conversationBinding}
               onScopeChange={(channelId) => {
                 setScopedChannelId(channelId);
                 input.current?.focus();
@@ -395,7 +447,7 @@ export function PageSearch({
             />
           ))}
       </Dialog>
-    </>
+    </SearchStepsContext.Provider>
   );
 }
 
@@ -413,6 +465,7 @@ function CommunitySearch({
   enabled,
   scopedChannelId,
   currentChannelId,
+  conversationBinding,
   onScopeChange,
   isOpen,
   close,
@@ -425,6 +478,8 @@ function CommunitySearch({
   enabled: boolean;
   scopedChannelId?: string | undefined;
   currentChannelId?: string | undefined;
+  /** The chord that searches the current conversation, as rebound. */
+  conversationBinding?: KeyBinding | undefined;
   onScopeChange: (channelId?: string) => void;
   /** Whether the palette is still open. A choice that resolves after it
    * closed, such as a DM still opening, must not navigate. */
@@ -506,6 +561,7 @@ function CommunitySearch({
         scope={
           scopedChannelId
             ? {
+                id: scopedChannelId,
                 label: t("search.thisConversation"),
                 onRemove: () => onScopeChange(),
               }
@@ -532,8 +588,8 @@ function CommunitySearch({
                 ]
               : [
                   {
-                    id: "Recent activity",
-                    label: t("search.recentActivity"),
+                    id: "Recents",
+                    label: t("v105shell.search.recents"),
                     destinations: [],
                     empty: !enabled
                       ? t("search.enableMessages")
@@ -597,6 +653,7 @@ function CommunitySearch({
         pages={pages}
         scopedChannelId={scopedChannelId}
         currentChannelId={currentChannelId}
+        conversationBinding={conversationBinding}
         onScopeChange={onScopeChange}
         usageScope={usageScope(scope)}
         sidebarScope={connection.scope}

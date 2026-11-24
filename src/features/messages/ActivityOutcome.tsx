@@ -20,21 +20,27 @@ export function activityOutcomeReason(state: string, reason?: string) {
 export function ActivityOutcome({
   state,
   name,
+  notice,
 }: {
   state: string;
   name?: string | undefined;
+  /** How the turn ran, such as without its gateway; shown after the label. */
+  notice?: string | undefined;
 }) {
   useLanguage();
   const label = activityOutcomeLabel(state);
-  return label ? (
+  return label || notice ? (
     <span
       className={`inline-flex items-center gap-1 ${state === "error" ? "text-danger" : "text-subtle"}`}
     >
       {name && <span className="text-subtle">{name} ·</span>}
       {state === "error" && <WarningCircleIcon size={12} aria-hidden="true" />}
-      <span>
-        {t(state === "error" ? "messageRow.failed" : "messageRow.stopped")}
-      </span>
+      {label && (
+        <span>
+          {t(state === "error" ? "messageRow.failed" : "messageRow.stopped")}
+        </span>
+      )}
+      {notice && <span>{label ? `· ${notice}` : notice}</span>}
     </span>
   ) : null;
 }

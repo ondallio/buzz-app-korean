@@ -6,6 +6,8 @@ import type {
   AgentAddedTab,
   Agents,
 } from "../../features/agents/service";
+import type { Navigation } from "../../features/navigation/controller";
+import type { SettingsCards } from "../../features/settings/service";
 import { useRelayConnection } from "../../features/relay/react";
 import type { RelayData } from "../../features/relay/service";
 import type { RelaySession } from "../../features/relay/session";
@@ -24,6 +26,7 @@ import { PreferenceRow } from "../../shared/design-system/ui/PreferenceRow";
 import { SettingsGroup } from "../../shared/design-system/ui/SettingsGroup";
 import { SwitchPreferenceRow } from "../../shared/design-system/ui/SwitchPreferenceRow";
 import { bestieName, useBestieChoice } from "../agents/BestieChoice";
+import { CostRow } from "./CostRow";
 import {
   FEATURES,
   type Feature,
@@ -50,9 +53,15 @@ import { inCommunity, savedBestie } from "./saved";
 
 /** The agents a tab saves to, and finds to know which are remote. */
 type TabAgents = FeatureAgents & Pick<Agents, "find">;
+type TabCards = Pick<SettingsCards, "subscribe" | "has">;
 
 /** The Bestie tab, on the agent saved as Bestie in its community. */
-export function bestieTab(relay: RelayData, agents: TabAgents): AgentAddedTab {
+export function bestieTab(
+  relay: RelayData,
+  agents: TabAgents,
+  navigation: Pick<Navigation, "open">,
+  settingsCards: TabCards,
+): AgentAddedTab {
   const bestie = savedBestie(relay);
   return {
     id: "bestie",
@@ -64,7 +73,13 @@ export function bestieTab(relay: RelayData, agents: TabAgents): AgentAddedTab {
       inCommunity(agent, relay.snapshot()),
     subscribe: bestie.subscribe,
     component: ({ agent }) => (
-      <BestieTab relay={relay} agents={agents} agent={agent} />
+      <BestieTab
+        relay={relay}
+        agents={agents}
+        agent={agent}
+        navigation={navigation}
+        settingsCards={settingsCards}
+      />
     ),
   };
 }
@@ -76,6 +91,8 @@ export function bestieTab(relay: RelayData, agents: TabAgents): AgentAddedTab {
 export function formerBestieTab(
   relay: RelayData,
   agents: TabAgents,
+  navigation: Pick<Navigation, "open">,
+  settingsCards: TabCards,
 ): AgentAddedTab {
   const bestie = savedBestie(relay);
   return {
@@ -107,7 +124,14 @@ export function formerBestieTab(
       };
     },
     component: ({ agent }) => (
-      <BestieTab relay={relay} agents={agents} agent={agent} former />
+      <BestieTab
+        relay={relay}
+        agents={agents}
+        agent={agent}
+        navigation={navigation}
+        settingsCards={settingsCards}
+        former
+      />
     ),
   };
 }
@@ -172,11 +196,15 @@ function BestieTab({
   relay,
   agents,
   agent,
+  navigation,
+  settingsCards,
   former = false,
 }: {
   relay: RelayData;
   agents: TabAgents;
   agent: Agent;
+  navigation: Pick<Navigation, "open">;
+  settingsCards: TabCards;
   former?: boolean;
 }) {
   const { session, scope } = useRelayConnection(relay);
@@ -280,6 +308,12 @@ function BestieTab({
             )}
           />
         )}
+        <CostRow
+          agents={agents}
+          agent={agent}
+          open={navigation.open}
+          settingsCards={settingsCards}
+        />
       </SettingsGroup>
       <InlineHeader title={t("v105agent.bestie.settings")} />
       <SettingsGroup>

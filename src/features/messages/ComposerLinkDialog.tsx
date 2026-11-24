@@ -10,6 +10,7 @@ import { Button } from "../../shared/design-system/ui/Button";
 import { Field } from "../../shared/design-system/ui/Field";
 import { Input } from "../../shared/design-system/ui/Input";
 import type { ComposerInputElement, ComposerLinkEdit } from "./composer-dom";
+import { Combobox } from "../../shared/design-system/ui/Combobox";
 import { composerLinkUrl } from "./composer-link";
 
 export function ComposerLinkDialog({
@@ -18,7 +19,11 @@ export function ComposerLinkDialog({
   finalFocus = input,
   disabled,
   close,
+  destinations,
+  limitLabel = "message",
 }: {
+  destinations?: readonly { label: string; href: string }[] | undefined;
+  limitLabel?: string;
   edit: ComposerLinkEdit;
   input: RefObject<ComposerInputElement | null>;
   finalFocus?: DialogProps["finalFocus"];
@@ -44,7 +49,11 @@ export function ComposerLinkDialog({
       return;
     }
     if (!edit.save(text, href)) {
-      setError(localMessage("messages.link.draftChanged"));
+      setError(
+        limitLabel === "document"
+          ? localMessage("v106msg.composerLink.documentDraftChanged")
+          : localMessage("messages.link.draftChanged"),
+      );
       return;
     }
     close();
@@ -94,6 +103,34 @@ export function ComposerLinkDialog({
           save();
         }}
       >
+        {destinations && (
+          <Combobox.Root<{ label: string; href: string }>
+            items={[...destinations]}
+            itemToStringLabel={(item) => item.label}
+            itemToStringValue={(item) => item.href}
+            onValueChange={(item) => {
+              if (!item) return;
+              setUrl(item.href);
+              if (!text.trim()) setText(item.label);
+              setError("");
+            }}
+          >
+            <Combobox.Control
+              label={t("v106msg.composerLink.destination")}
+              triggerLabel={t("v106msg.composerLink.browse")}
+              placeholder={t("v106msg.composerLink.search")}
+            />
+            <Combobox.Popup empty={t("v106msg.composerLink.noMatch")}>
+              <Combobox.List>
+                {(item) => (
+                  <Combobox.Item key={item.href} value={item}>
+                    {item.label}
+                  </Combobox.Item>
+                )}
+              </Combobox.List>
+            </Combobox.Popup>
+          </Combobox.Root>
+        )}
         <Field label={t("messages.link.text")}>
           <Input
             ref={textInput}

@@ -19,7 +19,7 @@ export function MessageListRow({
   sender: ReactNode;
   source: ReactNode;
   time: ReactNode;
-  preview: string;
+  preview: ReactNode;
   previewId?: string | undefined;
   unread?: boolean;
 } & Omit<
@@ -68,6 +68,7 @@ export function MessageListRow({
             className={styles.unreadSlot}
             role="img"
             aria-label={t("messages.unreadLabel")}
+            data-inbox-unread=""
           >
             <span className={styles.unreadDot} />
           </span>

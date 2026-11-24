@@ -74,6 +74,7 @@ import {
   type PluginInstallRequests,
 } from "../plugins/installer";
 import { PluginReadme } from "./PluginReadme";
+import performanceDiagnosticsManifest from "../bundled/performance-diagnostics/manifest.json";
 import { bundledReadmes } from "../bundled/readmes";
 import { bundledIcons } from "../bundled/icons";
 import type { Identity } from "../features/identity/service";
@@ -170,6 +171,12 @@ function groupPlugins(plugins: readonly PluginInfo[]) {
   const other: PluginInfo[] = [];
   const core: PluginInfo[] = [];
   for (const plugin of plugins) {
+    // Diagnostics are offered through agent requests in this panel.
+    if (
+      plugin.source === "bundled" &&
+      plugin.manifest.id === performanceDiagnosticsManifest.id
+    )
+      continue;
     if (isCorePlugin(plugin)) {
       core.push(plugin);
       continue;
@@ -481,7 +488,7 @@ function PluginDetails({
           </span>
           {managed && (
             <span className={styles.pluginInstallBadge}>
-              {t("settingsHost.managedBy", { source: managed.source })}
+              {t("settingsHost.managedBy", { source: managedSource(managed) })}
             </span>
           )}
           <span
@@ -1390,7 +1397,7 @@ export function Settings({
                           <PluginProvenance
                             source={plugin.source}
                             publisher={plugin.publisher}
-                            managedBy={managedBy(managed, id)?.source}
+                            managedBy={managedSource(managedBy(managed, id))}
                             className={styles.pluginRowAuthor}
                           />
                         </span>
@@ -2077,4 +2084,14 @@ function UrlInstallRequestReview({
       request={{ ...requests, id: request.id }}
     />
   );
+}
+
+type Managed = ReturnType<typeof managedBy>;
+function managedSource(managed: NonNullable<Managed>): string;
+function managedSource(managed: Managed): string | undefined;
+function managedSource(managed: Managed) {
+  if (!managed) return undefined;
+  return managed.entry.update === "automatic"
+    ? t("v106sh.plugins.managedAutomatic", { source: managed.source })
+    : managed.source;
 }

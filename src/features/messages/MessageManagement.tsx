@@ -692,15 +692,15 @@ function ManagedMessageItems({
         <MenuItem
           onClick={() => {
             management.report(undefined);
-            try {
-              session.unread.follow(row.channelId, threadRootId, !following);
-            } catch (cause) {
-              management.report(
-                cause instanceof Error
-                  ? errorMessage(cause)
-                  : localMessage("messageActions.followFailed"),
+            session.unread
+              .follow(row.channelId, threadRootId, !following)
+              .catch((cause: unknown) =>
+                management.report(
+                  cause instanceof Error
+                    ? errorMessage(cause)
+                    : localMessage("messageActions.followFailed"),
+                ),
               );
-            }
           }}
         >
           <MenuIcon>{following ? <BellSlashIcon /> : <BellIcon />}</MenuIcon>

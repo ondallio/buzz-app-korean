@@ -92,13 +92,15 @@ export function withLatest<T extends Transcript>(
  * one reads once more after it, and a change of `key`, `again` or `working`
  * aborts it, hidden or not. The last result for `key` stays while the next
  * is read, never another key's. Only the first read and Refresh show as
- * loading. */
+ * loading. Without `refreshWhileWorking`, a working agent reads only when
+ * `working` changes, as on any other input. */
 export function useLiveTranscript<T extends Transcript>({
   read,
   readLatest,
   key,
   again,
   working,
+  refreshWhileWorking = true,
   agentKey,
 }: {
   read: (signal: AbortSignal) => Promise<T | undefined>;
@@ -111,14 +113,29 @@ export function useLiveTranscript<T extends Transcript>({
   key: string;
   again: string;
   working: boolean;
+  refreshWhileWorking?: boolean | undefined;
   agentKey: string;
 }) {
   const agents = useContext(AgentsContext);
   const [shown, setShown] = useState<Shown<T>>({ key });
   const held = useRef<Shown<T>>(shown);
   const [loading, setLoading] = useState(true);
-  const latest = useRef({ read, readLatest, key, again, working });
-  latest.current = { read, readLatest, key, again, working };
+  const latest = useRef({
+    read,
+    readLatest,
+    key,
+    again,
+    working,
+    refreshWhileWorking,
+  });
+  latest.current = {
+    read,
+    readLatest,
+    key,
+    again,
+    working,
+    refreshWhileWorking,
+  };
   const running = useRef<
     | { key: string; again: string; working: boolean; abort: AbortController }
     | undefined
@@ -204,7 +221,7 @@ export function useLiveTranscript<T extends Transcript>({
         if (queued.current && request(true, queued.current)) return;
         setLoading(false);
         if (stepped.current) step();
-        if (latest.current.working)
+        if (latest.current.working && latest.current.refreshWhileWorking)
           timer.current = setTimeout(
             () => request(true, "latest"),
             Math.max(LIVE_READ_MS, spent.current),
@@ -260,14 +277,14 @@ export function useLiveTranscript<T extends Transcript>({
     };
   }, [request]);
   useEffect(() => {
-    if (!working) {
+    if (!working || !refreshWhileWorking) {
       clearTimeout(timer.current);
       clearTimeout(stepTimer.current);
       stepTimer.current = undefined;
       return;
     }
     return agents?.subscribeSteps(agentKey, () => request(true, "step"));
-  }, [working, agents, agentKey, request]);
+  }, [working, refreshWhileWorking, agents, agentKey, request]);
   return {
     shown: shown.key === key ? shown : ({ key } as Shown<T>),
     loading,
@@ -284,6 +301,7 @@ export function TranscriptPanel<T extends Transcript>({
   readKey,
   readAgain = "",
   working,
+  refreshWhileWorking,
   reading,
   missing,
   failed,
@@ -303,6 +321,9 @@ export function TranscriptPanel<T extends Transcript>({
   /** Inputs that only make `read` read again, keeping what it shows. */
   readAgain?: string;
   working: boolean;
+  /** Whether a working agent's transcript reads again on a timer and on its
+   * steps; otherwise only when it starts or stops working. On by default. */
+  refreshWhileWorking?: boolean;
   /** Shown before the first read settles. */
   reading: string;
   /** Shown when the agent type has no transcript for it. */
@@ -319,6 +340,7 @@ export function TranscriptPanel<T extends Transcript>({
     key: readKey,
     again: readAgain,
     working,
+    refreshWhileWorking,
     agentKey: agent.key,
   });
   const { transcript, error } = shown;

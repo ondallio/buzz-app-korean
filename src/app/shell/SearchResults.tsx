@@ -1,3 +1,4 @@
+import { workflowLabel } from "../../features/relay/workflow-attribution";
 import {
   errorMessage,
   localMessage,
@@ -23,6 +24,8 @@ import {
 import type { ChannelSummary, Profile } from "../../features/relay/contracts";
 import type { RelayEvent } from "../../features/relay/events";
 import type { RelaySession } from "../../features/relay/session";
+import type { InboxItem } from "../../features/relay/inbox";
+import type { KeyBinding } from "../../features/shortcuts/bindings";
 import {
   useChannelList,
   useProfileGeneration,
@@ -30,6 +33,7 @@ import {
 import { useSavedHiddenDmIds } from "../../bundled/channels/useHiddenDms";
 import {
   useUnreadChannelIds,
+  useUnreadReasons,
   useUnreadThreadOnly,
 } from "../../bundled/channels/useSidebarFilters";
 import { useAgentChoices } from "../../features/agents/use-choices";
@@ -43,6 +47,7 @@ import { searchedProfiles } from "../../features/relay/profile-search";
 import { foldProfiles } from "../../features/relay/profiles";
 import {
   ArrowsDownUpIcon,
+  AtIcon,
   CalendarIcon,
   ChatCircleIcon,
   ChatsCircleIcon,
@@ -51,6 +56,7 @@ import {
   HashIcon,
   InfoIcon,
   RobotIcon,
+  SlidersHorizontalIcon,
   SparklesIcon,
   ThreadIcon,
   XIcon,
@@ -66,6 +72,7 @@ import {
 } from "../../features/search/recent-searches";
 import { type PreviewCache, SearchPreview } from "./SearchPreview";
 import { formatItemTimestamp } from "../../shared/datetime";
+import { Badge } from "../../shared/design-system/ui/Badge";
 import { Button } from "../../shared/design-system/ui/Button";
 import { Calendar } from "../../shared/design-system/ui/Calendar";
 import { IconButton } from "../../shared/design-system/ui/IconButton";
@@ -83,6 +90,12 @@ import type {
   SearchViews,
 } from "./SearchChoices";
 import { type SearchChip, SearchChoices } from "./SearchChoices";
+import {
+  FilterGuidePreview,
+  FilterSyntax,
+  guideFilters,
+  syntaxOf,
+} from "./SearchFilterGuide";
 import { MatchRank, matchName, matchRank } from "../../features/search/match";
 import { useUnreadFirstPreference } from "../../features/search/unread-first-preference";
 import {
@@ -112,6 +125,7 @@ import {
 } from "../../features/search/people-rank";
 import { peopleRelationships } from "../../features/profiles/relationships";
 import { knownAgentPubkeys } from "../../features/agents/known";
+import { useBestieConversation } from "./bestie-context";
 import { usePersonDirectory } from "./usePersonDirectory";
 import {
   isChannelUuid,
@@ -123,6 +137,10 @@ import {
   parseSearchOperators,
 } from "./parseSearchOperators";
 import { avatarMedia } from "../../shared/avatar-source";
+import {
+  PreviewText,
+  withMentionedIds,
+} from "../../features/messages/PreviewText";
 import {
   useVerifiedNames,
   withVerifiedNames,
@@ -167,14 +185,12 @@ const confirmedMutes = (
 
 /** The most rows the People and Agents groups each show. */
 const PERSON_ROWS = 6;
-/** The most unread conversations an empty search leads with. */
-const UNREAD_ROWS = 6;
 const noMembers: readonly string[] = [];
 
-/** "Search in this conversation" narrows the search and "Show more messages"
- * extends it; neither is a result. */
+/** "Show more messages" extends the search and "Ask" hands it to an agent;
+ * neither is a result. */
 const isSearchAction = (key: string) =>
-  key.startsWith("scope:") || key === "more-messages" || key === "ask";
+  key === "more-messages" || key === "ask";
 
 function useDelayedSearch(pending: boolean) {
   const [slow, setSlow] = useState(false);
@@ -230,6 +246,7 @@ export function SearchResults({
   pages,
   scopedChannelId,
   currentChannelId,
+  conversationBinding,
   onScopeChange,
   openConversation,
   openNewMessage,
@@ -250,6 +267,8 @@ export function SearchResults({
   pages: readonly SearchDestination[];
   scopedChannelId?: string | undefined;
   currentChannelId?: string | undefined;
+  /** The chord that searches the current conversation, hinted below. */
+  conversationBinding?: KeyBinding | undefined;
   onScopeChange?: ((channelId?: string) => void) | undefined;
   openConversation: (
     channelId: string,
@@ -300,7 +319,14 @@ export function SearchResults({
         kind === "in" && !person
           ? list.channels.find(({ id }) => id === value)
           : undefined;
-      if (person) {
+      if (kind === "from" && isViewerHandle(value))
+        restored.push({
+          operand,
+          text: operand,
+          edit: operand,
+          label: localMessage("search.removeAuthor", { name: "me" }),
+        });
+      else if (person) {
         const name = resolveName(
           pubkey,
           profiles.get(pubkey)?.name ?? pubkey.slice(0, 10),
@@ -363,6 +389,12 @@ export function SearchResults({
   const question = askMatch
     ? [...chips.map(({ text }) => text), askText].filter(Boolean).join(" ")
     : "";
+  // The filter guide shows over the results until the query changes, so
+  // choosing a filter, or typing, goes back to them for good.
+  const [guideQuery, setGuideQuery] = useState<string>();
+  if (guideQuery !== undefined && guideQuery !== query)
+    setGuideQuery(undefined);
+  const guideOpen = guideQuery === query && !asking;
   const parsed = useMemo(
     () => parseSearchOperators(asking ? "" : query.trim()),
     [query, asking],
@@ -413,10 +445,15 @@ export function SearchResults({
     setChipState(next.length ? { query: nextQuery, chips: next } : undefined);
     onQueryChange(nextQuery);
   };
-  const updateDisplayQuery = (value: string) =>
-    chips.length
-      ? setChipQuery(chips, value.trimStart())
-      : onQueryChange(value);
+  const updateDisplayQuery = (value: string) => {
+    // `?` typed alone opens the filter guide rather than searching for it.
+    if (value.trim() === "?" && !visibleQuery.trim()) {
+      setGuideQuery(query);
+      return;
+    }
+    if (chips.length) setChipQuery(chips, value.trimStart());
+    else onQueryChange(value);
+  };
   const removeChip = (chip: SearchChip) => {
     setChipQuery(
       chips.filter((other) => other !== chip),
@@ -1030,8 +1067,8 @@ export function SearchResults({
   const slowChannels = useDelayedSearch(publicChannels.loading);
   const slowPeople = useDelayedSearch(peopleActive && personDirectory.loading);
 
-  const profileKey = [
-    ...new Set([
+  const profileKey = withMentionedIds(
+    [
       ...channels.flatMap((channel) =>
         channel.channelType === "dm" ? (channel.participants ?? []) : [],
       ),
@@ -1042,8 +1079,9 @@ export function SearchResults({
       ...personDirectory.people.flatMap((person) =>
         person.ownerPubkey ? [person.ownerPubkey] : [],
       ),
-    ]),
-  ]
+    ],
+    search.messages.map((message) => message.mentioned),
+  )
     .sort()
     .slice(0, 1024)
     .join(":");
@@ -1232,7 +1270,7 @@ export function SearchResults({
   // The shared search order, with archived channels half a step behind live
   // ones in the same place.
   const rankOf = (label: string, key: string, archived?: boolean) => {
-    const rank = rankName(label) ?? MatchRank.inOrder + 1;
+    const rank = rankName(label) ?? MatchRank.words + 1;
     return searchOrder(usage, picked, { key, rank }) + (archived ? 0.5 : 0);
   };
   /** Whether a search order is an exact name, live (-2) or archived (-1.5). */
@@ -1240,8 +1278,7 @@ export function SearchResults({
   const pageRank = (page: SearchDestination) =>
     searchOrder(usage, picked, {
       key: page.key,
-      rank:
-        page.labelMatchRank ?? rankName(page.label) ?? MatchRank.inOrder + 1,
+      rank: page.labelMatchRank ?? rankName(page.label) ?? MatchRank.words + 1,
     });
   const byMatch = <T,>(rows: readonly T[], rank: (row: T) => number) =>
     rows
@@ -1268,6 +1305,7 @@ export function SearchResults({
   // DMs, are where the viewer works with their agents. Removing DM-listed
   // people below only lifts the rest, so a row shown here still shows in the
   // Agents group.
+  const bestieDmId = useBestieConversation(session);
   const newChats = new Map(
     rankPeople(
       people.filter(({ agent }) => agent),
@@ -1455,11 +1493,12 @@ export function SearchResults({
     personAttempt.current = undefined;
     setPersonOpen(undefined);
   };
-  // So does closing, or a reopen during the close animation would navigate.
+  // So does closing, or a reopen during the close animation would navigate,
+  // and so does searching one conversation instead.
   // biome-ignore lint/correctness/useExhaustiveDependencies: cancelPersonOpen reads only refs and setters.
   useEffect(() => {
-    if (open === false) cancelPersonOpen();
-  }, [open]);
+    if (open === false || scopedChannelId) cancelPersonOpen();
+  }, [open, scopedChannelId]);
   const openPerson = async (pubkey: string, name: string, agent: boolean) => {
     if (personAttempt.current) return;
     const existing = directMessageWith(
@@ -1565,10 +1604,45 @@ export function SearchResults({
     .filter(({ person }) => !person.agent)
     .slice(0, PERSON_ROWS)
     .map(personDestination);
-  const agentResults = rankedPeople
+  // The viewer's Bestie is reached through its DM, so that DM follows its
+  // "New chat" row directly rather than its chats; other agents keep #1471's
+  // order. The row finds Bestie by any of its names (with or without "@"), so
+  // its DM comes from the eligible channels, after the hidden-DM rule but
+  // before the label match and the Direct messages cap, and shows only beside
+  // Bestie's shown "New chat" row. Top results keeps the two together where
+  // it cuts the Agents group short.
+  const bestieDm = channels.find(
+    (channel) =>
+      channel.id === bestieDmId &&
+      channel.channelType === "dm" &&
+      !channel.archived &&
+      !sidebarHidden(channel) &&
+      dmAgent(channel),
+  );
+  const bestieKey = personKey(bestieDm?.participants?.[0] ?? "");
+  const agentRows = rankedPeople
     .filter(({ person }) => person.agent)
     .slice(0, PERSON_ROWS)
     .map(personDestination);
+  const bestieShown =
+    !!openAgentSession &&
+    !!bestieDm &&
+    agentRows.some(({ key }) => key === bestieKey);
+  const agentResults = agentRows.flatMap((row) =>
+    bestieShown && bestieDm && row.key === bestieKey
+      ? [
+          row,
+          {
+            ...conversationDestination(bestieDm),
+            score: row.score,
+            attached: true,
+          },
+        ]
+      : [row],
+  );
+  const dmResults = directMessageResults.filter(
+    (channel) => !bestieShown || channel.id !== bestieDm?.id,
+  );
   const suggestions = channels
     .filter(
       (channel) =>
@@ -1584,12 +1658,27 @@ export function SearchResults({
         (a.lastActivityAt ?? a.updatedAt ?? 0),
     );
   // Other unread conversations lead an empty search, so Enter opens the
-  // latest, unless turned off. Muted ones stay quiet, as in the app's unread
-  // indicator.
+  // first, unless turned off: DMs, then mentions of you, then threads you're
+  // in, then the rest, each most recent first. Muted ones stay quiet, as in
+  // the app's unread indicator, except for a mention of you.
   const unreadFirst = useUnreadFirstPreference().enabled;
   const unreadIds = useUnreadChannelIds(
     session.unread,
     JSON.stringify(suggestions.map(({ id }) => id)),
+  );
+  const reasons = useUnreadReasons(
+    session.unread,
+    JSON.stringify(
+      suggestions.flatMap(({ id, channelType }) =>
+        unreadIds.has(id) && channelType !== "dm" ? [id] : [],
+      ),
+    ),
+  );
+  // A DM's or chat's own newest unread message, as the Inbox shows it.
+  const inbox = useSyncExternalStore(
+    session.unread.subscribeInbox,
+    session.unread.inbox,
+    session.unread.inbox,
   );
   const muted = useSyncExternalStore(
     session.sidebarPreferences.subscribe,
@@ -1600,8 +1689,18 @@ export function SearchResults({
     unreadFirst &&
     id !== currentChannelId &&
     unreadIds.has(id) &&
-    !muted.includes(id);
-  const unreadChannels = suggestions.filter(isUnread).slice(0, UNREAD_ROWS);
+    (!muted.includes(id) || !!reasons.get(id)?.mention);
+  const tier = ({ id, channelType }: ChannelSummary) =>
+    channelType === "dm"
+      ? 0
+      : reasons.get(id)?.mention
+        ? 1
+        : reasons.get(id)?.thread
+          ? 2
+          : 3;
+  const unreadChannels = suggestions
+    .filter(isUnread)
+    .sort((a, b) => tier(a) - tier(b));
   // A channel unread only through thread replies previews and opens the
   // newest one, as its sidebar activity does.
   const unreadThreads = useUnreadThreadOnly(
@@ -1610,11 +1709,25 @@ export function SearchResults({
       unreadChannels.map(({ id, channelType }) => [id, channelType === "dm"]),
     ),
   );
+  const latestUnread = new Map<string, InboxItem>();
+  for (const item of inbox.items) {
+    const kept = latestUnread.get(item.channelId);
+    if (
+      item.id === `${item.channelId}:${item.channelId}` &&
+      (!kept || item.createdAt > kept.createdAt)
+    )
+      latestUnread.set(item.channelId, item);
+  }
   const threadAuthors = [
     ...new Set(
-      [...unreadThreads.values()].map(
-        ({ authorId, workflowOwnerId }) => workflowOwnerId ?? authorId,
-      ),
+      [
+        ...unreadThreads.values(),
+        ...[...reasons.values()].flatMap(({ mention, thread }) => [
+          ...(mention ? [mention] : []),
+          ...(thread ? [thread] : []),
+        ]),
+        ...latestUnread.values(),
+      ].map(({ authorId, workflowOwnerId }) => workflowOwnerId ?? authorId),
     ),
   ]
     .sort()
@@ -1626,21 +1739,28 @@ export function SearchResults({
         .ensure(threadAuthors.split(":"), "background")
         .catch(() => {});
   }, [session, threadAuthors, profileGeneration]);
+  const authorName = (
+    {
+      authorId,
+      workflowOwnerId,
+    }: { authorId: string; workflowOwnerId?: string | undefined },
+    channel: ChannelSummary,
+  ) => {
+    const displayId = workflowOwnerId ?? authorId;
+    const resolved = resolveName(
+      displayId,
+      profiles.get(displayId)?.name ?? displayId.slice(0, 10),
+      channel.members ?? noMembers,
+    );
+    return workflowOwnerId ? workflowLabel(resolved) : resolved;
+  };
   // The preview beside the row shows its latest messages, so the row names
   // its kind, as a search result does.
   const suggestion = (channel: ChannelSummary): SearchDestination => {
     const destination = channelDestination(channel);
     const thread = unreadThreads.get(channel.id);
     if (!thread) return destination;
-    const displayId = thread.workflowOwnerId ?? thread.authorId;
-    const resolved = resolveName(
-      displayId,
-      profiles.get(displayId)?.name ?? displayId.slice(0, 10),
-      channel.members ?? noMembers,
-    );
-    const name = thread.workflowOwnerId
-      ? t("search.workflowOwner", { name: resolved })
-      : resolved;
+    const name = authorName(thread, channel);
     return {
       ...destination,
       detailIcon: ThreadIcon,
@@ -1653,34 +1773,65 @@ export function SearchResults({
       ),
     };
   };
-  const unread = unreadChannels.map(suggestion);
+  // An unread row says why it leads, and shows the message that made it
+  // unread: the mention, the thread reply, or a DM's or chat's newest.
+  const unread = unreadChannels.map((channel): SearchDestination => {
+    const reason = reasons.get(channel.id);
+    const mention = reason?.mention;
+    // The row shows the reply that earned it the Thread tier.
+    const thread = !mention && reason?.thread;
+    const threadOnly = unreadThreads.has(channel.id);
+    // A channel unread only through threads opens the thread its row shows;
+    // a mixed one opens to its conversation.
+    const root = threadOnly
+      ? (mention || thread || undefined)?.rootId
+      : undefined;
+    const row = suggestion(channel);
+    const latest =
+      threadOnly || thread ? undefined : latestUnread.get(channel.id);
+    // Only a group conversation names who wrote it.
+    const shown =
+      latest?.preview.trim() &&
+      ((channel.members?.length ?? 0) > 2
+        ? `${authorName(latest, channel)}: ${latest.preview}`
+        : latest.preview);
+    const tag =
+      channel.channelType === "dm"
+        ? t("v106sh.search.tagDm")
+        : mention
+          ? t("v106sh.search.tagMentioned")
+          : reason?.thread
+            ? t("v106sh.search.tagThread")
+            : undefined;
+    return {
+      ...row,
+      ...(root && {
+        run: choose(row.key, () => openConversation(channel.id, root, root)),
+      }),
+      ...(shown && { detail: shown }),
+      ...(thread && {
+        detailIcon: ThreadIcon,
+        detailIconLabel: t("search.threadReply"),
+        detail: thread.preview.trim()
+          ? `${authorName(thread, channel)}: ${thread.preview}`
+          : t("search.repliedThread", { name: authorName(thread, channel) }),
+      }),
+      ...(mention && {
+        detailIcon: AtIcon,
+        detailIconLabel: t("completionDisplay.mention"),
+        detail: mention.preview.trim()
+          ? `${authorName(mention, channel)}: ${mention.preview}`
+          : t("v106sh.search.mentionedYou", {
+              name: authorName(mention, channel),
+            }),
+      }),
+      ...(tag && { trailing: <Badge size="xs">{tag}</Badge> }),
+    };
+  });
   const recent = suggestions
     .filter((channel) => !isUnread(channel))
     .slice(0, 4)
     .map(suggestion);
-  const currentChannel = currentChannelId
-    ? channels.find((channel) => channel.id === currentChannelId)
-    : undefined;
-  const scopeAction: SearchDestination[] =
-    !scopedChannelId && !offline && currentChannel && onScopeChange
-      ? [
-          {
-            key: `scope:${currentChannel.id}`,
-            label: t(
-              currentChannel.channelType === "dm"
-                ? "search.searchConversation"
-                : "search.searchIn",
-              { name: names.get(currentChannel.id) ?? currentChannel.name },
-            ),
-            detail: t("search.searchMessagesConversation"),
-            icon: ChatCircleIcon,
-            run: () => {
-              cancelPersonOpen();
-              onScopeChange(currentChannel.id);
-            },
-          },
-        ]
-      : [];
   const nameOf = (pubkey: string, channelId?: string) =>
     resolveName(
       pubkey,
@@ -1706,18 +1857,31 @@ export function SearchResults({
       list.channels.find((channel) => channel.id === message.channelId)
         ?.members ?? noMembers,
     );
-    const shown = snippet(message.text || message.preview, terms);
+    const text = message.text || message.preview;
+    const shown = snippet(text, terms);
     return {
       key: message.id,
       label: shown.text || t("v105shell.search.attachment"),
       ...(shown.matches.length ? { matches: shown.matches } : {}),
+      labelContent: shown.text ? (
+        <PreviewText
+          text={shown.text}
+          full={text}
+          start={shown.start}
+          mentions={message.mentioned}
+          matches={shown.matches}
+          session={session}
+          channelId={message.channelId}
+        />
+      ) : undefined,
       peek: {
         kind: "message" as const,
         channelId: message.channelId,
         messageId: message.id,
         createdAt: message.createdAt,
         authorId: message.workflowOwnerId ?? message.authorId,
-        text: message.text || message.preview,
+        text,
+        mentioned: message.mentioned,
       },
       detail: `${names.get(message.channelId) ?? channel?.name ?? t("search.conversation")} · ${message.workflowOwnerId ? t("search.workflowOwner", { name }) : name} · ${formatItemTimestamp(message.createdAt)}`,
       detailIcon: channel && channelIcon(channel),
@@ -1773,6 +1937,82 @@ export function SearchResults({
           },
         })
       : undefined;
+  /** Types `text` after what's typed: a filter for its picker to complete,
+   * or a whole one to try, which ends with a space for typing to carry on.
+   * `ask:` leads instead, keeping the rest as the question. */
+  const addFilter = (text: string, whole = false) => {
+    if (text.startsWith("ask:"))
+      setChipQuery(
+        chips,
+        text === "ask:" ? `ask: ${visibleQuery.trim()}` : text,
+      );
+    else
+      updateDisplayQuery(
+        `${visibleQuery.trimEnd()}${visibleQuery.trim() ? " " : ""}${text}${whole ? " " : ""}`,
+      );
+    input.current?.focus();
+  };
+  const sampleChannel = channels.find(
+    (channel) =>
+      channel.channelType !== "dm" &&
+      channel.channelType !== "solo" &&
+      !channel.archived,
+  )?.name;
+  const filters = guideOpen
+    ? guideFilters({
+        channel: sampleChannel,
+        ask: !!openAsk && !offline,
+        agent: askAgent?.name,
+        scoped: !!scopedChannelId,
+      })
+    : [];
+  const guideGroup: SearchGroup = {
+    label: "Filters",
+    why: t("v106sh.search.filtersWhy"),
+    destinations: filters.map((filter) => ({
+      key: `guide:${filter.key}`,
+      label: filter.label,
+      // A filter with no example here has no second line.
+      ...(filter.examples.length
+        ? { detail: filter.examples.map(([example]) => example).join(" · ") }
+        : {}),
+      icon: filter.icon,
+      trailing: <FilterSyntax operator={filter.key} text={syntaxOf(filter)} />,
+      run: () => addFilter(filter.syntax),
+    })),
+  };
+  /** A guide example as the chip choosing it would make, when it is one. */
+  const exampleChip = (example: string): SearchChip | undefined => {
+    const restored = restoreChips(example).chips[0];
+    if (restored) return restored;
+    const channel = /^in:#(.+)$/.exec(example)?.[1];
+    const found = channel
+      ? channels.find(({ name }) => name === channel)
+      : undefined;
+    return found
+      ? {
+          operand: `in:${found.id}`,
+          text: `in:#${found.name}`,
+          edit: `in:#${found.name}`,
+          label: localMessage("search.removeChannel", { name: found.name }),
+          title: found.id,
+        }
+      : undefined;
+  };
+  const guidePreview = (row: SearchDestination | undefined) => {
+    const filter = filters.find(({ key }) => `guide:${key}` === row?.key);
+    return filter ? (
+      <FilterGuidePreview
+        filter={filter}
+        onTry={(example) => {
+          const chip = exampleChip(example);
+          // As a picker would: it replaces a typed filter of its kind.
+          if (chip) selectChip(query.length, query.length, chip);
+          else addFilter(example, true);
+        }}
+      />
+    ) : null;
+  };
   const hints = asking ? (
     <div className="search-peek-hints">
       <Button
@@ -1812,7 +2052,7 @@ export function SearchResults({
   // An author or date picker replaces the result groups, so it announces
   // none of their lookups.
   const resultsShown =
-    !showAuthorPicker && !showDateChoices && !showChannelPicker;
+    !guideOpen && !showAuthorPicker && !showDateChoices && !showChannelPicker;
   /** Results with a preview beside them: not a question or a picker. */
   const previewed = !asking && resultsShown;
   const searchAnnouncement = useSearchAnnouncement(
@@ -1909,8 +2149,8 @@ export function SearchResults({
       label: "Direct messages",
       tone: "person" as const,
       icon: UsersIcon,
-      destinations: directMessageResults.map(conversationDestination),
-      best: Math.min(...directMessageResults.map(dmRank)),
+      destinations: dmResults.map(conversationDestination),
+      best: Math.min(...dmResults.map(dmRank)),
     },
     {
       label: "Pages",
@@ -2027,7 +2267,7 @@ export function SearchResults({
     !messagesPending &&
     !rankedGroups.some((group) => group.destinations.length);
   const offerAsk = !!parsed.text && (words >= 4 || settledEmpty);
-  const groups: readonly SearchGroup[] =
+  const resultGroups: readonly SearchGroup[] =
     pickerPrompt || showAmbiguousPicker
       ? [
           {
@@ -2112,20 +2352,35 @@ export function SearchResults({
                   ...(unread.length
                     ? [{ label: "Unread", destinations: unread }]
                     : []),
-                  ...(scopeAction.length
+                  // Conversations first, then searches: searches keep no
+                  // time to interleave by.
+                  ...(recent.length || recentSearches.length || !unread.length
                     ? [
                         {
-                          label: "This conversation",
-                          tone: "page" as const,
-                          destinations: scopeAction,
-                        },
-                      ]
-                    : []),
-                  ...(recent.length || !unread.length
-                    ? [
-                        {
-                          label: "Recent activity",
-                          destinations: recent,
+                          label: "Recents",
+                          destinations: [
+                            ...recent,
+                            ...recentSearches.map((text): SearchDestination => {
+                              const restored = restoreChips(text);
+                              return {
+                                key: `recent:${text}`,
+                                label: [
+                                  ...restored.chips.map((chip) => chip.text),
+                                  restored.visible,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" "),
+                                icon: ClockIcon,
+                                kind: "page",
+                                action: t("v105shell.search.searchAgain"),
+                                run: () =>
+                                  setChipQuery(
+                                    restored.chips,
+                                    restored.visible,
+                                  ),
+                              };
+                            }),
+                          ],
                           empty:
                             list.status === "loading"
                               ? t("search.loadingRecent")
@@ -2164,49 +2419,11 @@ export function SearchResults({
                         ]
                       : [];
                   }),
-                  ...(recentSearches.length
-                    ? [
-                        {
-                          label: "Recent searches",
-                          destinations: recentSearches.map(
-                            (text): SearchDestination => {
-                              const restored = restoreChips(text);
-                              return {
-                                key: `recent:${text}`,
-                                label: [
-                                  ...restored.chips.map((chip) => chip.text),
-                                  restored.visible,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" "),
-                                icon: ClockIcon,
-                                kind: "page",
-                                action: t("v105shell.search.searchAgain"),
-                                run: () =>
-                                  setChipQuery(
-                                    restored.chips,
-                                    restored.visible,
-                                  ),
-                              };
-                            },
-                          ),
-                        },
-                      ]
-                    : []),
                 ]
               : [
                   ...rankedGroups.filter(
                     (group) => hits || group !== messageGroup,
                   ),
-                  ...(scopeAction.length
-                    ? [
-                        {
-                          label: "This conversation",
-                          tone: "page" as const,
-                          destinations: scopeAction,
-                        },
-                      ]
-                    : []),
                   ...(offerAsk && askRow
                     ? [
                         {
@@ -2224,8 +2441,9 @@ export function SearchResults({
                   // nothing moves when it goes.
                   ...(hits ? [] : [messageGroup]),
                 ];
+  const groups = guideOpen ? [guideGroup] : resultGroups;
   const askReader =
-    openAsk && !offline && (asking || !!parsed.text) ? (
+    openAsk && !offline && (asking || guideOpen || !!parsed.text) ? (
       <DefaultAgent
         session={session}
         scope={sidebarScope ?? ""}
@@ -2249,7 +2467,8 @@ export function SearchResults({
             ),
           );
         }}
-        inlineSettings={inlineSettings}
+        // The guide is the only list while it shows.
+        inlineSettings={guideOpen ? undefined : inlineSettings}
         query={query}
         onQueryChange={onQueryChange}
         views={views}
@@ -2262,49 +2481,71 @@ export function SearchResults({
         label={
           scopedChannelId ? t("search.conversationSearch") : t("search.buzz")
         }
+        onBack={guideOpen ? () => setGuideQuery(undefined) : undefined}
         fieldAction={
-          sortable ? (
-            <MenuRoot>
-              <MenuTrigger
-                render={(props) => (
-                  <IconButton
-                    {...props}
-                    variant="ghost"
-                    // The heading's order is visual only; name it here.
-                    aria-label={t("v105shell.search.sortMessagesOrder", {
-                      order,
-                    })}
-                    title={t("search.sortMessages")}
-                    icon={<ArrowsDownUpIcon size={16} aria-hidden="true" />}
-                  />
-                )}
-              />
-              <MenuPopup
-                align="end"
-                size="compact"
-                aria-label={t("search.sortMessages")}
-                finalFocus={input}
-              >
-                <MenuRadioGroup
-                  value={sort}
-                  onValueChange={(value) =>
-                    setSort(value === "newest" ? "newest" : "relevance")
-                  }
+          <>
+            {sortable && (
+              <MenuRoot>
+                <MenuTrigger
+                  render={(props) => (
+                    <IconButton
+                      {...props}
+                      variant="ghost"
+                      // The heading's order is visual only; name it here.
+                      aria-label={t("v105shell.search.sortMessagesOrder", {
+                        order,
+                      })}
+                      title={t("search.sortMessages")}
+                      icon={<ArrowsDownUpIcon size={16} aria-hidden="true" />}
+                    />
+                  )}
+                />
+                <MenuPopup
+                  align="end"
+                  size="compact"
+                  aria-label={t("search.sortMessages")}
+                  finalFocus={input}
                 >
-                  <MenuRadioItem value="relevance" closeOnClick>
-                    {t("search.relevance")}
-                  </MenuRadioItem>
-                  <MenuRadioItem value="newest" closeOnClick>
-                    {t("search.recentOrder")}
-                  </MenuRadioItem>
-                </MenuRadioGroup>
-              </MenuPopup>
-            </MenuRoot>
-          ) : undefined
+                  <MenuRadioGroup
+                    value={sort}
+                    onValueChange={(value) =>
+                      setSort(value === "newest" ? "newest" : "relevance")
+                    }
+                  >
+                    <MenuRadioItem value="relevance" closeOnClick>
+                      {t("search.relevance")}
+                    </MenuRadioItem>
+                    <MenuRadioItem value="newest" closeOnClick>
+                      {t("search.recentOrder")}
+                    </MenuRadioItem>
+                  </MenuRadioGroup>
+                </MenuPopup>
+              </MenuRoot>
+            )}
+            {!asking && (
+              <IconButton
+                variant={guideOpen ? "subtle" : "ghost"}
+                size="sm"
+                aria-label={t("v106sh.search.filters")}
+                aria-pressed={guideOpen}
+                aria-keyshortcuts="?"
+                data-search-filters=""
+                title={t("v106sh.search.filtersTitle")}
+                // The field keeps focus, so typing goes on from the guide.
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  setGuideQuery(guideOpen ? undefined : query);
+                  input.current?.focus();
+                }}
+                icon={<SlidersHorizontalIcon size={16} aria-hidden="true" />}
+              />
+            )}
+          </>
         }
         scope={
           scopedChannelId && onScopeChange
             ? {
+                id: scopedChannelId,
                 label:
                   names.get(scopedChannelId) ??
                   session.channels.get?.(scopedChannelId)?.name ??
@@ -2319,13 +2560,16 @@ export function SearchResults({
           label: groupLabel(group.label),
         }))}
         open={open}
-        highlightEmpty={!scopedChannelId && !query.trim() && unread.length > 0}
+        highlightEmpty={
+          guideOpen || (!scopedChannelId && !query.trim() && unread.length > 0)
+        }
         // Enter before any row, or on search actions alone, waits for a
         // channel or person row, or for the lookups to settle, rather than
         // opening a message that lands first. A cold joined list has not yet
         // started the open-channel lookup.
         pending={
           !asking &&
+          !guideOpen &&
           (directoryPending ||
             operatorLookupPending ||
             search.loading ||
@@ -2340,35 +2584,59 @@ export function SearchResults({
           )
         }
         isAction={isSearchAction}
+        // The guide's rows add filters; Tab doesn't complete into them.
+        completing={
+          !guideOpen &&
+          (pickerPrompt ||
+            showAmbiguousPicker ||
+            showDateChoices ||
+            showChannelPicker)
+        }
+        completionPending={
+          !guideOpen &&
+          showAuthorPicker &&
+          !authorAnswer &&
+          !authorChoices.length
+        }
+        conversationShortcut={
+          currentChannelId && !scopedChannelId && !offline && onScopeChange
+            ? conversationBinding
+            : undefined
+        }
         footer={offline}
         peek={{
           // A filter or a conversation's own search asks for messages
           // only, so they aren't ranked with other results, but each still
           // previews.
-          ranked: previewed && !scopedChannelId && !hasOperator,
+          ranked: !guideOpen && previewed && !scopedChannelId && !hasOperator,
           hints,
-          busy: !!query.trim() && (messagesPending || directoryPending),
+          busy:
+            !guideOpen &&
+            !!query.trim() &&
+            (messagesPending || directoryPending),
           unsearched:
-            search.tooShort || search.onlyExclusions
+            !guideOpen && (search.tooShort || search.onlyExclusions)
               ? { [groupLabel("Messages")]: messageEmpty }
               : undefined,
-          preview: previewed
-            ? (row, tone, follow) => (
-                <SearchPreview
-                  session={session}
-                  cache={previews}
-                  row={row}
-                  tone={tone}
-                  follow={follow}
-                  terms={terms}
-                  nameOf={nameOf}
-                  whereOf={whereOf}
-                />
-              )
-            : undefined,
+          preview: guideOpen
+            ? guidePreview
+            : previewed
+              ? (row, tone, follow) => (
+                  <SearchPreview
+                    session={session}
+                    cache={previews}
+                    row={row}
+                    tone={tone}
+                    follow={follow}
+                    terms={terms}
+                    nameOf={nameOf}
+                    whereOf={whereOf}
+                  />
+                )
+              : undefined,
         }}
       >
-        {dateOperator === "on" && (
+        {dateOperator === "on" && !guideOpen && (
           <Calendar
             mode="single"
             locale={language === "ko" ? ko : enUS}
@@ -2382,6 +2650,8 @@ export function SearchResults({
         <div
           className="space-y-2 px-3 text-body-sm text-subtle"
           aria-live="polite"
+          // Lookup status belongs to the results the guide covers.
+          hidden={guideOpen}
         >
           {list.status === "loading" &&
             query.trim() &&
@@ -2519,6 +2789,8 @@ function groupLabel(source: string): string {
     "This conversation": "search.thisConversation",
     "Recent activity": "search.recentActivity",
     "Recent searches": "v105shell.search.recentSearches",
+    Recents: "v105shell.search.recents",
+    Filters: "v106sh.search.filters",
     Chats: "search.chats",
     "Direct messages": "search.dms",
     Pages: "search.pages",

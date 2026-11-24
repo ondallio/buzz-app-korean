@@ -54,6 +54,8 @@ type Row = Readonly<{
   order: number;
   /** Native close/quit defaults are reserved, not user-rebindable. */
   readOnly: boolean;
+  /** Matched by its own field, which accepts Control alone on Apple platforms. */
+  local: boolean;
   defaults: readonly KeyBinding[];
   override: KeyBinding | undefined;
   effective: readonly KeyBinding[];
@@ -85,6 +87,7 @@ const shortcutLabels = {
   "set-status": "settings.shortcut.set-status",
   settings: "settings.shortcut.settings",
   "app-reload": "settings.shortcut.app-reload",
+  "app-restart": "v106sh.shortcut.app-restart",
   "close-tab": "settings.shortcut.close-tab",
   "next-tab": "fuwin.shortcut.next-tab",
   "previous-tab": "fuwin.shortcut.previous-tab",
@@ -93,6 +96,7 @@ const shortcutLabels = {
   "reply-to-message": "settings.shortcut.reply-to-message",
   "mark-message-unread": "settings.shortcut.mark-message-unread",
   "delete-message": "settings.shortcut.delete-message",
+  "quote-selection": "v106sh.shortcut.quote-selection",
   "react-to-latest": "settings.shortcut.react-to-latest",
   home: "settings.shortcut.home",
   "shortcuts-help": "settings.shortcut.shortcuts-help",
@@ -105,6 +109,8 @@ const shortcutLabels = {
   new: "navigation.openNew",
   "global-search": "search.buzz",
   "conversation-search": "search.conversationSearch",
+  "search-previous-result": "v106sh.shortcut.search-previous-result",
+  "search-next-result": "v106sh.shortcut.search-next-result",
   "editor:Bold": "messages.format.bold",
   "editor:Italic": "messages.format.italic",
   "editor:Strikethrough": "messages.format.strike",
@@ -169,6 +175,7 @@ const editorRows = (sendWithModEnter: boolean): readonly Row[] =>
     owner: "Message formatting",
     order,
     readOnly: true,
+    local: false,
     defaults: bindings,
     override: undefined,
     effective: bindings,
@@ -288,6 +295,7 @@ function useShortcutGroups({
     shortcut: NormalizedShortcut,
     owner: string,
     readOnly = false,
+    local = false,
   ): Row => {
     const override = overrides[key];
     return {
@@ -296,6 +304,7 @@ function useShortcutGroups({
       owner,
       order: shortcut.order,
       readOnly,
+      local,
       defaults: shortcut.binding,
       override,
       effective: override ? [override] : shortcut.binding,
@@ -317,6 +326,7 @@ function useShortcutGroups({
             shortcut.binding.some((binding) =>
               includes(DESKTOP_CHORDS, binding),
             ),
+          shortcut.local,
         ),
       ),
     },
@@ -412,10 +422,14 @@ export function ShortcutSettings({
   // A chord can become shared after capture (a plugin enabled later, a new
   // default in a release). The dispatcher then picks one silently, so each
   // affected row names the others.
+  // A field-local row and a global one never compete: the field takes the
+  // chord while it has focus and the dispatcher everywhere else.
+  const competes = (target: Row, other: Row) =>
+    other.key !== target.key && other.local === target.local;
   const sharedWith = (target: Row) =>
     rows.filter(
       (other) =>
-        other.key !== target.key &&
+        competes(target, other) &&
         other.effective.some((binding) =>
           target.effective.some((current) => sameBinding(current, binding)),
         ),
@@ -444,13 +458,31 @@ export function ShortcutSettings({
     if (binding.key === "Dead" || binding.key === "Unidentified")
       return refuse(localMessage("settings.invalidShortcut"));
     if (otherPrimary) return refuse(localMessage("settings.wrongPrimary"));
-    if (!binding.mod && !binding.alt)
+    // Control alone stays text editing on Apple outside field-local rows.
+    if (!binding.mod && !(binding.ctrl && target.local) && !binding.alt)
       return refuse(
         localMessage(
           apple
-            ? "settings.includeMacModifier"
+            ? target.local
+              ? "v106sh.includeMacLocalModifier"
+              : "settings.includeMacModifier"
             : "settings.includeOtherModifier",
         ),
+      );
+    // The search field opens its first nine results with these, by physical digit.
+    if (
+      target.local &&
+      /^Digit[1-9]$/.test(code) &&
+      binding.mod &&
+      binding.shift &&
+      !binding.alt &&
+      !binding.ctrl
+    )
+      return refuse(
+        localMessage("v106sh.searchResultDigitsReserved", {
+          chord: formatBinding({ key: "1", mod: true, shift: true }, apple)
+            .text,
+        }),
       );
     // Apple's ⌥⇧⌘V browser paste types a layout-specific key, so match the physical V.
     const applePlainPaste =
@@ -466,7 +498,7 @@ export function ShortcutSettings({
       return refuse(localMessage("settings.desktopReserved", { chord }));
     const conflict = rows.find(
       (row) =>
-        row.key !== target.key &&
+        competes(target, row) &&
         row.effective.some((current) => sameBinding(current, binding)),
     );
     if (conflict)
@@ -490,9 +522,10 @@ export function ShortcutSettings({
     setEditing(null);
     // EditableInput handles Enter locally regardless of the held modifiers.
     setNotice(
-      binding.key === "Enter" ||
-        includes(EDITOR_CHORDS, binding) ||
-        includes(EDITOR_FORMAT_CHORDS, binding)
+      !target.local &&
+        (binding.key === "Enter" ||
+          includes(EDITOR_CHORDS, binding) ||
+          includes(EDITOR_FORMAT_CHORDS, binding))
         ? {
             key: target.key,
             tone: "warning",

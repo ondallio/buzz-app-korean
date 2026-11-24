@@ -43,7 +43,7 @@ export const en = {
   "inbox.clearFilters": "Clear filters",
   "inbox.markReadNamed": "Mark as read {sender} in {context}",
   "inbox.markRead": "Mark as read",
-  "inbox.markUnread": "Mark unread",
+  "inbox.markUnread": "Mark as unread",
   "inbox.actionsNamed": "Actions for {sender} in {context}",
   "inbox.recentActivity": "Recent activity",
   "inbox.youreCaughtUp": "You're all caught up",

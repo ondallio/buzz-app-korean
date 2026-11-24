@@ -34,6 +34,7 @@ import {
   linkBindings,
   type ComposerFormat,
 } from "./composer-dom";
+import type { ComposerMarkdownMode } from "./composer-markdown";
 import styles from "./ComposerFormattingTools.module.css";
 
 // A short ease-out gives immediate feedback without an entrance delay.
@@ -87,8 +88,13 @@ export function ComposerFormattingTools({
   toggleFormat,
   editLink,
   trailing,
+  persistent = false,
+  markdownMode = "chat",
 }: {
   children: ReactNode;
+  /** Document surfaces expose the formatting list without a toggle. */
+  persistent?: boolean;
+  markdownMode?: ComposerMarkdownMode;
   /** Conversation controls that follow the tools on the same row. */
   trailing?: ReactNode;
   disabled: boolean;
@@ -98,7 +104,12 @@ export function ComposerFormattingTools({
   editLink(): void;
 }) {
   useLanguage();
-  const [open, setOpen] = useState(false);
+  const supportedOptions =
+    markdownMode === "document"
+      ? options.filter(([label]) => label !== "Spoiler")
+      : options;
+  const [toggled, setOpen] = useState(false);
+  const open = persistent || toggled;
   const reduceMotion = useReducedMotion();
   const [keyboardToggle, setKeyboardToggle] = useState(false);
   const instant = reduceMotion || keyboardToggle;
@@ -149,27 +160,29 @@ export function ComposerFormattingTools({
             exit={{ opacity: 0 }}
             transition={transition}
           >
-            <motion.div
-              className={styles.close}
-              initial={instant ? false : faded}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={faded}
-              transition={transition}
-            >
-              <IconButton
-                hint="familiar"
-                ref={openToggle}
-                size="sm"
-                variant="subtle"
-                aria-label={t("messages.format.close")}
-                title={t("messages.format.close")}
-                disabled={disabled}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={(event) => change(false, event.detail === 0)}
-                icon={<XIcon size={16} />}
-              />
-              <div className={styles.divider} aria-hidden="true" />
-            </motion.div>
+            {!persistent && (
+              <motion.div
+                className={styles.close}
+                initial={instant ? false : faded}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={faded}
+                transition={transition}
+              >
+                <IconButton
+                  hint="familiar"
+                  ref={openToggle}
+                  size="sm"
+                  variant="subtle"
+                  aria-label={t("messages.format.close")}
+                  title={t("messages.format.close")}
+                  disabled={disabled}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={(event) => change(false, event.detail === 0)}
+                  icon={<XIcon size={16} />}
+                />
+                <div className={styles.divider} aria-hidden="true" />
+              </motion.div>
+            )}
             <motion.div
               className={styles.scroll}
               initial={instant ? false : faded}
@@ -181,7 +194,7 @@ export function ComposerFormattingTools({
                 className={styles.options}
                 aria-label={t("messages.format.options")}
               >
-                {options.map(([label, Icon]) => {
+                {supportedOptions.map(([label, Icon]) => {
                   const format = composerFormats.find(
                     (item) => item.label === label,
                   );

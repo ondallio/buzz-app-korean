@@ -1,5 +1,6 @@
 import { rich } from "../../shared/i18n/rich";
 import { t, useLanguage } from "../../shared/i18n";
+import { sessionScope } from "../../features/agent-harness/session-scope";
 // Pi's New agent choices and agent settings. Providers, their keys and their
 // models are Pi's own: listed from it, and keys saved with its login.
 import {
@@ -19,7 +20,12 @@ import {
   whenShown,
 } from "../../features/agents/TranscriptPanel";
 import { AgentInstructions } from "../../features/agents/AgentInstructions";
-import { AgentSaveButton } from "../../features/agents/AgentSaveButton";
+import { CompactionField } from "../../features/agents/Compaction";
+import { withCompactAt } from "../../features/agents/compact-at";
+import {
+  AgentSaveButton,
+  ClearModelOverrides,
+} from "../../features/agents/AgentSaveButton";
 import { ModelPicker } from "../../features/agents/ModelPicker";
 import {
   ConversationName,
@@ -72,6 +78,7 @@ const scopes = () => [
     options: [
       { value: "thread", label: t("v1agent.pi.perThread") },
       { value: "channel", label: t("v1agent.pi.perChannel") },
+      { value: "community", label: t("v106ag.scope.piPerCommunity") },
     ],
   },
 ];
@@ -89,12 +96,14 @@ const providerIcon = (id: string | undefined) => {
   return Icon && <Icon size={18} aria-hidden="true" />;
 };
 const CONVERSATION_LIMIT = 30;
-const label = ({ channelId, name, root }: Place) =>
-  `${name || channelId.slice(0, 8)} · ${
-    root
-      ? t("v1agent.claudeTabs.threadId", { id: root.slice(0, 8) })
-      : t("v1agent.claudeTabs.channel")
-  }`;
+const label = ({ channelId, name, root, community }: Place) =>
+  community
+    ? t("v106ag.communitySession")
+    : `${name || channelId.slice(0, 8)} · ${
+        root
+          ? t("v1agent.claudeTabs.threadId", { id: root.slice(0, 8) })
+          : t("v1agent.claudeTabs.channel")
+      }`;
 type Read<T> = (
   | { status: "loading"; value?: T }
   | { status: "ready"; value: T }
@@ -814,6 +823,8 @@ export function createTabs({
       places,
       conversation,
       async () => undefined,
+      undefined,
+      readConfig(agent.config).scope,
     );
     const status = (place: Place) =>
       working.includes(place.conversation)
@@ -940,6 +951,17 @@ export function createTabs({
       setSaving(true);
       setError("");
       try {
+        if (
+          settingsHost?.proposedModelOrEffort &&
+          (draft.model || draft.effort)
+        ) {
+          const model = models.value?.find(
+            ({ id }) => id === (draft.model || defaultModel(draft, defaults)),
+          );
+          if (!model) throw new Error(t("v106ag.pi.chooseModel"));
+          if (draft.effort && !model.thinking.includes(draft.effort))
+            throw new Error(t("v106ag.pi.chooseThinking"));
+        }
         await save({
           ...draft,
           workspace: draft.workspace.trim() || DEFAULT_CONFIG.workspace,
@@ -1015,6 +1037,11 @@ export function createTabs({
                 groups={[{ label: "", options: efforts }]}
                 onValueChange={(effort) => setDraft({ ...draft, effort })}
               />
+              <CompactionField
+                value={draft.compactAt}
+                disabled={saving}
+                onChange={(value) => setDraft(withCompactAt(draft, value))}
+              />
             </SettingsGroup>
             <AgentInstructions
               value={draft.instructions}
@@ -1045,12 +1072,19 @@ export function createTabs({
               onValueChange={(value) =>
                 setDraft({
                   ...draft,
-                  scope: value === "channel" ? "channel" : "thread",
+                  scope: sessionScope(value),
                 })
               }
             />
           </>
         )}
+        {settingsHost?.proposedModelOrEffort &&
+          (draft.model || draft.effort) && (
+            <ClearModelOverrides
+              disabled={saving}
+              onClick={() => setDraft({ ...draft, model: "", effort: "" })}
+            />
+          )}
         <AgentSaveButton
           form={form}
           saving={saving}

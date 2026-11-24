@@ -339,7 +339,7 @@ export const en = {
   "v1agent.authorize.yourCommunities": "Your communities",
   "v1agent.authorize.notEnabledHere": "External apps are not enabled here.",
   "v1agent.authorize.fullAccess":
-    "Full access as the selected agent: the app can use every Buzz tool the agent has, including tools plugins add later. It reads, posts and manages channels where the agent can, uses its memory, attention and Git access to its community's repositories, wakes the agent in its conversations, runs the Nexus workers the agent may run, and can change Buzz settings on this device. It can post any file the agent can read on this device, including outside its workspace. It can disable plugins; installing, updating, enabling or removing one needs your confirmation. Keys stay in Buzz.",
+    "Full access as the selected agent: the app can use every Buzz tool the agent has, including tools plugins add later. It reads, posts and manages channels where the agent can, uses its memory, attention and Git access to its community's repositories, wakes the agent in its conversations, runs worker tasks the agent has access to, and can change Buzz settings on this device. It can post any file the agent can read on this device, including outside its workspace. It can disable plugins; installing, updating, enabling or removing one needs your confirmation. Keys stay in Buzz.",
   "v1agent.authorize.renewal":
     "The app can renew valid approval for another 30 days. Approval expires after 30 days without renewal. The app can restore this access after either app restarts. You can revoke it in External apps.",
   "v1agent.authorize.enableAgents":
@@ -470,7 +470,7 @@ export const en = {
     "The execution provider sets the remote workspace.",
   "v1agent.settings.workspaceHint":
     "The folder {harness} works in. Use ~/ for your home folder.",
-  "v1agent.settings.sessions": "Sessions",
+  "v1agent.settings.sessions": "Session scope",
   "v1agent.settings.modelAndThinking": "Model and thinking",
   "v1agent.codex.notInstalled": "The Codex integration isn't installed yet.",
   "v1agent.codex.signInNeeded": "Codex needs you to sign in.",
@@ -937,7 +937,7 @@ export const ko: Record<keyof typeof en, string> = {
   "v1agent.authorize.notEnabledHere":
     "여기서는 외부 앱이 활성화되어 있지 않습니다.",
   "v1agent.authorize.fullAccess":
-    "선택한 에이전트로서의 전체 접근 권한: 앱은 나중에 플러그인이 추가하는 도구를 포함해 에이전트가 가진 모든 Buzz 도구를 사용할 수 있습니다. 에이전트가 할 수 있는 채널에서 읽기, 게시, 관리를 하고, 에이전트의 메모리와 지켜보기, 커뮤니티 저장소에 대한 Git 접근 권한을 사용하며, 대화에서 에이전트를 깨우고, 에이전트가 실행할 수 있는 Nexus 워커를 실행하고, 이 기기의 Buzz 설정을 변경할 수 있습니다. 작업 공간 밖을 포함해 이 기기에서 에이전트가 읽을 수 있는 모든 파일을 게시할 수 있습니다. 플러그인을 비활성화할 수 있으며, 설치·업데이트·활성화·제거에는 사용자의 확인이 필요합니다. 키는 Buzz에 보관됩니다.",
+    "선택한 에이전트로서의 전체 접근 권한: 앱은 나중에 플러그인이 추가하는 도구를 포함해 에이전트가 가진 모든 Buzz 도구를 사용할 수 있습니다. 에이전트가 할 수 있는 채널에서 읽기, 게시, 관리를 하고, 에이전트의 메모리와 지켜보기, 커뮤니티 저장소에 대한 Git 접근 권한을 사용하며, 대화에서 에이전트를 깨우고, 에이전트가 접근할 수 있는 워커 작업을 실행하고, 이 기기의 Buzz 설정을 변경할 수 있습니다. 작업 공간 밖을 포함해 이 기기에서 에이전트가 읽을 수 있는 모든 파일을 게시할 수 있습니다. 플러그인을 비활성화할 수 있으며, 설치·업데이트·활성화·제거에는 사용자의 확인이 필요합니다. 키는 Buzz에 보관됩니다.",
   "v1agent.authorize.renewal":
     "앱은 유효한 승인을 30일 더 갱신할 수 있습니다. 갱신하지 않으면 승인은 30일 후 만료됩니다. 어느 앱이 재시작되더라도 앱이 이 접근 권한을 복원할 수 있습니다. 외부 앱에서 취소할 수 있습니다.",
   "v1agent.authorize.enableAgents":
@@ -1068,7 +1068,7 @@ export const ko: Record<keyof typeof en, string> = {
     "원격 작업 공간은 실행 제공자가 설정합니다.",
   "v1agent.settings.workspaceHint":
     "{harness} 하네스가 작업하는 폴더입니다. 홈 폴더는 ~/로 지정하세요.",
-  "v1agent.settings.sessions": "세션",
+  "v1agent.settings.sessions": "세션 범위",
   "v1agent.settings.modelAndThinking": "모델 및 사고",
   "v1agent.codex.notInstalled": "Codex 통합이 아직 설치되지 않았습니다.",
   "v1agent.codex.signInNeeded": "Codex에 로그인해야 합니다.",

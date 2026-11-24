@@ -13,14 +13,18 @@ import type { Agents } from "../../features/agents/service";
 import {
   templateAgents,
   useChannelTemplates,
+  type ChannelTemplate,
 } from "../../features/channel-templates/local";
+import {
+  projectDefault,
+  projectTemplateId,
+  shareableInstructions,
+} from "../../features/solo/workspace";
 import { Select } from "../../shared/design-system/ui/Select";
 import { useTeams } from "../../features/agents/react";
 import { useAgentChoices } from "../../features/agents/use-choices";
-import {
-  templateAgentChoices,
-  type AgentChoicesSnapshot,
-} from "../../features/agents/choices";
+import { templateEvidence } from "../../features/channel-templates/useTemplateAgents";
+import { templateAgentChoices } from "../../features/agents/choices";
 import {
   useEffect,
   useId,
@@ -31,6 +35,7 @@ import {
   type RefObject,
 } from "react";
 import { Button } from "../../shared/design-system/ui/Button";
+import { Checkbox } from "../../shared/design-system/ui/Checkbox";
 import { Dialog } from "../../shared/design-system/ui/Dialog";
 import {
   ChannelPrivacyConfirmation,
@@ -71,20 +76,6 @@ type Props = {
 export function CreateChannelDialog(props: Props) {
   // Each opening owns its callbacks. Closing/reopening cannot revive an old editor.
   return props.open ? <OpenCreateChannelDialog {...props} /> : null;
-}
-/** Templates add members only from ready inventory and archive evidence. */
-function templateEvidence(choices: AgentChoicesSnapshot) {
-  const ready =
-    choices.templates.status === "ready" && choices.archives.status === "ready";
-  return {
-    ready,
-    // Still being read, as opposed to failed or unavailable.
-    checking:
-      !ready &&
-      (choices.templates.pending ||
-        choices.archives.status === "idle" ||
-        choices.archives.status === "loading"),
-  };
 }
 function OpenCreateChannelDialog({
   open,
@@ -132,12 +123,83 @@ function OpenCreateChannelDialog({
   const [error, setError] = useState<DisplayMessage>("");
   const [groupId, setGroupId] = useState("");
   const [starred, setStarred] = useState(false);
-  const templates = useChannelTemplates();
+  const loadDefaults = !!initialGroup && session.channelKit.available;
+  const channelTemplates = useChannelTemplates();
+  const [workspaceTemplate, setWorkspaceTemplate] = useState<ChannelTemplate>();
+  // Workspace instructions start a channel's Canvas unless unticked.
+  const [shareWorkspaceInstructions, setShareWorkspaceInstructions] =
+    useState(true);
+  const [loadingDefaults, setLoadingDefaults] = useState(loadDefaults);
+  const [defaultsError, setDefaultsError] = useState("");
+  const [defaultsAttempt, setDefaultsAttempt] = useState(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Retry reloads the same workspace.
+  useEffect(() => {
+    if (!loadDefaults) return;
+    let active = true;
+    setLoadingDefaults(true);
+    setDefaultsError("");
+    void (async () => {
+      await session.channelKit.refresh();
+      const kit = session.channelKit.snapshot();
+      if (kit.status !== "ready")
+        throw new Error(kit.error ?? t("v106ch.create.defaultsFailed"));
+      const preferred = projectDefault(
+        kit.entries,
+        await projectTemplateId(initialGroup),
+        session.sidebarPreferences.snapshot().data?.legacyTemplates?.[
+          initialGroup
+        ],
+        true,
+      );
+      if (!active || !preferred) return;
+      const teamAgents = preferred.teamIds.flatMap((id) => {
+        const team = kit.entries.find(
+          ({ record }) =>
+            !record.deleted &&
+            record.value.type === "team" &&
+            record.value.id === id,
+        )?.record.value;
+        if (team?.type !== "team")
+          throw new Error(t("v106ch.create.defaultsTeamFailed"));
+        return team.agents;
+      });
+      // Only standalone instructions are eligible to share; local paths stay.
+      const canvas = shareableInstructions(preferred.canvas);
+      setWorkspaceTemplate({
+        id: preferred.id,
+        name: t("v106ch.create.workspaceDefaults"),
+        teams: [],
+        agents: [...new Set([...preferred.agents, ...teamAgents])],
+        canvas,
+      });
+    })()
+      .catch((reason: unknown) => {
+        if (active)
+          setDefaultsError(
+            reason instanceof Error ? reason.message : String(reason),
+          );
+      })
+      .finally(() => {
+        if (active) setLoadingDefaults(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [defaultsAttempt, initialGroup, loadDefaults, session]);
+  const templates = workspaceTemplate
+    ? [
+        workspaceTemplate,
+        ...channelTemplates.filter(({ id }) => id !== workspaceTemplate.id),
+      ]
+    : channelTemplates;
   const teams = useTeams(agents);
-  const [chosenTemplate, setTemplateId] = useState("");
+  const [chosenTemplate, setTemplateId] = useState<string>();
   // A template deleted meanwhile, here or in another window, is no choice.
-  const template = templates.find((item) => item.id === chosenTemplate);
+  const template = templates.find(
+    (item) => item.id === (chosenTemplate ?? workspaceTemplate?.id),
+  );
   const templateId = template?.id ?? "";
+  const usesWorkspaceDefaults = !!template && template === workspaceTemplate;
   // A template names agents and teams' members; which are the owner's agents in
   // this community is the shared selection's call, under the policy session
   // setup applies.
@@ -187,7 +249,10 @@ function OpenCreateChannelDialog({
   };
   const templateSetup = template && {
     agents: templateAgents(template, teams, new Set(agentNames.keys())),
-    canvas: template.canvas,
+    canvas:
+      usesWorkspaceDefaults && !shareWorkspaceInstructions
+        ? ""
+        : template.canvas,
   };
   const templateNote =
     templateSetup &&
@@ -231,7 +296,8 @@ function OpenCreateChannelDialog({
     setError("");
     setGroupId(initialGroup);
     setStarred(initialStarred);
-    setTemplateId("");
+    setTemplateId(undefined);
+    setShareWorkspaceInstructions(true);
   }, [open, initialGroup, initialStarred]);
 
   const normalizedName = canonicalDetailsName(name);
@@ -241,14 +307,20 @@ function OpenCreateChannelDialog({
     visibility: privateChannel ? "private" : "public",
   });
   const displayErrors = localizedDetailsErrors(errors);
-  const invalid = Object.values(errors).some(Boolean) || unresolved;
+  const invalid =
+    Object.values(errors).some(Boolean) ||
+    unresolved ||
+    (chosenTemplate === undefined && (loadingDefaults || !!defaultsError));
 
   const dirty =
     name !== "" ||
     description !== "" ||
     privateChannel ||
     lifetime !== "ongoing" ||
-    templateId !== "";
+    groupId !== initialGroup ||
+    !shareWorkspaceInstructions ||
+    (chosenTemplate !== undefined &&
+      chosenTemplate !== (workspaceTemplate?.id ?? ""));
   const requestClose = () => {
     if (busy) return;
     if (privacyChoice) setPrivacyChoice(undefined);
@@ -481,16 +553,64 @@ function OpenCreateChannelDialog({
               setError("");
             }}
           />
-          {templates.length > 0 && (
+          {initialGroup && (
+            <Select
+              label={t("v106ch.create.destination")}
+              variant="field"
+              value={groupId}
+              groups={[
+                {
+                  label: "",
+                  options: [
+                    { value: "", label: t("shell.sidebar.team") },
+                    ...(groupId && !destination
+                      ? [
+                          {
+                            value: groupId,
+                            label: t("v106ch.create.savedWorkspace"),
+                          },
+                        ]
+                      : []),
+                    ...destinations.map(({ id, name }) => ({
+                      value: id,
+                      label: name,
+                    })),
+                  ],
+                },
+              ]}
+              onValueChange={(value) => {
+                if (!editing.current) return;
+                setGroupId(value);
+                setError("");
+              }}
+            />
+          )}
+          {defaultsError && chosenTemplate === undefined && (
+            <p role="alert">
+              {defaultsError}{" "}
+              <Button
+                size="xs"
+                onClick={() => setDefaultsAttempt(defaultsAttempt + 1)}
+              >
+                {t("channelForms.retry")}
+              </Button>{" "}
+              <Button size="xs" onClick={() => setTemplateId("")}>
+                {t("v106ch.create.noTemplate")}
+              </Button>
+            </p>
+          )}
+          {(templates.length > 0 || loadingDefaults) && (
             <div ref={templateField} style={{ display: "contents" }}>
               <Select
                 label={t("channelForms.create.template")}
                 variant="field"
                 value={templateId}
                 description={
-                  checkingAgents
-                    ? t("channelForms.create.checkingAgents")
-                    : templateNote
+                  loadingDefaults && chosenTemplate === undefined
+                    ? t("v106ch.create.loadingDefaults")
+                    : checkingAgents
+                      ? t("channelForms.create.checkingAgents")
+                      : templateNote
                 }
                 error={
                   (unresolved && !checkingAgents) ||
@@ -524,10 +644,18 @@ function OpenCreateChannelDialog({
                 onValueChange={(value) => {
                   if (!editing.current) return;
                   setTemplateId(value);
+                  setShareWorkspaceInstructions(true);
                   setError("");
                 }}
               />
             </div>
+          )}
+          {usesWorkspaceDefaults && template.canvas.trim() && (
+            <Checkbox
+              label={t("v106ch.create.copyInstructions")}
+              checked={shareWorkspaceInstructions}
+              onCheckedChange={setShareWorkspaceInstructions}
+            />
           )}
           <ChannelDurationField
             temporary={lifetime === "temporary"}

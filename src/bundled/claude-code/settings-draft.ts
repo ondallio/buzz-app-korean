@@ -8,13 +8,15 @@ const groups = {
   instructions: ["instructions"],
   workspace: ["workspace"],
   scope: ["scope"],
+  compactAt: ["compactAt"],
 } as const;
 export type SettingGroup = keyof typeof groups;
 export const settingLabels: Record<SettingGroup, string> = {
   model: "Model and thinking",
   instructions: "Instructions",
   workspace: "Workspace",
-  scope: "Sessions",
+  scope: "Session scope",
+  compactAt: "Auto-compact at",
 };
 /** `settingLabels` in the viewer's language. */
 export const settingLabel = (group: SettingGroup) =>
@@ -24,7 +26,9 @@ export const settingLabel = (group: SettingGroup) =>
       ? t("agentCreate.instructions")
       : group === "workspace"
         ? t("v1agent.settings.workspace")
-        : t("v1agent.settings.sessions");
+        : group === "compactAt"
+          ? t("v106ag.compactAt")
+          : t("v1agent.settings.sessions");
 const names = Object.keys(groups) as SettingGroup[];
 const same = (a: Config, b: Config, group: SettingGroup) =>
   groups[group].every((key) => a[key] === b[key]);

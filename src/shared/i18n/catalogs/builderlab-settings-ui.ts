@@ -31,7 +31,7 @@ export const en = {
   "builderlabSettings.workspace": "Workspace",
   "builderlabSettings.workspaceDescription":
     "Remote runtime shared with your other agents in this workspace by default. Keeps working while this computer is off, and you can chat from your phone. It can’t open files on this computer.",
-  "builderlabSettings.sessions": "Sessions",
+  "builderlabSettings.sessions": "Session scope",
   "builderlabSettings.oneSession": "One session per thread",
   "builderlabSettings.differentAccountTitle": "Different account needed",
   "builderlabSettings.anotherAccountTitle": "Try another Builderlab account",
@@ -79,7 +79,7 @@ export const ko: Record<keyof typeof en, string> = {
   "builderlabSettings.workspace": "작업 공간",
   "builderlabSettings.workspaceDescription":
     "원격 런타임은 기본적으로 이 작업 공간의 다른 에이전트와 공유됩니다. 이 컴퓨터가 꺼져 있어도 계속 작동하며 휴대전화로 대화할 수 있습니다. 이 컴퓨터의 파일은 열 수 없습니다.",
-  "builderlabSettings.sessions": "세션",
+  "builderlabSettings.sessions": "세션 범위",
   "builderlabSettings.oneSession": "스레드마다 세션 하나",
   "builderlabSettings.differentAccountTitle": "다른 계정이 필요합니다",
   "builderlabSettings.anotherAccountTitle":

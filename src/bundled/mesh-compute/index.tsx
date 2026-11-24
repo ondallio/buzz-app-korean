@@ -4,7 +4,7 @@ import { MeshGoose } from "./meshGoose";
 import { createMeshTranscriptTab } from "./MeshTranscriptTab";
 import { MemoryReads, coreOf } from "../../features/agent-harness/core-memory";
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import type { PluginModule } from "../../plugins/api";
 
 import { EmbeddedActivity } from "./EmbeddedActivity";
@@ -15,7 +15,6 @@ import { Switch } from "../../shared/design-system/ui/Switch";
 import { Accordion } from "../../shared/design-system/ui/Accordion";
 import { CpuIcon } from "../../shared/design-system/icons";
 import { t, useLanguage } from "../../shared/i18n";
-import { rich } from "../../shared/i18n/rich";
 import { ShareModelPicker } from "./ShareModelPicker";
 import { CommunityMesh } from "./CommunityMesh";
 import { ConsumerComputeView } from "./ConsumerComputeView";
@@ -280,6 +279,7 @@ export const apply: PluginModule["apply"] = (ctx) => {
     disabled?: boolean;
   }) {
     useLanguage();
+    const sharingDisclosure = useId();
     const snapshot = useSyncExternalStore(
       ctx.relay.subscribe,
       ctx.relay.snapshot,
@@ -569,11 +569,23 @@ export const apply: PluginModule["apply"] = (ctx) => {
       );
     return (
       <ConsumerComputeView
+        headerDescription={
+          isTauri() && status && !otherCommunity ? (
+            <span id={sharingDisclosure}>
+              {community?.name
+                ? t("v106ag.mesh.sharingDisclosure", {
+                    community: community.name,
+                  })
+                : t("v106ag.mesh.sharingDisclosureDefault")}
+            </span>
+          ) : undefined
+        }
         headerControl={
           isTauri() && status && !otherCommunity ? (
             <div className={styles.sharingControl}>
               <Switch
                 aria-label={t("fubestie.mesh.shareCompute")}
+                aria-describedby={sharingDisclosure}
                 checked={shareOn}
                 onCheckedChange={(next) => {
                   if (next) void share();
@@ -614,25 +626,6 @@ export const apply: PluginModule["apply"] = (ctx) => {
         refreshDisabled={busy || !isTauri()}
         refresh={() => void refresh()}
       >
-        {community?.name &&
-          (status?.sharing && !otherCommunity ? (
-            <p className="m-0 text-body">
-              {rich("fubestie.mesh.sharingWith", {
-                model: (
-                  <strong title={status.sharing}>
-                    {modelNames[status.sharing] ?? status.sharing}
-                  </strong>
-                ),
-                community: <strong>{community.name}</strong>,
-              })}
-            </p>
-          ) : (
-            <p className="m-0 text-body-sm text-secondary">
-              {rich("fubestie.mesh.sharedComputeFor", {
-                community: <strong>{community.name}</strong>,
-              })}
-            </p>
-          ))}
         {otherCommunity && (
           <section aria-label={t("fubestie.mesh.boundCommunity")}>
             <p>
@@ -670,11 +663,6 @@ export const apply: PluginModule["apply"] = (ctx) => {
         )}
         {isTauri() && status && !otherCommunity && (
           <section aria-label={t("fubestie.mesh.shareCompute")}>
-            <p className="m-0 text-body-sm text-secondary">
-              {community?.name
-                ? t("fubestie.mesh.shareIntro", { community: community.name })
-                : t("fubestie.mesh.shareIntroDefault")}
-            </p>
             {status.sharing && status.download && !status.download.done && (
               <DownloadProgress download={status.download} />
             )}

@@ -18,14 +18,36 @@ function pullKey<P extends "pull" | "launcher">(prefix: P, read: Read) {
     : (`githubPullLinks.${prefix}.${state.state}.${checks}` as const);
 }
 
+/** Puts an open or draft pull request's review right after its state, as
+ * `describePull` lists it: the plain state's wording is the full one's start. */
+function withReview(word: (read: Read) => string, read: Read) {
+  const full = word(read);
+  const review = read.state?.review;
+  if (!review || read.failed) return full;
+  if (read.state?.state !== "open" && read.state?.state !== "draft")
+    return full;
+  const plain = word({
+    ...read,
+    state: { ...read.state, checks: undefined, conflicts: false },
+  });
+  const note = t(
+    review === "approved"
+      ? "v106ag.gh.review.approved"
+      : "v106ag.gh.review.changesRequested",
+  );
+  return full.startsWith(plain)
+    ? `${plain}, ${note}${full.slice(plain.length)}`
+    : `${full}, ${note}`;
+}
+
 /** Render-only PR wording; inputs and the canonical English producer stay unchanged. */
 export function displayPull(read: Read): string {
-  return t(pullKey("pull", read));
+  return withReview((value) => t(pullKey("pull", value)), read);
 }
 
 /** The linked pull request launcher's label, as `displayPull` words it. */
 export function displayPullLauncher(read: Read): string {
-  return t(pullKey("launcher", read));
+  return withReview((value) => t(pullKey("launcher", value)), read);
 }
 
 /** Render-only issue wording, as `describeIssue` words it in English. */
