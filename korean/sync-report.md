@@ -1,82 +1,93 @@
-## 원본 텍스트 영향 보고 (v1.0.4 → v1.0.5)
+## 원본 텍스트 영향 보고 (v1.0.5 → v1.0.6)
 
-### 원본 영어 문장이 바뀌었거나 사라진 번역 키: 50개
-- `channelForms.general.newParticipateExisting`: New people can participate. People already in the channel keep their access.
-- `channelForms.general.publicExisting`: Public (existing)
-- `channelForms.general.retainedMember`: People who already joined remain members and keep their access until you remove them in People.
-- `channelForms.general.retainedGuest`: People who joined while it was View only are members and keep reading until you remove them in People.
-- `channelForms.members.dmFixed`: DM membership cannot be changed here.
-- `claudeCreate.followDefault`: Following the provider's model default
-- `codexCreate.followDefault`: Following the provider's model default
-- `messageActions.forward.preview`: Message to forward
-- `messageActions.forward.access`: The recipient can open the original only if they have access to its conversation.
-- `messageActions.typing.scopeUnknown`: Work with unconfirmed thread
-- `search.channelMatches`: {count} channel matches
-- `search.joinableChannels`: Channels you can join
-- `search.allChannelsFailed`: Couldn’t load all channels.
-- `search.onlyRecentChannels`: Only the newest open channels are shown.
-- `search.loadingMoreChannels`: Loading more channels…
-- `search.privateChannels`: Private channels show up once someone invites you.
-- `search.joinedRecent`: You’ve joined all of the newest open channels.
-- `search.joinedAll`: You’ve joined every open channel.
-- `settingsHost.clickUpdate`: Click to update
-- `settingsHost.readyToUpdate`: Ready to update!
-- `v1wf.todo.conflict`: Canvas changed elsewhere. Refresh to load the latest todos. Your changes are kept until then.
-- `v1wf.todo.saveFailed`: Couldn’t save. Your changes are still here. {reason}
-- `v1wf.todo.recovered`: Recovered unsaved changes. Retry to save them to Canvas.
-- `v1wf.todo.saved`: Saved in Canvas
-- `v1wf.todo.changeStatus`: Change status
-- `v1wf.todo.assigneeFor`: Assignee for {task}
-- `v1wf.todo.assigneeForNamed`: Assignee for {task}: {name}
-- `v1wf.todo.fromCanvasChoose`: {name} (from Canvas; choose a member to link)
-- `v1wf.todo.fromCanvasNotLinked`: {name} (from Canvas; not linked to a member)
-- `v1wf.todo.refreshTodos`: Refresh todos
-- `v1wf.todo.localDraft`: Showing your unsaved local draft. Refresh to see the saved list.
-- `v1wf.todo.membersUnavailable`: Channel members unavailable or out of date.
-- `v1wf.todo.namesUnavailable`: Names unavailable; public keys still identify users.
-- `v1wf.todo.noCanvas`: This connection doesn’t support saving Canvas.
-- `v1wf.todo.readOnly`: Todos are read-only.
-- `v1wf.todo.loading`: Loading todos…
-- `v1wf.todo.loadFailed`: Couldn’t load todos. Try Refresh.
-- `v1wf.todo.none`: No todos yet
-- `v1wf.todo.emptyDescription`: Add a todo above to track work with this channel. Changes save automatically.
-- `v1wf.todo.discardTitle`: Discard unsaved changes?
-- `v1wf.todo.discardDescription`: Refreshing replaces your local changes and new todo text with the saved channel Canvas.
-- `v1wf.todo.discardRefresh`: Discard and refresh
-- `v1wf.todo.toggle`: Toggle channel todos
-- `v1wf.todo.connect`: Connect to this channel to view todos.
-- `v1wf.todo.err.multipleSections`: Canvas has more than one Todos section. Keep one ## Todos heading in Canvas before editing here.
-- `v1wf.todo.err.changed`: This todo changed. Reload the Canvas before editing it.
-- `v1wf.todo.err.singleLine`: Use a single line for your todo.
-- `v1wf.todo.err.addUnsafe`: Could not add a todo safely. Check Canvas for unfinished Markdown blocks.
-- `v1wf.todo.err.invalidUser`: Choose a valid Buzz user.
-- `v1wf.todo.err.assignUnsafe`: Could not assign safely. Check this todo’s Markdown in Canvas.
+### 원본 영어 문장이 바뀌었거나 사라진 번역 키: 45개
+- `channelsMenus.workspace.title`: Create new workspace
+- `channelsMenus.workspace.description`: Move {name} into a personal workspace that syncs across Buzz.
+- `fubestie.mesh.sharedComputeFor`: Shared compute for {community}
+- `fubestie.mesh.shareIntro`: Let {community} run prompts on this machine. Auto picks the best model for your hardware; you can also choose one. Members serving your helper’s model can read its prompts, conversation history and, in Agent mode, tool output and core memory. Sharing resumes when you reopen Buzz.
+- `messages.link.draftChanged`: The draft changed or this link exceeds the message limit. Close and try again.
+- `search.searchMessagesConversation`: Search messages in this conversation
+- `sidebarSectionDialogs.createTitle`: Create new section
+- `sidebarSectionDialogs.moveTitle`: Move to new section
+- `sidebarSectionDialogs.confirmation`: Couldn't confirm the section was saved. Try again.
+- `sidebarSectionDialogs.preferencesUnavailable`: Saved preferences are unavailable. Retry preferences before trying again.
+- `v1shell.channel.archivedViewOnly`: Archived · view only
+- `v1shell.inventory.moveChannel`: Move channel
+- `v1shell.inventory.moveConversation`: Move conversation
+- `v1fv.noText`: No text to copy
+- `v1fv.copied`: Copied text to clipboard
+- `v1fv.copyFailed`: Failed to copy text
+- `v1fv.cantOpen`: Can't open this file
+- `v1fv.onlyCommunity`: Only files shared in this community open here.
+- `v1fv.formatTimeout`: This file took too long to format, so it shows as plain text.
+- `v1fv.cantOpenPdf`: Can't open this PDF
+- `v1fv.pdfControls`: PDF controls
+- `v1fv.previousPage`: Previous page
+- `v1fv.fitWidth`: Fit to width
+- `v1fv.pageDrawFailed`: This page couldn't be drawn.
+- `v1fv.tooLarge`: {format} files open up to {limit} MB. Download it to read it.
+- `v1fv.loadFailed`: This file couldn't be loaded. Check your connection and try again.
+- `v1fv.notText`: This file isn't text. Download it to open it in another app.
+- `v1msg.chatCards.label`: Chat attachments
+- `v1msg.chatCards.remove`: Remove chat attachment {index}
+- `v1msg.link.chatUnavailable`: Chat unavailable. You don’t have access, or it no longer exists.
+- `v1msg.link.chatUnavailableTitle`: {label}. Chat unavailable. You don’t have access, or it no longer exists.
+- `v1wf.diff.noHunks`: No textual hunks in this diff.
+- `v105ch.archiveInactive.archiveChats`: Archive chats
+- `v105ch.archiveInactive.archiving`: Archiving inactive chats…
+- `v105ch.archiveInactive.checkFailed`: Couldn’t check which chats are inactive.
+- `v105ch.archiveInactive.checking`: Checking which chats are inactive…
+- `v105ch.archiveInactive.foundMany`: {count} chats have been inactive for the last {days} days.
+- `v105ch.archiveInactive.foundNone`: No chats have been inactive for the last {days} days.
+- `v105ch.archiveInactive.noneLeft`: No inactive chats left to archive
+- `v105ch.archiveInactive.restoring`: Restoring chats…
+- `v105ch.archiveInactive.title`: Archive inactive chats
+- `v105shell.search.jumpBackIn`: Jump back in
+- `v105shell.search.recentSearches`: Recent searches
+- `v105sweep.solo.fields.instructionsPlaceholder`: Instructions and context for agents working in this chat.
+- `v105sweep.solo.convert.workspacesUnreadable`: Solo workspaces could not be read. Try again.
 
-### 새로 추가됐고 아직 번역되지 않은 영어 문구 후보: 27개
-- `src/app/shell/SearchResults.tsx`: Agents
-- `src/app/shell/SearchResults.tsx`: Chats
-- `src/app/shell/SearchResults.tsx`: Channels
-- `src/app/shell/SearchResults.tsx`: People
-- `src/app/shell/SearchResults.tsx`: Direct messages
-- `src/app/shell/SearchResults.tsx`: Pages
-- `src/app/shell/SearchResults.tsx`: Messages
-- `src/app/shell/SearchResults.tsx`: Messages
-- `src/app/shell/SearchResults.tsx`: Unread
-- `src/app/shell/SearchResults.tsx`: This conversation
-- `src/app/shell/SearchResults.tsx`: Recent activity
-- `src/app/shell/SearchResults.tsx`: Recent searches
-- `src/app/shell/SearchResults.tsx`: This conversation
-- `src/bundled/bestie/BestieTab.tsx`: On failed too, or one was deleted in Attention: Remove takes it
-- `src/bundled/bestie/features.ts`: Remembers you
-- `src/bundled/bestie/features.ts`: Your memory has these slugs. Keep each within its size, so you can read it in one call.
-- `src/bundled/bestie/features.ts`: Hourly notes
-- `src/bundled/bestie/features.ts`: Nightly review
-- `src/bundled/bestie/features.ts`: Every hour
-- `src/bundled/channels/ArchiveInactiveChats.tsx`: Try again
-- `src/bundled/channels/MessagesSidebar.tsx`: All
-- `src/bundled/channels/MessagesSidebar.tsx`: Solo
-- `src/bundled/channels/MessagesSidebar.tsx`: Team
-- `src/buzz-mcp/tools.ts`: Default 30, max 100.
-- `src/buzz-mcp/tools.ts`: From a continue line.
-- `src/features/messages/forward-clipboard.ts`: Forwarded message
-- `src/features/solo/WorkspaceSettings.tsx`: Workspace name
+### 새로 추가됐고 아직 번역되지 않은 영어 문구 후보: 43개
+- `src/app/shell/SearchResults.tsx`: Filters
+- `src/app/shell/SearchResults.tsx`: Recents
+- `src/app/shortcuts.ts`: Reload Buzz and restart agents
+- `src/app/shortcuts.ts`: Mark as unread from selected message
+- `src/bundled/agents/AgentTabs.tsx`: Previous versions
+- `src/bundled/goose/goose-testing.ts`: Native prompt rejected
+- `src/bundled/pi/gateway.ts`: The model gateway is not available here
+- `src/bundled/pi/gateway.ts`: A refusal needs its revision
+- `src/bundled/pi/gateway.ts`: This turn has no Buzz context
+- `src/bundled/pi/pi.ts`: The model gateway is not available here
+- `src/bundled/profiles/ProfilePanel.tsx`: Previous versions
+- `src/buzz-mcp/tools.ts`: Model ID; empty follows the default.
+- `src/buzz-mcp/tools.ts`: Thinking level; empty follows the default.
+- `src/buzz-mcp/tools.ts`: Huddle voice ID; empty follows the default.
+- `src/buzz-mcp/tools.ts`: Allow Codex apps and plugins.
+- `src/buzz-mcp/tools.ts`: Auto-compact threshold in tokens, in multiples of 1000 from ${MIN_COMPACT_AT}. Empty uses the harness default.
+- `src/buzz-mcp/tools.ts`: Buzz message link; replaces channel and thread.
+- `src/buzz-mcp/tools.ts`: With channel: only this hex pubkey or npub.
+- `src/buzz-mcp/tools.ts`: With channel: Unix seconds, at or after.
+- `src/buzz-mcp/tools.ts`: Unix seconds, at or before.
+- `src/buzz-mcp/tools.ts`: For paginating: with before, from a continue line.
+- `src/buzz-mcp/tools.ts`: Thread 100 (max 500), channel 30 (max 200).
+- `src/features/agent-harness/sections/index.ts`: Incoming Turn Contract
+- `src/features/agent-harness/sections/index.ts`: Trust
+- `src/features/agent-harness/sections/index.ts`: Buzz Tools
+- `src/features/agent-harness/sections/index.ts`: Mentions
+- `src/features/agent-harness/sections/index.ts`: Callback Mentions
+- `src/features/agent-harness/sections/index.ts`: Threading
+- `src/features/agent-harness/sections/index.ts`: Routing
+- `src/features/agent-harness/sections/index.ts`: Publishing
+- `src/features/agent-harness/sections/index.ts`: Progress
+- `src/features/agent-harness/sections/index.ts`: Waiting
+- `src/features/agent-harness/sections/index.ts`: Etiquette
+- `src/features/agent-harness/sections/index.ts`: Audience
+- `src/features/agent-harness/sections/index.ts`: Workspace Layout
+- `src/features/agent-harness/sections/index.ts`: Agent Memory
+- `src/features/agent-harness/sections/index.ts`: Engineering Discipline
+- `src/features/agent-harness/sections/index.ts`: Working in the Repo
+- `src/features/agent-harness/sections/index.ts`: Commit identity
+- `src/features/agent-harness/sections/index.ts`: Working location
+- `src/features/agent-harness/sections/index.ts`: Autonomy
+- `src/features/agent-harness/sections/index.ts`: Session Model
+- `src/features/agent-harness/sections/index.ts`: Product help
