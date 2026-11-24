@@ -84,7 +84,7 @@ git apply ../buzz-korean-v1.0.5.patch
 2. 충돌 없이 합쳐지면 검사(타입·린트·번역·테스트)를 돌리고 PR을 엽니다.
    PR에는 **원본에서 바뀐 영어 문장**과 **새로 생긴 영어 문구** 목록이 함께 실립니다.
 3. 번역을 보완해 PR을 합치면 `korean-v<원본버전>` 태그가 자동으로 붙습니다. (예: 원본 `v1.0.5` → `korean-v1.0.5`)
-4. 충돌이 나면 이슈를 열고 멈춥니다. 직접 해결한 뒤 `scripts/korean/finish-sync.mjs`로 마무리합니다.
+4. 충돌이 나면 한 번만 실패로 알리고(실행 요약·이슈) `korean-sync/<버전>` 브랜치를 남긴 채 멈춥니다. 직접 해결한 뒤 `scripts/korean/finish-sync.mjs`로 마무리합니다.
 
 관련 파일: [`korean/upstream.json`](../korean/upstream.json) (현재 기준 원본 버전),
 [`scripts/korean/`](../scripts/korean/), [`.github/workflows/korean-sync.yml`](workflows/korean-sync.yml)
